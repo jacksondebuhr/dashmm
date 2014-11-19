@@ -1,0 +1,10 @@
+This is the main repository for the DASHMM project.
+
+To keep this repository clean, we shall adopt a similar workflow model as for
+the development of HPX-5. The master branch will only be used for releases of
+the code. All other commits should appear in the 'dev' branch. Individual
+developers will work in their own branches and merge into 'dev.' Merging
+incomplete or non-working code into 'dev' *will not happen.* Doing so will 
+cause a change in the offenders permissions. Merging non-release code into
+'master' *will not happen.*
+
