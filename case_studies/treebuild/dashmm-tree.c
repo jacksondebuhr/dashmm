@@ -44,6 +44,16 @@ const int _onlevel1d[8] = {1, 2, 4,  8,   16,   32,    64,     128};
 
 
 //******* actions and action parameters *****************************
+
+
+//NOTE: The naming scheme for the actions, the functions implementing the
+// actions, and the parameters to those actions are pretty straightforward,
+// if a bit long-winded. The action name has _action appended to the name 
+// of the function implementing that action. The parameter type for that
+// action has _params_t appended to the name of the function implementing
+// the action.
+
+
 hpx_action_t dashmm_tree_node_refine_action;
 
 typedef struct {
