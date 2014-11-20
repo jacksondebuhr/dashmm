@@ -292,7 +292,35 @@ void dashmm_tree_topnode_from_point(dashmm_volume_t vol, int level,
 /// \brief Spawn the given action over all the records of a given global array
 ///
 /// This will cause the given action to be invoked on each record in the given
-/// array. ...
+/// array. The array specified by @param base_record is assumed to be a set of
+/// records of size @param record_size. The data is distributed in the global
+/// address space in blocks of size @param block_size. As a result
+/// @param block_size is evenly divisible by @param record_size.
+///
+/// This routine will spawn the action over the records using a tree. The 
+/// list of records will be split into @param branching_factor chunks 
+/// recursively until the chunk contains fewer than @param chunk_size, after
+/// which the tasks are spawned serially.
+///
+/// This routine will return an LCO that the terminal actions can use to 
+/// indicate completion. This LCO will be created and returned even if the
+/// terminal actions do nothing with it. The caller of this function will
+/// assume ownership of the LCO and is responsible for freeing the memory.
+///
+/// \param base_record - the base of the global array or records
+/// \param n_records - the number of records over which to spawn the action
+/// \param record_size - the size in bytes of each record
+/// \param block_size - the number of bytes in each block of the global array
+/// \param terminal_action - the action to invoke on each record
+/// \param branching_factor - the number of chunks into which the records will
+///                           be split at each node of the recursion
+/// \param chunk_size - the number of records below which the tree spawn will
+///                     cease, and the actions will be invoked in a simple loop
+/// \param args - pointer to the arguments to pass to each action
+/// \param arg_size - the size of those arguments
+///
+/// \return - the address of an LCO that the terminal action can use to indicate
+///           completion of the tasks
 ///
 hpx_addr_t dashmm_parallel_spawn(
                         hpx_addr_t base_record,       //first record
@@ -307,15 +335,156 @@ hpx_addr_t dashmm_parallel_spawn(
                                         
 
 
-//actions
+//******* actions ***************************************************
+
+
+///
+/// \brief Action to refine a given node of the tree
+///
+/// This action takes an existing node and refines it into up to eight
+/// children based on the list of points indexed by the node. The refinement
+/// proceeds if the node contains more points than the refinement limit
+/// specified in the arguments to the action.
+///
+/// If the node needs to be refined, the dashmm_tree_points_refine_action
+/// will be invoked and the dashmm_tree_init_child_action will be invoked on
+/// those children that are to receive points.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_node_refine(void *args);
+
+
+///
+/// \brief Action to sort the points for a given node
+///
+/// This action will rearrange the points in a given segment of a point array
+/// so that points in the same child of the currently assigned node are in
+/// sequence in the array. The action then returns the offsets and lengths of
+/// each segment to the continuation address of the action.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_points_refine(void *args);
+
+
+///
+/// \brief Action to setup a node, and optionally refine it
+///
+/// This will set up the target node with the input volume, parent, points
+/// address and number of points. Additionally, if the refinement_limit is
+/// non-zero, this will cause the node to be refined further if needed. This
+/// action, if invoked, will be invoked synchronously, which means that the
+/// node will be refined completely before this action returns.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_init_child(void *args);
+
+
+///
+/// \brief This action spawns a given terminal action over all the records in
+///        the given global array.
+///
+/// This action implements the parallel record spawn. When the terminal actions
+/// are invoked, this will wrap the arguments into a another structure that
+/// contains the index of the record in the array as well as the address of the
+/// LCO to detect completion.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_parallel_record_spawn(void *args);
+
+
+///
+/// \brief Action that starts the process of a point adding itself to the 
+///        correct topnode.
+///
+/// The target point determines which topnode it belongs in and invokes the
+/// appropriate action to inform the topnode of the incoming point.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_topnode_count(void *args);
-int dashmm_tree_topnode_init(void *args);
+
+
+///
+/// \brief Action that receives a point's address and adds it to the node's 
+///        array eventually.
+///
+/// As the points send their addresses to the topnodes, they count the incoming
+/// points (atomically) and then wait on the LCO in the node's first child
+/// slot. This LCO is set as soon as the node has allocated the space for the
+/// incoming points. After the wait is complete, the action then copies the
+/// point data into the array allocated for this point. The actions ends by 
+/// setting one of the inputs on the and LCO stored in the second child slot.
+/// Once that LCO is set, another action will begin the process of refining
+/// the topnode.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_topnode_increment_count(void *args);
+
+
+///
+/// \brief Action to initialize the data in the topnodes of the tree
+///
+/// In addition to setting up the volume and parent/child relationships inside
+/// the topnode array, this action will create the LCO used by the node to 
+/// signal that the global memory in which it will store its point data has been
+/// allocated. This LCO is stored in child[0] for the finest level of the
+/// topnodes.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
+int dashmm_tree_topnode_init(void *args);
+
+
+///
+/// \brief Action to allocate global memory for a topnode's points
+///
+/// This action waits for the parallel spawn over the point records to set the
+/// completion LCO for that spawn. After this, it will allocate the needed
+/// amount of memory for the incoming points. Then, an and LCO is created to
+/// count the arrived points (this LCO is stored in child[1]). Finally, the
+/// LCO stored in child[0] is set.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_topnode_points_alloc(void *args);
+
+
+///
+/// \brief Action to begin the refinement of the finest topnodes
+///
+/// This will start the refinement of the finest topnode's points into a 
+/// branch. This will wait in sequence on the two LCO's stored in the node's
+/// first two child slots. After they are both set (indicating memory for the
+/// points has been allocated, and that the points have all arrived) these LCO's
+/// are deleted and the refinement begins. This action does not return until the
+/// refinement is complete.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
 int dashmm_tree_topnode_start_refine(void *args);
+
 
 #endif
