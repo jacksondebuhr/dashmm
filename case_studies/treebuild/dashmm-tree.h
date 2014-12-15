@@ -147,7 +147,9 @@ typedef struct {
 /// \param top_depth - the number of levels of full refinement at the top of
 ///                    the tree.
 /// 
-/// \return - The global address of the created tree
+/// \return - The global address of the created tree; the tree will be in the
+///           global address space, but the calling thread will need to share
+///           the address if other threads need the address
 ///
 hpx_addr_t dashmm_tree_create(hpx_addr_t points,
                               int n_points,
@@ -155,6 +157,21 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
                               dashmm_volume_t vol,
                               int refinement,
                               int top_depth);
+
+
+///
+/// \brief Destroy a dashmm tree
+///
+/// This will destroy the tree, and all memory associated with it. This routine
+/// proceeds immediately, and so it is imperative that the tree not be in use
+/// when this routine is called.
+///
+/// This will remove all branches of the tree and the point data allocated to
+/// store the sorted list of points.
+///
+/// \param tree_gas - the global address of the tree to destroy
+///
+void dashmm_tree_destroy(hpx_addr_t tree_gas);
 
 
 //******* utility functions *****************************************
@@ -485,6 +502,22 @@ int dashmm_tree_topnode_points_alloc(void *args);
 /// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
 ///
 int dashmm_tree_topnode_start_refine(void *args);
+
+
+///
+/// \brief Action to walk through the tree and destroy it
+///
+/// This will, starting at the root, go through each child of the target node
+/// and spawn the destroy action. The action will release the memory for the 
+/// points only if the node is the bottom of the topnodes. If the node is in
+/// the top portion of the tree, it will not free the node itself, as that is
+/// part of an array allocation. Otherwise, the node itself will be freed.
+///
+/// \param args - the action parameters
+///
+/// \return - HPX_RESEND on pin failure; HPX_SUCCESS otherwise
+///
+int dashmm_tree_destroy_node(void *args);
 
 
 #endif

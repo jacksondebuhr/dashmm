@@ -47,7 +47,7 @@ const int _onlevel1d[8] = {1, 2, 4,  8,   16,   32,    64,     128};
 
 
 //NOTE: The naming scheme for the actions, the functions implementing the
-// actions, and the parameters to those actions are pretty straightforward,
+// actions, and the parameters to those actions is pretty straightforward,
 // if a bit long-winded. The action name has _action appended to the name 
 // of the function implementing that action. The parameter type for that
 // action has _params_t appended to the name of the function implementing
@@ -146,6 +146,14 @@ hpx_action_t dashmm_tree_topnode_start_refine_action;
 typedef struct {
   int refine_limit;
 } dashmm_tree_topnode_start_refine_params_t;
+
+
+hpx_action_t dashmm_tree_destroy_node_action;
+
+typedef struct {
+  int top_depth;
+  int this_depth;
+} dashmm_tree_destroy_node_params_t;
 
 
 
@@ -265,6 +273,39 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,    //the points in GAS
 }
 
 
+void dashmm_tree_destroy(hpx_addr_t tree_gas) {
+  //get the tree from memory
+  dashmm_tree_t tree;
+  hpx_addr_t getdone = hpx_lco_future_new(0);
+  assert(getdone != HPX_NULL);
+  hpx_gas_memget(&tree, tree_gas, sizeof(tree), getdone);
+  hpx_lco_wait(getdone);
+  hpx_lco_delete(getdone, HPX_NULL);
+
+  //This is simply an invocation of the tree destroy action
+  dashmm_tree_destroy_node_params_t input;
+  input.top_depth = tree.top_depth;
+  input.this_depth = 0;
+  hpx_call_sync(tree.topnode, dashmm_tree_destroy_node_action, 
+                &input, sizeof(input),
+                NULL, 0);
+
+  //used to make sure the tree is totally out of memory
+  hpx_addr_t deldone = hpx_lco_and_new(2);
+
+  //now that is done, we can get rid of the topnodes
+  hpx_gas_free(tree.topnodes, deldone);
+  
+  //and the tree itself
+  hpx_gas_free(tree_gas, deldone);
+  
+  hpx_lco_wait(deldone);
+  hpx_lco_delete(deldone, HPX_NULL);
+  
+  return;
+}
+
+
 //******* utility functions *****************************************
 
 void dashmm_tree_register_actions(void) {
@@ -286,6 +327,8 @@ void dashmm_tree_register_actions(void) {
             HPX_REGISTER_ACTION(dashmm_tree_topnode_points_alloc);
   dashmm_tree_topnode_start_refine_action = 
             HPX_REGISTER_ACTION(dashmm_tree_topnode_start_refine);
+  dashmm_tree_destroy_node_action =
+            HPX_REGISTER_ACTION(dashmm_tree_destroy_node);
 }
 
 
@@ -1007,6 +1050,45 @@ int dashmm_tree_topnode_start_refine(void *args) {
   
   //set the done lco
   hpx_lco_and_set(wrap->donelco, HPX_NULL);
+  
+  return HPX_SUCCESS;
+}
+
+
+int dashmm_tree_destroy_node(void *args) {
+  hpx_addr_t node_gas = hpx_thread_current_target();
+  dashmm_tree_node_t *node;
+  if( !hpx_gas_try_pin(node_gas, (void **)&node) ) {
+    return HPX_RESEND;
+  }
+  
+  //interpret params
+  dashmm_tree_destroy_node_params_t *parms = args;
+  
+  //spawn at children
+  dashmm_tree_destroy_node_params_t input;
+  input.top_depth = parms->top_depth;
+  input.this_depth = parms->this_depth + 1;
+  for(int i = 0; i < 8; ++i) {
+    if(node->child[i] != HPX_NULL) {
+      hpx_call_sync(node->child[i], dashmm_tree_destroy_node_action, 
+               &input, sizeof(input),
+               NULL, 0);
+    }
+  }
+  
+  //if this is the bottom of the topnodes, free the points
+  if(parms->this_depth == parms->top_depth) {
+    hpx_gas_free(node->points, HPX_NULL);
+  }
+  
+  //done
+  hpx_gas_unpin(node_gas);
+  
+  //if this is not a topnode, remove this node from memory
+  if(parms->this_depth > parms->top_depth) {
+    hpx_gas_free(node_gas, HPX_NULL);
+  }
   
   return HPX_SUCCESS;
 }
