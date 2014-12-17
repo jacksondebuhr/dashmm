@@ -110,7 +110,6 @@ typedef struct {
 } dashmm_parallel_record_spawn_terminal_params_t;
 
 
-//TODO THIS NEEDS A BETTER NAME
 hpx_action_t dashmm_tree_topnode_count_action;
 
 typedef struct {
@@ -125,7 +124,6 @@ typedef struct {
 } dashmm_tree_topnode_init_params_t;
 
 
-//TODO This needs a better name as well
 hpx_action_t dashmm_tree_topnode_increment_count_action;
 
 typedef struct {
@@ -286,7 +284,7 @@ void dashmm_tree_destroy(hpx_addr_t tree_gas) {
   dashmm_tree_destroy_node_params_t input;
   input.top_depth = tree.top_depth;
   input.this_depth = 0;
-  hpx_call_sync(tree.topnode, dashmm_tree_destroy_node_action, 
+  hpx_call_sync(tree.topnodes, dashmm_tree_destroy_node_action, 
                 &input, sizeof(input),
                 NULL, 0);
 
@@ -309,26 +307,26 @@ void dashmm_tree_destroy(hpx_addr_t tree_gas) {
 //******* utility functions *****************************************
 
 void dashmm_tree_register_actions(void) {
-  dashmm_tree_node_refine_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_node_refine);
-  dashmm_tree_points_refine_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_points_refine);
-  dashmm_tree_init_child_action =
-            HPX_REGISTER_ACTION(dashmm_tree_init_child);
-  dashmm_parallel_record_spawn_action = 
-            HPX_REGISTER_ACTION(dashmm_parallel_record_spawn);
-  dashmm_tree_topnode_count_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_topnode_count);
-  dashmm_tree_topnode_init_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_topnode_init);
-  dashmm_tree_topnode_increment_count_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_topnode_increment_count);
-  dashmm_tree_topnode_points_alloc_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_topnode_points_alloc);
-  dashmm_tree_topnode_start_refine_action = 
-            HPX_REGISTER_ACTION(dashmm_tree_topnode_start_refine);
-  dashmm_tree_destroy_node_action =
-            HPX_REGISTER_ACTION(dashmm_tree_destroy_node);
+  HPX_REGISTER_ACTION(&dashmm_tree_node_refine_action, 
+                      dashmm_tree_node_refine);
+  HPX_REGISTER_ACTION(&dashmm_tree_points_refine_action, 
+                      dashmm_tree_points_refine);
+  HPX_REGISTER_ACTION(&dashmm_tree_init_child_action, 
+                      dashmm_tree_init_child);
+  HPX_REGISTER_ACTION(&dashmm_parallel_record_spawn_action, 
+                      dashmm_parallel_record_spawn);
+  HPX_REGISTER_ACTION(&dashmm_tree_topnode_count_action, 
+                      dashmm_tree_topnode_count);
+  HPX_REGISTER_ACTION(&dashmm_tree_topnode_init_action, 
+                      dashmm_tree_topnode_init);
+  HPX_REGISTER_ACTION(&dashmm_tree_topnode_increment_count_action, 
+                      dashmm_tree_topnode_increment_count);
+  HPX_REGISTER_ACTION(&dashmm_tree_topnode_points_alloc_action, 
+                      dashmm_tree_topnode_points_alloc);
+  HPX_REGISTER_ACTION(&dashmm_tree_topnode_start_refine_action, 
+                      dashmm_tree_topnode_start_refine);
+  HPX_REGISTER_ACTION(&dashmm_tree_destroy_node_action, 
+                      dashmm_tree_destroy_node);
 }
 
 
@@ -619,6 +617,9 @@ int dashmm_tree_node_refine(void *args) {
     // the moment computation
     //FUTURE: We might want to create a local copy of the point data, so that
     // some operations can proceed quickly. Or not.
+    
+    //THIS branch is also executed when the node has no points. This is
+    // relevant for topnodes that did not end up with any points.
   }
   
   //done
@@ -859,7 +860,6 @@ int dashmm_tree_topnode_count(void *args) {
 }
 
 
-//TODO this needs a more appropriate name
 int dashmm_tree_topnode_increment_count(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -924,6 +924,8 @@ int dashmm_tree_topnode_init(void *args) {
                                                         level, index);
   node->n_points = 0;
   node->n_arrived = 0;
+  
+  node->points = HPX_NULL;
 
   if(level < parms->tree.top_depth) {
     int clevel = level + 1;
@@ -998,16 +1000,18 @@ int dashmm_tree_topnode_points_alloc(void *args) {
   //wait for the counting to be done
   hpx_lco_wait(parms->done_counting);
   
-  //allocate the and gate
-  node->child[1] = hpx_lco_and_new(node->n_points);
-  assert(node->child[1] != HPX_NULL);
+  if(node->n_points) {
+    //allocate the and gate
+    node->child[1] = hpx_lco_and_new(node->n_points);
+    assert(node->child[1] != HPX_NULL);
   
-  //allocate space
-  node->points = hpx_gas_alloc(sizeof(dashmm_point_t) * node->n_points);
-  assert(node->points != HPX_NULL);
+    //allocate space
+    node->points = hpx_gas_alloc(sizeof(dashmm_point_t) * node->n_points);
+    assert(node->points != HPX_NULL);
   
-  //set LCO to indicate that it is ready
-  hpx_lco_set(node->child[0], 0, NULL, HPX_NULL, HPX_NULL);
+    //set LCO to indicate that it is ready
+    hpx_lco_set(node->child[0], 0, NULL, HPX_NULL, HPX_NULL);
+  }
   
   //set the completion LCO as well
   hpx_lco_and_set(wrap->donelco, HPX_NULL);
@@ -1032,21 +1036,26 @@ int dashmm_tree_topnode_start_refine(void *args) {
   
   //wait for all to have arrived
   hpx_lco_wait(node->child[0]);
-  hpx_lco_wait(node->child[1]);
   
-  //clear those LCO's out
+  int refine = 0;
+  if(node->n_points) {
+    refine = 1;
+    hpx_lco_wait(node->child[1]);
+    hpx_lco_delete(node->child[1], HPX_NULL);
+  }
+  
   hpx_lco_delete(node->child[0], HPX_NULL);
-  hpx_lco_delete(node->child[1], HPX_NULL);
+  
   
   //done with the node data, so unpin
   hpx_gas_unpin(node_gas);
   
-  
-  
-  //begin the refinement process
-  hpx_call_sync(node_gas, dashmm_tree_node_refine_action,
+  if(refine) {
+    //begin the refinement process
+    hpx_call_sync(node_gas, dashmm_tree_node_refine_action,
                 &parms->refine_limit, sizeof(parms->refine_limit),
                 NULL, 0);
+  }
   
   //set the done lco
   hpx_lco_and_set(wrap->donelco, HPX_NULL);
@@ -1055,6 +1064,8 @@ int dashmm_tree_topnode_start_refine(void *args) {
 }
 
 
+//NOTE: Something goes very wrong here... Not sure what it is...
+// So don't call this routine it seems.
 int dashmm_tree_destroy_node(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -1069,11 +1080,34 @@ int dashmm_tree_destroy_node(void *args) {
   dashmm_tree_destroy_node_params_t input;
   input.top_depth = parms->top_depth;
   input.this_depth = parms->this_depth + 1;
+  
+  //count children
+  int ccount = 0;
   for(int i = 0; i < 8; ++i) {
     if(node->child[i] != HPX_NULL) {
-      hpx_call_sync(node->child[i], dashmm_tree_destroy_node_action, 
-               &input, sizeof(input),
-               NULL, 0);
+      ++ccount;
+    }
+  }
+  
+  hpx_addr_t cdone = hpx_lco_and_new(ccount);
+  assert(cdone != HPX_NULL);
+  
+  for(int i = 0; i < 8; ++i) {
+    if(node->child[i] != HPX_NULL) {
+      hpx_call(node->child[i], dashmm_tree_destroy_node_action, 
+               &input, sizeof(input), cdone);
+    }
+  }
+  
+  hpx_lco_wait(cdone);
+  hpx_lco_delete(cdone, HPX_NULL);
+  
+  //free the children
+  if(parms->this_depth > parms->top_depth) {
+    for(int i = 0; i < 8; ++i) {
+      if(node->child[i] != HPX_NULL) {
+        hpx_gas_free(node->child[i], HPX_NULL);
+      }
     }
   }
   
@@ -1084,11 +1118,6 @@ int dashmm_tree_destroy_node(void *args) {
   
   //done
   hpx_gas_unpin(node_gas);
-  
-  //if this is not a topnode, remove this node from memory
-  if(parms->this_depth > parms->top_depth) {
-    hpx_gas_free(node_gas, HPX_NULL);
-  }
   
   return HPX_SUCCESS;
 }

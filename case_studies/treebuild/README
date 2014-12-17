@@ -1,3 +1,132 @@
 This case study deals with the construction of the tree from a set of points.
 
-More details to follow.
+
+THE TREE
+
+The tree is in two parts. The top part of the tree, made up of the topnodes,
+is a complete refinement of the physical domain up to a certain level. The depth
+of the top part of the tree is generally a small number. If the refinement
+reaches 7 complete levels, there are already 2 million nodes. Below the top 
+nodes are the remaining branches of the tree. These are then adapted to the
+particle distribution.
+
+The primary reason for the division of the tree into two parts is that this 
+allows for a simple distribution of the tree among the available resources.
+Ideally, each branch of the tree below the top part would be colocated in the
+system, allowing local data physically to be local in the memory of the system.
+To make use of the light weight ephemeral threading of HPX-5, ideally one would
+choose a number of topnodes that allows multiple branches on each locality.
+With this in mind, it is easy to imagine that in the near future, we should not
+need to go much over 4 or 5 levels of automatic refinement in the top portion
+of the tree.
+
+The topnodes of the tree will be stored in a global cyclic allocation in the
+GAS provided by HPX-5. The block size for the topnodes will be one node, which
+should distribute the branches of the tree pretty evenly among the system. This,
+of course, is no guarantee that the points are distributed in a way that will
+balance the tree across the system, but it is a good starting point. If there
+is some imbalance, using a more refined top portion of the tree might help.
+The rest of the nodes in the branches of the tree are stored in the GAS one node
+at a time. 
+
+There is a summary structure of tree information that will also be in the GAS.
+This will contain the address of the topnodes, the volume of the root, the 
+limiting number of points before a node will be further refined, and the number
+of topnodes.
+
+
+CONSTRUCTION
+
+The tree construction proceeds rougly in two parts, mirroring the two part
+structure of the data. In the first phase, the points are distributed among the
+finest topnodes. In the second phase, the topnodes are then refined until each 
+node has fewer points in its volume than the refinement limit. 
+
+The input to the tree construction is a global allocation of point data. These
+points are arranged in some block cyclic fashion in the GAS and the user
+provides the distribution to the construction routine. The main work of the 
+first phase is as follows: count the number of points going to each of the 
+finest topnodes; allocate space for those points; copy the point data into 
+GAS allocations that are owned by the tree object. 
+
+Given the overall volume of the points, it is easy to determine in which finest
+topnode a given point will reside. So an action is spawned for each point to
+determine the topnode to which it belongs. This action will spawn another action
+targeting the topnode to which the point belongs that will increment the counter
+and which will eventually copy the memory from the input list of points into 
+the local GAS allocation. Once the points have all supplied their contribution 
+to the count for the topnodes, a separate action, which had been waiting on the
+signal of the completion of counting, will allocate the space for the local GAS
+memory for the points in each branch. Then, it will signal that the memory is
+available, at which point the actions waiting to copy the point data will 
+resume and perform the copy.
+
+Once all the points have been copied into their respective topnodes, the
+refinement of the topnodes will proceed. This is the second phase of the
+construction.
+
+In phase two, we need to only consider the action at a single branch (all those
+nodes below a given finest topnode of the tree) as the work at the other
+branches will be identical. At the start of the refinement, the node will have
+the address of a global allocation of points (the points copied into it during
+phase one), and a number of points. 
+
+At each step of refinement, the node will see if the number of points is 
+larger than the refinement limit. If not, the refinement terminates. Otherwise,
+the points are sorted according to which child of the current node they would
+inhabit. The new nodes are added to the tree, and they are given the number of
+points they have, and the offset in the sorted list of points. After this, each 
+node has an address of the start of their points, and the number of points, and
+the process can continue recursively until no node has more points than the
+refinement limit.
+
+
+PROBLEMS
+
+Currently, the system just assumes that the user can provide a volume that 
+surrounds the points. There is no parallel method to do that in this code.
+
+There might be quite a bit of overhead in the way this is done. It might be
+better to populate the finest topnodes in larger grains than a single point at
+a time.
+
+The balance of the points among localities might be really poor. This has not
+been tested with some realistic point sets. And it may be that high contrast
+distributions do badly for this.
+
+Some of the naming is bad. This is not a long term problem, as this can be 
+easily changed when this is incorporated into the main line of the code.
+
+There are currently a couple of magic numbers that appear in the parallel spawn
+framework. These should be explored. Perhaps there is even a better method for
+handling these.
+
+With a restriction on the input data layout, we could perhaps do much better
+with the first phase. It is a very similar sorting pattern as for the second
+phase. Perhaps each block of the input data could be sorted according to the
+topnodes, and then it will be sent to each. The topnodes would then be able to
+know the incoming number of points. This way, the data layout would inform the
+execution.
+    This seems so much better that it might be worth doing this first. But we 
+    may as well characterize what is happening before doing so.
+
+
+PERFORMANCE TESTS TO RUN
+
+Scaling with number of points. This should be done for a couple different 
+point layouts, and over a big range of point counts. We should hopefully see
+something similar to N log N for the construction. 
+
+Strong scaling with the number of compute resources.
+
+Weak scaling with the number of compute resources.
+
+Parameter study of the parallel spawn factors.
+
+Parameter study of the refinement limit. (for a given particle count)
+
+Parameter study of the top depth. (for a given particle count)
+
+Balance study of the branches (for multiple distributions)
+
+See if I can collect more detaild timing information

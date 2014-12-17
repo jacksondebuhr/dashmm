@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "hpx/hpx.h"
 
@@ -35,12 +36,14 @@ hpx_action_t hpx_main_action;
 hpx_action_t create_point_data_action;
 
 typedef struct {
+  int set_type;
   int n_points;
   int refinement_limit;
   int top_depth;
 } hpx_main_params_t;
 
 typedef struct {
+  int set_type;
   int n_points;
   int n_per_block;
   int n_blocks;
@@ -54,7 +57,7 @@ int create_point_data(void *args);
 
 
 static void usage(FILE *f) {
-  fprintf(f, "Usage: ygg2 [options] <number of points> <refinement limit> <top depth> \n"
+  fprintf(f, "Usage: ygg2 [options] <point set type> <number of points> <refinement limit> <top depth> \n"
           "\t-c, number of cores to run on\n"
           "\t-t, number of scheduler threads\n"
           "\t-T, select a transport by number (see hpx_config.h)\n"
@@ -64,7 +67,10 @@ static void usage(FILE *f) {
           "\t-s, set stack size\n"
           "\t-p, set per-PE global heap size\n"
           "\t-r, set send/receive request limit\n"
-          "\t-h, show help\n");
+          "\t-h, show help\n\n");
+  fprintf(f, "<point set type>\n");
+  fprintf(f, "\t0 - uniform cube\n\t1 - Hernquist Halo\n");
+  fprintf(f, "\t2 - disjoint spheres\n");
 }
 
 
@@ -109,11 +115,12 @@ int main(int argc, char **argv) {
   argc -= optind;
   argv += optind;
 
-  if(argc < 3) {
+  if(argc < 4) {
     usage(stderr);
     return -1;
   }
   
+  int set_type = atoi(argv[argc-4]);
   int n_points = atoi(argv[argc-3]);
   int refinement_limit = atoi(argv[argc-2]);
   int top_depth = atoi(argv[argc-1]);
@@ -121,18 +128,19 @@ int main(int argc, char **argv) {
   
   
   //register actions
-  hpx_main_action = HPX_REGISTER_ACTION(hpx_main);
-  create_point_data_action = HPX_REGISTER_ACTION(create_point_data);
+  HPX_REGISTER_ACTION(&hpx_main_action, hpx_main);
+  HPX_REGISTER_ACTION(&create_point_data_action, create_point_data);
   dashmm_tree_register_actions();
   
   //setup parameters to main action
   hpx_main_params_t input;
+  input.set_type = set_type;
   input.n_points = n_points;
   input.refinement_limit = refinement_limit;
   input.top_depth = top_depth;
   
   //start it up
-  return hpx_run(hpx_main_action, &input, sizeof(input));
+  return hpx_run(&hpx_main_action, &input, sizeof(input));
 }
 
 
@@ -143,8 +151,8 @@ int hpx_main(void *args) {
   
   //run an action to create some point data
   create_point_data_params_t input;
+  input.set_type = parms->set_type;
   input.n_points = parms->n_points;
-  //more options eventually...
   
 #ifdef BRANCHESONLY
   input.n_per_block = parms->n_points;
@@ -206,11 +214,13 @@ fprintf(stdout, "Done with point creation\n");fflush(stdout);
   hpx_time_t end_time = hpx_time_now();
   double dt_ms = hpx_time_diff_ms(start_time, end_time);
   
-  
   //put out some information
   fprintf(stdout, "%d %lg\n", parms->n_points, dt_ms);
   //more stuff that will be interesting I guess would be the number of nodes
   // the number of cores used and so on
+  
+  //free up the tree
+  //dashmm_tree_destroy(tree);
   
   hpx_shutdown(HPX_SUCCESS);
 }
@@ -229,19 +239,62 @@ int create_point_data(void *args) {
   //read in the options
   create_point_data_params_t *parms = args;
   
-  //put out message about number of points and data set type
-  //fprintf(stdout, 
-  //        "Creating point data for %d points distributed in a unit cube\n",
-  //        parms->n_points);
-  
   //start a basic RNG
   srand(time(NULL));
   
   //fill the data
-  for(int i = 0; i < parms->n_per_block; ++i) {
-    points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
-    points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
-    points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
+  switch(parms->set_type) {
+  case 0:
+    //Unit cube
+    for(int i = 0; i < parms->n_per_block; ++i) {
+      points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
+      points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
+      points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
+    }
+    break;
+  case 1:
+    for(int i = 0; i < parms->n_per_block; ++i) {
+      //Hernquist Halo
+      double x = 25.0 / 36.0 * ((double)rand())/((double)RAND_MAX);
+      double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+      double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+      double r = 0.1 * x / (1.0 - x) * (1.0 + sqrt(1.0 / x));
+      points[i].pos[0] = 0.5 + r * sin(theta) * cos(phi);
+      points[i].pos[1] = 0.5 + r * sin(theta) * sin(phi);
+      points[i].pos[2] = 0.5 + r * cos(theta);
+    }
+    break;
+  case 2:
+    for(int i = 0; i < parms->n_per_block; ++i) {
+      //Two disjoint spheres
+      double r = ((double)rand())/((double)RAND_MAX);
+      double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+      double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+      double xcen[3] = {0.0};
+      if(rand() % 2) {        //point for sphere 1
+        r *= 0.5;
+        xcen[0] = 0.5;
+        xcen[1] = 0.5;
+        xcen[2] = 0.5;
+      } else {                //point for sphere 2
+        r *= 0.5;
+        xcen[0] = 0.5;
+        xcen[0] = 0.5;
+        xcen[0] = 0.5;
+      }
+      points[i].pos[0] = xcen[0] + r * sin(theta) * cos(phi);
+      points[i].pos[1] = xcen[1] + r * sin(theta) * sin(phi);
+      points[i].pos[2] = xcen[2] + r * cos(theta);
+    }
+    break;
+  default:
+    //Unit cube
+    for(int i = 0; i < parms->n_per_block; ++i) {
+      points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
+      points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
+      points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
+    }
+    break;
   }
   
   hpx_gas_unpin(points_gas);
