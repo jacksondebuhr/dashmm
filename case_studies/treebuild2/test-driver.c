@@ -28,9 +28,6 @@
 #include "dashmm-tree.h"
 
 
-//define this to test the branch only construction - in SMP
-//#define BRANCHESONLY
-
 
 hpx_action_t hpx_main_action;
 hpx_action_t create_point_data_action;
@@ -48,30 +45,10 @@ typedef struct {
   int n_per_block;
   int n_blocks;
   int i_block;
-  //eventually some option for data type
-  // (i.e. cube; sphere, two cubes, two spheres)
 } create_point_data_params_t;
 
 int hpx_main(void *args);
 int create_point_data(void *args);
-
-
-static void usage(FILE *f) {
-  fprintf(f, "Usage: ygg2 [options] <point set type> <number of points> <refinement limit> <top depth> \n"
-          "\t-c, number of cores to run on\n"
-          "\t-t, number of scheduler threads\n"
-          "\t-T, select a transport by number (see hpx_config.h)\n"
-          "\t-D, all localities wait for debugger\n"
-          "\t-d, wait for debugger at specific locality\n"
-          "\t-l, set logging level\n"
-          "\t-s, set stack size\n"
-          "\t-p, set per-PE global heap size\n"
-          "\t-r, set send/receive request limit\n"
-          "\t-h, show help\n\n");
-  fprintf(f, "<point set type>\n");
-  fprintf(f, "\t0 - uniform cube\n\t1 - Hernquist Halo\n");
-  fprintf(f, "\t2 - disjoint spheres\n");
-}
 
 
 int main(int argc, char **argv) {
@@ -81,35 +58,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  /*
   int opt = 0;
-  while ((opt = getopt(argc, argv, "c:t:T:d:Dl:s:p:r:h")) != -1) {
-    switch (opt) {
-    case 'c':
-      break;
-    case 't':
-      break;
-    case 'T':
-      break;
-    case 'D':
-      break;
-    case 'd':
-      break;
-    case 'l':
-      break;
-    case 's':
-      break;
-    case 'p':
-      break;
-    case 'r':
-      break;
-    case 'h':
-      usage(stdout);
-      return 0;
-    case '?':
-    default:
-      usage(stderr);
-      return -1;
-    }
+  while ((opt = getopt(argc, argv, "")) != -1) {
   }
   
   argc -= optind;
@@ -124,7 +75,13 @@ int main(int argc, char **argv) {
   int n_points = atoi(argv[argc-3]);
   int refinement_limit = atoi(argv[argc-2]);
   int top_depth = atoi(argv[argc-1]);
+  */
   
+  //TEMPORARY HARD CODED VALUES
+  int set_type = 1;
+  int n_points = 1000000;
+  int refinement_limit = 100;
+  int top_depth = 1;
   
   
   //register actions
@@ -154,13 +111,7 @@ int hpx_main(void *args) {
   input.set_type = parms->set_type;
   input.n_points = parms->n_points;
   
-#ifdef BRANCHESONLY
-  input.n_per_block = parms->n_points;
-  input.n_blocks = 1;
-  input.i_block = 0;
-  hpx_addr_t points = hpx_gas_alloc(sizeof(dashmm_point_t) * input.n_points);
-#else
-  int numlocs = hpx_get_num_ranks();
+  int numlocs = 25;//hpx_get_num_ranks();
   int numperblock = input.n_points / numlocs;
   if(input.n_points % numlocs != 0) {
     ++numperblock;
@@ -171,7 +122,7 @@ int hpx_main(void *args) {
   input.i_block = 0;
   hpx_addr_t points = hpx_gas_global_alloc(numlocs, 
                                     sizeof(dashmm_point_t) * numperblock);
-#endif
+
   assert(points != HPX_NULL);
 
 fprintf(stdout, "Beginning point creation\n");fflush(stdout);  
@@ -186,29 +137,11 @@ fprintf(stdout, "Done with point creation\n");fflush(stdout);
   //start a timer
   hpx_time_t start_time = hpx_time_now();
   
-  dashmm_volume_t rootvol;
-  rootvol.a[0] = 0.0;
-  rootvol.a[1] = 0.0;
-  rootvol.a[2] = 0.0;
-  rootvol.b[0] = 1.0;
-  rootvol.b[1] = 1.0;
-  rootvol.b[2] = 1.0;
-  
-#ifdef BRANCHESONLY  
-  //create the tree
-  //NOTE that is only using a subset of the eventual functionality
-  hpx_addr_t root = hpx_gas_alloc(sizeof(dashmm_tree_node_t));
-  assert(root != HPX_NULL);
-  
-  dashmm_invoke_tree_init_child_sync(root, rootvol, HPX_NULL, 
-                points, parms->n_points, parms->refinement_limit);
-#else
   //Do some stuff for a full tree...
   hpx_addr_t tree = dashmm_tree_create(points, parms->n_points, 
-                        input.n_per_block, rootvol, 
+                        input.n_per_block, 
                         parms->refinement_limit,
                         parms->top_depth);
-#endif  
   
   //stop the timer
   hpx_time_t end_time = hpx_time_now();
@@ -220,7 +153,7 @@ fprintf(stdout, "Done with point creation\n");fflush(stdout);
   // the number of cores used and so on
   
   //free up the tree
-  //dashmm_tree_destroy(tree);
+  dashmm_tree_destroy(tree);
   
   hpx_shutdown(HPX_SUCCESS);
 }
@@ -258,7 +191,7 @@ int create_point_data(void *args) {
       double x = 25.0 / 36.0 * ((double)rand())/((double)RAND_MAX);
       double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
       double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
-      double r = 0.1 * x / (1.0 - x) * (1.0 + sqrt(1.0 / x));
+      double r = 0.1 * x / (1.0 - x) * (1.0 + sqrt(1.0 / x)) * 20.0;
       points[i].pos[0] = 0.5 + r * sin(theta) * cos(phi);
       points[i].pos[1] = 0.5 + r * sin(theta) * sin(phi);
       points[i].pos[2] = 0.5 + r * cos(theta);
@@ -278,9 +211,9 @@ int create_point_data(void *args) {
         xcen[2] = 0.5;
       } else {                //point for sphere 2
         r *= 0.5;
-        xcen[0] = 0.5;
-        xcen[1] = 0.5;
-        xcen[2] = 0.5;
+        xcen[0] = -0.5;
+        xcen[1] = -0.5;
+        xcen[2] = -0.5;
       }
       points[i].pos[0] = xcen[0] + r * sin(theta) * cos(phi);
       points[i].pos[1] = xcen[1] + r * sin(theta) * sin(phi);
