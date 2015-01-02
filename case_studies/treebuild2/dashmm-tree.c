@@ -232,8 +232,8 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
   //wait on those two things - really only the second is needed, as it cannot
   // finish without the first.
   hpx_lco_wait(sortdone);
-  hpx_lco_delete(sortdone, HPX_NULL);
   hpx_lco_wait(refinedone);
+  hpx_lco_delete(sortdone, HPX_NULL);
   hpx_lco_delete(refinedone, HPX_NULL);
   
   //some final work
