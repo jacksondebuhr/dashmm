@@ -921,9 +921,16 @@ int dashmm_tree_topnode_init(void *args) {
   dashmm_tree_topnode_index_in_level(wrap->index, level, index);
   node->vol = dashmm_tree_topnode_volume(parms->tree.vol, level, index);
   
-  //UM: What is going on here. This sets the parent to itself...
-  node->parent = dashmm_tree_topnode_address(parms->tree.topnodes, 
-                                                        level, index);
+  if (level) {
+    int pindex[3];
+    pindex[0] = index[0] / 2;
+    pindex[1] = index[1] / 2;
+    pindex[2] = index[2] / 2;
+    node->parent = dashmm_tree_topnode_address(parms->tree.topnodes, 
+                                                       level - 1, pindex);
+  } else {
+    node->parent = HPX_NULL;
+  }
   assert(node->parent != node_gas);
   node->n_points = 0;
   node->n_arrived = 0;
