@@ -577,6 +577,8 @@ hpx_addr_t dashmm_parallel_block_spawn(hpx_addr_t base,
     memcpy(input->payload, payload, payload_size);
     
     hpx_call(base, terminal_action, input, input_size, retval);
+    
+    free(input);
   }
   
   return retval;
@@ -881,7 +883,8 @@ int dashmm_tree_points_sort(void *args) {
   }
    
   //tell topnodes the results
-  hpx_addr_t results[n_bins];
+  hpx_addr_t *results = malloc(sizeof(hpx_addr_t) * n_bins);
+  assert(results != NULL);
   for (int ires = 0; ires < n_bins; ++ires) {
     results[ires] = hpx_lco_future_new(sizeof(hpx_addr_t));
     assert(results[ires] != HPX_NULL);
@@ -929,6 +932,7 @@ int dashmm_tree_points_sort(void *args) {
     hpx_lco_delete(results[ibin], HPX_NULL);
   }
   free(bins);
+  free(results);
   hpx_gas_unpin(points_gas);
   
   return HPX_SUCCESS;

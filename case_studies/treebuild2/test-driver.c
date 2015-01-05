@@ -53,7 +53,7 @@ int create_point_data(void *args);
 
 
 int main(int argc, char **argv) {
-  if (argc < 5) {
+  if (argc < 6) {
     fprintf(stdout, "Usage: %s <point set type> <n points> <refinement limit> <top depth> <number of point blocks>\n", argv[0]);
     fprintf(stdout, 
      "Valid inputs will have n_points divisible by the number of point blocks\n");
