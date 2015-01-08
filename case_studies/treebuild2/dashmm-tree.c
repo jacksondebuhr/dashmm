@@ -141,6 +141,7 @@ typedef struct {
 //
 
 
+//OKAY
 hpx_addr_t dashmm_tree_create(hpx_addr_t points,
                               int n_points,
                               int n_per_block,
@@ -255,6 +256,7 @@ void dashmm_tree_destroy(hpx_addr_t tree_gas) {
 //
 
 
+//OKAY
 void dashmm_tree_register_actions(void) {
   HPX_REGISTER_ACTION(&dashmm_block_spawn_action, dashmm_block_spawn);
   HPX_REGISTER_ACTION(&dashmm_point_volume_action, dashmm_point_volume);
@@ -270,6 +272,7 @@ void dashmm_tree_register_actions(void) {
 }
 
 
+//OKAY
 int dashmm_volume_which_child(dashmm_volume_t vol, double *pos) {
   int result = 0;
   
@@ -294,6 +297,7 @@ int dashmm_volume_which_child(dashmm_volume_t vol, double *pos) {
 }
 
 
+//OKAY
 dashmm_volume_t dashmm_volume_of_child(dashmm_volume_t vol, int which) {
   dashmm_volume_t result;
   
@@ -330,6 +334,7 @@ dashmm_volume_t dashmm_volume_of_child(dashmm_volume_t vol, int which) {
 }
 
 
+//OKAY
 void dashmm_volume_reducer(void *a, void *b) {
   dashmm_volume_t *save = a;
   dashmm_volume_t *mod = b;
@@ -346,6 +351,7 @@ void dashmm_volume_reducer(void *a, void *b) {
 }
 
 
+//OKAY
 void dashmm_volume_cubify(dashmm_volume_t *vol, double expand) {
   double diff[3];
   diff[0] = vol->b[0] - vol->a[0];
@@ -375,6 +381,7 @@ void dashmm_volume_cubify(dashmm_volume_t *vol, double expand) {
 }
 
 
+//OKAY
 int dashmm_tree_topnode_level(int index) {
   int retval = 0;
   
@@ -389,6 +396,7 @@ int dashmm_tree_topnode_level(int index) {
 }
 
 
+//OKAY
 void dashmm_tree_topnode_index_in_level(int index, int level, int *array) {
   //get the portion of index that is offset from the first at level
   int idx = index - _offsets[level];
@@ -406,6 +414,7 @@ void dashmm_tree_topnode_index_in_level(int index, int level, int *array) {
 }
 
 
+//OKAY
 int dashmm_tree_topnode_offset_on_level(int level, int *array) {
   int retval = array[0];
   retval += array[1] * _onlevel1d[level];
@@ -414,6 +423,7 @@ int dashmm_tree_topnode_offset_on_level(int level, int *array) {
 }
 
 
+//OKAY
 int dashmm_tree_topnode_offset_from_index(int level, int *array) {
   int retval = _offsets[level] 
                 + dashmm_tree_topnode_offset_on_level(level, array);
@@ -421,6 +431,7 @@ int dashmm_tree_topnode_offset_from_index(int level, int *array) {
 }
 
 
+//OKAY
 dashmm_volume_t dashmm_tree_topnode_volume(dashmm_volume_t vol, 
                                            int level, int *index) {
   //vol here is the base volume
@@ -442,6 +453,7 @@ dashmm_volume_t dashmm_tree_topnode_volume(dashmm_volume_t vol,
 }
 
 
+//OKAY
 hpx_addr_t dashmm_tree_topnode_address(hpx_addr_t base, int level, int *index) {
   int offset = dashmm_tree_topnode_offset_from_index(level, index);
   
@@ -454,6 +466,7 @@ hpx_addr_t dashmm_tree_topnode_address(hpx_addr_t base, int level, int *index) {
 }
 
 
+//OKAY
 void dashmm_tree_topnode_from_point(dashmm_volume_t vol, int level,
                                     dashmm_point_t *point, int *index) {
   double denom = 1.0 / ((double)_onlevel1d[level]);
@@ -482,6 +495,7 @@ void dashmm_tree_topnode_from_point(dashmm_volume_t vol, int level,
 // gives the bin to which they are assigned. This means the entries in bins
 // must match that number of points with the given bin marked, or this will
 // behave badly.
+//OKAY
 void dashmm_point_bin_sort(dashmm_point_t *points, int n_points,
                         int *bins, int n_bins) {
   int *bin_offsets = calloc(sizeof(int), n_bins);
@@ -530,11 +544,13 @@ void dashmm_point_bin_sort(dashmm_point_t *points, int n_points,
 }
 
 
+//OKAY
 void dashmm_continue_cleanup(void *env) {
   free(env);
 }
 
 
+//OKAY
 hpx_addr_t dashmm_parallel_block_spawn(hpx_addr_t base,
                                        int block_size,
                                        int block_count,
@@ -590,10 +606,10 @@ hpx_addr_t dashmm_parallel_block_spawn(hpx_addr_t base,
 //
 
 
+//OKAY
 int dashmm_block_spawn(void *args) {
   //interpret parameters
   dashmm_block_spawn_params_t *parms = args;
-  size_t parms_size = sizeof(dashmm_block_spawn_params_t) + parms->payload_size;
   
   //storage for the results
   hpx_addr_t results[2];
@@ -638,6 +654,9 @@ int dashmm_block_spawn(void *args) {
     free(inputs[0]);
     free(inputs[1]);
   } else {
+    size_t parms_size = sizeof(dashmm_block_spawn_params_t) 
+                            + parms->payload_size;
+    
     //we divide up the span
     dashmm_block_spawn_params_t *inputs[2];
     inputs[0] = malloc(parms_size);
@@ -720,6 +739,7 @@ int dashmm_block_spawn(void *args) {
 }
 
 
+//OKAY
 int dashmm_point_volume(void *args) {
   hpx_addr_t points_gas = hpx_thread_current_target();
   dashmm_point_t *points;
@@ -755,11 +775,14 @@ int dashmm_point_volume(void *args) {
     }
   }
   
+  hpx_gas_unpin(points_gas);
+  
   //done
   hpx_thread_continue(sizeof(dashmm_volume_t), &retval);
 }
 
 
+//OKAY
 int dashmm_tree_node_init(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -785,7 +808,6 @@ int dashmm_tree_node_init(void *args) {
     pindex[2] = index[2] / 2;
     node->parent = dashmm_tree_topnode_address(parms->tree.topnodes, 
                                                      level - 1, pindex);
-    assert(node->parent != node_gas);
   } else {
     node->parent = HPX_NULL;
   }
@@ -849,6 +871,7 @@ int dashmm_tree_node_init(void *args) {
 }
 
 
+//OKAY - but worth another look
 int dashmm_tree_points_sort(void *args) {
   hpx_addr_t points_gas = hpx_thread_current_target();
   dashmm_point_t *points;
@@ -939,6 +962,7 @@ int dashmm_tree_points_sort(void *args) {
 }
 
 
+//OKAY
 int dashmm_tree_inform_topnode(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -970,6 +994,7 @@ int dashmm_tree_inform_topnode(void *args) {
 }
 
 
+//OKAY
 int dashmm_tree_node_alloc(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -1015,6 +1040,7 @@ int dashmm_tree_node_alloc(void *args) {
 }
 
 
+//OKAY
 int dashmm_tree_node_refine(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
@@ -1095,6 +1121,7 @@ int dashmm_tree_node_refine(void *args) {
 }
 
 
+//OKAY
 int dashmm_tree_points_refine(void *args) {
   hpx_addr_t points_gas = hpx_thread_current_target();
   dashmm_point_t *points;
@@ -1141,6 +1168,7 @@ int dashmm_tree_points_refine(void *args) {
 //This can be used in two modes. If the refine_limit parameter is set in the
 //input arguments, this will call the node refinement action synchronously.
 //Otherwise, this will just set the values before finishing.
+//OKAY
 int dashmm_tree_init_child(void *args) {
   hpx_addr_t node_gas = hpx_thread_current_target();
   dashmm_tree_node_t *node;
