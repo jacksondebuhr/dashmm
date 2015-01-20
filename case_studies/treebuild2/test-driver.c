@@ -49,7 +49,8 @@ typedef struct {
 } create_point_data_params_t;
 
 int hpx_main(void *args);
-int create_point_data(void *args);
+void create_point_data(hpx_addr_t points_gas, int n_per_block, int n_blocks, 
+                        int set_type);
 
 
 int main(int argc, char **argv) {
@@ -69,13 +70,6 @@ int main(int argc, char **argv) {
   int top_depth = atoi(argv[4]);
   int block_count = atoi(argv[5]);
   
-  //test usage
-  if (n_points % block_count) {
-    fprintf(stderr, 
-      "Number of points must be evenly divisible by the number of blocks.\n");
-    return -1;
-  }
-  
   
   //initialize the runtime
   if ( hpx_init(&argc, &argv) ) {
@@ -85,8 +79,7 @@ int main(int argc, char **argv) {
   
   
   //register actions
-  HPX_REGISTER_ACTION(&hpx_main_action, hpx_main);
-  HPX_REGISTER_ACTION(&create_point_data_action, create_point_data);
+  HPX_REGISTER_ACTION(hpx_main, &hpx_main_action);
   dashmm_tree_register_actions();
   
   //setup parameters to main action
@@ -105,37 +98,36 @@ int main(int argc, char **argv) {
 int hpx_main(void *args) {
   //interpret params
   hpx_main_params_t *parms = args;
-  
-  
-  //run an action to create some point data
-  create_point_data_params_t input;
-  input.set_type = parms->set_type;
-  input.n_points = parms->n_points;
-  
-  int numlocs = parms->block_count;//hpx_get_num_ranks();
-  int numperblock = input.n_points / numlocs;
-  if (input.n_points % numlocs != 0) {
+
+  //compute some numbers
+  int numblocks = parms->block_count * hpx_get_num_ranks();
+  int numperblock = parms->n_points / numblocks;
+  if (parms->n_points % numblocks != 0) {
     ++numperblock;
   }
-  input.n_points = numlocs * numperblock;
-  input.n_per_block = numperblock;
-  input.n_blocks = numlocs;
-  input.i_block = 0;
-  hpx_addr_t points = hpx_gas_global_alloc(numlocs, 
+
+  if (parms->n_points % numblocks) {
+    fprintf(stderr, 
+      "Number of points must be evenly divisible by the number of blocks.\n");
+    return HPX_SUCCESS;
+  }
+
+//fprintf(stdout, "Trying to get numblocks=%d with %d parts per block of %lu bytes each\n", numblocks, numperblock, sizeof(dashmm_point_t)*numperblock);
+
+
+  hpx_addr_t points = hpx_gas_global_alloc(numblocks, 
                                     sizeof(dashmm_point_t) * numperblock);
 
-  assert(points != HPX_NULL);
+  //assert(points != HPX_NULL);
 
-  hpx_call_sync(points, create_point_data_action, 
-                &input, sizeof(input),
-                NULL, 0);
+  create_point_data(points, numperblock, numblocks, parms->set_type);
   
   //start a timer
   hpx_time_t start_time = hpx_time_now();
   
   //Do some stuff for a full tree...
   hpx_addr_t tree = dashmm_tree_create(points, parms->n_points, 
-                        input.n_per_block, 
+                        numperblock, 
                         parms->refinement_limit,
                         parms->top_depth);
   
@@ -155,93 +147,89 @@ int hpx_main(void *args) {
 }
 
 
-int create_point_data(void *args) {
-  //Please NOTE: This is a  more or less silly way to do the synchronization
-  // for this. However, this is just the initialization, so who cares.
-
-  hpx_addr_t points_gas = hpx_thread_current_target();
-  dashmm_point_t *points;
-  if ( !hpx_gas_try_pin(points_gas, (void **)&points) ) {
-    return HPX_RESEND;
-  }
-
-  //read in the options
-  create_point_data_params_t *parms = args;
-  
+void create_point_data(hpx_addr_t points_gas, int n_per_block, int n_blocks, 
+                            int set_type) {
   //start a basic RNG
   srand(time(NULL));
+
+  //create local space for the points
+  dashmm_point_t *points = malloc(sizeof(dashmm_point_t) * n_per_block);
+  assert(points != NULL);
   
-  //fill the data
-  switch (parms->set_type) {
-  case 0:
-    //Unit cube
-    for (int i = 0; i < parms->n_per_block; ++i) {
-      points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
-      points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
-      points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
-    }
-    break;
-  case 1:
-    for (int i = 0; i < parms->n_per_block; ++i) {
-      //Hernquist Halo
-      double x = 25.0 / 36.0 * ((double)rand())/((double)RAND_MAX);
-      double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
-      double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
-      double r = 0.1 * x / (1.0 - x) * (1.0 + sqrt(1.0 / x)) * 20.0;
-      points[i].pos[0] = 0.5 + r * sin(theta) * cos(phi);
-      points[i].pos[1] = 0.5 + r * sin(theta) * sin(phi);
-      points[i].pos[2] = 0.5 + r * cos(theta);
-    }
-    break;
-  case 2:
-    for (int i = 0; i < parms->n_per_block; ++i) {
-      //Two disjoint spheres
-      double r = ((double)rand())/((double)RAND_MAX);
-      double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
-      double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
-      double xcen[3] = {0.0};
-      if (rand() % 2) {        //point for sphere 1
-        r *= 0.5;
-        xcen[0] = 0.5;
-        xcen[1] = 0.5;
-        xcen[2] = 0.5;
-      } else {                //point for sphere 2
-        r *= 0.5;
-        xcen[0] = -0.5;
-        xcen[1] = -0.5;
-        xcen[2] = -0.5;
+  for (int iblock = 0; iblock < n_blocks; ++iblock) {
+    //fill the data
+    switch (set_type) {
+    case 0:
+      //Unit cube
+      for (int i = 0; i < n_per_block; ++i) {
+        points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
+        points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
+        points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
       }
-      points[i].pos[0] = xcen[0] + r * sin(theta) * cos(phi);
-      points[i].pos[1] = xcen[1] + r * sin(theta) * sin(phi);
-      points[i].pos[2] = xcen[2] + r * cos(theta);
+      break;
+    case 1:
+      for (int i = 0; i < n_per_block; ++i) {
+        //Hernquist Halo
+        double x = 25.0 / 36.0 * ((double)rand())/((double)RAND_MAX);
+        double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+        double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+        double r = 0.1 * x / (1.0 - x) * (1.0 + sqrt(1.0 / x)) * 20.0;
+        points[i].pos[0] = 0.5 + r * sin(theta) * cos(phi);
+        points[i].pos[1] = 0.5 + r * sin(theta) * sin(phi);
+        points[i].pos[2] = 0.5 + r * cos(theta);
+      }
+      break;
+    case 2:
+      for (int i = 0; i < n_per_block; ++i) {
+        //Two disjoint spheres
+        double r = ((double)rand())/((double)RAND_MAX);
+        double theta = 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+        double phi = 2.0 * 3.1415926535 * ((double)rand())/((double)RAND_MAX);
+        double xcen[3] = {0.0};
+        if (rand() % 2) {        //point for sphere 1
+          r *= 0.5;
+          xcen[0] = 0.5;
+          xcen[1] = 0.5;
+          xcen[2] = 0.5;
+        } else {                //point for sphere 2
+          r *= 0.5;
+          xcen[0] = -0.5;
+          xcen[1] = -0.5;
+          xcen[2] = -0.5;
+        }
+        points[i].pos[0] = xcen[0] + r * sin(theta) * cos(phi);
+        points[i].pos[1] = xcen[1] + r * sin(theta) * sin(phi);
+        points[i].pos[2] = xcen[2] + r * cos(theta);
+      }
+      break;
+    default:
+      //Unit cube
+      for (int i = 0; i < n_per_block; ++i) {
+        points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
+        points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
+        points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
+      }
+      break;
     }
-    break;
-  default:
-    //Unit cube
-    for (int i = 0; i < parms->n_per_block; ++i) {
-      points[i].pos[0] = ((double)rand())/((double)RAND_MAX);
-      points[i].pos[1] = ((double)rand())/((double)RAND_MAX);
-      points[i].pos[2] = ((double)rand())/((double)RAND_MAX);
-    }
-    break;
-  }
-  
-  hpx_gas_unpin(points_gas);
-  
-  
-  //decide if there is a next block to handle
-  parms->i_block += 1;
-  if (parms->i_block < parms->n_blocks) {
-    //send the action to the next block
+    
+    //now do a memput
     hpx_addr_t target = hpx_addr_add(points_gas, 
-                            sizeof(dashmm_point_t) * parms->n_per_block,
-                            sizeof(dashmm_point_t) * parms->n_per_block);
-    hpx_call_sync(target, create_point_data_action, 
-                    parms, sizeof(*parms), NULL, 0);
+                           sizeof(dashmm_point_t) * n_per_block * iblock,
+                           sizeof(dashmm_point_t) * n_per_block);
+
+    hpx_addr_t local = hpx_lco_future_new(0);
+    hpx_addr_t global = hpx_lco_future_new(0);
+    assert(local != HPX_NULL && global != HPX_NULL);
+    
+    hpx_gas_memput(target, points, sizeof(dashmm_point_t) * n_per_block,
+                        local, global);
+                        
+    hpx_lco_wait(local);
+    hpx_lco_wait(global);
+    hpx_lco_delete(local, HPX_NULL);
+    hpx_lco_delete(global, HPX_NULL);
   }
-  
-  
-  return HPX_SUCCESS;
+
 }
 
 

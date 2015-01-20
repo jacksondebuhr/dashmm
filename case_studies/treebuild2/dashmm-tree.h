@@ -24,6 +24,9 @@
 #include "hpx/hpx.h"
 
 
+//#define DEBUGID
+
+
 ///
 /// \type dashmm_volume_t
 ///
@@ -64,11 +67,15 @@ typedef struct {
 typedef struct {
   dashmm_volume_t vol;  ///< the volume of the node
   
+#ifdef DEBUGID
+  uint64_t ID;          ///< an ID; useful when debugging
+#endif
+  
   hpx_addr_t parent;    ///< parent of this node
   hpx_addr_t child[8];  ///< children of this node
   
   hpx_addr_t points;    ///< address of the first point represented by this node
-  uint32_t n_points;    ///< number of points represented by this node
+  int n_points;         ///< number of points represented by this node
 } dashmm_tree_node_t;
 
 
@@ -172,6 +179,10 @@ dashmm_volume_t dashmm_tree_topnode_volume(dashmm_volume_t vol,
 hpx_addr_t dashmm_tree_topnode_address(hpx_addr_t base, int level, int *index);
 void dashmm_tree_topnode_from_point(dashmm_volume_t vol, int level,
                                     dashmm_point_t *point, int *index);
+#ifdef DEBUGID
+uint64_t dashmm_tree_node_id(int *index, int level);
+uint64_t dashmm_tree_node_index_for_child(uint64_t id, int which);
+#endif
 
 
 void dashmm_point_bin_sort(dashmm_point_t *points, int n_points, 

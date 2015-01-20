@@ -20,14 +20,14 @@ DEBUGGING = -g
 #Some HPX settings
 
 #for frigg
-HPXINCLUDE = -I/u/jdebuhr/Code/hpx/build/include
-HPXLIBS = -L/u/jdebuhr/Code/hpx/build/lib -lhpx -lpthread
+#HPXINCLUDE = -I/u/jdebuhr/Code/hpx/build/include
+#HPXLIBS = -L/u/jdebuhr/Code/hpx/build/lib -lhpx -lpthread
 
 #for cutter
-#HPXINCLUDE = -I/u/jdebuhr/hpx/build/include
-#HPXLIBS = -L/u/jdebuhr/hpx/build/lib -lhpx -lrdmacm -libverbs
+HPXINCLUDE = -I/u/jdebuhr/hpx/build/include
+HPXLIBS = -Wl,-rpath,/u/jdebuhr/hpx/build/lib -L/u/jdebuhr/hpx/build/lib -lhpx /u/jdebuhr/hpx/build/lib/libjemalloc_hpx.a -lffi -lphoton -lrdmacm -libverbs
 
-CFLAGS = -O0 -Wall -pedantic $(DEBUGGING) $(PROFILE) $(HPXINCLUDE)
+CFLAGS = -O3 -Wall -pedantic $(DEBUGGING) $(PROFILE) $(HPXINCLUDE)
 
 
 LIBS   = -lm $(HPXLIBS)
