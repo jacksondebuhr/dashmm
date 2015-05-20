@@ -57,4 +57,20 @@ typedef hpx_addr_t dashmm_handle_t;
 #define INVALID_HANDLE HPX_NULL
 
 
+///
+/// \type dashmm_stats_t
+///
+/// This type holds basic timing statistics for an evaluation using DASHMM,
+/// including the total time take, the min and max times over each locality in
+/// the system, the median times and the variance.
+///
+typedef struct {
+  double t_total;
+  double t_min;
+  double t_max;
+  double t_mean;
+  double t_variance;
+} dashmm_stats_t;
+
+
 #endif

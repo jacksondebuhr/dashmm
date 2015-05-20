@@ -1,0 +1,11 @@
+For the basic interface, there are a number of things that the user 
+might need to query about the methods. Things like
+    - number of charges per point (typically this is 1, but advanced user
+      kernels might use more)
+    - available accuracies
+    - 
+
+
+We will need to make a Macro that wraps up the HPX-5 macro for defining a 
+function. All of the kernel functions will have to be done this way. Similarly
+for the MAC functions as well.
