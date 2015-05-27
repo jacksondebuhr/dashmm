@@ -48,4 +48,4 @@ typedef struct {
 } dashmm_method_t;
 
 
-#endif
+#endif //__DASHMM_METHOD_H__

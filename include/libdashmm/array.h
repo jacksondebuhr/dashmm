@@ -14,31 +14,29 @@
 //    Jackson DeBuhr, Indiana University <jdebuhr [at] indiana.edu>
 // =============================================================================
 
-#ifndef __DASHMM_OBJECT_H__
-#define __DASHMM_OBJECT_H__
+#ifndef __DASHMM_ARRAY_H__
+#define __DASHMM_ARRAY_H__
+
+
+#include "libdashmm/basic_types.h"
+#include "libdashmm/object.h"
+
+
+typedef enum {
+  DASHMM_DISTRIB_CYCLIC,
+  DASHMM_DISTRIB_BLOCK_CYCLIC,
+  DASHMM_DISTRIB_BLOCKED,
+} dashmm_array_distrib_t;
 
 
 typedef struct {
-  uint32_t properties;
-} dashmm_object_t;
+  dashmm_object_t object;
+  
+  hpx_addr_t data;          // hpx address of the data
+  size_t num_records;       // the number of records total
+  size_t record_size;       // the size of each record
+  size_t block_size;        // the number of records per block in GAS
+} dashmm_array_t;
 
 
-#define DASHMM_CLASS_MASK    0xffff
-#define DASHMM_PROPERTY_MASK 0xffff0000
-
-
-//We define the object classes and properties here so that we can guarantee
-// uniqueness of the identifiers.
-#define DASHMM_CLASS_KERNEL  1
-#define DASHMM_CLASS_METHOD  2
-#define DASHMM_CLASS_ARRAY   3
-
-
-#define DASHMM_PROPERTY_SYSTEM 0x10000
-#define DASHMM_PROPERTY_USER   0x20000
-
-
-bool dashmm_verify_user_object(dashmm_handle_t handle, uint32_t type);
-
-
-#endif // __DASHMM_OBJECT_H__
+#endif //__DASHMM_ARRAY_H__

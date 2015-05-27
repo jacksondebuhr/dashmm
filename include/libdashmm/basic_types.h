@@ -30,6 +30,7 @@ typedef enum {
   DASHMM_ERROR = -1;
   DASHMM_SUCCESS = 0;
   DASHMM_DOMAIN_ERROR = 1;
+  DASHMM_RUNTIME_ERROR = 2;
   //and so on...
 } dashmm_status_t;
 
@@ -73,4 +74,4 @@ typedef struct {
 } dashmm_stats_t;
 
 
-#endif
+#endif // __DASHMM_BASIC_TYPES_H__

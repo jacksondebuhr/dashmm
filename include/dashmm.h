@@ -57,7 +57,7 @@ extern dashmm_handle_t DASHMM_LAPLACE_POTENTIAL;
 ///
 /// \var DASHMM_YUKAWA_POTENTIAL
 ///
-/// This is the handle to the build in Yukawa kernel.
+/// This is the handle to the built-in Yukawa kernel.
 ///
 extern dashmm_handle_t DASHMM_YUKAWA_POTENTIAL;
 
@@ -125,10 +125,8 @@ int dashmm_finalize(...)
 ///                 be one of the built in kernels, or can be a kernel defined
 ///                 by the user.
 /// \param accuracy - the parameter controls the accuracy of the chosen method;
-///                 giving either the number of digits of accuracy for 
-///                 FMM-like methods, or the number of terms in the multipole
-///                 expansion for BH-like methods.
-///                 TODO revisit this argument (accuracy)
+///                 giving either the requested accuracy for 
+///                 FMM-like methods, or the opening angle for BH-like methods.
 /// \param source - the handle to the global buffer holding the source data.
 ///                 this routine will not modify the input data, unless the
 ///                 same global buffers are used as @param source and 
@@ -157,7 +155,7 @@ int dashmm_finalize(...)
 /// 
 int dashmm_evaluate(dashmm_handle_t method,
                     dashmm_handle_t kernel,
-                    int accuracy,
+                    double accuracy,
                     dashmm_handle_t source, 
                     size_t source_position_offset,
                     size_t source_charge_offset,
@@ -200,11 +198,11 @@ dashmm_handle_t dashmm_array_alloc(uint64_t records, size_t record_size);
 ///
 /// \param handle - the handle to the object in question
 ///
-/// \return - DASHMM_ERROR if provided an invalid handle; 
-///           DASHMM_DOMAIN_ERROR if handle is for a system object;
+/// \return - DASHMM_DOMAIN_ERROR if handle is not a user array object;
+///           DASHMM_RUNTIME_ERROR if an error from the runtime is encountered;
 ///           DASHMM_SUCCESS otherwise
 ///
-int dashmm_free(dashmm_handle_t handle);
+int dashmm_array_free(dashmm_handle_t handle);
 
 
 ///
@@ -223,13 +221,14 @@ int dashmm_free(dashmm_handle_t handle);
 /// \param length - the number of bytes to write
 /// \param data   - the address of the data to write into the global buffer
 ///
-/// \return - DASHMM_SUCCESS (or various others once we work that out)
+/// \return - DASHMM_SUCCESS or DASHMM_DOMAIN_ERROR if record is larger than
+///           the number of records in the provided array.
 ///
-int dashmm_memput(dashmm_handle_t handle, 
-                  uint64_t record, 
-                  size_t offset,
-                  size_t length,
-                  void *data);
+int dashmm_array_memput(dashmm_handle_t handle, 
+                        uint64_t record, 
+                        size_t offset,
+                        size_t length,
+                        void *data);
 
 
 ///
@@ -249,13 +248,14 @@ int dashmm_memput(dashmm_handle_t handle,
 /// \param data   - address of local memory to hold the data read from global 
 ///                 memory
 ///
-/// \return - DASHMM_SUCCESS (or various others once we work that out)
+/// \return - DASHMM_SUCCESS or DASHMM_DOMAIN_ERROR if record is larger than
+///           the number of records in the provided array.
 ///
-int dashmm_memget(dashmm_handle_t handle,
-                  uint64_t record,
-                  size_t offset,
-                  size_t length,
-                  void *data);
+int dashmm_array_memget(dashmm_handle_t handle,
+                        uint64_t record,
+                        size_t offset,
+                        size_t length,
+                        void *data);
 
 
 // ==================================================================
@@ -268,4 +268,4 @@ int dashmm_memget(dashmm_handle_t handle,
 //      files.
 
 
-#endif
+#endif // __DASHMM_INTERFACE_H__

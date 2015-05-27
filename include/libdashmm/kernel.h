@@ -62,4 +62,4 @@ typedef struct {
 } dashmm_kernel_t;
 
 
-#endif
+#endif // __DASHMM_KERNEL_H__
