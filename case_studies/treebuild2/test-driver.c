@@ -31,6 +31,7 @@
 
 hpx_action_t hpx_main_action;
 hpx_action_t create_point_data_action;
+hpx_action_t tree_print_ordered_action;
 
 typedef struct {
   int set_type;
@@ -51,6 +52,8 @@ typedef struct {
 int hpx_main(void *args);
 void create_point_data(hpx_addr_t points_gas, int n_per_block, int n_blocks, 
                         int set_type);
+void print_tree_ordered(hpx_addr_t tree);
+int tree_print_ordered(void *parms);
 
 
 int main(int argc, char **argv) {
@@ -80,6 +83,7 @@ int main(int argc, char **argv) {
   
   //register actions
   HPX_REGISTER_ACTION(hpx_main, &hpx_main_action);
+  HPX_REGISTER_ACTION(tree_print_ordered, &tree_print_ordered_action);
   dashmm_tree_register_actions();
   
   //setup parameters to main action
@@ -112,13 +116,10 @@ int hpx_main(void *args) {
     return HPX_SUCCESS;
   }
 
-//fprintf(stdout, "Trying to get numblocks=%d with %d parts per block of %lu bytes each\n", numblocks, numperblock, sizeof(dashmm_point_t)*numperblock);
-
-
   hpx_addr_t points = hpx_gas_global_alloc(numblocks, 
                                     sizeof(dashmm_point_t) * numperblock);
 
-  //assert(points != HPX_NULL);
+  assert(points != HPX_NULL);
 
   create_point_data(points, numperblock, numblocks, parms->set_type);
   
@@ -139,6 +140,13 @@ int hpx_main(void *args) {
   fprintf(stdout, "%d %lg\n", parms->n_points, dt_ms);
   //more stuff that will be interesting I guess would be the number of nodes
   // the number of cores used and so on
+  
+  
+  //print out the tree in Lorax format
+  if (parms->refinement_limit == 1 && hpx_get_num_ranks() == 1) {
+    print_tree_ordered(tree);
+  }
+  
   
   //free up the tree
   dashmm_tree_destroy(tree);
@@ -233,3 +241,82 @@ void create_point_data(hpx_addr_t points_gas, int n_per_block, int n_blocks,
 }
 
 
+void print_tree_ordered(hpx_addr_t tree) {
+  dashmm_tree_t treedata;
+  hpx_gas_memget_sync(&treedata, tree, sizeof(treedata));
+
+  FILE *ofd = fopen("treedata.dat", "wb");
+  assert(ofd != NULL);
+  
+  double size = treedata.vol.b[0] - treedata.vol.a[0];
+  
+  assert(1 == fwrite(&size, sizeof(double), 1, ofd));
+  assert(3 == fwrite(&treedata.vol.a, sizeof(double), 3, ofd));
+  assert(1 == fwrite(&size, sizeof(double), 1, ofd));
+  
+  hpx_addr_t target = treedata.topnodes;
+  hpx_call_sync(target, tree_print_ordered_action, &ofd, sizeof(ofd), NULL, 0);
+  
+  fclose(ofd);
+}
+
+
+int tree_print_ordered(void *parms) {
+  hpx_addr_t node_gas = hpx_thread_current_target();
+  dashmm_tree_node_t *node;
+  if (!hpx_gas_try_pin(node_gas, (void **)&node)) {
+    return HPX_RESEND;
+  }
+  
+  FILE *ofd = *(FILE **)parms;
+
+  //count kids
+  int kids = 0;
+  for (int i = 0; i < 8; ++i) {
+    if (node->child[i] != HPX_NULL) {
+      kids = 1;
+      break;
+    }
+  }  
+
+  //compute a thing or two
+  double COM[3];
+  COM[0] = 0.5 * (node->vol.a[0] + node->vol.b[0]);
+  COM[1] = 0.5 * (node->vol.a[1] + node->vol.b[1]);
+  COM[2] = 0.5 * (node->vol.a[2] + node->vol.b[2]);
+  double zero = 0.0;
+  double size = node->vol.b[0] - node->vol.a[0];
+  uint64_t junk = ((uint64_t)1 << 63);
+  if (!kids) {
+    junk = 1;
+  }
+  
+  //write it out
+  assert(3 == fwrite(COM, sizeof(double), 3, ofd));
+  assert(1 == fwrite(&zero, sizeof(double), 1, ofd));
+  assert(1 == fwrite(&zero, sizeof(double), 1, ofd));
+  assert(3 == fwrite(node->vol.a, sizeof(double), 3, ofd));
+  assert(1 == fwrite(&size, sizeof(double), 1, ofd));
+  assert(3 == fwrite(node->vol.a, sizeof(double), 3, ofd));
+  assert(3 == fwrite(node->vol.b, sizeof(double), 3, ofd));
+  assert(1 == fwrite(&junk, sizeof(uint64_t), 1, ofd));
+  assert(1 == fwrite(&junk, sizeof(uint64_t), 1, ofd));
+  assert(1 == fwrite(&junk, sizeof(uint64_t), 1, ofd));
+  
+  for (int i = 0; i < 8; ++i) {
+    if (node->child[i] != HPX_NULL) {
+      assert(1 == fwrite(&i, sizeof(int), 1, ofd));
+      
+      hpx_call_sync(node->child[i], tree_print_ordered_action,
+                    parms, sizeof(FILE *),
+                    NULL, 0);
+    } else {
+      int neg = -1;
+      assert(1 == fwrite(&neg, sizeof(int), 1, ofd));
+    }
+  }
+  
+  hpx_gas_unpin(node_gas);
+  
+  return HPX_SUCCESS;
+}

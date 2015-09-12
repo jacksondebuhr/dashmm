@@ -144,12 +144,13 @@ typedef struct {
 //
 
 
-//OKAY
 hpx_addr_t dashmm_tree_create(hpx_addr_t points,
                               int n_points,
                               int n_per_block,
                               int refinement,
                               int top_depth) {
+  hpx_time_t vol_start = hpx_time_now();
+
   //first get the volume
   int n_blocks = n_points / n_per_block;
   //For now, we assume that the points fit into the blocks evenly...
@@ -168,8 +169,8 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
   
   //cubify the volume - leaving a bit of space around the outermost points
   dashmm_volume_cubify(&domain, 1.005);
-
-//fprintf(stdout, "Volume obtained: (%lg %lg %lg) - (%lg %lg %lg)\n", domain.a[0], domain.a[1], domain.a[2], domain.b[0], domain.b[1], domain.b[2]); fflush(stdout);
+  
+  hpx_time_t vol_end = hpx_time_now();
   
   //Create the tree data
   dashmm_tree_t tree;
@@ -193,7 +194,10 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
   
   hpx_gas_memput(retval, &tree, sizeof(tree), HPX_NULL, tree_put_done);
   
+  
   //block spawn to initialize the topnodes
+  hpx_time_t init_start = hpx_time_now();
+  
   dashmm_tree_node_init_params_t initinput;
   initinput.tree = tree;
   initinput.point_block_count = n_blocks;
@@ -208,7 +212,10 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
   hpx_lco_wait(initdone);
   hpx_lco_delete(initdone, HPX_NULL);
   
+  hpx_time_t init_end = hpx_time_now();
+  
   //block spawn to begin sorting the point data
+  hpx_time_t sort_start = hpx_time_now();
   hpx_addr_t sortdone = dashmm_parallel_block_spawn(points, 
                             n_per_block * sizeof(dashmm_point_t),
                             n_blocks,
@@ -219,6 +226,7 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
                             NULL);
   
   //block spawn to begin the allocation actions for the finest topnodes
+  hpx_time_t refine_start = hpx_time_now();
   hpx_addr_t first_finest = hpx_addr_add(tree.topnodes, 
                     sizeof(dashmm_tree_node_t) * _offsets[tree.top_depth],
                     sizeof(dashmm_tree_node_t));
@@ -238,13 +246,26 @@ hpx_addr_t dashmm_tree_create(hpx_addr_t points,
   //wait on those two things - really only the second is needed, as it cannot
   // finish without the first.
   hpx_lco_wait(sortdone);
+  hpx_time_t sort_end = hpx_time_now();
+  
   hpx_lco_wait(refinedone);
+  hpx_time_t refine_end = hpx_time_now();
+  
   hpx_lco_delete(sortdone, HPX_NULL);
   hpx_lco_delete(refinedone, HPX_NULL);
   
   //some final work
   hpx_lco_wait(tree_put_done);
   hpx_lco_delete(tree_put_done, HPX_NULL);
+  
+  double dt_volume = hpx_time_diff_ms(vol_start, vol_end);
+  double dt_init = hpx_time_diff_ms(init_start, init_end);
+  double dt_sort = hpx_time_diff_ms(sort_start, sort_end);
+  double dt_refine = hpx_time_diff_ms(refine_start, refine_end);
+  double dt_deltasortrefine = hpx_time_diff_ms(sort_end, refine_end);
+  
+  fprintf(stdout, "%lg %lg %lg %lg %lg ", 
+	   dt_volume, dt_init, dt_sort, dt_refine, dt_deltasortrefine);
   
   return retval;
 }
@@ -261,7 +282,6 @@ void dashmm_tree_destroy(hpx_addr_t tree_gas) {
 //
 
 
-//OKAY
 void dashmm_tree_register_actions(void) {
   HPX_REGISTER_ACTION(dashmm_block_spawn, &dashmm_block_spawn_action);
   HPX_REGISTER_ACTION(dashmm_point_volume, &dashmm_point_volume_action);
@@ -277,7 +297,6 @@ void dashmm_tree_register_actions(void) {
 }
 
 
-//OKAY
 int dashmm_volume_which_child(dashmm_volume_t vol, double *pos) {
   int result = 0;
   
@@ -302,7 +321,6 @@ int dashmm_volume_which_child(dashmm_volume_t vol, double *pos) {
 }
 
 
-//OKAY
 dashmm_volume_t dashmm_volume_of_child(dashmm_volume_t vol, int which) {
   dashmm_volume_t result;
   
@@ -339,7 +357,6 @@ dashmm_volume_t dashmm_volume_of_child(dashmm_volume_t vol, int which) {
 }
 
 
-//OKAY
 void dashmm_volume_reducer(void *a, void *b) {
   dashmm_volume_t *save = a;
   dashmm_volume_t *mod = b;
@@ -356,7 +373,6 @@ void dashmm_volume_reducer(void *a, void *b) {
 }
 
 
-//OKAY
 void dashmm_volume_cubify(dashmm_volume_t *vol, double expand) {
   double diff[3];
   diff[0] = vol->b[0] - vol->a[0];
@@ -386,7 +402,6 @@ void dashmm_volume_cubify(dashmm_volume_t *vol, double expand) {
 }
 
 
-//OKAY
 int dashmm_tree_topnode_level(int index) {
   int retval = 0;
   
@@ -401,7 +416,6 @@ int dashmm_tree_topnode_level(int index) {
 }
 
 
-//OKAY
 void dashmm_tree_topnode_index_in_level(int index, int level, int *array) {
   //get the portion of index that is offset from the first at level
   int idx = index - _offsets[level];
@@ -419,7 +433,6 @@ void dashmm_tree_topnode_index_in_level(int index, int level, int *array) {
 }
 
 
-//OKAY
 int dashmm_tree_topnode_offset_on_level(int level, int *array) {
   int retval = array[0];
   retval += array[1] * _onlevel1d[level];
@@ -428,7 +441,6 @@ int dashmm_tree_topnode_offset_on_level(int level, int *array) {
 }
 
 
-//OKAY
 int dashmm_tree_topnode_offset_from_index(int level, int *array) {
   int retval = _offsets[level] 
                 + dashmm_tree_topnode_offset_on_level(level, array);
@@ -436,7 +448,6 @@ int dashmm_tree_topnode_offset_from_index(int level, int *array) {
 }
 
 
-//OKAY
 dashmm_volume_t dashmm_tree_topnode_volume(dashmm_volume_t vol, 
                                            int level, int *index) {
   //vol here is the base volume
@@ -458,7 +469,6 @@ dashmm_volume_t dashmm_tree_topnode_volume(dashmm_volume_t vol,
 }
 
 
-//OKAY
 hpx_addr_t dashmm_tree_topnode_address(hpx_addr_t base, int level, int *index) {
   int offset = dashmm_tree_topnode_offset_from_index(level, index);
   
@@ -471,7 +481,6 @@ hpx_addr_t dashmm_tree_topnode_address(hpx_addr_t base, int level, int *index) {
 }
 
 
-//OKAY
 void dashmm_tree_topnode_from_point(dashmm_volume_t vol, int level,
                                     dashmm_point_t *point, int *index) {
   double denom = 1.0 / ((double)_onlevel1d[level]);
