@@ -14,6 +14,7 @@
 struct ArrayMetaData {
   hpx_addr_t data;
   size_t count;
+  size_t size;
 };
 
 
@@ -37,6 +38,7 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj) {
     hpx_exit(HPX_ERROR);
   }
   meta->count = count;
+  meta->size = size;
 
   meta->data = hpx_gas_alloc(1, count * size, 0, HPX_DIST_TYPE_LOCAL);
   hpx_gas_unpin(retval);
@@ -63,7 +65,7 @@ HPX_ACTION(HPX_DEFAULT, 0, deallocate_array_action, deallocate_array_handler,
 
 
 int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
-                      size_t size, void *in_data) {
+                      void *in_data) {
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     hpx_exit(HPX_ERROR);
@@ -79,8 +81,8 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
   assert(last <= meta->count);
   assert(last >= first);
 
-  char *beginning = local + first * size;
-  size_t copy_size = (last - first) * size;
+  char *beginning = local + first * meta->size;
+  size_t copy_size = (last - first) * meta->size;
   memcpy(beginning, in_data, copy_size);
 
   hpx_gas_unpin(meta->data);
@@ -92,7 +94,7 @@ HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
 
 
 int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
-                      size_t size, void *out_data) {
+                      void *out_data) {
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     hpx_exit(HPX_ERROR);
@@ -108,8 +110,8 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
   assert(last <= meta->count);
   assert(last >= first);
 
-  char *beginning = local + first * size;
-  size_t copy_size = (last - first) * size;
+  char *beginning = local + first * meta->size;
+  size_t copy_size = (last - first) * meta->size;
   memcpy(out_data, beginning, copy_size);
 
   hpx_gas_unpin(meta->data);
@@ -145,10 +147,9 @@ int deallocate_array(ObjectHandle obj) {
 }
 
 
-int array_put(ObjectHandle obj, size_t first, size_t last,
-                     size_t size, void *in_data) {
+int array_put(ObjectHandle obj, size_t first, size_t last, void *in_data) {
   if (HPX_SUCCESS == hpx_run(array_put_action, &obj, &first, &last,
-                            &size, &in_data)) {
+                            &in_data)) {
     return kSuccess;
   } else {
     return kRuntimeError;
@@ -156,10 +157,9 @@ int array_put(ObjectHandle obj, size_t first, size_t last,
 }
 
 
-int array_get(ObjectHandle obj, size_t first, size_t last,
-                     size_t size, void *out_data) {
-  if (HPX_SUCCESS == hpx_run(array_get_action, &obj, &first, &last
-                             &size, &out_data)) {
+int array_get(ObjectHandle obj, size_t first, size_t last, void *out_data) {
+  if (HPX_SUCCESS == hpx_run(array_get_action, &obj, &first, &last,
+                             &out_data)) {
     return kSuccess;
   } else {
     return kRuntimeError;
