@@ -1,0 +1,11 @@
+Some notes about issues or future features
+
+* In the future, we may want to have the ObjectHandle be something a little
+more specific. Perhaps a dashmm::Array object. Of course, like everything else
+it is backed by data in the GAS, but it would at least add some meaning to the
+symbols in the code.
+
+* We should get an ETA about the multiple run thing. If it looks too far out,
+we should just implement in the stupid way that we would be forced to, but leave
+in the other stuff as comments? Or something. At least in the dev branch. That
+way when it finally does work, we can make that shit happen quickly.

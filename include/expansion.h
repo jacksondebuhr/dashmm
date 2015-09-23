@@ -27,6 +27,8 @@ class Expansion {
   virtual hpx_addr_t data() const = 0;
   virtual bool valid() const = 0;
 
+  virtual bool provides_L() const = 0;
+
   virtual size_t size() const = 0;
   virtual Point center() const = 0;
 
