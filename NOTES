@@ -9,3 +9,8 @@ symbols in the code.
 we should just implement in the stupid way that we would be forced to, but leave
 in the other stuff as comments? Or something. At least in the dev branch. That
 way when it finally does work, we can make that shit happen quickly.
+
+* Perhaps make some nested namespaces that hide the internal implementation
+objects so that the users do not accidentally clash with the internals. Though,
+they should never define things in dashmm namespace anyway, so this might not
+really be a problem.
