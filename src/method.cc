@@ -11,18 +11,25 @@
 namespace dashmm {
 
 
-constexpr int first_method_type_ = 0;
-constexpr int last_method_type_ = 999;
+constexpr int kFirstMethodType = 0;
+constexpr int kLastMethodType = 999;
 
 
 //This is a global quantity containing the next available type for methods
 // this is an integer. This is only used from locality zero. Other localities
 // will send requests to locality zero for a new type identifier.
-int next_available_method_ = first_method_type_;
+int next_available_method_ = kFirstMethodType;
 
 
 //The mapping from type to table entries
 std::map<int, MethodDesc> method_table_;
+
+
+//Types for user-marshalled actions
+struct register_method_params_t {
+  int type;
+  MethodDesc desc;
+};
 
 
 /////////////////////////////////////////////////////////////////////
@@ -30,27 +37,37 @@ std::map<int, MethodDesc> method_table_;
 /////////////////////////////////////////////////////////////////////
 
 
-int register_method_handler(int type, size_t params, hpx_action_t compat,
-                            hpx_action_t gen, hpx_action_t agg,
-                            hpx_action_t inherit, hpx_action_t proc,
-                            hpx_action_t reftest) {
-  MethodDesc desc{params, compat, gen, agg, inherit, proc, reftest};
-  assert(method_table[type].count() == 0 && "Registering method over existing");
-  method_table_[type] = desc;
+int register_method_handler(register_method_params_t *parms, size_t size) {
+  assert(method_table_[parms->type].count() == 0
+            && "Registering method over existing");
+  method_table_[parms->type] = parms->desc;
   return HPX_SUCCESS;
 }
-HPX_ACTION(HPX_DEFAULT, 0, register_method_action, register_method_handler,
-           HPX_INT, HPX_SIZE_T, HPX_ACTION_T, HPX_ACTION_T, HPX_ACTION_T,
-           HPX_ACTION_T, HPX_ACTION_T, HPX_ACTION_T);
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+           register_method_action, register_method_handler,
+           HPX_POINTER, HPX_SIZE_T);
 
 
-int request_next_method_identifier_handler(void *UNUSED, size_t UNWANTED) {
+int request_next_method_identifier_handler(void *UNUSED) {
   int retval = sync_fadd(&next_available_method_, 1, SYNC_ACQ_REL);
-  assert(retval <= last_method_type_ && "Out of methods, somehow...");
+  assert(retval <= kLastMethodType && "Out of methods, somehow...");
   HPX_THREAD_CONTINUE(retval);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, request_next_method_identifier_action
-           request_next_method_identifier_handler, HPX_POINTER, HPX_SIZE_T);
+HPX_ACTION(HPX_DEFAULT, 0, request_next_method_identifier_action
+           request_next_method_identifier_handler, HPX_POINTER);
+
+
+int method_generate_handler(int expand_type, hpx_action_t genfunc) {
+  hpx_addr_t source_node = hpx_thread_current_target();
+  SourceNode node{source_node};
+  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
+  generate_handler_t func = hpx_action_get_handler(genfunc);
+  func(node, expand);
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           method_generate_action, method_generate_handler,
+           HPX_INT, HPX_ACTION_T);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -61,7 +78,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, request_next_method_identifier_action
 const MethodDesc &get_method_desc(int type) {
   auto entry = method_table_.find(type);
   if (entry == method_table_.end()) {
-    return method_table_[first_method_type_];
+    return method_table_[kFirstMethodType];
   } else {
     return *entry;
   }
@@ -71,7 +88,7 @@ const MethodDesc &get_method_desc(int type) {
 int request_next_method_identifier() {
   int retval{0};
   hpx_call_sync(HPX_THERE(0), request_next_method_identifier_action,
-                &retval, sizeof(retval), nullptr, 0);
+                &retval, sizeof(retval), nullptr);
   return retval;
 }
 
@@ -81,48 +98,37 @@ int request_next_method_identifier() {
 /////////////////////////////////////////////////////////////////////
 
 
-int register_method(size_t params, hpx_action_t compat,
-                    hpx_action_t gen, hpx_action_t agg, hpx_action_t inherit,
-                    hpx_action_t proc, hpx_action_t reftest) {
-  int retval = request_next_method_identifier();
-  hpx_bcast_rsync(register_method_action, &retval, &params, &compat, &gen,
-                  &agg, &inherit, &proc, &reftest);
-  return retval;
-}
-
-
 Method::Method(int type, std::vector<double> parms) {
   type_ = type;
   table_ = get_method_desc(type);
   if (table_.compatible_with_function == HPX_ACTION_NULL) {
-    type_ = first_method_type_;
+    type_ = kFirstMethodType;
   } else {
     params_ = parms;
   }
 }
 
 
-bool Method::valid() const {
-  return type_ != first_method_type_;
+bool Method::compatible_with(const Expansion &expand) const {
+  compatible_with_handler_t func =
+            hpx_action_get_handler(table_.compatible_with_function);
+  return func(expand);
 }
 
 
-hpx_addr_t Method::compatible_with(hpx_addr_t sync,
-                                   const Expansion *expand) const {
-  hpx_addr_t retval = sync;
-  if (retval == HPX_NULL) {
-    retval = hpx_lco_future_new(sizeof(bool));
+hpx_addr_t Method::generate(hpx_addr_t sync, SourceNode &curr,
+                            const Expansion &expand) const {
+  hpx_addr_t retval{sync};
+  if (sync == HPX_NULL) {
+    retval = hpx_lco_future_new(0);
+    assert(retval != HPX_NULL);
   }
 
-  hpx_call();
+  int type{expand.type()};
+  hpx_action_t genfunc{table_.generate_function};
+  hpx_call(curr.data(), method_generate_action, retval, &type, &genfunc);
 
   return retval;
-}
-
-
-hpx_addr_t Method::generate(hpx_addr_t sync, SourceNode *curr,
-                    const Expansion *expand) const {
-  //
 }
 
 
@@ -149,6 +155,15 @@ hpx_addr_t Method::refine_test(hpx_addr_t sync, bool same_sources_and_targets,
                             const TargetNode *curr,
                             const std::vector<SourceNode *> &consider) const {
   //
+}
+
+
+int register_method(MethodDesc desc) {
+  register_method_params_t parms{};
+  parms.type = request_next_method_identifier();
+  parms.desc = desc;
+  hpx_bcast_rsync(register_method_action, &parms, sizeof(parms));
+  return parms.type;
 }
 
 
