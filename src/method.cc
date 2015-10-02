@@ -70,6 +70,33 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_INT, HPX_ACTION_T);
 
 
+int method_aggregate_handler(int expand_type, hpx_action_t aggfunc) {
+  hpx_addr_t source_node = hpx_thread_current_target();
+  SourceNode node{source_node};
+  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
+  aggregate_handler_t func = hpx_action_get_handler(aggfunc);
+  func(node, expand);
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           method_aggregate_action, method_aggregate_handler,
+           HPX_INT, HPX_ACTION_T);
+
+
+int method_inherit_handler(int expand_type, hpx_action_t inhfunc,
+                           int which_child) {
+  hpx_addr_t target_node = hpx_thread_current_target();
+  TargetNode node{target_node};
+  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
+  inherit_handler_t func = hpx_action_get_handler(inhfunc);
+  func(node, expand, which_child);
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           method_inherit_action, method_inherit_handler,
+           HPX_INT, HPX_ACTION_T, HPX_INT);
+
+
 /////////////////////////////////////////////////////////////////////
 // Internal routines
 /////////////////////////////////////////////////////////////////////
@@ -132,15 +159,36 @@ hpx_addr_t Method::generate(hpx_addr_t sync, SourceNode &curr,
 }
 
 
-hpx_addr_t Method::aggregate(hpx_addr_t sync, SourceNode *curr,
-                     const Expansion *expand) const {
-  //
+hpx_addr_t Method::aggregate(hpx_addr_t sync, SourceNode &curr,
+                     const Expansion &expand) const {
+  hpx_addr_t retval{sync};
+  if (sync == HPX_NULL) {
+    retval = hpx_lco_future_new(0);
+    assert(retval != HPX_NULL);
+  }
+
+  int type{expand.type()};
+  hpx_action_t aggfunc{table_.aggregate_function};
+  hpx_call(curr.data(), method_aggregate_action, retval, &type, &aggfunc);
+
+  return retval;
 }
 
 
-hpx_addr_t Method::inherit(hpx_addr_t sync, TargetNode *curr,
-                           const Expansion *expand, size_t which_child) const {
-  //
+hpx_addr_t Method::inherit(hpx_addr_t sync, TargetNode &curr,
+                           const Expansion &expand, size_t which_child) const {
+  hpx_action_t retval{sync};
+  if (sync == HPX_NULL) {
+    retval = hpx_lco_future_new(0);
+    assert(retval != HPX_NULL);
+  }
+
+  int type{expand.type()};
+  hpx_action_t inhfunc{table_.inherit_function};
+  hpx_call(curr.data(), method_inherit_action, retval, &type, &inhfunc,
+           &which_child);
+
+  return retval;
 }
 
 

@@ -24,6 +24,8 @@ class Method {
   //Types that the functions implementing these need to take
   typedef bool (*compatible_with_handler_t)(const Expansion &);
   typedef void (*generate_handler_t)(SourceNode &, const Expansion &);
+  typedef void (*aggregate_handler_t)(SourceNode &, const Expansion &);
+  typedef void (*inherit_handler_t)(TargetNode &, const Expansion &, int which_child);
 
   //Generall speaking, built-in methods will not be constructed this way by
   // the user. This form should only be used to create the first instance of
@@ -41,11 +43,11 @@ class Method {
   bool compatible_with(const Expansion &expand) const;
   hpx_addr_t generate(hpx_addr_t sync, SourceNode &curr,
                       const Expansion &expand) const;
-
-  hpx_addr_t aggregate(hpx_addr_t sync, SourceNode *curr,
-                       const Expansion *expand) const;
-  hpx_addr_t inherit(hpx_addr_t sync, TargetNode *curr, const Expansion *expand,
+  hpx_addr_t aggregate(hpx_addr_t sync, SourceNode &curr,
+                       const Expansion &expand) const;
+  hpx_addr_t inherit(hpx_addr_t sync, TargetNode &curr, const Expansion &expand,
                      size_t which_child) const;
+
   hpx_addr_t process(hpx_addr_t sync, TargetNode *curr,
                      std::vector<SourceNode *> &consider,
                      bool curr_is_leaf) const;
