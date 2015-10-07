@@ -25,20 +25,21 @@ class Method {
   typedef bool (*compatible_with_handler_t)(const Expansion &);
   typedef void (*generate_handler_t)(SourceNode &, const Expansion &);
   typedef void (*aggregate_handler_t)(SourceNode &, const Expansion &);
-  typedef void (*inherit_handler_t)(TargetNode &, const Expansion &, int which_child);
+  typedef void (*inherit_handler_t)(TargetNode &, const Expansion &, int);
+  typedef void (*process_handler_t)(TargetNode &, std::vector<SourceNode> &,
+                                    bool);
+  typedef bool (*refine_test_handler_t)(bool, TargetNode &,
+                                        std::vector<SourceNode> &);
 
   //Generall speaking, built-in methods will not be constructed this way by
   // the user. This form should only be used to create the first instance of
   // a method. For the built-in methods, this is handled by dashmm. For user-
   // defined methods, the user will need to perform this at least once.
-  //
-  //Though, this will also occur when we copy a method remotely. So we need
-  // some mechanism to do that easily...
   Method(int type, std::vector<double> parms);
-  // Otherwise, we generally just do copy construction from a prototype.
+  explicit Method(hpx_addr_t met) {data_ = met;}
 
-  bool valid() const {return type != kFirstMethodType;}
-  int type() const {return type_;}
+  bool valid() const;
+  int type() const;
 
   bool compatible_with(const Expansion &expand) const;
   hpx_addr_t generate(hpx_addr_t sync, SourceNode &curr,
@@ -47,15 +48,17 @@ class Method {
                        const Expansion &expand) const;
   hpx_addr_t inherit(hpx_addr_t sync, TargetNode &curr, const Expansion &expand,
                      size_t which_child) const;
-
-  hpx_addr_t process(hpx_addr_t sync, TargetNode *curr,
-                     std::vector<SourceNode *> &consider,
+  hpx_addr_t process(hpx_addr_t sync, TargetNode &curr,
+                     std::vector<SourceNode> &consider,
                      bool curr_is_leaf) const;
   hpx_addr_t refine_test(hpx_addr_t sync, bool same_sources_and_targets,
-                           const TargetNode *curr,
+                           const TargetNode &curr,
                            const std::vector<SourceNode *> &consider) const;
 
  private:
+  hpx_addr_t data_;
+
+
   int type_;
   const MethodDesc &table_;
   std::vector<double> params_;

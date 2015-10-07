@@ -8,20 +8,24 @@
 
 namespace dashmm {
 
-
+//These provide instances of these expansions
 Expansion *laplace_cartesian_expansion();
+Expansion *laplace_COM_expansion();
 Expansion *laplace_spherical_harmonic_expansion(int n_digits);
 
+//These provide instances of these methods
 Method *bh_method(double theta);
 Method *fmm_classic_method();
 
 
-//TODO: add a few routines that will provide the MethodDesc or ExpansionDesc
-// for these builtins. This will allow the user to make modified versions of
-// these easily. Also, we can use these routines during init to register the
-// built-ins ourselves. This means the implementation of these manually
-// constructs the description each time it is called, but whatever. That is
-// init code.
+//These provide the description of these expansions
+ExpansionDesc laplace_cartesian_expansion_description();
+ExpansionDesc laplace_COM_expansion_description();
+ExpansionDesc laplace_spherical_harmonic_expansion_description();
+
+//These provide the description of these methods
+MethodDesc bh_method_description();
+MethodDesc fmm_classic_description();
 
 
 } // namespace dashmm

@@ -8,6 +8,7 @@
 
 #include "include/domaingeometry.h"
 #include "include/index.h"
+#include "include/method.h"
 
 
 namespace dashmm {

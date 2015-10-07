@@ -24,7 +24,7 @@ class SourceNode {
   // this returns an LCO to signal that partition is complete (this does not
   // mean that generation and aggregation are complete)
   hpx_addr_t partition(hpx_addr_t first, hpx_addr_t last, int limit,
-                 hpx_addr_t expand);
+                       hpx_addr_t expand);
 
   //queries
   bool is_leaf() const;

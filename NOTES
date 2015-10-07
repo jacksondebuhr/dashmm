@@ -14,3 +14,11 @@ way when it finally does work, we can make that shit happen quickly.
 objects so that the users do not accidentally clash with the internals. Though,
 they should never define things in dashmm namespace anyway, so this might not
 really be a problem.
+
+* Go through the code and add markers that indicate that sections work only
+in SMP mode. This will help us easily identify things to improve after the
+first release.
+
+* We will need to improve the error handling in this thing quite a bit.
+Basically any way that the user-facing methods can go wrong should return
+sensible error where possible instead of just being assertions that fail.

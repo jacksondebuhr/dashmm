@@ -17,6 +17,14 @@ struct ArrayMetaData {
   size_t size;
 };
 
+//TODO: decide if this needs to be upgraded to a class, or if this is
+// sufficient. At the moment, we are only using this internally, so this
+// might be good enough.
+struct ArrayIterator {
+  hpx_addr_t data;
+  size_t block_size;
+}
+
 
 /////////////////////////////////////////////////////////////////////
 // Actions
