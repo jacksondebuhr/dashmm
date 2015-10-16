@@ -20,6 +20,9 @@ enum ReturnCode {
 };
 
 
+//TODO
+//we should likely make this into a class to avoid errors in usage reporting
+// on hpx_addr_t or something...
 using ObjectHandle = hpx_addr_t;
 
 

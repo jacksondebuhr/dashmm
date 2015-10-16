@@ -2,10 +2,9 @@
 
 #include <map>
 
-#include "hpx/hpx.h"
-#include "libsync/sync.h"
+#include <hpx/hpx.h>
 
-//other dashmm stuff
+#include "include/reductionops.h"
 
 
 namespace dashmm {
@@ -14,21 +13,15 @@ namespace dashmm {
 //The range of Expansion type identifiers
 constexpr int kFirstExpansionType = 1000;
 constexpr int kLastExpansionType = 1999;
-
-//A global kept by locality zero
-int next_available_expansion_ = kFirstExpansionType;
+constexpr int kFirstUserExpansionType = 2000;
+constexpr int kLastUserExpansionType = 2999;
 
 
 //map from type to description of that type
-std::map<int, ExpansionDesc> expansion_table_;
+std::map<int, hpx_action_t> expansion_table_;
 
 
 //parameter types for user-marshalled actions
-struct register_expansion_params_t {
-  int type;
-  ExpansionDesc desc;
-  hpx_action_t coregen;
-};
 
 
 /////////////////////////////////////////////////////////////////////
@@ -53,35 +46,26 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            HPX_POINTER, HPX_SIZE_T);
 
 
-int request_next_expansion_identifier_handler(void *UNUSED) {
-  int retval = sync_fadd(&next_available_expansion_, 1, SYNC_ACQ_REL);
-  assert(retval <= kLastExpansionType && "Out of expansions, somehow...");
-  HPX_THREAD_CONTINUE(retval);
-}
-HPX_ACTION(HPX_DEFAULT, 0, request_next_expansion_identifier_action,
-           request_next_expansion_identifier_handler, HPX_POINTER);
-
-
 /////////////////////////////////////////////////////////////////////
 // Internal Routines
 /////////////////////////////////////////////////////////////////////
 
 
-const ExpansionDesc &get_expansion_desc(int type) {
+std::unique_ptr<Expansion> create_expansion(int type, size_t size, void *data) {
   auto entry = expansion_table_.find(type);
   if (entry == expansion_table_.end()) {
-    return expansion_table_[kFirstExpansionType];
-  } else {
-    return *entry;
+    return std::unique_ptr<Expansion>{nullptr};
   }
+  expansion_creation_function_t func =
+      reinterpret_cast<expansion_creation_function_t>(
+        hpx_action_get_handler(entry->second)
+      );
+  return std::unique_ptr<Expansion>{func(size, data)};
 }
 
 
-int request_next_expansion_identifier() {
-  int retval{0};
-  hpx_call_sync(HPX_THERE(0), request_next_expansion_identifier_action,
-                &retval, sizeof(retval), nullptr);
-  return retval;
+void expansion_serialization_deleter(ExpansionSerial *p) {
+  hpx_free_registered(p);
 }
 
 
@@ -90,87 +74,36 @@ int request_next_expansion_identifier() {
 /////////////////////////////////////////////////////////////////////
 
 
-void Expansion::destroy() {
+int register_expansion(int type, hpx_action_t creator) {
+  int nlocs = hpx_get_num_ranks();
+  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
+                                          int_sum_ident_op, int_sum_op);
+  assert(checker != HPX_NULL);
+  hpx_bcast_lsync(register_expansion_action, HPX_NULL, &type, &creator,
+                  &checker);
+  int checkval{0};
+  hpx_lco_get(checker, sizeof(int), &checkval);
+  return (checkval == 0);
 }
 
 
-Point Expansion::center() const {
+ExpansionSerialPtr expansion_serialization_allocator(size_t size) {
+  ExpansionSerial *p = static_cast<ExpansionSerial *>(
+      hpx_malloc_registered(size));
+  return ExpansionSerialPtr{p, expansion_serialization_deleter};
 }
 
 
-std::complex<double> Expansion::term(size_t i) const {
-}
-
-
-std::unique_ptr<Expansion> Expansion::S_to_M(Point center,
-                                  std::vector<Source>::iterator first,
-                                  std::vector<Source>::iterator last) const {
-  //
-}
-
-
-std::unique_ptr<Expansion> Expansion::S_to_L(Point center,
-                                  std::vector<Source>::iterator first,
-                                  std::vector<Source>::iterator last) const {
-  //
-}
-
-
-std::unique_ptr<Expansion> Expansion::M_to_M(int from_child,
-                                             double s_size) const {
-  //
-}
-
-
-std::unique_ptr<Expansion> Expansion::M_to_L(Index s_index, double s_size,
-                                  Index t_index) const {
-  //
-}
-
-
-std::unique_ptr<Expansion> Expansion::L_to_L(int to_child,
-                                             double t_size) const {
-}
-
-
-void Expansion::M_to_T(std::vector<Target>::iterator first,
-            std::vector<Target>::iterator last) const {
-  //
-}
-
-
-void Expansion::L_to_T(std::vector<Target>::iterator first,
-            std::vector<Target>::iterator last) const {
-  //
-}
-
-
-void Expansion::S_to_T(std::vector<Source>::iterator s_first,
-            std::vector<Source>::iterator s_last,
-            std::vector<Target>::iterator t_first,
-            std::vector<Target>::iterator t_last) const {
-  //
-}
-
-void Expansion::add_expansion(const Expansion *temp1) {
-}
-
-
-void Expansion::from_sum(const std::vector<const Expansion *> &exps) {
-}
-
-
-std::unique_ptr<Expansion> Expansion::get_new_expansion(Point center) const {
-}
-
-
-int register_expansion(ExpansionDesc desc, hpx_action_t coregen) {
-  register_expansion_params_t parms{};
-  parms.type = request_next_expansion_identifier();
-  parms.desc = desc;
-  parms.coregen = coregen;
-  hpx_bcast_rsync(register_expansion_action, &parms, sizeof(parms));
-  return parms.type;
+ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where) {
+  if (exp == nullptr) {
+    return ExpansionRef{HPX_NULL};
+  }
+  ExpansionSerialPtr serial = met->serialize();
+  size_t size = serial->size + sizeof(ExpansionSerial);
+  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
+  assert(data != HPX_NULL);
+  hpx_gas_memput_rsync(data, serial.get(), size);
+  return data;
 }
 
 

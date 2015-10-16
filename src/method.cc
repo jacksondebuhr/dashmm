@@ -1,11 +1,11 @@
 #include "method.h"
 
 #include <map>
+#include <memory>
 
-#include "hpx/hpx.h"
-#include "libsync/sync.h"
+#include <hpx/hpx.h>
 
-//other dashmm stuff
+#include "include/reductionops.h"
 
 
 namespace dashmm {
@@ -13,46 +13,17 @@ namespace dashmm {
 
 constexpr int kFirstMethodType = 0;
 constexpr int kLastMethodType = 999;
+constexpr int kFirstUserMethodType = 1000;
+constexpr int kLastUserMethodType = 1999;
 
-
-//This is a global quantity containing the next available type for methods
-// this is an integer. This is only used from locality zero. Other localities
-// will send requests to locality zero for a new type identifier.
-int next_available_method_ = kFirstMethodType;
 
 
 //The mapping from type to table entries
-std::map<int, MethodDesc> method_table_;
-
-
-//The Method's data
-struct MethodData {
-  int type;
-  const MethodDesc &table;
-  size_t param_count;
-  double params[];
-};
+std::map<int, hpx_action_t> method_table_;
 
 
 //Types for user-marshalled actions
-struct register_method_params_t {
-  int type;
-  MethodDesc desc;
-};
 
-struct method_process_params_t {
-  hpx_action_t procfunc;
-  bool curr_is_leaf;
-  size_t consider_size;
-  hpx_addr_t consider[];
-};
-
-struct method_refine_test_params_t {
-  hpx_action_t refine_func;
-  bool same_sources_and_targets;
-  size_t consider_size;
-  hpx_addr_t consider[];
-};
 
 
 /////////////////////////////////////////////////////////////////////
@@ -60,97 +31,19 @@ struct method_refine_test_params_t {
 /////////////////////////////////////////////////////////////////////
 
 
-int register_method_handler(register_method_params_t *parms, size_t size) {
-  assert(method_table_[parms->type].count() == 0
-            && "Registering method over existing");
-  method_table_[parms->type] = parms->desc;
+int register_method_handler(int type, hpx_action_t creator, hpx_addr_t check) {
+  int checkval = 0;
+  if (method_table_[type].count() != 0) {
+    int checkval = 1;
+  } else {
+    method_table_[type] = creator;
+  }
+  hpx_lco_set_lsync(check, sizeof(int), &checkval, HPX_NULL);
   return HPX_SUCCESS;
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+HPX_ACTION(HPX_DEFAULT, 0,
            register_method_action, register_method_handler,
-           HPX_POINTER, HPX_SIZE_T);
-
-
-int request_next_method_identifier_handler(void *UNUSED) {
-  int retval = sync_fadd(&next_available_method_, 1, SYNC_ACQ_REL);
-  assert(retval <= kLastMethodType && "Out of methods, somehow...");
-  HPX_THREAD_CONTINUE(retval);
-}
-HPX_ACTION(HPX_DEFAULT, 0, request_next_method_identifier_action
-           request_next_method_identifier_handler, HPX_POINTER);
-
-
-int method_generate_handler(int expand_type, hpx_action_t genfunc) {
-  hpx_addr_t source_node = hpx_thread_current_target();
-  SourceNode node{source_node};
-  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
-  generate_handler_t func = hpx_action_get_handler(genfunc);
-  func(node, expand);
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           method_generate_action, method_generate_handler,
-           HPX_INT, HPX_ACTION_T);
-
-
-int method_aggregate_handler(int expand_type, hpx_action_t aggfunc) {
-  hpx_addr_t source_node = hpx_thread_current_target();
-  SourceNode node{source_node};
-  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
-  aggregate_handler_t func = hpx_action_get_handler(aggfunc);
-  func(node, expand);
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           method_aggregate_action, method_aggregate_handler,
-           HPX_INT, HPX_ACTION_T);
-
-
-int method_inherit_handler(int expand_type, hpx_action_t inhfunc,
-                           int which_child) {
-  hpx_addr_t target_node = hpx_thread_current_target();
-  TargetNode node{target_node};
-  Expansion expand{expand_type, Point{0.0, 0.0, 0.0}, false};
-  inherit_handler_t func = hpx_action_get_handler(inhfunc);
-  func(node, expand, which_child);
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           method_inherit_action, method_inherit_handler,
-           HPX_INT, HPX_ACTION_T, HPX_INT);
-
-
-int method_process_handler(method_process_params_t *parms, size_t size) {
-  hpx_addr_t target_node = hpx_thread_current_target();
-  TargetNode node{target_node};
-  std::vector<SourceNode> consider(parms->consider_size);
-  for (size_t i = 0; i < parms->consider_size; ++i) {
-    consider[i] = SourceNode{parms->consider[i]};
-  }
-  process_handler_t func = hpx_action_get_handler(parms->procfunc);
-  func(node, consider, parms->curr_is_leaf);
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-           method_process_action, method_process_handler,
-           HPX_POINTER, HPX_SIZE_T);
-
-
-int method_refine_test_handler(method_refine_test_params_t *parms,
-                               size_t size) {
-  hpx_addr_t target_node = hpx_thread_current_target();
-  TargetNode node{target_node};
-  std::vector<SourceNode> consider(parms->consider_size);
-  for (size_t i = 0; i < parms.consider_size; ++i) {
-    consider[i] = SourceNode{parms->consider[i]};
-  }
-  refine_test_handler_t func = parms->refine_func;
-  bool result = func(parms->same_sources_and_targets, node, consider);
-  HPX_THREAD_CONTINUE(result);
-}
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-           method_refine_test_action, method_refine_test_handler,
-           HPX_POINTER, HPX_SIZE_T);
+           HPX_INT, HPX_ACTION_T, HPX_ADDR_T);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -158,53 +51,21 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
 /////////////////////////////////////////////////////////////////////
 
 
-const MethodDesc &get_method_desc(int type) {
+std::unique_ptr<Method> create_method(int type, size_t size, void *data) {
   auto entry = method_table_.find(type);
   if (entry == method_table_.end()) {
-    return method_table_[kFirstMethodType];
-  } else {
-    return *entry;
+    return std::unique_ptr<Method>{nullptr};
   }
+  method_creation_function_t func =
+      reinterpret_cast<method_creation_function_t>(
+        hpx_action_get_handler(entry->second)
+      );
+  return std::unique_ptr<Method>{func(size, data)};
 }
 
 
-int request_next_method_identifier() {
-  int retval{0};
-  hpx_call_sync(HPX_THERE(0), request_next_method_identifier_action,
-                &retval, sizeof(retval), nullptr);
-  return retval;
-}
-
-
-size_t size_of_method_process_params(size_t count) {
-  return sizeof(method_process_params_t) + sizeof(hpx_addr_t) * count;
-}
-
-
-size_t size_of_method_refine_test_params(size_t count) {
-  return sizeof(method_refine_test_params_t) + sizeof(hpx_addr_t) * count;
-}
-
-
-size_t size_of_method_data(MethodData *mdata) {
-  return sizeof(MethodData) + mdata->param_count * sizeof(double);
-}
-
-
-MethodData *method_data_pin(hpx_addr_t data) {
-  MethodData *local{nullptr};
-  assert(hpx_gas_try_pin(data, (void **)&local));
-  return local;
-}
-
-
-void method_data_unpin(hpx_addr_t data) {
-  hpx_gas_unpin(data);
-}
-
-
-void method_is_valid(MethodData *method) {
-  return method->type != kFirstMethodType;
+void method_serialization_deleter(MethodSerial *p) {
+  hpx_free_registered(p);
 }
 
 
@@ -213,162 +74,35 @@ void method_is_valid(MethodData *method) {
 /////////////////////////////////////////////////////////////////////
 
 
-Method::Method(int type, std::vector<double> parms) {
-  data_ = hpx_gas_alloc(1, size_of_method_data(parms.size()), 0,
-                        HPX_DIST_TYPE_LOCAL);
-  assert(data_ != HPX_NULL);
 
-  MethodData *method = method_data_pin(data_);
-  method->type = type;
-  //NOTE: This only works in SMP. In distributed, we will need to keep refinding
-  // this reference when we use the MethodData
-  method->table = get_method_desc(type);
-  if (method->table.compatible_with_function == HPX_ACTION_NULL) {
-    method->type = kFirstMethodType;
-  } else {
-    method->param_count = parms.size();
-    for (size_t i = 0; i < parms.size(); ++i) {
-      method->params[i] = parms[i];
-    }
+bool register_method(int type, hpx_action_t creator) {
+  int nlocs = hpx_get_num_ranks();
+  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
+                                          int_sum_ident_op, int_sum_op);
+  assert(checker != HPX_NULL);
+  hpx_bcast_lsync(register_method_action, HPX_NULL, &type, &creator, &checker);
+  int checkval{0};
+  hpx_lco_get(checker, sizeof(int), &checkval);
+  return (checkval == 0);
+}
+
+
+MethodSerialPtr method_serialization_allocator(size_t size) {
+  MethodSerial *p = static_cast<MethodSerial *>(hpx_malloc_registered(size));
+  return MethodSerialPtr{p, method_serialization_deleter};
+}
+
+
+ObjectHandle globalize_method(Method *met, hpx_addr_t where) {
+  if (met == nullptr) {
+    return HPX_NULL;
   }
-  method_data_unpin(data_);
-}
-
-
-bool Method::valid() const {
-  return type() != kFirstMethodType;
-}
-
-
-int Method::type() const {
-  MethodData *method = method_data_pin(data_);
-  int retval{method->type};
-  method_data_unpin(data_);
-  return retval;
-}
-
-
-bool Method::compatible_with(const Expansion &expand) const {
-  MethodData *method = method_data_pin(data_);
-  assert(method_is_valid(method));
-  compatible_with_handler_t func =
-            hpx_action_get_handler(method->table_.compatible_with_function);
-  method_data_unpin(data_);
-  return func(expand);
-}
-
-
-hpx_addr_t Method::generate(hpx_addr_t sync, SourceNode &curr,
-                            const Expansion &expand) const {
-  hpx_addr_t retval{sync};
-  if (sync == HPX_NULL) {
-    retval = hpx_lco_future_new(0);
-    assert(retval != HPX_NULL);
-  }
-
-  int type{expand.type()};
-  MethodData *method = method_data_pin(data_);
-  hpx_action_t genfunc{method->table_.generate_function};
-  method_data_unpin(data_);
-  hpx_call(curr.data(), method_generate_action, retval, &type, &genfunc);
-
-  return retval;
-}
-
-
-hpx_addr_t Method::aggregate(hpx_addr_t sync, SourceNode &curr,
-                     const Expansion &expand) const {
-  hpx_addr_t retval{sync};
-  if (sync == HPX_NULL) {
-    retval = hpx_lco_future_new(0);
-    assert(retval != HPX_NULL);
-  }
-
-  int type{expand.type()};
-  MethodData *method = method_data_pin(data_);
-  hpx_action_t aggfunc{method->table_.aggregate_function};
-  method_data_unpin(data_);
-  hpx_call(curr.data(), method_aggregate_action, retval, &type, &aggfunc);
-
-  return retval;
-}
-
-
-hpx_addr_t Method::inherit(hpx_addr_t sync, TargetNode &curr,
-                           const Expansion &expand, size_t which_child) const {
-  hpx_addr_t retval{sync};
-  if (sync == HPX_NULL) {
-    retval = hpx_lco_future_new(0);
-    assert(retval != HPX_NULL);
-  }
-
-  int type{expand.type()};
-  MethodData *method = method_data_pin(data_);
-  hpx_action_t inhfunc{method->table_.inherit_function};
-  method_data_unpin(data_);
-  hpx_call(curr.data(), method_inherit_action, retval, &type, &inhfunc,
-           &which_child);
-
-  return retval;
-}
-
-
-hpx_addr_t Method::process(hpx_addr_t sync, TargetNode &curr,
-                           std::vector<SourceNode> &consider,
-                           bool curr_is_leaf) const {
-  hpx_addr_t retval{sync};
-  if (sync == HPX_NULL) {
-    retval = hpx_lco_future_new(0);
-    assert(retval != HPX_NULL);
-  }
-
-  size_t parms_size = size_of_method_process_params(consider.size());
-  method_process_params_t *parms = malloc(parms_size);
-  assert(parms != nullptr);
-  parms->proc_func = table_.process_function;
-  parms->curr_is_leaf = curr_is_leaf;
-  parms->consider_size = consider.size();
-  for (size_t i = 0; i < consider.size(); ++i) {
-    parms->consider[i] = consider[i].data();
-  }
-  hpx_call(curr.data(), method_process_action, retval, parms, parms_size);
-  free(parms);
-
-  return retval;
-}
-
-
-hpx_addr_t Method::refine_test(hpx_addr_t sync, bool same_sources_and_targets,
-                            const TargetNode &curr,
-                            const std::vector<SourceNode> &consider) const {
-  hpx_addr_t retval{sync};
-  if (sync == HPX_NULL) {
-    retval = hpx_lco_future_new(sizeof(int));
-    assert(retval != HPX_NULL);
-  }
-
-  size_t parms_size = size_of_method_refine_test_params(consider.size());
-  method_refine_test_params_t *parms = malloc(parms_size);
-  assert(parms != nullptr);
-  parms->refine_func = table_.refine_test_function;
-  parms->same_sources_and_targets = same_sources_and_targets;
-  parms->consider_size = consider.size();
-  for (size_t i = 0; i < consider.size(); ++i) {
-    parms->consider[i] = consider[i].data();
-  }
-  hpx_call(curr.data(), method_refine_test_action, retval, parms, parms_size);
-  free(parms);
-
-  return retval;
-}
-
-
-int register_method(MethodDesc desc) {
-  register_method_params_t parms{};
-  parms.type = request_next_method_identifier();
-  parms.desc = desc;
-  hpx_bcast_rsync(register_method_action, &parms, sizeof(parms));
-  return parms.type;
+  MethodSerialPtr serial = met->serialize();
+  size_t size = serial->size + sizeof(MethodSerial);
+  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
+  assert(data != HPX_NULL);
+  hpx_gas_memput_rsync(data, serial.get(), size);
+  return data;
 }
 
 

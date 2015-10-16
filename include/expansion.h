@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include "hpx/hpx.h"
+#include <hpx/hpx.h>
 
 #include "include/index.h"
 #include "include/particle.h"
@@ -16,91 +16,82 @@
 namespace dashmm {
 
 
-struct ExpansionDesc {
-  bool provides_L;
+extern constexpr int kFirstUserExpansionType;
+extern constexpr int kLastUserExpansionType;
+
+
+typedef Expansion *(*expansion_creation_function_t)(size_t, void *);
+
+
+struct ExpansionSerial {
+  int type;
+  //TODO is it useful to put common expansion stuff here?
+  //that way we could get just this stuff, and not all of the data if needed?
   size_t size;
-  hpx_action_t destroy_function;
-  hpx_action_t S_to_M_function;
-  hpx_action_t S_to_L_function;
-  hpx_action_t M_to_M_function;
-  hpx_action_t M_to_L_function;
-  hpx_action_t L_to_L_function;
-  hpx_action_t M_to_T_function;
-  hpx_action_t L_to_T_function;
-  hpx_action_t S_to_T_function;
-  hpx_action_t add_expansion_function;
-  hpx_action_t from_sum_function;
-  hpx_action_t get_new_expansion_function;
-  //The following is a pointer to shared data for each instance of the
-  // expansion. We need a copy of this data on each locality. It will be part
-  // of the lookup table about the expansion. So for expansions when we make
-  // new ones, we shall always have to look up the core pointer?
-  // Or maybe we can keep both the size and the pointer. If the size is nonzero,
-  // then look it up.
-  size_t core_size;
-  void *core;
-};
+  char data[];
+}
+
+
+using ExpansionSerialPtr =
+          std::unique_ptr<ExpansionSerial, void (*)(ExpansionSerial *)>;
 
 
 class Expansion {
  public:
-  //NOTE: This is again generally not used by the user. The preference is that
-  // user code will copy construct these objects.
-  //allocate controls if the object will allocate global memory
-  Expansion(int type, Point center, bool allocate = true);
+  virtual ~Expansion() { }
 
-  hpx_addr_t data() const {return data_;}
-  bool valid() const {return data_ != HPX_NULL;}
-  bool provides_L() const {return table_.provides_L;}
-  size_t size() const {return table_.size;}
-  int type() const {return type_;}
+  virtual int type() const = 0;
+  virtual ExpansionSerialPtr serialize() const = 0;
 
-  void destroy();
+  virtual bool provides_L() const = 0;
+  virtual size_t size() const = 0;
+  virtual Point center() const = 0;
 
-  Point center() const;
+  virtual std::complex<double> term(size_t i) const = 0;
 
-  //TODO: Finish going over these; make sure the argument and return types are
-  // solid.
+  virtual std::unique_ptr<Expansion> S_to_M(Point center,
+                                  std::vector<Source>::iterator first,
+                                  std::vector<Source>::iterator last) const = 0;
+  virtual std::unique_ptr<Expansion> S_to_L(Point center,
+                                  std::vector<Source>::iterator first,
+                                  std::vector<Source>::iterator last) const = 0;
 
-  std::complex<double> term(size_t i) const;
+  virtual std::unique_ptr<Expansion> M_to_M(int from_child,
+                                            double s_size) const = 0;
+  virtual std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
+                                            Index t_index) const = 0;
+  virtual std::unique_ptr<Expansion> L_to_L(int to_child,
+                                            double t_size) const = 0;
 
-  std::unique_ptr<Expansion> S_to_M(Point center,
-                                    std::vector<Source>::iterator first,
-                                    std::vector<Source>::iterator last) const;
-  std::unique_ptr<Expansion> S_to_L(Point center,
-                                    std::vector<Source>::iterator first,
-                                    std::vector<Source>::iterator last) const;
+  virtual void M_to_T(std::vector<Target>::iterator first,
+                      std::vector<Target>::iterator last) const = 0;
+  virtual void L_to_T(std::vector<Target>::iterator first,
+                      std::vector<Target>::iterator last) const = 0;
+  virtual void S_to_T(std::vector<Source>::iterator s_first,
+                      std::vector<Source>::iterator s_last,
+                      std::vector<Target>::iterator t_first,
+                      std::vector<Target>::iterator t_last) const = 0;
 
-  std::unique_ptr<Expansion> M_to_M(int from_child, double s_size) const;
-  std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
-                                    Index t_index) const;
-  std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
+  virtual void add_expansion(const Expansion *temp1) = 0;
+  virtual void from_sum(const std::vector<const Expansion *> &exps) = 0;
 
-  void M_to_T(std::vector<Target>::iterator first,
-              std::vector<Target>::iterator last) const;
-  void L_to_T(std::vector<Target>::iterator first,
-              std::vector<Target>::iterator last) const;
-  void S_to_T(std::vector<Source>::iterator s_first,
-              std::vector<Source>::iterator s_last,
-              std::vector<Target>::iterator t_first,
-              std::vector<Target>::iterator t_last) const;
-
-  void add_expansion(const Expansion *temp1);
-  void from_sum(const std::vector<const Expansion *> &exps);
-
-  std::unique_ptr<Expansion> get_new_expansion(Point center) const;
-
- private:
-  int type_;
-  const ExpansionDesc &table_;
-  hpx_addr_t data_;
+  virtual std::unique_ptr<Expansion> get_new_expansion(Point center) const = 0;
 };
 
 
-//The function signature for coredata generating functions
-typedef void *(*coregen_function_t)(size_t);
+//TODO: put in something for the ExpansionRef, either the definition here
+// or an inclusion of another file...
 
-int register_expansion(ExpansionDesc desc, hpx_action_t coregen);
+
+//return true on success
+//TODO hpx is exposed here...
+bool register_expansion(int type, hpx_action_t creator);
+
+//this should be used by the serialize methods for expansions
+ExpansionSerialPtr expansion_serialization_allocator(size_t size);
+
+//TODO exposure of HPX here...
+ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where);
 
 
 } // namespace dashmm
