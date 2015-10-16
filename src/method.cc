@@ -1,29 +1,23 @@
-#include "method.h"
+#include "include/method.h"
 
-#include <map>
-#include <memory>
+//C++
 
 #include <hpx/hpx.h>
 
-#include "include/reductionops.h"
+#include "include/methodref.h"
 
 
 namespace dashmm {
-
-
-constexpr int kFirstMethodType = 0;
-constexpr int kLastMethodType = 999;
-constexpr int kFirstUserMethodType = 1000;
-constexpr int kLastUserMethodType = 1999;
-
 
 
 //The mapping from type to table entries
 std::map<int, hpx_action_t> method_table_;
 
 
-//Types for user-marshalled actions
-
+constexpr int kFirstMethodType = 0;
+constexpr int kLastMethodType = 999;
+constexpr int kFirstUserMethodType = 1000;
+constexpr int kLastUserMethodType = 1999;
 
 
 /////////////////////////////////////////////////////////////////////
@@ -74,7 +68,6 @@ void method_serialization_deleter(MethodSerial *p) {
 /////////////////////////////////////////////////////////////////////
 
 
-
 bool register_method(int type, hpx_action_t creator) {
   int nlocs = hpx_get_num_ranks();
   hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
@@ -90,19 +83,6 @@ bool register_method(int type, hpx_action_t creator) {
 MethodSerialPtr method_serialization_allocator(size_t size) {
   MethodSerial *p = static_cast<MethodSerial *>(hpx_malloc_registered(size));
   return MethodSerialPtr{p, method_serialization_deleter};
-}
-
-
-ObjectHandle globalize_method(Method *met, hpx_addr_t where) {
-  if (met == nullptr) {
-    return HPX_NULL;
-  }
-  MethodSerialPtr serial = met->serialize();
-  size_t size = serial->size + sizeof(MethodSerial);
-  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
-  assert(data != HPX_NULL);
-  hpx_gas_memput_rsync(data, serial.get(), size);
-  return data;
 }
 
 

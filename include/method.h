@@ -4,6 +4,9 @@
 
 #include <vector>
 
+
+#include "include/expansionref.h"
+#include "include/node.h"
 #include "include/types.h"
 
 
@@ -37,12 +40,12 @@ class Method {
   virtual int type() const = 0;
   virtual MethodSerialPtr serialize() const = 0;
 
-  virtual bool compatible_with(const Expansion &expand) const = 0;
-  virtual void generate(SourceNode &curr, const Expansion &expand) const = 0;
-  virtual void aggregate(SourceNode &curr, const Expansion &expand) const = 0;
-  virtual void inherit(TargetNode &curr, const Expansion &expand,
+  virtual bool compatible_with(const ExpansionRef expand) const = 0;
+  virtual void generate(SourceNode &curr, const ExpansionRef expand) const = 0;
+  virtual void aggregate(SourceNode &curr, const ExpansionRef expand) const = 0;
+  virtual void inherit(TargetNode &curr, const ExpansionRef expand,
                        size_t which_child) const = 0;
-  virtual void process(TargetNode &curr, std::vector<SourceNode> &consider,
+  virtual void process(TargetNode &curr, std::vector<SourceNode *> &consider,
                        bool curr_is_leaf) const = 0;
   virtual bool refine_test(bool same_sources_and_targets,
                            const TargetNode &curr,
@@ -54,12 +57,10 @@ class Method {
 //TODO: hpx is exposed here
 bool register_method(int type, hpx_action_t creator);
 
+
 //intended use is for serialize methods to use this as an allocator
 //This is a smart pointer, that will delete itself when appropriate
 MethodSerialPtr method_serialization_allocator(size_t size);
-
-//TODO: hpx_addr_t visible here... can we fix it?
-ObjectHandle globalize_method(Method *met, hpx_addr_t where);
 
 
 } // namespace dashmm
