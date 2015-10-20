@@ -23,7 +23,7 @@ class SourceNode {
   //all the action is here
   // this returns an LCO to signal that partition is complete (this does not
   // mean that generation and aggregation are complete)
-  hpx_addr_t partition(hpx_addr_t first, hpx_addr_t last, int limit,
+  hpx_addr_t partition(hpx_addr_t parts, int n_parts, int limit,
                        hpx_addr_t expand);
 
   //queries
@@ -40,8 +40,8 @@ class SourceNode {
   SourceNode *child(size_t i) const;
   SourceNode *parent() const;
   hpx_addt_t expansion() const;
-  hpx_addr_t first() const;
-  hpx_addr_t last() const;
+  hpx_addr_t parts() const;
+  int n_parts() const;
   Point low() const;
   Point high() const;
   Point center() const;
