@@ -4,6 +4,7 @@
 
 #include <hpx/hpx.h>
 
+#include "include/expansionref.h"
 #include "include/reductionops.h"
 
 
@@ -29,21 +30,20 @@ std::map<int, hpx_action_t> expansion_table_;
 /////////////////////////////////////////////////////////////////////
 
 
-int register_expansion_handler(register_expansion_params_t *parms,
-                               size_t size) {
-  assert(expansion_table_[parms->type].count() == 0
-            && "Registering expansion over existing");
-  parms->desc.core_data = nullptr;
-  if (parms->desc.core_size) {
-    coregen_function_t func = hpx_action_gen_handler(parms->coregen);
-    parms->desc.core_data = func(parms->desc.size);
+int register_expansion_handler(int type, hpx_action_t creator,
+                               hpx_addr_t check) {
+  //
+  int checkval = 0;
+  if (expansion_table_.count(type) != 0) {
+    int checkval = 1;
+  } else {
+    expansion_table_[type] = creator;
   }
-  expansion_table_[parms->type] = parms->desc;
-  return HPX_SUCCESS;
+  hpx_lco_set_lsync(check, sizeof(int), &checkval, HPX_NULL);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+HPX_ACTION(HPX_DEFAULT, 0,
            register_expansion_action, register_expansion_handler,
-           HPX_POINTER, HPX_SIZE_T);
+           HPX_INT, HPX_ACTION_T, HPX_ADDR);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -91,19 +91,6 @@ ExpansionSerialPtr expansion_serialization_allocator(size_t size) {
   ExpansionSerial *p = static_cast<ExpansionSerial *>(
       hpx_malloc_registered(size));
   return ExpansionSerialPtr{p, expansion_serialization_deleter};
-}
-
-
-ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where) {
-  if (exp == nullptr) {
-    return ExpansionRef{HPX_NULL};
-  }
-  ExpansionSerialPtr serial = met->serialize();
-  size_t size = serial->size + sizeof(ExpansionSerial);
-  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
-  assert(data != HPX_NULL);
-  hpx_gas_memput_rsync(data, serial.get(), size);
-  return data;
 }
 
 

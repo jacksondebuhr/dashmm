@@ -54,7 +54,6 @@ class Method {
 
 
 //returns true on success
-//TODO: hpx is exposed here
 bool register_method(int type, hpx_action_t creator);
 
 

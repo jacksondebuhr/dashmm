@@ -77,7 +77,7 @@ MethodSerial *MethodRef::pin() {
 
 void MethodRef::unpin() {
   if (data_ == HPX_NULL) {
-    return nullptr;
+    return;
   }
   hpx_gas_unpin(data_);
 }

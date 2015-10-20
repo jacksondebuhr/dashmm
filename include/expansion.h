@@ -25,13 +25,17 @@ typedef Expansion *(*expansion_creation_function_t)(size_t, void *);
 
 struct ExpansionSerial {
   int type;
-  //TODO is it useful to put common expansion stuff here?
-  //that way we could get just this stuff, and not all of the data if needed?
+  bool provides_L;        //the thing returned by provides_L()
+  Point center;           //the thing returned by center()
+  size_t term_count;      //the thing returned by size()
   size_t size;
   char data[];
 }
 
 
+//TODO
+//This really should be made into a full class, so that errors and so on
+// do not expose the implementation...
 using ExpansionSerialPtr =
           std::unique_ptr<ExpansionSerial, void (*)(ExpansionSerial *)>;
 
@@ -79,19 +83,12 @@ class Expansion {
 };
 
 
-//TODO: put in something for the ExpansionRef, either the definition here
-// or an inclusion of another file...
-
-
 //return true on success
-//TODO hpx is exposed here...
 bool register_expansion(int type, hpx_action_t creator);
+
 
 //this should be used by the serialize methods for expansions
 ExpansionSerialPtr expansion_serialization_allocator(size_t size);
-
-//TODO exposure of HPX here...
-ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where);
 
 
 } // namespace dashmm

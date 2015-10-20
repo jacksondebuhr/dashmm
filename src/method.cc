@@ -27,7 +27,7 @@ constexpr int kLastUserMethodType = 1999;
 
 int register_method_handler(int type, hpx_action_t creator, hpx_addr_t check) {
   int checkval = 0;
-  if (method_table_[type].count() != 0) {
+  if (method_table_.count(type) != 0) {
     int checkval = 1;
   } else {
     method_table_[type] = creator;
@@ -37,7 +37,7 @@ int register_method_handler(int type, hpx_action_t creator, hpx_addr_t check) {
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            register_method_action, register_method_handler,
-           HPX_INT, HPX_ACTION_T, HPX_ADDR_T);
+           HPX_INT, HPX_ACTION_T, HPX_ADDR);
 
 
 /////////////////////////////////////////////////////////////////////
