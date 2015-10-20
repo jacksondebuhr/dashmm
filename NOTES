@@ -9,6 +9,8 @@ symbols in the code.
 we should just implement in the stupid way that we would be forced to, but leave
 in the other stuff as comments? Or something. At least in the dev branch. That
 way when it finally does work, we can make that shit happen quickly.
+    Jayashree says it is planned to be ready for the 2.0 release.
+    So that is perfect timing I think.
 
 * Perhaps make some nested namespaces that hide the internal implementation
 objects so that the users do not accidentally clash with the internals. Though,
@@ -22,3 +24,26 @@ first release.
 * We will need to improve the error handling in this thing quite a bit.
 Basically any way that the user-facing methods can go wrong should return
 sensible error where possible instead of just being assertions that fail.
+
+
+Interface Ideas
+
+ * We should add kDomainError where it makes sense
+
+ * Do we want a direct sum method?
+
+ * For the array get and put, should we perhaps have a template function that
+   accepts iterators here? This would make it work nicely with the STL
+
+ * Do we want to define instead SourceSpec and TargetSpec to combine the
+   relevant arguments for evaluate()?
+
+ * Is there a sensible way to templatize allocate_array?
+
+ * Eventually the expansion should have a method indicating the number of
+   charges. And the number of outputs (phi, ax, ay, az, whatever)
+
+ * We should add a routine to check compatibility without having to call
+   evaluate to check method,expansion compatibility.
+
+ * Provide C bindings before too long
