@@ -225,13 +225,21 @@ HPX_ACTION(HPX_DEFAULT, 0, node_delete_action, node_delete_handler,
            HPX_ADDR_T);
 
 
-int source_node_child_generation_done_action(node_t *node, hpx_addr_t gendone) {
-  //aggregate here
-  //TODO
+int source_node_child_generation_done_handler(node_t *node, hpx_addr_t gendone,
+                                             hpx_addr_t expand) {
+  ExpansionRef expref{expand};
+  MethodRef method{node->method};
+  SourceNode snode{hpx_thread_current_target()};
+
+  method.aggregate(snode, expref);
 
   hpx_lco_delete_sync(gendone);
   return HPX_SUCCESS;
 }
+HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+           source_node_child_generation_done_action,
+           source_node_child_generation_done_handler,
+           HPX_POINTER, HPX_ADDR, HPX_ADDR);
 
 
 int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
@@ -242,7 +250,6 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            HPX_POINTER, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT,
            HPX_ADDR);
 
-
 int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
                                   hpx_addr_t gendone, hpx_addr_t parts,
                                   int n_parts, int limit, hpx_addr_t expand) {
@@ -251,7 +258,12 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
   node->n_parts = n_parts;
   if (n_parts <= limit) {
     node->parts = parts;
-    //TODO generate from method
+
+    MethodRef method{node->method};
+    SourceNode curr{hpx_thread_current_target()};
+    ExpansionRef expref{expand};
+    methor.generate(curr, expref);
+
     hpx_lco_set(alldone, 0, nullptr, HPX_NULL, HPX_NULL);
     return HPX_SUCCESS;
   }
@@ -300,25 +312,13 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
     n_per_child[i] = splits[i + 1] - splits[i];
     if (n_per_child[i]) {
       ++n_children;
-      cparts[i] = hpx_gas_alloc_local_at_sync(sizeof(Source) * n_per_child[i],
-                                              0, HPX_HERE);
-      assert(cparts[i] != HPX_NULL);
-      hpx_addr_t from = hpx_addr_add(parts, sizeof(Source) * n_offset,
-                                     sizeof(Source) * n_parts);
-      hpx_addr_t cpydone = hpx_lco_future_new(0);
-      assert(cpydone != HPX_NULL);
-      hpx_gas_memcpy(cparts[i], from, sizeof(Source) * n_per_child[i],
-                     cpydone);
-      hpx_lco_wait(cpydone);
-      hpx_lco_delete_sync(cpydone);
+      cparts[i] = hpx_addr_add(parts, sizeof(Source) * n_offset,
+                                      sizeof(Source) * n_parts);
     } else {
       cparts[i] = HPX_NULL;
     }
     n_offset += n_per_child[i];
   }
-
-  //At this point, parts is no longer needed
-  hpx_gas_free_sync(parts);
 
   hpx_addr_t childpartdone = hpx_lco_and_new(n_children);
   assert(childpartdone != HPX_NULL);
@@ -344,7 +344,7 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
                 partdone, nullptr, 0);
   hpx_call_when(childgendone, hpx_thread_current_target(),
                 source_node_child_generation_done_action, gendone,
-                &childgendone);
+                &childgendone, &expand);
 
   return HPX_NULL;
 }
@@ -382,7 +382,6 @@ SourceNode::~SourceNode() {
 }
 
 
-//TODO
 hpx_addr_t SourceNode::partition(hpx_addr_t parts, int n_parts, int limit,
                                  hpx_addr_t expand) {
   hpx_addr_t retval = hpx_lco_future_new(0);
