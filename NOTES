@@ -47,3 +47,7 @@ Interface Ideas
    evaluate to check method,expansion compatibility.
 
  * Provide C bindings before too long
+
+ * We should also in the near term get a base nearest neighbor search. This will
+ be essential for SPH and Phil's MFV methods.
+  This would be useful in much wider contexts, however.

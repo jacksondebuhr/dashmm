@@ -48,8 +48,7 @@ class SourceNode {
   double size() const;
 
   //mutators
-  void set_expansion(hpx_addr_t expand);
-
+  void set_expansion(hpx_addr_t expand
 
  private:
   hpx_addr_t data_;
