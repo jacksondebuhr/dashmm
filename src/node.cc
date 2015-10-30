@@ -225,7 +225,7 @@ HPX_ACTION(HPX_DEFAULT, 0, node_delete_action, node_delete_handler,
            HPX_ADDR_T);
 
 
-int source_node_child_generation_done_handler(node_t *node, hpx_addr_t gendone,
+int source_node_child_generation_done_handler(NodeData *node, hpx_addr_t gendone,
                                              hpx_addr_t expand) {
   ExpansionRef expref{expand};
   MethodRef method{node->method};
@@ -242,27 +242,30 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            HPX_POINTER, HPX_ADDR, HPX_ADDR);
 
 
-int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
+int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
                                   hpx_addr_t gendone, hpx_addr_t parts,
-                                  int n_parts, int limit, hpx_addr_t expand);
+                                  int n_parts, int n_parts_total, int limit,
+                                  hpx_addr_t expand);
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            source_node_partition_action, source_node_partition_handler,
            HPX_POINTER, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT,
-           HPX_ADDR);
+           HPX_INT, HPX_ADDR);
 
-int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
+int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
                                   hpx_addr_t gendone, hpx_addr_t parts,
-                                  int n_parts, int limit, hpx_addr_t expand) {
+                                  int n_parts, int n_parts_total, int limit,
+                                  hpx_addr_t expand) {
   assert(n_parts > 0);
-  node->parts = HPX_NULL;
+  //NOTE: The following line only makes sense in SMP; In distributed, having
+  // the address of the start of parts will not work, as those are temporary
+  // global addresses. I think.
+  node->parts = parts;
   node->n_parts = n_parts;
   if (n_parts <= limit) {
-    node->parts = parts;
-
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
     ExpansionRef expref{expand};
-    methor.generate(curr, expref);
+    method.generate(curr, expref);
 
     hpx_lco_set(alldone, 0, nullptr, HPX_NULL, HPX_NULL);
     return HPX_SUCCESS;
@@ -313,7 +316,7 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
     if (n_per_child[i]) {
       ++n_children;
       cparts[i] = hpx_addr_add(parts, sizeof(Source) * n_offset,
-                                      sizeof(Source) * n_parts);
+                                      sizeof(Source) * n_parts_total);
     } else {
       cparts[i] = HPX_NULL;
     }
@@ -337,7 +340,7 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
     node->child[i] = kid.data();
 
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, &childpartdone,
-             &childgendone, &cparts[i], &n_per_child[i], &limit, &expand);
+             &childgendone, &cparts[i], &n_per_child[i], &n_parts_total, &limit, &expand);
   }
 
   hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
@@ -347,6 +350,155 @@ int source_node_partition_handler(node_t *node, hpx_addr_t partdone,
                 &childgendone, &expand);
 
   return HPX_NULL;
+}
+
+
+struct TargetNodePartitionParams {
+  hpx_addr_t done;
+  bool same_sources_and_targets;
+  hpx_addr_t parts;
+  int n_parts;
+  int n_parts_total;
+  int limit;
+  hpx_addr_t expansion;
+  int which_child;
+  int n_consider;
+  hpx_addr_t consider[];
+};
+
+size_t target_node_partition_params_size(int n_consider) {
+  return sizeof(TargetNodePartitionParams) + n_consider * sizeof(hpx_addr_t);
+}
+
+TargetNodeParitionParams *target_node_partition_params_alloc(int n_consider) {
+  TargetNodeParitionParams *retval = static_cast<TargetNodeParitionParams *>(
+      malloc(target_node_partition_params_size(n_consider));
+  if (retval) {
+    retval->n_consider = n_consider;
+  }
+  return retval;
+}
+
+int target_node_partition_handler(NodeData *node,
+                                  TargetNodeParitionParams *parms,
+                                  size_t bytes);
+HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
+           target_node_partition_action, target_node_partition_handler,
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+
+int target_node_partition_handler(NodeData *node,
+                                  TargetNodeParitionParams *parms,
+                                  size_t bytes) {
+  node->parts = parms->parts;
+  node->n_parts = parms->n_parts;
+
+  bool refine = false;
+  MethodRef method{node->method};
+  TargetNode curr{hpx_thread_current_target()};
+  std::vector<SourceNode> consider{};
+  for (size_t i = 0; i < parms->n_consider; ++i) {
+    consider.push_back(SourceNode{parms->consider[i]});
+  }
+
+  if (parms->n_parts > parms->limit) {
+    refine = method.refine_test(parms->same_sources_and_targets, curr,
+                                consider);
+  }
+
+  ExpansionRef expand{parms->expand};
+  method.inherit(curr, expand, parms->which_child);
+  //If we are not going to refine, then curr is a leaf
+  method.process(curr, consider, !refine);
+
+  if (refine) {
+    //partition
+    Target *P{nullptr};
+    assert(hpx_gas_try_pin(parms->parts, (void **)T));
+    Target *splits[9]{};
+    splits[0] = T;
+    splits[8] = &T[parms->n_parts];
+
+    Point cen{center()};
+    double z_center = cen.z();
+    auto z_comp = [&z_center](Target a) {
+      return a.z() < z_center;
+    };
+    splits[4] = std::partition(splits[0], splits[8], z_comp);
+
+    double y_center = cen.y();
+    auto y_comp = [&y_center](Target a) {
+      return a.y() < y_center;
+    };
+    splits[2] = std::partition(splits[0], splits[4], y_comp);
+    splits[6] = std::partition(splits[4], splits[8], y_comp);
+
+    double x_center = cen.x();
+    auto x_comp = [&x_center](Target a) {
+      return a.x() < x_center;
+    };
+    splits[1] = std::partition(splits[0], splits[2], z_comp);
+    splits[3] = std::partition(splits[2], splits[4], z_comp);
+    splits[5] = std::partition(splits[4], splits[6], z_comp);
+    splits[7] = std::partition(splits[6], splits[8], z_comp);
+    hpx_gas_unpin(parms->parts);
+
+    hpx_addr_t cparts[8];
+    int n_per_child[8]{0, 0, 0, 0, 0, 0, 0, 0};
+    int n_children{0};
+    int n_offset{0};
+    for (int i = 0; i < 8; ++i) {
+      n_per_child[i] = splits[i + 1] - splits[i];
+      if (n_per_child[i]) {
+        ++n_children;
+        cparts[i] = hpx_addr_add(parts, sizeof(Source) * n_offset,
+                                        sizeof(Source) * parms->n_parts_total);
+      } else {
+        cparts[i] = HPX_NULL;
+      }
+      n_offset += n_per_child[i];
+    }
+
+    hpx_addr_t cdone = hpx_lco_and_new(n_children);
+    assert(cdone != HPX_NULL);
+
+    //We set up the arguments to the partition actions; these are the constant parts
+    TargetNodePartitionParams *args =
+        target_node_partition_params_alloc(consider.size());
+    size_t argssize = target_node_partition_params_size(consider.size());
+    args->done = cdone;
+    args->same_sources_and_targets = parms->same_sources_and_targets;
+    args->n_parts_total = parms->n_parts_total;
+    args->limit = parms->limit;
+    args->expansion = parms->expansion;
+    args->n_consider = consider.size();
+    for (size_t i = 0; i < consider.size(); ++i) {
+      args->consider[i] = consider[i].data();;
+    }
+
+    for (int i = 0; i < 8; ++i) {
+      if (n_per_child[i] == 0) {
+        node->child[i] = HPX_NULL;
+        continue;
+      }
+
+      Index cidx{node->idx.child(i)};
+      TargetNode kid{node->root_geo, cidx.x(), cidx.y(), cidx.z(), cidx.level(),
+                     node->method, hpx_thread_current_target()};
+      node->child[i] = kid.data();
+
+      args->parts = cparts[i];
+      args->n_parts = n_per_child[i];
+      args->which_child = i;
+
+      hpx_call(kid.data(), target_node_partition_action, HPX_NULL, args, argssize);
+    }
+
+    hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
+  } else {  // no refinement needed; so just set the input done LCO
+    hpx_lco_and_set(parms->done, HPX_NULL);
+  }
+
+  return HPX_SUCCESS;
 }
 
 

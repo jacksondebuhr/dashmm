@@ -24,11 +24,11 @@ class MethodRef {
   void aggregate(SourceNode &curr, const ExpansionRef expand) const;
   void inherit(TargetNode &curr, const ExpansionRef expand,
                size_t which_child) const;
-  void process(TargetNode &curr, std::vector<SourceNode *> &consider,
+  void process(TargetNode &curr, std::vector<SourceNode> &consider,
                bool curr_is_leaf) const;
   void bool refine_test(bool same_sources_and_targets,
                         const TargetNode &curr,
-                        const std::vector<SourceNode *> &consider) const;
+                        const std::vector<SourceNode> &consider) const;
 
  private:
   MethodSerial *pin();

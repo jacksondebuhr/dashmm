@@ -15,7 +15,7 @@ class SourceNode {
  public:
   SourceNode(DomainGeometry g, int ix, int iy, int iz, int level,
              hpx_addr_t met, SourceNode *parent);
-  explicit SourceNode(hpx_addr_t data) : data_{data} { }
+  explicit SourceNode(hpx_addr_t data = HPX_NULL) : data_{data} { }
   ~SourceNode();
 
   hpx_addr_t data() const {return data_;}
