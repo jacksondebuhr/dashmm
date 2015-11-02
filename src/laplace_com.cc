@@ -10,29 +10,30 @@
 namespace dashmm {
 
 
-struct LaplaceCOMData {
-  double mtot_;
-  double xcom_[3];
-  //Ordering: Qxx Qxy Qxz Qyy Qyz Qzz
-  double Q_[6];
-};
-
-
-LaplaceCOM::LaplaceCOM(Point center) {
-  //(c)allocate space in GAS for it
-  //save address
-}
-
-
-void LaplaceCOM::destroy() {
-  //free the global memory
-  data_ = HPX_NULL;
+ExpansionSerialPtr LaplaceCOM::serialize() const {
+  size_t size = sizeof(ExpansionSerial) + size() * sizeof(double);
+  ExpansionSerialPtr retval = expansion_serialization_allocator(size);
+  retval->type = type();
+  retval->provides_L = provides_L();
+  retval->center = center();
+  retval->term_count = size();
+  retval->size = size() * sizeof(double);
+  double *terms = static_cast<double *>(retval->data);
+  terms[0] = mtot_;
+  terms[1] = xcom_[0];
+  terms[2] = xcom_[1];
+  terms[3] = xcom_[2];
+  terms[4] = Q_[0];
+  terms[5] = Q_[1];
+  terms[6] = Q_[2];
+  terms[7] = Q_[3];
+  terms[8] = Q_[4];
+  terms[9] = Q_[5];
+  return retval;
 }
 
 
 std::complex<double> LaplaceCOM::term(size_t i) const {
-  //TODO: if valid, pull the particular value and return it
-
   if (i == 0) {
     return std::complex<double>{mtot_};
   } else if (i < 4) {
@@ -44,8 +45,8 @@ std::complex<double> LaplaceCOM::term(size_t i) const {
 
 
 std::unique_ptr<Expansion> LaplaceCOM::S_to_M(Point center,
-                       std::vector<Source>::iterator first,
-                       std::vector<Source>::iterator last) const {
+                                              Source *first,
+                                              Source *last) const {
   LaplaceCOM *retval{new LaplaceCOM{center}};
   assert(retval);
   retval->calc_mtot(first, last);
@@ -56,7 +57,7 @@ std::unique_ptr<Expansion> LaplaceCOM::S_to_M(Point center,
 
 
 std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,
-                                                double s_size) const {
+                                              double s_size) const {
   LaplaceCOM *temp = new LaplaceCOM(Point{0.0, 0.0, 0.0});
   temp->set_mtot(mtot_);
   temp->set_xcom(xcom_);
@@ -65,8 +66,7 @@ std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,
 }
 
 
-void LaplaceCOM::M_to_T(std::vector<Target>::iterator first,
-                          std::vector<Target>::iterator last) const {
+void LaplaceCOM::M_to_T(Target *first, Target *last) const {
   for (auto i = first; i != last; ++i) {
     Point pos{i->position()};
 
@@ -91,18 +91,17 @@ void LaplaceCOM::M_to_T(std::vector<Target>::iterator first,
 }
 
 
-void LaplaceCOM::S_to_T(std::vector<Source>::iterator s_first,
-                          std::vector<Source>::iterator s_last,
-                          std::vector<Target>::iterator t_first,
-                          std::vector<Target>::iterator t_last) const {
+void LaplaceCOM::S_to_T(Source *s_first, Source *s_last,
+                        Target *t_first, Target *t_last) const {
   for (auto targ = t_first; targ != t_last; ++targ) {
     Point pos = targ->position();
     double sum{0.0};
     for (auto i = s_first; i != s_last; ++i) {
       double diff[3]{pos.x() - i->x(), pos.y() - i->y(), pos.z() - i->z()};
       double mag{diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]};
-      if (mag > 0)
+      if (mag > 0) {
         sum += i->charge() / sqrt(mag);
+      }
     }
 
     targ->set_phi(targ->phi() + std::complex<double>{sum});
@@ -165,8 +164,7 @@ void LaplaceCOM::from_sum(const std::vector<const Expansion *> &exps) {
 
 
 
-void LaplaceCOM::calc_mtot(std::vector<Source>::iterator first,
-                             std::vector<Source>::iterator last) {
+void LaplaceCOM::calc_mtot(Source *first, Source *last) {
   mtot_ = 0.0;
   for (auto i = first; i != last; ++i) {
     mtot_ += i->charge();
@@ -174,8 +172,7 @@ void LaplaceCOM::calc_mtot(std::vector<Source>::iterator first,
 }
 
 
-void LaplaceCOM::calc_xcom(std::vector<Source>::iterator first,
-                             std::vector<Source>::iterator last) {
+void LaplaceCOM::calc_xcom(Source *first, Source *last) {
   xcom_[0] = 0.0;
   xcom_[1] = 0.0;
   xcom_[2] = 0.0;
@@ -193,8 +190,7 @@ void LaplaceCOM::calc_xcom(std::vector<Source>::iterator first,
 }
 
 
-void LaplaceCOM::calc_Q(std::vector<Source>::iterator first,
-                          std::vector<Source>::iterator last) {
+void LaplaceCOM::calc_Q(Source *first, Source *last) {
   for (int i = 0; i < 6; ++i) {
     Q_[i] = 0;
   }
@@ -211,5 +207,6 @@ void LaplaceCOM::calc_Q(std::vector<Source>::iterator first,
     Q_[5] += i->charge() * (3.0 * diff[2] * diff[2] - diffmag);   //Qzz
   }
 }
+
 
 } //namespace dashmm

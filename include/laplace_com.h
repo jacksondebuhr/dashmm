@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "include/builtin_ids.h"
 #include "include/expansion.h"
 #include "include/index.h"
 #include "include/particle.h"
@@ -18,14 +19,13 @@ namespace dashmm {
 
 class LaplaceCOM : public Expansion {
  public:
-  explicit LaplaceCOM(Point center);
-  explicit LaplaceCOM(hpx_addr_t data) : data_{data} { }
+  explicit LaplaceCOM(Point center)
+      : mtot_{0.0}, xcom_{0.0, 0.0, 0.0}, Q_{0.0, 0.0, 0.0, 0.0, 0.0, 0.0} { }
 
-  void LaplaceCOM::destroy() override;
+  int type() const override {return kExpansionLaplaceCOM;}
+  ExpansionSerialPtr serialize() const override;
 
-  hpx_addr_t data() const override {return data_;}
-  bool valid() const override {return data_ != HPX_NULL;}
-
+  bool provides_L() const override;
   size_t size() const override {return 10;}
   Point center() const override {
     return Point{xcom_[0], xcom_[1], xcom_[2]};
@@ -34,11 +34,11 @@ class LaplaceCOM : public Expansion {
 
 
   std::unique_ptr<Expansion> S_to_M(Point center,
-      std::vector<Source>::iterator first,
-      std::vector<Source>::iterator last) const override;
+                                    Source *first,
+                                    Source *last) const override;
   std::unique_ptr<Expansion> S_to_L(Point center,
-      std::vector<Source>::iterator first,
-      std::vector<Source>::iterator last) const override {
+                                    Source *first,
+                                    Source *last) const override {
     return std::unique_ptr<Expansion>{nullptr};
   }
 
@@ -53,14 +53,10 @@ class LaplaceCOM : public Expansion {
     return std::unique_ptr<Expansion>{nullptr};
   }
 
-  void M_to_T(std::vector<Target>::iterator first,
-              std::vector<Target>::iterator last) const override;
-  void L_to_T(std::vector<Target>::iterator first,
-              std::vector<Target>::iterator last) const override {  }
-  void S_to_T(std::vector<Source>::iterator s_first,
-              std::vector<Source>::iterator s_last,
-              std::vector<Target>::iterator t_first,
-              std::vector<Target>::iterator t_last) const override;
+  void M_to_T(Target *first, Target *last) const override;
+  void L_to_T(Target *first, Target *last) const override {  }
+  void S_to_T(Source *s_first, Source *s_last,
+              Target *t_first, Target *t_last) const override;
 
   void add_expansion(const Expansion *temp1) override;
   void from_sum(const std::vector<const Expansion *> &exps) override;
@@ -70,12 +66,9 @@ class LaplaceCOM : public Expansion {
   }
 
  private:
-  void calc_mtot(std::vector<Source>::iterator first,
-                 std::vector<Source>::iterator last);
-  void calc_xcom(std::vector<Source>::iterator first,
-                 std::vector<Source>::iterator last);
-  void calc_Q(std::vector<Source>::iterator first,
-              std::vector<Source>::iterator last);
+  void calc_mtot(Source *first, Source *last);
+  void calc_xcom(Source *first, Source *last);
+  void calc_Q(Source *first, Source *last);
 
   void set_mtot(double m) {mtot_ = m;}
   void set_xcom(const double c[3]) {
@@ -86,8 +79,9 @@ class LaplaceCOM : public Expansion {
     Q_[3] = q[3]; Q_[4] = q[4]; Q_[5] = q[5];
   }
 
-
-  hpx_addr_t data_;
+  double mtot_;
+  double xcom_[3];
+  double Q_[6];
 };
 
 
