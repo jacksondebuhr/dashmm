@@ -65,8 +65,9 @@ class TargetNode {
   hpx_addr_t data() const {return data_;}
 
   //all the action is here
-  void partition(hpx_addr_t first, hpx_addr_t last, int limit,
+  void partition(hpx_addr_t parts, int n_parts, int limit,
                  hpx_addr_t expand, int which_child,
+                 bool same_sources_and_targets,
                  std::vector<SourceNode *> consider);
 
   //queries

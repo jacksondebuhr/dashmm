@@ -225,8 +225,9 @@ HPX_ACTION(HPX_DEFAULT, 0, node_delete_action, node_delete_handler,
            HPX_ADDR_T);
 
 
-int source_node_child_generation_done_handler(NodeData *node, hpx_addr_t gendone,
-                                             hpx_addr_t expand) {
+int source_node_child_generation_done_handler(NodeData *node,
+                                              hpx_addr_t gendone,
+                                              hpx_addr_t expand) {
   ExpansionRef expref{expand};
   MethodRef method{node->method};
   SourceNode snode{hpx_thread_current_target()};
@@ -340,7 +341,8 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
     node->child[i] = kid.data();
 
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, &childpartdone,
-             &childgendone, &cparts[i], &n_per_child[i], &n_parts_total, &limit, &expand);
+             &childgendone, &cparts[i], &n_per_child[i], &n_parts_total, &limit,
+             &expand);
   }
 
   hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
@@ -370,8 +372,8 @@ size_t target_node_partition_params_size(int n_consider) {
   return sizeof(TargetNodePartitionParams) + n_consider * sizeof(hpx_addr_t);
 }
 
-TargetNodeParitionParams *target_node_partition_params_alloc(int n_consider) {
-  TargetNodeParitionParams *retval = static_cast<TargetNodeParitionParams *>(
+TargetNodePartitionParams *target_node_partition_params_alloc(int n_consider) {
+  TargetNodePartitionParams *retval = static_cast<TargetNodePartitionParams *>(
       malloc(target_node_partition_params_size(n_consider));
   if (retval) {
     retval->n_consider = n_consider;
@@ -380,14 +382,14 @@ TargetNodeParitionParams *target_node_partition_params_alloc(int n_consider) {
 }
 
 int target_node_partition_handler(NodeData *node,
-                                  TargetNodeParitionParams *parms,
+                                  TargetNodePartitionParams *parms,
                                   size_t bytes);
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
            target_node_partition_action, target_node_partition_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
 int target_node_partition_handler(NodeData *node,
-                                  TargetNodeParitionParams *parms,
+                                  TargetNodePartitionParams *parms,
                                   size_t bytes) {
   node->parts = parms->parts;
   node->n_parts = parms->n_parts;
@@ -461,7 +463,7 @@ int target_node_partition_handler(NodeData *node,
     hpx_addr_t cdone = hpx_lco_and_new(n_children);
     assert(cdone != HPX_NULL);
 
-    //We set up the arguments to the partition actions; these are the constant parts
+    //set up the arguments to the partition actions; the constant parts
     TargetNodePartitionParams *args =
         target_node_partition_params_alloc(consider.size());
     size_t argssize = target_node_partition_params_size(consider.size());
@@ -490,7 +492,8 @@ int target_node_partition_handler(NodeData *node,
       args->n_parts = n_per_child[i];
       args->which_child = i;
 
-      hpx_call(kid.data(), target_node_partition_action, HPX_NULL, args, argssize);
+      hpx_call(kid.data(), target_node_partition_action, HPX_NULL, args,
+               argssize);
     }
 
     hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
@@ -675,12 +678,33 @@ TargetNode::~TargetNode() {
 }
 
 
-//TODO
-void TargetNode::partition(std::vector<Target>::iterator first,
-                           std::vector<Target>::iterator last, int limit,
+void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
                            hpx_addr_t expand, int which_child,
+                           bool same_sources_and_targets,
                            std::vector<SourceNode *> consider) {
-  //
+  hpx_addr_t done = hpx_lco_future_new(0);
+  assert(done != HPX_NULL);
+
+  size_t parms_size = target_node_partition_params_size(consider.size());
+  TargetNodePartitionParams *parms =
+      target_node_partition_params_alloc(consider.size());
+  parms->done = done;
+  parms->same_sources_and_targets = same_sources_and_targets;
+  parms->parts = parts;
+  parms->n_parts = n_parts;
+  parms->n_parts_total = n_parts;
+  parms->limit = limit;
+  parms->expansion = expansion();
+  parms->which_child = which_child;
+  parms->n_consider = consider.size();
+  for (size_t i = 0; i < consider.size(); ++i) {
+    parms->consider[i] = consider[i]->data();
+  }
+
+  hpx_call(data_, target_node_partition_action, HPX_NULL, parms, parms_size);
+
+  hpx_lco_wait(done);
+  hpx_lco_delete_sync(done);
 }
 
 
