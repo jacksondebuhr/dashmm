@@ -32,7 +32,6 @@ std::map<int, hpx_action_t> expansion_table_;
 
 int register_expansion_handler(int type, hpx_action_t creator,
                                hpx_addr_t check) {
-  //
   int checkval = 0;
   if (expansion_table_.count(type) != 0) {
     int checkval = 1;

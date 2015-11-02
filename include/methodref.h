@@ -16,7 +16,7 @@ namespace dashmm {
 
 class MethodRef {
  public:
-  explicit MethodRef(hpx_addr_t addr) : data_{ref} { }
+  explicit MethodRef(hpx_addr_t addr) : data_{ref}, met_{nullptr} { }
 
   int type() const;
   bool compatible_with(const ExpansionRef expand) const;
