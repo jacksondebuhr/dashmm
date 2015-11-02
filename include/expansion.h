@@ -28,7 +28,7 @@ struct ExpansionSerial {
   bool provides_L;        //the thing returned by provides_L()
   Point center;           //the thing returned by center()
   size_t term_count;      //the thing returned by size()
-  size_t size;
+  size_t size;            //the size of the following data
   char data[];
 }
 
