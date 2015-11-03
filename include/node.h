@@ -39,16 +39,17 @@ class SourceNode {
   int level() const;
   SourceNode *child(size_t i) const;
   SourceNode *parent() const;
-  hpx_addt_t expansion() const;
-  hpx_addr_t parts() const;
+  ExpansionRef expansion() const;
+  SourceRef parts() const;
   int n_parts() const;
+  int n_parts_total() const;
   Point low() const;
   Point high() const;
   Point center() const;
   double size() const;
 
   //mutators
-  void set_expansion(hpx_addr_t expand
+  void set_expansion(ExpansionRef expand);
 
  private:
   hpx_addr_t data_;
@@ -83,16 +84,17 @@ class TargetNode {
   int level() const;
   TargetNode *child(size_t i) const;
   TargetNode *parent() const;
-  hpx_addr_t expansion() const;
-  hpx_addr_t first() const;
-  hpx_addr_t last() const;
+  ExpansionRef expansion() const;
+  TargetRef parts() const;
+  int n_parts() const;
+  int n_parts_total() const;
   Point low() const;
   Point high() const;
   Point center() const;
   double size() const;
 
   //mutators
-  void set_expansion(hpx_addr_t expand);
+  void set_expansion(ExpansionRef expand);
 
  private:
   hpx_addr_t data_;

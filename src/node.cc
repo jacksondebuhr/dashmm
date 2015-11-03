@@ -30,6 +30,7 @@ struct NodeData {
   // For target nodes, these refer to the target points
   hpx_addr_t parts;
   int n_parts;
+  int n_parts_total;
 };
 
 
@@ -133,6 +134,14 @@ static hpx_addr_t node_get_parts(hpx_addr_t data) {
 static int node_get_n_parts(hpx_addr_t data) {
   NodeData *local = node_data_pin(data);
   int retval{local->n_parts};
+  node_data_unpin(data);
+  return retval;
+}
+
+
+static int node_get_n_parts_total(hpx_addr_t data) {
+  NodeData *local = node_data_pin(data);
+  int retval{local->n_parts_total};
   node_data_unpin(data);
   return retval;
 }
@@ -262,6 +271,8 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
   // global addresses. I think.
   node->parts = parts;
   node->n_parts = n_parts;
+  node->n_parts_total = n_parts_total;
+
   if (n_parts <= limit) {
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
@@ -393,6 +404,7 @@ int target_node_partition_handler(NodeData *node,
                                   size_t bytes) {
   node->parts = parms->parts;
   node->n_parts = parms->n_parts;
+  node->n_parts_total = parms->n_parts_total;
 
   bool refine = false;
   MethodRef method{node->method};
@@ -604,18 +616,26 @@ SourceNode *SourceNode::parent() const {
 }
 
 
-hpx_addt_t SourceNode::expansion() const {
-  return node_get_expansion(data_);
+ExpansionRef SourceNode::expansion() const {
+  return ExpansionRef{node_get_expansion(data_)};
 }
 
 
-hpx_addr_t SourceNode::parts() const {
-  return node_get_parts(data_);
+SourceRef SourceNode::parts() const {
+  NodeData *local = node_data_pin(data);
+  SourceRef retval{local->parts, local->n_parts, local->n_parts_total};
+  node_data_unpin(data);
+  return retval;
 }
 
 
 int SourceNode::n_parts() const {
-  return node_get_last(data_);
+  return node_get_n_parts(data_);
+}
+
+
+int SourceNode::n_parts_total() const {
+  return node_get_n_parts_total(data_);
 }
 
 
@@ -639,9 +659,9 @@ double SourceNode::size() const {
 }
 
 
-void SourceNode::set_expansion(hpx_addr_t expand) {
+void SourceNode::set_expansion(ExpansionRef expand) {
   NodeData *local = node_data_pin(data_);
-  local->expansion = expand;
+  local->expansion = expand.data();
   node_data_unpin(data_);
 }
 
@@ -762,18 +782,26 @@ TargetNode *TargetNode::parent() const {
 }
 
 
-hpx_addr_t TargetNode::expansion() const {
-  return node_get_expansion(data_);
+ExpansionRef TargetNode::expansion() const {
+  return ExpansionRef{node_get_expansion(data_)};
 }
 
 
-hpx_addr_t TargetNode::parts() const {
-  return node_get_parts(data_);
+TargetRef TargetNode::parts() const {
+  NodeData *local = node_data_pin(data);
+  TargetRef retval{local->parts, local->n_parts, local->n_parts_total};
+  node_data_unpin(data);
+  return retval;
 }
 
 
 int TargetNode::n_parts() const {
   return node_get_n_parts(data_);
+}
+
+
+int TargetNode::n_parts_total() const {
+  return node_get_n_parts_total(data_);
 }
 
 
@@ -797,9 +825,9 @@ double TargetNode::size() const {
 }
 
 
-void TargetNode::set_expansion(Expansion *expand) {
+void TargetNode::set_expansion(ExpansionRef expand) {
   NodeData *local = node_data_pin(data_);
-  local->expansion = expand;
+  local->expansion = expand.data();
   node_data_unpin(data_);
 }
 

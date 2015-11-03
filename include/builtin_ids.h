@@ -8,6 +8,9 @@ namespace dashmm {
 extern constexpr int kExpansionLaplaceCOM;
 
 
+extern constexpr int kMethodBH;
+
+
 } // namespace dashmm
 
 

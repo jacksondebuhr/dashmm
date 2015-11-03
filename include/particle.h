@@ -30,6 +30,46 @@ class Source {
 };
 
 
+//NOTE: This will only work in SMP
+class SourceRef {
+ public:
+  SourceRef(hpx_addr_t data, int n, int n_total)
+      : local_{nullptr}, data_{data}, n_{n}, n_total_{n_total} { }
+  ~SourceRef() {unpin();}
+
+  Source *first() const {
+    pin();
+    return local_;
+  }
+  Source *last() const {
+    pin();
+    return &local_[n_];
+  }
+
+  int n() const {return n_;}
+  int n_total() const {return n_total_;}
+  hpx_addr_t data() const {return data_;}
+
+ private:
+  void pin() const {
+    if (!local_ && data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
+  }
+  void unpin() const {
+    if (local_ && data_ != HPX_NULL) {
+      hpx_gas_unpin(data_);
+    }
+  }
+
+  mutable Source *local_;
+
+  hpx_addr_t data_;
+  int n_;
+  int n_total_;
+};
+
+
 class Target {
  public:
   Target() : position_{0.0, 0.0, 0.0}, phi_{0.0}, direct_{0.0} { }
@@ -50,6 +90,46 @@ class Target {
   Point position_;
   std::complex<double> phi_;
   std::complex<double> direct_;
+};
+
+
+//NOTE: This will only work in SMP
+class TargetRef {
+ public:
+  TargetRef(hpx_addr_t data, int n, int n_total)
+      : local_{nullptr}, data_{data}, n_{n}, n_total_{n_total} { }
+  ~TargetRef() {unpin();}
+
+  Target *first() const {
+    pin();
+    return local_;
+  }
+  Target *last() const {
+    pin();
+    return &local_[n_];
+  }
+
+  int n() const {return n_;}
+  int n_total() const {return n_total_;}
+  hpx_addr_t data() const {return data_;}
+
+ private:
+  void pin() const {
+    if (!local_ && data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
+  }
+  void unpin() const {
+    if (local_ && data_ != HPX_NULL) {
+      hpx_gas_unpin(data_);
+    }
+  }
+
+  mutable Target *local_;
+
+  hpx_addr_t data_;
+  int n_;
+  int n_total_;
 };
 
 

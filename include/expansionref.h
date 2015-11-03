@@ -16,6 +16,7 @@
 namespace dashmm {
 
 
+//NOTE: Some of these will not be in the documentation.
 class ExpansionRef {
  public:
   ExpansionRef(hpx_addr_t addr) : data_{ref}, exp_{nullptr} { }
@@ -23,6 +24,7 @@ class ExpansionRef {
   bool valid() const {return data_ != HPX_NULL;}
 
   int type() const;
+  hpx_addr_t data() const {return data_;}
 
   bool provides_L() const;
   size_t size() const;
