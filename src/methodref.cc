@@ -10,10 +10,6 @@
 namespace dashmm {
 
 
-//We add this declaration here to make the function available
-std::unique_ptr<Method> create_method(int type, size_t size, void *data);
-
-
 /////////////////////////////////////////////////////////////////////
 // Interface
 /////////////////////////////////////////////////////////////////////
@@ -98,7 +94,7 @@ MethodRef globalize_method(Method *met, hpx_addr_t where) {
   if (met == nullptr) {
     return HPX_NULL;
   }
-  MethodSerialPtr serial = met->serialize();
+  MethodSerialPtr serial = met->serialize(true);
   size_t size = serial->size + sizeof(MethodSerial);
   hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
   assert(data != HPX_NULL);

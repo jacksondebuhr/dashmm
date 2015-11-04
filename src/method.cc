@@ -80,9 +80,14 @@ bool register_method(int type, hpx_action_t creator) {
 }
 
 
-MethodSerialPtr method_serialization_allocator(size_t size) {
-  MethodSerial *p = static_cast<MethodSerial *>(hpx_malloc_registered(size));
-  return MethodSerialPtr{p, method_serialization_deleter};
+MethodSerialPtr method_serialization_allocator(size_t size, bool alloc) {
+  if (alloc) {
+    MethodSerial *p = static_cast<MethodSerial *>(hpx_malloc_registered(size));
+    return MethodSerialPtr{p, method_serialization_deleter};
+  } else {
+    MethodSerial *p = static_cast<MethodSerial *>(malloc(size));
+    return MethodSerialPtr{p, free};
+  }
 }
 
 

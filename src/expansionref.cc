@@ -10,10 +10,6 @@
 namespace dashmm {
 
 
-//we repeat this so we can use it below.
-std::unique_ptr<Expansion> create_expansion(int type, size_t size, void *data)
-
-
 int ExpansionRef::type() const {
   assert(valid());
   hpx_addr_t from = hpx_addr_add(data_, );
@@ -29,6 +25,19 @@ bool ExpansionRef::provides_L() const {
     return retval;
   } else {
     assert(0 && "This should not happen. We are in SMP.")
+  }
+}
+
+
+bool ExpansionRef::provdes_exp() const {
+  assert(valid());
+  ExpansionSerial *local = pin();
+  if (local) {
+    bool retval = local->provdes_exp;
+    unpin();
+    return retval;
+  } else {
+    assert(0 && "This should not happen. We are in SMP.");
   }
 }
 
@@ -173,7 +182,7 @@ void ExpansionRef::setup_local_expansion() {
 //NOTE: There is some repetition between this and globalize_expansion...
 void ExpansionRef::save_to_global() {
   assert(exp_ != nullptr);
-  ExpansionSerialPtr serial = exp_->serialize();
+  ExpansionSerialPtr serial = exp_->serialize(true);
   size_t size = serial->size + sizeof(ExpansionSerial);
   hpx_gas_memput_rsync(data_, serial.get(), size);
 }
@@ -183,7 +192,7 @@ ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where) {
   if (exp == nullptr) {
     return ExpansionRef{HPX_NULL};
   }
-  ExpansionSerialPtr serial = exp->serialize();
+  ExpansionSerialPtr serial = exp->serialize(true);
   size_t size = serial->size + sizeof(ExpansionSerial);
   hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
   assert(data != HPX_NULL);

@@ -10,11 +10,12 @@
 namespace dashmm {
 
 
-ExpansionSerialPtr LaplaceCOM::serialize() const {
+ExpansionSerialPtr LaplaceCOM::serialize(bool alloc) const {
   size_t size = sizeof(ExpansionSerial) + size() * sizeof(double);
-  ExpansionSerialPtr retval = expansion_serialization_allocator(size);
+  ExpansionSerialPtr retval = expansion_serialization_allocator(size, alloc);
   retval->type = type();
   retval->provides_L = provides_L();
+  retval->provides_exp = provides_exp();
   retval->center = center();
   retval->term_count = size();
   retval->size = size() * sizeof(double);

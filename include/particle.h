@@ -72,24 +72,23 @@ class SourceRef {
 
 class Target {
  public:
-  Target() : position_{0.0, 0.0, 0.0}, phi_{0.0}, direct_{0.0} { }
-  Target(double x, double y, double z) :
-    position_{x, y, z}, phi_{}, direct_{} { }
+  Target() : position_{0.0, 0.0, 0.0}, phi_{0.0}, index_{0} { }
+  Target(double x, double y, double z, size_t idx) :
+    position_{x, y, z}, phi_{}, direct_{}, index_{idx} { }
 
   Point position() const {return position_;}
   double x() const {return position_.x();}
   double y() const {return position_.y();}
   double z() const {return position_.z();}
   std::complex<double> phi() const {return phi_;}
-  std::complex<double> direct() const {return direct_;}
+  size_t index() const {return index_;}
 
   void set_phi(std::complex<double> p) {phi_ = p;}
-  void set_direct(std::complex<double> p) {direct_ = p;}
 
  private:
   Point position_;
   std::complex<double> phi_;
-  std::complex<double> direct_;
+  size_t index_;              //the index in the original data from the user
 };
 
 

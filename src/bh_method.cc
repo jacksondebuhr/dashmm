@@ -8,9 +8,9 @@
 namespace dashmm {
 
 
-MethodSerialPtr BHMethod::serialize() const {
+MethodSerialPtr BHMethod::serialize(bool alloc) const {
   size_t size = sizeof(MethodSerial) + sizeof(double);
-  MethodSerialPtr retval = method_serialization_allocator(size);
+  MethodSerialPtr retval = method_serialization_allocator(size, alloc);
   retval->type = type();
   retval->size = sizeof(double);
   double theta = static_cast<double *>{retval->data};

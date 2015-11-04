@@ -40,7 +40,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, fini_action, fini_handler,
 /////////////////////////////////////////////////////////////////////
 
 
-int init(int *argc, char ***argv) {
+ReturnCode init(int *argc, char ***argv) {
   if (HPX_SUCCESS != hpx_init(argc, argv)) {
     return kRuntimeError;
   }
@@ -54,7 +54,7 @@ int init(int *argc, char ***argv) {
 }
 
 
-int finalize() {
+ReturnCode finalize() {
   //run the finalization action
   if (HPX_SUCCESS != hpx_run(fini_action, nullptr, 0)) {
     return kFiniError;

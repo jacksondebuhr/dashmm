@@ -17,7 +17,7 @@ class BHMethod {
   BHMethod(double theta) : theta_{theta} { }
 
   int type() const override {return kMethodBH;}
-  MethodSerialPtr serialize() const override;
+  MethodSerialPtr serialize(bool alloc) const override;
 
   //BHMethod has no special requirements
   bool compatible_with(const ExpansionRef expand) const override {return true;}

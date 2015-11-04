@@ -26,6 +26,7 @@ typedef Expansion *(*expansion_creation_function_t)(size_t, void *);
 struct ExpansionSerial {
   int type;
   bool provides_L;        //the thing returned by provides_L()
+  bool provides_exp;      //the thing returned by provides_exp()
   Point center;           //the thing returned by center()
   size_t term_count;      //the thing returned by size()
   size_t size;            //the size of the following data
@@ -45,9 +46,10 @@ class Expansion {
   virtual ~Expansion() { }
 
   virtual int type() const = 0;
-  virtual ExpansionSerialPtr serialize() const = 0;
+  virtual ExpansionSerialPtr serialize(bool alloc) const = 0;
 
   virtual bool provides_L() const = 0;
+  virtual bool provides_exp() const = 0;
   virtual size_t size() const = 0;
   virtual Point center() const = 0;
 
@@ -84,7 +86,11 @@ bool register_expansion(int type, hpx_action_t creator);
 
 
 //this should be used by the serialize methods for expansions
-ExpansionSerialPtr expansion_serialization_allocator(size_t size);
+ExpansionSerialPtr expansion_serialization_allocator(size_t size, bool alloc);
+
+
+//NOTE: not intended for end-user use
+std::unique_ptr<Expansion> create_expansion(int type, size_t size, void *data);
 
 
 } // namespace dashmm

@@ -23,9 +23,10 @@ class LaplaceCOM : public Expansion {
       : mtot_{0.0}, xcom_{0.0, 0.0, 0.0}, Q_{0.0, 0.0, 0.0, 0.0, 0.0, 0.0} { }
 
   int type() const override {return kExpansionLaplaceCOM;}
-  ExpansionSerialPtr serialize() const override;
+  ExpansionSerialPtr serialize(bool alloc) const override;
 
-  bool provides_L() const override;
+  bool provides_L() const override {return false;}
+  bool provides_exp() const override {return false;}
   size_t size() const override {return 10;}
   Point center() const override {
     return Point{xcom_[0], xcom_[1], xcom_[2]};

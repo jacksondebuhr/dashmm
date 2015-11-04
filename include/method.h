@@ -22,7 +22,7 @@ typedef Method *(*method_creation_function_t)(size_t, void *);
 
 struct MethodSerial {
   int type;
-  size_t size;
+  size_t size;      //NOTE: This refers to the data, not the overall size here
   char data[];
 };
 
@@ -38,7 +38,7 @@ class Method {
   virtual ~Method() { }
 
   virtual int type() const = 0;
-  virtual MethodSerialPtr serialize() const = 0;
+  virtual MethodSerialPtr serialize(bool alloc) const = 0;
 
   virtual bool compatible_with(const ExpansionRef expand) const = 0;
   virtual void generate(SourceNode &curr, const ExpansionRef expand) const = 0;
@@ -59,7 +59,11 @@ bool register_method(int type, hpx_action_t creator);
 
 //intended use is for serialize methods to use this as an allocator
 //This is a smart pointer, that will delete itself when appropriate
-MethodSerialPtr method_serialization_allocator(size_t size);
+MethodSerialPtr method_serialization_allocator(size_t size, bool alloc);
+
+
+//NOTE: Not intended for end-user use
+std::unique_ptr<Method> create_method(int type, size_t size, void *data);
 
 
 } // namespace dashmm

@@ -27,6 +27,7 @@ class ExpansionRef {
   hpx_addr_t data() const {return data_;}
 
   bool provides_L() const;
+  bool provides_exp() const;
   size_t size() const;
   Point center() const;
 

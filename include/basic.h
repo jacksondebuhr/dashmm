@@ -23,21 +23,22 @@ namespace dashmm {
 /// \param argv [inout] - the arguments themselves
 ///
 /// \return kSuccess on successful initialization; kInitError otherwise
-int init(int *argc, char ***argv);
+ReturnCode init(int *argc, char ***argv);
 
 
-/// \breif finalize DASHMM
+/// \brief finalize DASHMM
 ///
 /// This will finalize the runtime system supporting DASHMM and will free any
 /// resources claimed by DASHMM.
 ///
 /// \return kSuccess on successful shutdown; kFiniError otherwise
-int finalize();
+ReturnCode finalize();
 
 
 //TODO;
-int evaluate(ObjectHandle sources, ObjectHandle targets, int refinement_limit,
-             Method *method, Expansion *expansion);
+ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
+                    ObjectHandle targets, int tpos_offset, int phi_offset,
+                    int refinement_limit, Method *method, Expansion *expansion);
 
 
 /// \brief Allocate an array in DASHMM's global address space
@@ -52,7 +53,7 @@ int evaluate(ObjectHandle sources, ObjectHandle targets, int refinement_limit,
 ///
 /// \return kSuccess on success; kRuntimeError if there is an error with the
 ///         runtime; kAllocationError if there was a problem with the allocation
-int allocate_array(size_t count, size_t size, ObjectHandle *obj);
+ReturnCode allocate_array(size_t count, size_t size, ObjectHandle *obj);
 
 
 /// \brief Frees an array in DASHMM's global address space
@@ -64,7 +65,7 @@ int allocate_array(size_t count, size_t size, ObjectHandle *obj);
 ///
 /// \return kSuccess on successful deallocation; kRuntimeError if there is an
 ///         error from the runtime
-int deallocate_array(ObjectHandle obj);
+ReturnCode deallocate_array(ObjectHandle obj);
 
 
 /// \brief Put some data into a DASHMM array
@@ -80,7 +81,8 @@ int deallocate_array(ObjectHandle obj);
 /// \param in_data - the data to put into the array
 ///
 /// \return kSuccess on success; kRuntimeError otherwise
-int array_put(ObjectHandle obj, size_t first, size_t last, void *in_data);
+ReturnCode array_put(ObjectHandle obj, size_t first, size_t last,
+                     void *in_data);
 
 
 /// \brief Get some data from a DASHMM array
@@ -96,7 +98,8 @@ int array_put(ObjectHandle obj, size_t first, size_t last, void *in_data);
 /// \param in_data [out] - buffer for retrieved data
 ///
 /// \return kSuccess on success; kRuntimeError otherwise
-int array_get(ObjectHandle obj, size_t first, size_t last, void *out_data);
+ReturnCode array_get(ObjectHandle obj, size_t first, size_t last,
+                     void *out_data);
 
 
 } // namespace dashmm

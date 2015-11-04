@@ -17,14 +17,6 @@ struct ArrayMetaData {
   size_t size;
 };
 
-//TODO: decide if this needs to be upgraded to a class, or if this is
-// sufficient. At the moment, we are only using this internally, so this
-// might be good enough.
-struct ArrayIterator {
-  hpx_addr_t data;
-  size_t block_size;
-}
-
 
 /////////////////////////////////////////////////////////////////////
 // Actions
@@ -135,7 +127,7 @@ HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
 /////////////////////////////////////////////////////////////////////
 
 
-int allocate_array(size_t records, size_t size, ObjectHandle *obj) {
+ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
   int runcode = hpx_run(allocate_array_action, &records, &size, &obj);
   if (runcode != HPX_SUCCESS) {
     return kRuntimeError;
@@ -146,7 +138,7 @@ int allocate_array(size_t records, size_t size, ObjectHandle *obj) {
 }
 
 
-int deallocate_array(ObjectHandle obj) {
+ReturnCode deallocate_array(ObjectHandle obj) {
   if (HPX_SUCCESS == hpx_run(deallocate_array_action, &obj)) {
     return kSuccess;
   } else {
@@ -155,7 +147,7 @@ int deallocate_array(ObjectHandle obj) {
 }
 
 
-int array_put(ObjectHandle obj, size_t first, size_t last, void *in_data) {
+ReturnCode array_put(ObjectHandle obj, size_t first, size_t last, void *in_data) {
   if (HPX_SUCCESS == hpx_run(array_put_action, &obj, &first, &last,
                             &in_data)) {
     return kSuccess;
@@ -165,7 +157,7 @@ int array_put(ObjectHandle obj, size_t first, size_t last, void *in_data) {
 }
 
 
-int array_get(ObjectHandle obj, size_t first, size_t last, void *out_data) {
+ReturnCode array_get(ObjectHandle obj, size_t first, size_t last, void *out_data) {
   if (HPX_SUCCESS == hpx_run(array_get_action, &obj, &first, &last,
                              &out_data)) {
     return kSuccess;

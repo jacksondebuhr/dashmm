@@ -86,10 +86,16 @@ int register_expansion(int type, hpx_action_t creator) {
 }
 
 
-ExpansionSerialPtr expansion_serialization_allocator(size_t size) {
-  ExpansionSerial *p = static_cast<ExpansionSerial *>(
-      hpx_malloc_registered(size));
-  return ExpansionSerialPtr{p, expansion_serialization_deleter};
+ExpansionSerialPtr expansion_serialization_allocator(size_t size, bool alloc) {
+  if (alloc) {
+    ExpansionSerial *p = static_cast<ExpansionSerial *>(
+        hpx_malloc_registered(size));
+    return ExpansionSerialPtr{p, expansion_serialization_deleter};
+  } else {
+    ExpansionSerial *p = static_cast<ExpansionSerial *>(
+        malloc(size));
+    return ExpansionSerialPtr{p, free};
+  }
 }
 
 
