@@ -2,6 +2,7 @@
 
 #include "hpx/hpx.h"
 
+#include "inlude/builtins.h"
 #include "include/types.h"
 
 
@@ -15,6 +16,11 @@ namespace dashmm {
 
 int init_handler(void *UNUSED, size_t UNWANTED) {
   //do a broadcast of some stuff, who knows...
+
+  //These register any built-in methods or expansions.
+  register_built_in_methods();
+  register_built_in_expansions();
+
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, init_action, init_handler,

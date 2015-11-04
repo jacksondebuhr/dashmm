@@ -20,6 +20,12 @@ Method *fmm_method();
 Method *fmm_exp_method();
 
 
+//These are not part of the standard interface. Perhaps we should hide these
+// away somehow. Perhaps in the init stuff?
+void register_built_in_methods();
+void register_built_in_expansions();
+
+
 } // namespace dashmm
 
 

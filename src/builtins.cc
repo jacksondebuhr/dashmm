@@ -5,6 +5,8 @@
 #include <hpx/hpx.h>
 
 #include "include/bh_method.h"
+#include "include/expansion.h"
+#include "include/laplace_com.h"
 #include "include/method.h"
 
 
