@@ -17,7 +17,7 @@ extern constexpr int kFirstUserMethodType;
 extern constexpr int kLastUserMethodType;
 
 
-typedef Method *(*method_creation_function_t)(size_t  void *);
+typedef Method *(*method_creation_function_t)(size_t, void *);
 
 
 struct MethodSerial {

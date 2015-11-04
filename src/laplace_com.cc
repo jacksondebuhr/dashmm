@@ -209,10 +209,4 @@ void LaplaceCOM::calc_Q(Source *first, Source *last) {
 }
 
 
-Expansion *laplace_COM_expansion() {
-  Expansion *retval = new LaplaceCOM{Point{0.0, 0.0, 0.0}};
-  return retval;
-}
-
-
 } //namespace dashmm

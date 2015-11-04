@@ -105,10 +105,4 @@ Point nearest(Point scenter, Point tcenter, double tsize) const {
 }
 
 
-Method *bh_method(double theta) {
-  Method *retval = new BHMethod{theta};
-  return retval;
-}
-
-
 } // namespace dashmm

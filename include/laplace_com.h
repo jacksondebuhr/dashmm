@@ -65,11 +65,9 @@ class LaplaceCOM : public Expansion {
     return std::unique_ptr<Expansion>{new LaplaceCOM{center}};
   }
 
- private:
-  void calc_mtot(Source *first, Source *last);
-  void calc_xcom(Source *first, Source *last);
-  void calc_Q(Source *first, Source *last);
 
+  //These are private in the serial version, but are exposed for
+  // deserialize
   void set_mtot(double m) {mtot_ = m;}
   void set_xcom(const double c[3]) {
     xcom_[0] = c[0]; xcom_[1] = c[1]; xcom_[2] = c[2];
@@ -78,6 +76,13 @@ class LaplaceCOM : public Expansion {
     Q_[0] = q[0]; Q_[1] = q[1]; Q_[2] = q[2];
     Q_[3] = q[3]; Q_[4] = q[4]; Q_[5] = q[5];
   }
+
+ private:
+  void calc_mtot(Source *first, Source *last);
+  void calc_xcom(Source *first, Source *last);
+  void calc_Q(Source *first, Source *last);
+
+
 
   double mtot_;
   double xcom_[3];
