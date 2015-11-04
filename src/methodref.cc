@@ -50,7 +50,7 @@ void MethodRef::inherit(TargetNode &curr, const ExpansionRef expand,
 }
 
 
-void MethodRef::process(TargetNode &curr, std::vector<SourceNode *> &consider,
+void MethodRef::process(TargetNode &curr, std::vector<SourceNode> &consider,
              bool curr_is_leaf) const {
   setup_local_method();
   met_->process(curr, consider, curr_is_leaf);
@@ -59,7 +59,7 @@ void MethodRef::process(TargetNode &curr, std::vector<SourceNode *> &consider,
 
 void bool MethodRef::refine_test(bool same_sources_and_targets,
                       const TargetNode &curr,
-                      const std::vector<SourceNode *> &consider) const {
+                      const std::vector<SourceNode> &consider) const {
   setup_local_method();
   return met_->refine_test(same_sources_and_targets, curr, consider);
 }

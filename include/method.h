@@ -45,11 +45,11 @@ class Method {
   virtual void aggregate(SourceNode &curr, const ExpansionRef expand) const = 0;
   virtual void inherit(TargetNode &curr, const ExpansionRef expand,
                        size_t which_child) const = 0;
-  virtual void process(TargetNode &curr, std::vector<SourceNode *> &consider,
+  virtual void process(TargetNode &curr, std::vector<SourceNode> &consider,
                        bool curr_is_leaf) const = 0;
   virtual bool refine_test(bool same_sources_and_targets,
                            const TargetNode &curr,
-                           const std::vector<SourceNode *> &consider) const = 0;
+                           const std::vector<SourceNode> &consider) const = 0;
 };
 
 

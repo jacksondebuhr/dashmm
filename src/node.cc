@@ -14,26 +14,6 @@
 namespace dashmm {
 
 
-struct NodeData {
-  DomainGeometry root_geo;
-  Index idx;
-  hpx_addr_t parent;
-  hpx_addr_t child[8];
-
-  //TODO: Is this just a future that stores the ObjectBase?
-  // then once it is ready, the future is set, and those reading it
-  // can go ahead and get the information? I think so...
-  hpx_addr_t expansion;
-  hpx_addr_t method;
-
-  //For Source Nodes, these refer to the source points
-  // For target nodes, these refer to the target points
-  hpx_addr_t parts;
-  int n_parts;
-  int n_parts_total;
-};
-
-
 /////////////////////////////////////////////////////////////////////
 // Some shared utilities
 /////////////////////////////////////////////////////////////////////
@@ -529,22 +509,26 @@ SourceNode::SourceNode(DomainGeometry g, int ix, int iy, int iz, int level,
     return;
   }
 
-  NodeData *local = node_data_pin(data_);
-  local->root_geo = g;
-  local->idx = Index{ix, iy, iz, level};
-  local->parent = parent->data();
+  pin();
+  local_->root_geo = g;
+  local_->idx = Index{ix, iy, iz, level};
+  local_->parent = parent->data();
   for (int i = 0; i < 8; ++i) {
-    local->child[0] = HPX_NULL;
+    local_->child[0] = HPX_NULL;
   }
-  local->expansion = HPX_NULL;
-  local->method = method;
-  local->parts = HPX_NULL;
-  local->n_parts = 0;
-  node_data_unpin(data_);
+  local_->expansion = HPX_NULL;
+  local_->method = method;
+  local_->parts = HPX_NULL;
+  local_->n_parts = 0;
 }
 
 
 SourceNode::~SourceNode() {
+  unpin();
+}
+
+
+void SourceNode::destroy() {
   hpx_call_sync(data_, node_delete_action, nullptr, 0, &data_);
 }
 
@@ -563,106 +547,137 @@ hpx_addr_t SourceNode::partition(hpx_addr_t parts, int n_parts, int limit,
 
 
 bool SourceNode::is_leaf() const {
-  NodeData *local = node_data_pin(data_);
+  pin();
+
   bool retval{true};
   for (int i = 0; i < 8; ++i) {
-    if (child[i] != HPX_NULL) {
+    if (local_->child[i] != HPX_NULL) {
       retval = false;
       break;
     }
   }
-  node_data_unpin(data_);
+
   return retval;
 }
 
 
 DomainGeometry SourceNode::root_geo() const {
-  return node_get_root_geo(data_);
+  pin();
+  return local_->root_geo;
 }
 
 
 Index SourceNode::index() const {
-  return node_get_index(data_);
+  pin();
+  return local_->idx;
 }
 
 
 int SourceNode::x_index() const {
-  return node_get_x_index(data_);
+  pin();
+  return local_->idx.x();
 }
 
 
 int SourceNode::y_index() const {
-  return node_get_y_index(data_);
+  pin();
+  return local_->idx.y();
 }
 
 
 int SourceNode::z_index() const {
-  return node_get_z_index(data_);
+  pin();
+  return local_->idx.z();
 }
 
 
 int SourceNode::level() const {
-  return node_get_level(data_);
+  pin();
+  return local_->idx.level();
 }
 
 
-SourceNode *SourceNode::child(size_t i) const {
-  return SourceNode{node_get_child(data_, i)};
+SourceNode SourceNode::child(size_t i) const {
+  pin();
+  return SourceNode{local_->child[i]};
 }
 
 
-SourceNode *SourceNode::parent() const {
-  return SourceNode{node_get_parent(data_)};
+SourceNode SourceNode::parent() const {
+  pin();
+  return SourceNode{local_->parent};
 }
 
 
 ExpansionRef SourceNode::expansion() const {
-  return ExpansionRef{node_get_expansion(data_)};
+  pin();
+  return ExpansionRef{local_->expansion};
 }
 
 
 SourceRef SourceNode::parts() const {
-  NodeData *local = node_data_pin(data);
-  SourceRef retval{local->parts, local->n_parts, local->n_parts_total};
-  node_data_unpin(data);
-  return retval;
+  pin();
+  return SourceRef{local->parts, local->n_parts, local->n_parts_total};
 }
 
 
 int SourceNode::n_parts() const {
-  return node_get_n_parts(data_);
+  pin();
+  return local_->n_parts;
 }
 
 
 int SourceNode::n_parts_total() const {
-  return node_get_n_parts_total(data_);
+  pin();
+  return local_->n_parts_total;
 }
 
 
 Point SourceNode::low() const {
-  return node_get_low(data_);
+  pin();
+  return local->root_geo.low_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 Point SourceNode::high() const {
-  return node_get_high(data_);
+  pin();
+  return local->root_geo.high_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 Point SourceNode::center() const {
-  return node_get_center(data_);
+  pin();
+  return local->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 double SourceNode::size() const {
-  return node_get_size(data_);
+  pin();
+  return local->root_geo.size_from_index(local_->idx.level());
 }
 
 
-void SourceNode::set_expansion(ExpansionRef expand) {
-  NodeData *local = node_data_pin(data_);
-  local->expansion = expand.data();
-  node_data_unpin(data_);
+void SourceNode::set_expansion(std::unique_ptr<Expansion> expand) {
+  ExpansionRef globexp = globalize_expansion(expand.get(), data_);
+  pin();
+  local_->expansion = globexp.data();
+}
+
+
+void SourceNode::pin() const {
+  if (!local_ && data_ != HPX_NULL) {
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
+  }
+}
+
+void SourceNode::unpin() const {
+  if (local_ && data_ != HPX_NULL) {
+    hpx_gas_unpin(data_);
+    local_ = nullptr;
+  }
 }
 
 
@@ -678,22 +693,26 @@ TargetNode::TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
     return;
   }
 
-  NodeData *local = node_data_pin(data_);
-  local->root_geo = g;
-  local->idx = Index{ix, iy, iz, level};
-  local->parent = parent->data();
+  pin();
+  local_->root_geo = g;
+  local_->idx = Index{ix, iy, iz, level};
+  local_->parent = parent->data();
   for (int i = 0; i < 8; ++i) {
-    local->child[0] = HPX_NULL;
+    local_->child[0] = HPX_NULL;
   }
-  local->expansion = HPX_NULL;
-  local->method = method;
-  local->parts = HPX_NULL;
-  local->n_parts = 0;
-  node_data_unpin(data_);
+  local_->expansion = HPX_NULL;
+  local_->method = method;
+  local_->parts = HPX_NULL;
+  local_->n_parts = 0;
 }
 
 
 TargetNode::~TargetNode() {
+  unpin();
+}
+
+
+void TargetNode::destroy() {
   hpx_call_sync(data_, node_delete_action, nullptr, 0, &data_);
 }
 
@@ -729,106 +748,138 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
 
 
 bool TargetNode::is_leaf() const {
-  NodeData *local = node_data_pin(data_);
+  pin();
+
   bool retval{true};
   for (int i = 0; i < 8; ++i) {
-    if (child[i] != HPX_NULL) {
+    if (local_->child[i] != HPX_NULL) {
       retval = false;
       break;
     }
   }
-  node_data_unpin(data_);
+
   return retval;
 }
 
 
 DomainGeometry TargetNode::root_geo() const {
-  return node_get_root_geo(data_);
+  pin();
+  return local_->root_geo;
 }
 
 
 Index TargetNode::index() const {
-  return node_get_index(data_);
+  pin();
+  return local_->idx;
 }
 
 
 int TargetNode::x_index() const {
-  return node_get_x_index(data_);
+  pin();
+  return local_->idx.x();
 }
 
 
 int TargetNode::y_index() const {
-  return node_get_y_index(data_);
+  pin();
+  return local_->idx.y();
 }
 
 
 int TargetNode::z_index() const {
-  return node_get_z_index(data_);
+  pin();
+  return local_->idx.z();
 }
 
 
 int TargetNode::level() const {
-  return node_get_level(data_);
+  pin();
+  return local_->idx.level();
 }
 
 
-TargetNode *TargetNode::child(size_t i) const {
-  return TargetNode{node_get_child(data_, i)};
+TargetNode TargetNode::child(size_t i) const {
+  pin();
+  return TargetNode{local_->child[i]};
 }
 
 
-TargetNode *TargetNode::parent() const {
-  return TargetNode{node_get_parent(data_, i)};
+TargetNode TargetNode::parent() const {
+  pin();
+  return TargetNode{local_->parent};
 }
 
 
 ExpansionRef TargetNode::expansion() const {
-  return ExpansionRef{node_get_expansion(data_)};
+  pin();
+  return ExpansionRef{local->expansion};
 }
 
 
 TargetRef TargetNode::parts() const {
-  NodeData *local = node_data_pin(data);
-  TargetRef retval{local->parts, local->n_parts, local->n_parts_total};
-  node_data_unpin(data);
-  return retval;
+  pin();
+  return TargetRef{local->parts, local->n_parts, local->n_parts_total};;
 }
 
 
 int TargetNode::n_parts() const {
-  return node_get_n_parts(data_);
+  pin();
+  return local_->n_parts;
 }
 
 
 int TargetNode::n_parts_total() const {
-  return node_get_n_parts_total(data_);
+  pin();
+  return local_->n_parts_total;
 }
 
 
 Point TargetNode::low() const {
-  return node_get_low(data_);
+  pin();
+  return local_->root_geo.low_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 Point TargetNode::high() const {
-  return node_get_high(data_);
+  pin();
+  return local_->root_geo.high_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 Point TargetNode::center() const {
-  return node_get_center(data_);
+  pin();
+  return local_->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
+                                   local_->idx.z(), local_->idx.level());
 }
 
 
 double TargetNode::size() const {
-  return node_get_size(data_);
+  pin();
+  return local_->root_geo.size_from_index(local_->idx.level());
 }
 
 
-void TargetNode::set_expansion(ExpansionRef expand) {
-  NodeData *local = node_data_pin(data_);
-  local->expansion = expand.data();
-  node_data_unpin(data_);
+void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
+  ExpansionRef globexp = globalize_expansion(expand.get(), data_);
+  pin();
+  local->expansion = globexp.data();
+}
+
+
+void TargetNode::pin() {
+  if (!local_ && data_ != HPX_NULL) {
+    assert(hpx_gas_try_pin(data_, (void **)&local));
+  }
+}
+
+
+void TargetNode::unpin() {
+  if (local_ && data_ != HPX_NULL) {
+    hpx_gas_unpin(data_);
+    local_ = nullptr;
+  }
 }
 
 
