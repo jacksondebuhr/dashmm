@@ -83,7 +83,9 @@ class Target {
   std::complex<double> phi() const {return phi_;}
   size_t index() const {return index_;}
 
+  void set_position(Point p) {position_ = p;}
   void set_phi(std::complex<double> p) {phi_ = p;}
+  void set_index(size_t idx) {index_ = idx;}
 
  private:
   Point position_;

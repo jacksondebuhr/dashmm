@@ -103,7 +103,7 @@ class TargetNode {
   void partition(hpx_addr_t parts, int n_parts, int limit,
                  hpx_addr_t expand, int which_child,
                  bool same_sources_and_targets,
-                 std::vector<SourceNode *> consider);
+                 std::vector<SourceNode> consider);
 
   //queries
   bool is_leaf() const;
