@@ -10,6 +10,76 @@
 namespace dashmm {
 
 
+/////////////////////////////////////////////////////////////////////
+// Stuff for the user LCO
+/////////////////////////////////////////////////////////////////////
+
+
+int ExpansionLCOHeader {
+  int arrived;
+  int scheduled;
+  int finished;
+  size_t payload_size;
+}
+
+
+void expansion_lco_init_handler(void *i, size_t bytes,
+                                void *init, size_t init_bytes) {
+  ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(i);
+  i->arrived = 0;
+  i->scheduled = 0;
+  i->finished = 0;
+  i->payload_size = init_bytes;
+  char *payload = static_cast<char *>(i) + sizeof(ExpansionLCOHeader);
+  memcpy(payload, init, init_bytes);
+}
+HPX_ACTION(HPX_FUNCTION, 0,
+           expansion_lco_init, expansion_lco_init_handler);
+
+
+void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
+  int *code = static_cast<int *>(rhs);
+  if (code == kFinish) {
+    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
+    head->finished = 1;
+  } else if (code == kSchedule) {
+    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
+    head->scheduled += 1;
+  } else if (code == kContribute) {
+    //create the expansion from the payload
+    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
+    char *payload = static_cast<char *>(i) + sizeof(ExpansionLCOHeader);
+    auto local = interpret_expansion(payload, head->payload_size);
+
+    //create an expansion from the rhs
+    char *input = static_cast<char *>(rhs) + sizeof(int);
+    auto incoming = interpret_expansion(input, bytes - sizeof(int));
+
+    //add the one to the other
+    local->add_expansion(incoming.get());
+
+    //increment the counter
+    head->arrived += 1;
+  } else {
+    assert(0 && "Incorrect code to expansion LCO");
+  }
+}
+HPX_ACTION(HPX_FUNCTION, 0,
+           expansion_lco_operation, expansion_lco_operation_handler);
+
+
+bool expansion_lco_predicate_handler(ExpansionLCOHeader *i, size_t bytes) {
+  return (i->finished && (i->arrived == i->scheduled));
+}
+HPX_ACTION(HPX_FUNCTION, 0,
+           expansion_lco_predicate, expansion_lco_predicate_handler);
+
+
+/////////////////////////////////////////////////////////////////////
+// Stuff for the user LCO
+/////////////////////////////////////////////////////////////////////
+
+
 int ExpansionRef::type() const {
   assert(valid());
   hpx_addr_t from = hpx_addr_add(data_, );
@@ -135,69 +205,28 @@ void ExpansionRef::add_expansion(const Expansion *temp1) {
 }
 
 
-void ExpansionRef::from_sum(const std::vector<const Expansion *> &exps) {
-  setup_local_expansion();
-  exp_->from_sum(exps);
-  save_to_global();
-}
-
-
 std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center) const {
-  setup_local_expansion();
-  return exp_->get_new_expansion(center);
+  return create_expansion(type_, center);
 }
 
 
-ExpansionSerial *ExpansionRef::pin() {
-  if (data == HPX_NULL) {
-    return nullptr;
-  }
-  ExpansionSerial *retval{nullptr};
-  hpx_gas_try_pin(data_, (void **)&retval);
-  return retval;
-}
-
-
-void ExpansionRef::unpin() {
-  if (data_ == HPX_NULL) {
-    return;
-  }
-  hpx_gas_unpin(data_);
-}
-
-
-//NOTE: This makes a copy. Which will need to happen in non SMP mode eventually,
-// but for now, this might be a performance hit.
-void ExpansionRef::setup_local_expansion() {
-  if (exp_ != nullptr) {
-    return;
-  }
-  ExpansionSerial *local = pin();
-  size_t total = sizeof(ExpansionSerial) + local->size;
-  exp_ = create_expansion(local->type, total, local);
-  unpin();
-}
-
-
-//NOTE: There is some repetition between this and globalize_expansion...
-void ExpansionRef::save_to_global() {
-  assert(exp_ != nullptr);
-  ExpansionSerialPtr serial = exp_->serialize(true);
-  size_t size = serial->size + sizeof(ExpansionSerial);
-  hpx_gas_memput_rsync(data_, serial.get(), size);
-}
-
-
-ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where) {
+//NOTE that this function takes ownership of the Expansion.
+ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
   if (exp == nullptr) {
-    return ExpansionRef{HPX_NULL};
+    return ExpansionRef{0, HPX_NULL};
   }
-  ExpansionSerialPtr serial = exp->serialize(true);
-  size_t size = serial->size + sizeof(ExpansionSerial);
-  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
+
+  //This is the init data for the LCO
+  size_t bytes = exp->bytes();
+  void *data = exp->release();
+  int *type = static_cast<int *>(data);
+
+  size_t total_size = sizeof(ExpansionLCOHeader) + bytes;
+
+  hpx_addr_t data = hpx_lco_user_new(total_size, id, op, pred, data, bytes);
   assert(data != HPX_NULL);
-  hpx_gas_memput_rsync(data, serial.get(), size);
-  return data;
+
+  return ExpansionRef{*type, data};
 }
 
 

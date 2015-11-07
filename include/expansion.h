@@ -20,33 +20,15 @@ extern constexpr int kFirstUserExpansionType;
 extern constexpr int kLastUserExpansionType;
 
 
-typedef Expansion *(*expansion_creation_function_t)(size_t, void *);
-
-
-//TODO: I think we lose this type
-struct ExpansionSerial {
-  int type;
-  bool provides_L;        //the thing returned by provides_L()
-  bool provides_exp;      //the thing returned by provides_exp()
-  Point center;           //the thing returned by center()
-  size_t term_count;      //the thing returned by size()
-  size_t size;            //the size of the following data
-  char data[];
-}
-
-
-//TODO This also is likely going away
-//This really should be made into a full class, so that errors and so on
-// do not expose the implementation...
-using ExpansionSerialPtr =
-          std::unique_ptr<ExpansionSerial, void (*)(ExpansionSerial *)>;
+typedef Expansion *(*expansion_creation_function_t)(Point);
+typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes);
 
 
 class Expansion {
  public:
   virtual ~Expansion() { }
 
-  virtual void *data() = 0;
+  virtual void *release() = 0;
   virtual size_t bytes() const = 0;
   virtual bool valid() const = 0;
   virtual int type() const = 0;
@@ -63,7 +45,7 @@ class Expansion {
 
   virtual std::unique_ptr<Expansion> M_to_M(int from_child,
                                             double s_size) const = 0;
-  virtual Estd::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
+  virtual std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
                                              Index t_index) const = 0;
   virtual std::unique_ptr<Expansion> L_to_L(int to_child,
                                             double t_size) const = 0;
@@ -80,16 +62,13 @@ class Expansion {
 
 
 //return true on success
-bool register_expansion(int type, hpx_action_t creator);
-
-
-//TODO This is likely gone as well
-//this should be used by the serialize methods for expansions
-ExpansionSerialPtr expansion_serialization_allocator(size_t size, bool alloc);
+bool register_expansion(int type, hpx_action_t creator,
+                                  hpx_action_t interpreter);
 
 
 //NOTE: not intended for end-user use
-std::unique_ptr<Expansion> create_expansion(int type, size_t size, void *data);
+Expansion *interpret_expansion(void *data, size_t size);
+std::unique_ptr<Expansion> create_expansion(int type, Point center);
 
 
 } // namespace dashmm

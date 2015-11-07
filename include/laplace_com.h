@@ -32,7 +32,7 @@ class LaplaceCOM : public Expansion {
       : data_{ptr}, bytes_{sizeof(LaplaceCOMData)} { }
   ~LaplaceCOM();
 
-  void *data() override {
+  void *release() override {
     retval = data_;
     data_ = nullptr;
     return retval;

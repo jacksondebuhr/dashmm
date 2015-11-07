@@ -19,19 +19,16 @@ namespace dashmm {
 //NOTE: Some of these will not be in the documentation.
 class ExpansionRef {
  public:
-  ExpansionRef(hpx_addr_t addr) : data_{ref}, exp_{nullptr} { }
+  ExpansionRef(int type, hpx_addr_t addr) : type_{type}, data_{addr} { }
 
-  bool valid() const {return data_ != HPX_NULL;}
-
-  int type() const;
   hpx_addr_t data() const {return data_;}
+  bool valid() const {return data_ != HPX_NULL;}
+  int type() const {return type_;}
 
-  bool provides_L() const;
-  bool provides_exp() const;
-  size_t size() const;
-  Point center() const;
-
-  std::complex<double> term(size_t i) const;
+  //NOTE: We have removed some of the normal interface for expansions...
+  // I think they will not be needed, and so we have removed them.
+  //And for that matter, what do we do with the rest of these? We want to
+  // basically always schedule these operations. So do we remove them as well?
 
   std::unique_ptr<Expansion> S_to_M(Point center,
                                     Source *first, Source *last) const;
@@ -49,24 +46,19 @@ class ExpansionRef {
               Target *t_first, Target *t_last) const;
 
   void add_expansion(const Expansion *temp1);
-  void from_sum(const std::vector<const Expansion *> &exps);
+  //end TODO comment
 
   std::unique_ptr<Expansion> get_new_expansion(Point center) const;
 
   //schedule is added to this
 
  private:
-  ExpansionSerial *pin();
-  void unpin();
-  void setup_local_expansion();
-  void save_to_global();
-
-  hpx_addr_t data_;
-  std::unique_ptr<Expansion> exp_;
+  int type_;
+  hpx_addr_t data_;     //this is the LCO
 };
 
 
-ExpansionRef globalize_expansion(Expansion *exp, hpx_addr_t where);
+ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp);
 
 
 } // namespace dashmm
