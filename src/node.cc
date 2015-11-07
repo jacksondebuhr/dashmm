@@ -75,6 +75,8 @@ int source_node_child_generation_done_handler(NodeData *node,
 
   method.aggregate(snode, expref);
 
+  //TODO: set the all scheduled input on the expansion
+
   hpx_lco_delete_sync(gendone);
   return HPX_SUCCESS;
 }
@@ -110,6 +112,8 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
     SourceNode curr{hpx_thread_current_target()};
     ExpansionRef expref{expand};
     method.generate(curr, expref);
+
+    //TODO: set the all scheduled input on the expansion
 
     hpx_lco_set(alldone, 0, nullptr, HPX_NULL, HPX_NULL);
     return HPX_SUCCESS;
@@ -255,6 +259,8 @@ int target_node_partition_handler(NodeData *node,
   method.inherit(curr, expand, parms->which_child);
   //If we are not going to refine, then curr is a leaf
   method.process(curr, consider, !refine);
+
+  //TODO: set the all scheduled input on the expansion
 
   if (refine) {
     //partition

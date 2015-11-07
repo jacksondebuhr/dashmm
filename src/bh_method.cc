@@ -23,24 +23,26 @@ void BHMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
   SourceRef sources = curr.parts();
   auto multi = expand.S_to_M(Point{0.0, 0.0, 0.0},
                              sources.first(), sources.last());
+
+  //NOTE: This can happen directly. There will not be any waiting as the
+  // input is local
   curr.set_expansion(multi);
 }
 
 
 void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  auto multi = expand.get_new_expansion(Point{0.0, 0.0, 0.0});
-
-  std::vector<std::unique_ptr<Expansion>> exps{};
-  std::vector<const Expansion *> refs{};
+  curr->set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
   for (size_t i = 0; i < 8; ++i) {
     SourceNode kid = curr.child(i);
     if (kid.is_valid()) {
-      exps.push_back(kid->expansion().M_to_M(i, 0.0));
-      refs.push_back(exps[exps.size() - 1].get());
+      ExpansionRef kexp = kid->expansion();  //this data is available in the node
+
+      //NOTE: This pair is essentially a call when
+      // So we need a new sort of interface here. Call it connect? Schedule?
+      auto term{kexp.M_to_M(i, 0.0)};        //this will need to wait on the readiness
+      curr->expansion().add_expansion(term.get());
     }
   }
-  multi->from_sum(refs);
-  curr->set_expansion(multi);
 }
 
 
@@ -58,11 +60,16 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
       if (can_use) {
         ExpansionRef expand = i->expansion();
         TargetRef targets = curr.parts();
+        //NOTE: This operation is merely scheduled
         expand.M_to_T(targets.first(), targets.last());
       } else if (i->is_leaf()) {
         ExpansionRef expand = i->expansion();
         TargetRef targets = curr.parts();
         SourceRef sources = i->parts();
+        //NOTE: again, a scheduled operation
+        //NOTE: We also need to make sure the contributions to the points
+        // occur consistently. There might be multiple updates simultaneous
+        // here.
         expand.S_to_T(sources.first(), sources.last(),
                       targets.first(), targets.last());
       } else {
