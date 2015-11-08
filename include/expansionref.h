@@ -25,35 +25,40 @@ class ExpansionRef {
   bool valid() const {return data_ != HPX_NULL;}
   int type() const {return type_;}
 
-  //NOTE: We have removed some of the normal interface for expansions...
-  // I think they will not be needed, and so we have removed them.
-  //And for that matter, what do we do with the rest of these? We want to
-  // basically always schedule these operations. So do we remove them as well?
-
-  //NOTE: These source and target things should be changed to SourceRef and
-  // TargetRef?
-
+  //TODO: these...
   //NOTE: These do not need to wait on the expansion
-  std::unique_ptr<Expansion> S_to_M(Point center,
-                                    Source *first, Source *last) const;
-  std::unique_ptr<Expansion> S_to_L(Point center,
-                                    Source *first, Source *last) const;
+  // we will have access to the SourceRef, which knows counts. SO here we
+  // just get the source data, compute the S_to_M and then set the LCO
+  //
+  // TODO: This needs more thinking too...
+  //
+  // See next. This is generally called on the prototype, and it then
+  // contributes to the local.
+  std::unique_ptr<Expansion> S_to_M(Point center, SourceRef sources) const;
+  std::unique_ptr<Expansion> S_to_L(Point center, SourceRef sources) const;
 
-  //NOTE: So do we take the set that needs to wait and make these the
-  // only work through schedule
   //NOTE: These *do* have to wait for the expansion
+  // This is a call when on the expansion containted, that will perform the
+  // translation, and continue that with the correct code to the expansion LCO
+  //
+  //TODO: These need more thinking...
+  //
+  //The results of these are typically added to a particular target or
+  // something.
   std::unique_ptr<Expansion> M_to_M(int from_child, double s_size) const;
   std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
                                     Index t_index) const;
   std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
 
   //NOTE: These *do* have to wait
-  void M_to_T(Target *first, Target *last) const;
-  void L_to_T(Target *first, Target *last) const;
+  // This is a call when on the expansion containted, that will perform the
+  // translation, and continue that with the correct code to the target LCO
+  void M_to_T(TargetRef targets) const;
+  void L_to_T(TargetRef targets) const;
 
   //NOTE: This does not
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const;
+  //
+  void S_to_T(SourceRef sources, TargetRef targets) const;
 
   //NOTE: This needs to wait on the input expansion
   void add_expansion(const Expansion *temp1);
@@ -61,7 +66,11 @@ class ExpansionRef {
 
   std::unique_ptr<Expansion> get_new_expansion(Point center) const;
 
-  //schedule is added to this
+  //TODO: methods to make the inputs easy
+  // these will wrap up the HPX stuff so the user can do "obvious" seeming
+  // thigns instead.
+  void finalize() const;
+  void schedule() const;
 
  private:
   int type_;

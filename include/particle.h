@@ -56,6 +56,8 @@ class TargetRef {
   // Perhaps these will be called by the expansionref object. This way
   // the user will not ever see this happening.
   // Or maybe the expansionref object will go ahead an do the whole thing...
+  void finalize() const;
+  void schedule(int num) const;
 
  private:
   hpx_addr_t data_;

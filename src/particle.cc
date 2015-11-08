@@ -18,12 +18,12 @@ namespace dashmm {
 struct TargetRefLCOData {
   int arrived;
   int scheduled;
+  int finished;
   int count;
   Target targets[];
 };
 
 struct TargetRefLCOInitData {
-  int inputs;
   int count;
   Target targets[];
 };
@@ -50,14 +50,16 @@ enum TargetRefLCOSetCodes {
   kSetOnly = 1,
   kStoT = 2,
   kMtoT = 3,
-  kLtoT = 4
+  kLtoT = 4,
+  kFinish = 5
 };
 
 
 void targetref_lco_init_handler(TargetRefLCOData *i, size_t bytes,
                                 TargetRefLCOInitData *init, size_t init_bytes) {
   i->arrived = 0;
-  i->scheduled = init->inputs;
+  i->scheduled = 0;
+  i->finished = 0;
   i->count = init->count;
   memcpy(i->targets, init->targets, sizeof(Target) * init->count);
 }
@@ -91,6 +93,8 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
                                          input->bytes);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
     lhs->arrived += 1;
+  } else if (*code == kFinish) {
+    lhs->finished = 1;
   } else {
     assert(0 && "Incorrect code to TargetRef LCO");
   }
@@ -100,7 +104,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 bool targetref_lco_predicate_handler(TargetRefLCOData *i, size_t bytes) {
-  return (i->arrived == i->scheduled);
+  return i->finished && (i->arrived == i->scheduled);
 }
 HPX_ACTION(HPX_FUNCTION, 0,
            targetref_lco_predicate, targetref_lco_predicate_handler);
@@ -131,11 +135,10 @@ void SourceRef::destroy() {
 }
 
 
-TargetRef::TargetRef(Target *targets, int n, int inputs) {
+TargetRef::TargetRef(Target *targets, int n) {
   size_t init_size = sieof(TargetRefLCOInitData) + sizeof(Target) * n;
   TargetRefLCOInitData *init = malloc(init_size);
   assert(init);
-  init->inputs = inputs;
   init->count = n;
   memcpy(init->targets, targets, sizeof(Target) * n);
 
@@ -152,6 +155,24 @@ void TargetRef::destroy() {
     hpx_lco_delete_sync(data_);
     data_ = HPX_NULL;
     n = 0;
+  }
+}
+
+
+void TargetRef::finalize() const {
+  if (data_ != HPX_NULL) {
+    int code = kFinish;
+    hpx_lco_set_lsync(data_, sizeof(code), &code, HPX_NULL);
+  }
+}
+
+
+//NOTE: This one must be remote complete so that there is no timing issue
+// between scheduling an input and finalizing the schedule.
+void TargetRef::schedule(int num) const {
+  if (data_ != HPX_NULL) {
+    int input[2]{kSetOnly, num};
+    hpx_lco_set_rsync(data_, sizeof(int) * 2, input);
   }
 }
 

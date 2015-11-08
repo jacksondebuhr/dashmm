@@ -159,6 +159,22 @@ std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center) const {
 }
 
 
+void ExpansionRef::finalize() const {
+  if (data_ != HPX_NULL) {
+    int code = kFinish;
+    hpx_lco_set_lsync(data_, sizeof(code), &code, HPX_NULL);
+  }
+}
+
+
+void ExpansionRef::schedule() const {
+  if (data_ != HPX_NULL) {
+    int code = kSchedule;
+    hpx_lco_set_rsync(data_, sizeof(code), &code);
+  }
+}
+
+
 //NOTE that this function takes ownership of the Expansion.
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
   if (exp == nullptr) {
