@@ -56,7 +56,8 @@ HPX_ACTION(HPX_DEFAULT, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-Expansion *interpret_expansion(void *data, size_t size) {
+std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
+                                               size_t size) {
   auto entry = expansion_table_.find(type);
   if (entry == expansion_table_.end()) {
     return nullptr;
@@ -65,7 +66,7 @@ Expansion *interpret_expansion(void *data, size_t size) {
       reinterpret_cast<expansion_creation_function_t>(
         hpx_action_get_handler(entry->second.interpret)
       );
-  return func(size, data);
+  return std::unique_ptr<Expansion>{func(size, data)};
 }
 
 std::unique_ptr<Expansion> create_expansion(int type, Point center) {

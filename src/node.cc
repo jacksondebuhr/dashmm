@@ -86,36 +86,41 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            HPX_POINTER, HPX_ADDR, HPX_ADDR);
 
 
-int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
-                                  hpx_addr_t gendone, hpx_addr_t parts,
-                                  int n_parts, int n_parts_total, int limit,
-                                  hpx_addr_t expand);
-HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+struct SourceNodePartitionParams {
+  hpx_addr_t partdone;
+  hpx_addr_t gendone;
+  int limit;
+  int type;
+  hpx_addr_t expand;
+  int n_sources;
+  Source sources[];
+};
+
+int source_node_partition_handler(NodeData *node,
+                                  SourceNodePartitionParams *parms,
+                                  size_t bytes);
+HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
            source_node_partition_action, source_node_partition_handler,
-           HPX_POINTER, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT,
-           HPX_INT, HPX_ADDR);
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
-                                  hpx_addr_t gendone, hpx_addr_t parts,
-                                  int n_parts, int n_parts_total, int limit,
-                                  hpx_addr_t expand) {
-  assert(n_parts > 0);
-  //NOTE: The following line only makes sense in SMP; In distributed, having
-  // the address of the start of parts will not work, as those are temporary
-  // global addresses. I think.
-  node->parts = parts;
-  node->n_parts = n_parts;
-  node->n_parts_total = n_parts_total;
+int source_node_partition_handler(NodeData *node,
+                                  SourceNodePartitionParams *parms,
+                                  size_t bytes) {
+  if (parms->n_sources <= parms->limit) {
+    assert(node->sources.data() == HPX_NULL);
+    node->sources = SourceRef(parms->sources, parms->n_sources);
 
-  if (n_parts <= limit) {
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
-    ExpansionRef expref{expand};
+    ExpansionRef expref{parms->type, parms->expand};
     method.generate(curr, expref);
 
     //TODO: set the all scheduled input on the expansion
 
-    hpx_lco_set(alldone, 0, nullptr, HPX_NULL, HPX_NULL);
+    hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
+    if (parms->gendone != HPX_NULL) {
+      hpx_lco_set(parms->gendone, 0, nullptr, HPX_NULL, HPX_NULL);
+    }
     return HPX_SUCCESS;
   }
 
@@ -123,11 +128,9 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
   // distributed.
 
   //partition sources
-  Source *P{nullptr};
-  assert(hpx_gas_try_pin(parts, (void **)&P));
   Source *splits[9]{};
-  splits[0] = P;
-  splits[8] = &P[n_parts];
+  splits[0] = parms->sources;
+  splits[8] = &parms->sources[n_parts];
 
   Point cen{center()};
   double z_center = cen.z();
@@ -151,11 +154,10 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
   splits[3] = std::partition(splits[2], splits[4], x_comp);
   splits[5] = std::partition(splits[4], splits[6], x_comp);
   splits[7] = std::partition(splits[6], splits[8], x_comp);
-  hpx_gas_unpin(parts);
 
   //copy sections of particles into their own allocations
   // This will be needed in distributed mode.
-  hpx_addr_t cparts[8];
+  Source *cparts[8];
   int n_per_child[8]{0, 0, 0, 0, 0, 0, 0, 0};
   int n_children{0};
   int n_offset{0};
@@ -163,10 +165,9 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
     n_per_child[i] = splits[i + 1] - splits[i];
     if (n_per_child[i]) {
       ++n_children;
-      cparts[i] = hpx_addr_add(parts, sizeof(Source) * n_offset,
-                                      sizeof(Source) * n_parts_total);
+      cparts[i] = &parms->sources[n_offset];
     } else {
-      cparts[i] = HPX_NULL;
+      cparts[i] = nullptr;
     }
     n_offset += n_per_child[i];
   }
@@ -187,18 +188,30 @@ int source_node_partition_handler(NodeData *node, hpx_addr_t partdone,
                    node->method, hpx_thread_current_target()};
     node->child[i] = kid.data();
 
-    hpx_call(kid.data(), source_node_partition_action, HPX_NULL, &childpartdone,
-             &childgendone, &cparts[i], &n_per_child[i], &n_parts_total, &limit,
-             &expand);
+    //TODO: can probably pretty easily remove this allocation/deallocation
+    // overhead.
+    size_t argsz = sizeof(SourceNodePartitionParams)
+                   + sizeof(Sourc) * n_per_child[i]);
+    SourceNodePartitionParams *args = malloc(argsz);
+    assert(args != nullptr);
+    args->partdone = childpartdone;
+    args-gendone = childgendone;
+    args->limit = parms->limit;
+    args->type = parms->type;
+    args->expand = parms->expand;
+    args->n_sources = n_per_child[i];
+    memcpy(args->sources, cparts[i], sizeof(Source) * n_per_child[i]);
+    hpx_call(kid.data(), source_node_partition_action, HPX_NULL, args, argsz);
+    free(args);
   }
 
   hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
-                partdone, nullptr, 0);
+                parms->partdone, nullptr, 0);
   hpx_call_when(childgendone, hpx_thread_current_target(),
-                source_node_child_generation_done_action, gendone,
-                &childgendone, &expand);
+                source_node_child_generation_done_action, parms->gendone,
+                &childgendone, &parms->expand);
 
-  return HPX_NULL;
+  return HPX_SUCCESS;
 }
 
 
@@ -376,8 +389,7 @@ SourceNode::SourceNode(DomainGeometry g, int ix, int iy, int iz, int level,
   }
   local_->expansion = HPX_NULL;
   local_->method = method;
-  local_->parts = HPX_NULL;
-  local_->n_parts = 0;
+  local_->sources = SourceRef{};
 }
 
 
@@ -391,7 +403,7 @@ void SourceNode::destroy() {
 }
 
 
-hpx_addr_t SourceNode::partition(hpx_addr_t parts, int n_parts, int limit,
+hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
                                  hpx_addr_t expand) {
   hpx_addr_t retval = hpx_lco_future_new(0);
   assert(retval != HPX_NULL);

@@ -30,21 +30,32 @@ class ExpansionRef {
   //And for that matter, what do we do with the rest of these? We want to
   // basically always schedule these operations. So do we remove them as well?
 
+  //NOTE: These source and target things should be changed to SourceRef and
+  // TargetRef?
+
+  //NOTE: These do not need to wait on the expansion
   std::unique_ptr<Expansion> S_to_M(Point center,
                                     Source *first, Source *last) const;
   std::unique_ptr<Expansion> S_to_L(Point center,
                                     Source *first, Source *last) const;
 
+  //NOTE: So do we take the set that needs to wait and make these the
+  // only work through schedule
+  //NOTE: These *do* have to wait for the expansion
   std::unique_ptr<Expansion> M_to_M(int from_child, double s_size) const;
   std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
                                     Index t_index) const;
   std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
 
+  //NOTE: These *do* have to wait
   void M_to_T(Target *first, Target *last) const;
   void L_to_T(Target *first, Target *last) const;
+
+  //NOTE: This does not
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const;
 
+  //NOTE: This needs to wait on the input expansion
   void add_expansion(const Expansion *temp1);
   //end TODO comment
 

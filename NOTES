@@ -1,3 +1,63 @@
+Okay, so we are about to figure this all out. First step, what to do with the
+particles.
+ * The sources are read only, so when the source tree partitions, we can have
+   the data get split up as it has been. Then there just needs to be a way to
+   get that data. It will get packed into various messages for doing things
+   like S->M, S->T.  DONE
+ * The targets need to have some kind of mutual exclusion so that contributions
+   do not overwrite and screw up the potentials if there is a race to
+   contribute.
+
+   At the end of the computation, they can just issue a swarm of memputs or
+   something to save the contributions. There will only be one particle
+   contributing to each input target, so there is no problem here.
+   Be sure to use an and gate for sync on this, rather than a host of
+   futures.
+
+   And so there needs to be some method to apply M->T, L-> and S->T for the
+   targets. Especially given that sometimes this action occurs at an internal
+   node. It will need to propagate the message to the children of that node.
+   This will need to happen until leaves are reached. In the distributed
+   version, each node could be on a distinct locality.
+
+   So how does this work? The expansions are now LCOs. They will be gotten
+   at the target. So the ->T actions should occur at the target locations.
+   So the node should save the targets address, and then these addresses will
+   be the target of the action. Probably the memory will contain a count and
+   then the packed data (a bunch of target records - just a struct)
+
+   Are we going to be able to hide this from the user in their implementations
+   of methods?
+
+ * The new scheme for point data storage means that the partition actions
+   will not be sending around global memory, but rather local stuff until
+   leaves are reached. At that point they would be put into the global memory
+   object.
+
+   The internal nodes could perhaps save some special marker, or otherwise.
+   Or maybe the action is called on the node which passes it along to children
+   until it finds a non-null target object?
+
+   BIG QUESTION: How can we be sure the tree is done being constructed when
+   the message comes through? Do we perhaps have to enqueue these on some
+   partitioning complete LCO? Also, the ->T actions occur during partition.
+   But the source messages might not be ready initially (M->T for example) so
+   the action might be delayed. So we need a signal that indicates that the
+   children are ready and set up? This is tricky...
+
+   This perhaps indicates how the targeting will occur. Methods always have
+   the node reference available. So the method can call an
+
+
+Some things to not forget:
+  * The MethodRef should be updated to work the same way as ExpansionRef
+    that is, the stuff to pass them around the system should be the same
+  * Complete the work on the ExpansionRef.
+
+
+
+
+
 Some notes about issues or future features
 
 * In the future, we may want to have the ObjectHandle be something a little
@@ -11,11 +71,6 @@ in the other stuff as comments? Or something. At least in the dev branch. That
 way when it finally does work, we can make that shit happen quickly.
     Jayashree says it is planned to be ready for the 2.0 release.
     So that is perfect timing I think.
-
-* Perhaps make some nested namespaces that hide the internal implementation
-objects so that the users do not accidentally clash with the internals. Though,
-they should never define things in dashmm namespace anyway, so this might not
-really be a problem.
 
 * Go through the code and add markers that indicate that sections work only
 in SMP mode. This will help us easily identify things to improve after the

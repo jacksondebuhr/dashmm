@@ -27,9 +27,7 @@ struct NodeData {
 
   //For Source Nodes, these refer to the source points
   // For target nodes, these refer to the target points
-  hpx_addr_t parts;
-  int n_parts;
-  int n_parts_total;
+  SourceRef sources;
 };
 
 

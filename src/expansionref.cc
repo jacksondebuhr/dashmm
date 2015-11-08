@@ -15,12 +15,18 @@ namespace dashmm {
 /////////////////////////////////////////////////////////////////////
 
 
-int ExpansionLCOHeader {
+struct ExpansionLCOHeader {
   int arrived;
   int scheduled;
   int finished;
   size_t payload_size;
-}
+};
+
+enum ExpansionLCOSetCodes {
+  kFinish = 1,
+  kSchedule = 2,
+  kContribute = 3
+};
 
 
 void expansion_lco_init_handler(void *i, size_t bytes,
@@ -39,13 +45,13 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
   int *code = static_cast<int *>(rhs);
-  if (code == kFinish) {
+  if (*code == kFinish) {
     ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
     head->finished = 1;
-  } else if (code == kSchedule) {
+  } else if (*code == kSchedule) {
     ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
     head->scheduled += 1;
-  } else if (code == kContribute) {
+  } else if (*code == kContribute) {
     //create the expansion from the payload
     ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
     char *payload = static_cast<char *>(i) + sizeof(ExpansionLCOHeader);
@@ -76,7 +82,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 /////////////////////////////////////////////////////////////////////
-// Stuff for the user LCO
+// Interface
 /////////////////////////////////////////////////////////////////////
 
 
@@ -86,64 +92,7 @@ int ExpansionRef::type() const {
 }
 
 
-bool ExpansionRef::provides_L() const {
-  assert(valid());
-  ExpansionSerial *local = pin();
-  if (local) {
-    bool retval = local->provides_L;
-    unpin();
-    return retval;
-  } else {
-    assert(0 && "This should not happen. We are in SMP.")
-  }
-}
-
-
-bool ExpansionRef::provdes_exp() const {
-  assert(valid());
-  ExpansionSerial *local = pin();
-  if (local) {
-    bool retval = local->provdes_exp;
-    unpin();
-    return retval;
-  } else {
-    assert(0 && "This should not happen. We are in SMP.");
-  }
-}
-
-
-size_t ExpansionRef::size() const {
-  assert(valid());
-  ExpansionSerial *local = pin();
-  if (local) {
-    size_t retval = local->term_count;
-    unpin();
-    return retval;
-  } else {
-    assert(0 && "This should not happen. We are in SMP.")
-  }
-}
-
-
-Point ExpansionRef::center() const {
-  assert(valid());
-  ExpansionSerial *local = pin();
-  if (local) {
-    Point retval = local->center;
-    unpin();
-    return retval;
-  } else {
-    assert(0 && "This should not happen. We are in SMP.")
-  }
-}
-
-
-std::complex<double> ExpansionRef::term(size_t i) const {
-  setup_local_expansion();
-  return exp_->term(i);
-}
-
-
+//TODO
 std::unique_ptr<Expansion> ExpansionRef::S_to_M(Point center,
                                       Source *first, Source *last) const {
   setup_local_expansion();

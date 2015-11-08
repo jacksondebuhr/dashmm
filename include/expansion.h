@@ -67,7 +67,12 @@ bool register_expansion(int type, hpx_action_t creator,
 
 
 //NOTE: not intended for end-user use
-Expansion *interpret_expansion(void *data, size_t size);
+
+//This first should be able to support an "empty" version of the object
+//Or more accurately, and invalid expansion. It will have no data, but will
+// be able to perform the correct methods
+std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
+                                               size_t size);
 std::unique_ptr<Expansion> create_expansion(int type, Point center);
 
 
