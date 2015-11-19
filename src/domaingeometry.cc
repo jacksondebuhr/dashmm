@@ -22,28 +22,27 @@ DomainGeometry::DomainGeometry(Point low_rect, Point high_rect)
 }
 
 
-Point DomainGeometry::low_from_index(int ix, int iy, int iz, int level) const {
-  double level_size = size_from_level(level);
-  return Point{ix * level_size + low_.x(),
-      iy * level_size + low_.y(),
-      iz * level_size + low_.z()};
+Point DomainGeometry::low_from_index(Index idx) const {
+  double level_size = size_from_level(idx.level());
+  return Point{idx.x() * level_size + low_.x(),
+               idx.y() * level_size + low_.y(),
+               idx.z() * level_size + low_.z()};
 }
 
 
-Point DomainGeometry::high_from_index(int ix, int iy, int iz, int level) const {
-  double level_size = size_from_level(level);
-  return Point{(ix + 1) * level_size + low_.x(),
-      (iy + 1) * level_size + low_.y(),
-      (iz + 1) * level_size + low_.z()};
+Point DomainGeometry::high_from_index(Index idx) const {
+  double level_size = size_from_level(idx.level());
+  return Point{(idx.x() + 1) * level_size + low_.x(),
+               (idx.y() + 1) * level_size + low_.y(),
+               (idx.z() + 1) * level_size + low_.z()};
 }
 
 
-Point DomainGeometry::center_from_index(int ix, int iy, int iz,
-                                        int level) const {
-  double level_size = size_from_level(level);
-  return Point{(static_cast<double>(ix) + 0.5) * level_size + low_.x(),
-               (static_cast<double>(iy) + 0.5) * level_size + low_.y(),
-               (static_cast<double>(iz) + 0.5) * level_size + low_.z()};
+Point DomainGeometry::center_from_index(Index idx) const {
+  double level_size = size_from_level(idx.level());
+  return Point{(idx.x() + 0.5) * level_size + low_.x(),
+               (idx.y() + 0.5) * level_size + low_.y(),
+               (idx.z() + 0.5) * level_size + low_.z()};
 }
 
 

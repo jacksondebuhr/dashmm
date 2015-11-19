@@ -7,6 +7,8 @@
 #include "include/types.h"
 
 
+/// \namespace dashmm
+/// \brief The namespace inside which all DASHMM symbols are defined
 namespace dashmm {
 
 
