@@ -21,11 +21,23 @@ class ExpansionRef {
  public:
   ExpansionRef(int type, hpx_addr_t addr) : type_{type}, data_{addr} { }
 
+  void destroy();
+
   hpx_addr_t data() const {return data_;}
   bool valid() const {return data_ != HPX_NULL;}
   int type() const {return type_;}
 
+  //TODO this one provides the serial data for the object
+  // NOTE: These will be synchronous... Only call if the expansion is ready
+  void *serial() const;
+  size_t bytes() const;
+
   //TODO: these...
+  // So all of these basically have the following pattern: once the LCO is
+  // ready, an action will spawn to continue the data to a relevant other
+  // action.
+  //
+
   //NOTE: These do not need to wait on the expansion
   // we will have access to the SourceRef, which knows counts. SO here we
   // just get the source data, compute the S_to_M and then set the LCO
@@ -51,7 +63,7 @@ class ExpansionRef {
   std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
 
   //NOTE: These *do* have to wait
-  // This is a call when on the expansion containted, that will perform the
+  // This is a call when on the expansion contained, that will perform the
   // translation, and continue that with the correct code to the target LCO
   void M_to_T(TargetRef targets) const;
   void L_to_T(TargetRef targets) const;

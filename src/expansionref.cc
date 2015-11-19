@@ -86,9 +86,12 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-int ExpansionRef::type() const {
-  assert(valid());
-  hpx_addr_t from = hpx_addr_add(data_, );
+void ExpansionRef::destroy() {
+  if (data_ != HPX_NULL) {
+    hpx_lco_delete_sync(data_);
+    data_ = HPX_NULL;
+    type_ = 0;
+  }
 }
 
 
@@ -100,6 +103,7 @@ std::unique_ptr<Expansion> ExpansionRef::S_to_M(Point center,
 }
 
 
+//TODO
 std::unique_ptr<Expansion> ExpansionRef::S_to_L(Point center,
                                       Source *first, Source *last) const {
   setup_local_expansion();
@@ -107,6 +111,7 @@ std::unique_ptr<Expansion> ExpansionRef::S_to_L(Point center,
 }
 
 
+//TODO
 std::unique_ptr<Expansion> ExpansionRef::M_to_M(int from_child,
                                                 double s_size) const {
   setup_local_expansion();
@@ -114,6 +119,7 @@ std::unique_ptr<Expansion> ExpansionRef::M_to_M(int from_child,
 }
 
 
+//TODO
 std::unique_ptr<Expansion> ExpansionRef::M_to_L(Index s_index, double s_size,
                                   Index t_index) const {
   setup_local_expansion();
@@ -121,6 +127,7 @@ std::unique_ptr<Expansion> ExpansionRef::M_to_L(Index s_index, double s_size,
 }
 
 
+//TODO
 std::unique_ptr<Expansion> ExpansionRef::L_to_L(int to_child,
                                                 double t_size) const {
   setup_local_expansion();
@@ -128,18 +135,21 @@ std::unique_ptr<Expansion> ExpansionRef::L_to_L(int to_child,
 }
 
 
+//TODO
 void ExpansionRef::M_to_T(Target *first, Target *last) const {
   setup_local_expansion();
   exp_->M_to_T(first, last);
 }
 
 
+//TODO
 void ExpansionRef::L_to_T(Target *first, Target *last) const {
   setup_local_expansion();
   exp_->L_to_T(first, last);
 }
 
 
+//TODO
 void ExpansionRef::S_to_T(Source *s_first, Source *s_last,
                           Target *t_first, Target *t_last) const {
   setup_local_expansion();
@@ -147,6 +157,7 @@ void ExpansionRef::S_to_T(Source *s_first, Source *s_last,
 }
 
 
+//TODO
 void ExpansionRef::add_expansion(const Expansion *temp1) {
   setup_local_expansion();
   exp_->add_expansion(temp1);
@@ -188,7 +199,9 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
 
   size_t total_size = sizeof(ExpansionLCOHeader) + bytes;
 
-  hpx_addr_t data = hpx_lco_user_new(total_size, id, op, pred, data, bytes);
+  hpx_addr_t data = hpx_lco_user_new(total_size, expansion_lco_init,
+                                     expansion_lco_operation,
+                                     expansion_lco_predicate, data, bytes);
   assert(data != HPX_NULL);
 
   return ExpansionRef{*type, data};

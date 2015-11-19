@@ -60,7 +60,7 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
                                                size_t size) {
   auto entry = expansion_table_.find(type);
   if (entry == expansion_table_.end()) {
-    return nullptr;
+    return std::unique_ptr<Expansion>{nullptr};
   }
   expansion_creation_function_t func =
       reinterpret_cast<expansion_creation_function_t>(
@@ -87,8 +87,13 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center) {
 /////////////////////////////////////////////////////////////////////
 
 
+//TODO: extend this to have both in-HPX and outside-HPX versions.
 int register_expansion(int type, hpx_action_t creator,
                                  hpx_action_t interpreter) {
+  if (type < kFirstUserExpansionType || type > kLastUserExpansionType) {
+    return false;
+  }
+
   int nlocs = hpx_get_num_ranks();
   hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
                                           int_sum_ident_op, int_sum_op);

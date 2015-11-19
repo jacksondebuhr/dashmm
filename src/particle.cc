@@ -1,6 +1,7 @@
 #include "include/particle.h"
 
-// C/C++
+#include <cassert>
+#include <cstring>
 
 #include <hpx/hpx.h>
 
@@ -29,18 +30,21 @@ struct TargetRefLCOInitData {
 };
 
 struct TargetRefLCOSetStoTData {
+  int code;
   int type;
   int count;
   Source sources[];
 }
 
 struct TargetRefLCOSetMtoTData {
+  int code;
   int type;
   size_t bytes;
   char data[];
 }
 
 struct TargetRefLCOSetLtoTData {
+  int code;
   int type;
   size_t bytes;
   char data[];
@@ -74,21 +78,21 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     lhs->arrived += code[1];
   } else if (*code == kStoT) {
     TargetRefLCOSetStoTData *input =
-        static_cast<TargetRefLCOSetStoTData *>(rhs);
+        static_cast<TargetRefLCOSetStoTData *>(rhs + sizeof(int));
     auto expansion = interpret_expansion(input->type, nullptr, 0);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
     lhs->arrived += 1;
   } else if (*code == kMtoT) {
     TargetRefLCOSetMtoTData *input =
-        static_cast<TargetRefLCOSetMtoTData *>(rhs);
+        static_cast<TargetRefLCOSetMtoTData *>(rhs + sizeof(int));
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count]);
     lhs->arrived += 1;
   } else if (*code == kLtoT) {
     TargetRefLCOSetLtoTData *input =
-        static_cast<TargetRefLCOSetLtoTData *>(rhs);
+        static_cast<TargetRefLCOSetLtoTData *>(rhs + sizeof(int));
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
@@ -136,7 +140,7 @@ void SourceRef::destroy() {
 
 
 TargetRef::TargetRef(Target *targets, int n) {
-  size_t init_size = sieof(TargetRefLCOInitData) + sizeof(Target) * n;
+  size_t init_size = sizeof(TargetRefLCOInitData) + sizeof(Target) * n;
   TargetRefLCOInitData *init = malloc(init_size);
   assert(init);
   init->count = n;
@@ -174,6 +178,48 @@ void TargetRef::schedule(int num) const {
     int input[2]{kSetOnly, num};
     hpx_lco_set_rsync(data_, sizeof(int) * 2, input);
   }
+}
+
+
+void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
+  //NOTE: We assume this is called local to the sources
+  size_t inputsize = sizeof(TargetRefLCOSetStoTData)
+                     + sizeof(Source) * n;
+  TargetRefLCOSetStoTData *input = malloc(inputsize);
+  assert(input);
+  input->code = kStoT;
+  input->type = type;
+  input->count = n;
+  memcpy(input->sources, sources, sizeof(Source) * sources.n());
+
+  //call set with appropriate data
+  hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
+
+  free(input);
+}
+
+
+void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
+  size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
+  TargetRefLCOSetMtoTData *input = malloc(inputsize);
+  assert(input);
+  input->code = kMtoT;
+  input->type = type;
+  input->bytes = bytes;
+  memcpy(input->data, data, bytes);
+  hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
+}
+
+
+void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data) const {
+  size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
+  TargetRefLCOSetLtoTData *input = malloc(inputsize);
+  assert(input);
+  input->code = kLtoT;
+  input->type = type;
+  input->bytes = bytes;
+  memcpy(input->data, data, bytes);
+  hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
 }
 
 

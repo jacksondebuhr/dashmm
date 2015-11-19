@@ -22,6 +22,7 @@ DomainGeometry cubify_domain(hpx_addr_t source_bounds,
   double t_bounds[6];
   hpx_lco_get(target_bounds, sizeof(double) * 6, t_bounds);
 
+  //TODO Can't I use the DomainGeometry Constructor here?
   //cubify the domain
   Point low{s_bounds[0] < t_bounds[0] ? s_bounds[0] : t_bounds[0],
             s_bounds[1] < t_bounds[1] ? s_bounds[1] : t_bounds[1],
