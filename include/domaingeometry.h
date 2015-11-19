@@ -2,6 +2,10 @@
 #define __DASHMM_DOMAIN_GEOMETRY_H__
 
 
+/// \file include/domaingeometry.h
+/// \brief Object to represent the top-level domain
+
+
 #include "include/index.h"
 #include "include/point.h"
 
