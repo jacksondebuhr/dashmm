@@ -220,7 +220,6 @@ struct TargetNodePartitionParams {
   bool same_sources_and_targets;
   hpx_addr_t parts;
   int n_parts;
-  int n_parts_total;
   int limit;
   hpx_addr_t expansion;
   int which_child;
@@ -251,10 +250,6 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
 int target_node_partition_handler(NodeData *node,
                                   TargetNodePartitionParams *parms,
                                   size_t bytes) {
-  node->parts = parms->parts;
-  node->n_parts = parms->n_parts;
-  node->n_parts_total = parms->n_parts_total;
-
   bool refine = false;
   MethodRef method{node->method};
   TargetNode curr{hpx_thread_current_target()};
@@ -323,14 +318,14 @@ int target_node_partition_handler(NodeData *node,
       n_offset += n_per_child[i];
     }
 
-    hpx_addr_t cdone = hpx_lco_and_new(n_children);
-    assert(cdone != HPX_NULL);
+    node->part_done = hpx_lco_and_new(n_children);
+    assert(node->part_done != HPX_NULL);
 
     //set up the arguments to the partition actions; the constant parts
     TargetNodePartitionParams *args =
         target_node_partition_params_alloc(consider.size());
     size_t argssize = target_node_partition_params_size(consider.size());
-    args->done = cdone;
+    args->done = node->part_done;
     args->same_sources_and_targets = parms->same_sources_and_targets;
     args->n_parts_total = parms->n_parts_total;
     args->limit = parms->limit;
@@ -347,8 +342,8 @@ int target_node_partition_handler(NodeData *node,
       }
 
       Index cidx{node->idx.child(i)};
-      TargetNode kid{node->root_geo, cidx.x(), cidx.y(), cidx.z(), cidx.level(),
-                     node->method, hpx_thread_current_target()};
+      TargetNode kid{node->root_geo, cidx, node->method,
+                     hpx_thread_current_target()};
       node->child[i] = kid.data();
 
       args->parts = cparts[i];
@@ -359,8 +354,13 @@ int target_node_partition_handler(NodeData *node,
                argssize);
     }
 
-    hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
+    hpx_call_when(node->part_done, parms->done, hpx_lco_set_action, HPX_NULL,
+                  nullptr, 0);
   } else {  // no refinement needed; so just set the input done LCO
+    Targets *targs{nullptr};
+    assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
+    node->targets = TargetRef(targs, parms->n_parts);
+
     hpx_lco_and_set(parms->done, HPX_NULL);
   }
 
@@ -572,8 +572,9 @@ TargetNode::TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
   }
   local_->expansion = HPX_NULL;
   local_->method = method;
-  local_->parts = HPX_NULL;
-  local_->n_parts = 0;
+  local_->targets = TargetRef{};
+  local_->part_done = hpx_lco_future_new(0);
+  assert(local_->part_done != HPX_NULL);
 }
 
 
@@ -588,7 +589,7 @@ void TargetNode::destroy() {
 
 
 void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
-                           hpx_addr_t expand, int which_child,
+                           ExpansionRef expand, int which_child,
                            bool same_sources_and_targets,
                            std::vector<SourceNode *> consider) {
   hpx_addr_t done = hpx_lco_future_new(0);
@@ -734,7 +735,7 @@ double TargetNode::size() const {
 void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
   ExpansionRef globexp = globalize_expansion(expand.get(), data_);
   pin();
-  local->expansion = globexp.data();
+  local->expansion = globexp;
 }
 
 

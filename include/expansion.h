@@ -238,22 +238,40 @@ bool register_expansion(int type, hpx_action_t creator,
 
 //NOTE: not intended for end-user use
 
-//This first should be able to support an "empty" version of the object
-//Or more accurately, and invalid expansion. It will have no data, but will
-// be able to perform the correct methods
-
 /// Interpret some data as an expansion object
 ///
 /// This will interpret the given data as an expansion of the given type.
 /// The returned expansion will be constructed from the interpret function
 /// provided by the user during expansion registration.
 ///
-/// TODO: Answer these questions:
-///   does the object take ownership of the data?
-///   data is the data of the expansion, which must have type as its first
-///     element, so is type superfluous?
+/// Note that the resulting expansion will assume ownership of the data
+/// passed in. When the returned object is destroyed, it will attempt to
+/// free the data. If this is an error, the user will need to call release()
+/// before letting the object be destroyed.
+///
+/// Note also that the data might be a nullptr. This is to allow for shallow
+/// construction of an Expansion when the specific data for the expansion is
+/// not needed. Examples of this would be to get the size(), or to perform
+/// S_to_T().
+///
+/// \param type - the type identifier for the expansion
+/// \param data - the data for the expansion, may be nullptr
+/// \param size - the size of the data for the expansion
+///
+/// \returns - the resulting expansion
 std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
                                                size_t size);
+
+/// Create an expansion of the given type
+///
+/// This will create a new expansion of the given type. The returned expansion
+/// will be constructed from the create function provided by the user during
+/// expansion registration.
+///
+/// \param type - the type identifier for the expansion
+/// \param center - the Point around which to create the expansion
+///
+/// \returns - the resulting expansion
 std::unique_ptr<Expansion> create_expansion(int type, Point center);
 
 

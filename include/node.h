@@ -154,18 +154,20 @@ struct TargetNodeData {
   /// The global addresses of the children of this node.
   hpx_addr_t child[8];
   /// The global address of the expansion object for this node.
-  hpx_addr_t expansion;
+  ExpansionRef expansion;
   /// The global address of the method object for this node.
   hpx_addr_t method;
   /// A reference to the targets for this node.
   TargetRef targets;
+  /// An LCO to signal that any children of this node have been added
+  hpx_addr_t part_done;
 };
 
 
 class TargetNode {
  public:
-  TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
-             hpx_addr_t method, TargetNode *parent);
+  TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
+             TargetNode *parent);
   explicit TargetNode(hpx_addr_t data)
       : local_{nullptr}, data_{data} { }
   ~TargetNode();

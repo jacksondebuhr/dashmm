@@ -82,6 +82,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     auto expansion = interpret_expansion(input->type, nullptr, 0);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
+    expansion->release();
     lhs->arrived += 1;
   } else if (*code == kMtoT) {
     TargetRefLCOSetMtoTData *input =
@@ -89,6 +90,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count]);
+    expansion->release();
     lhs->arrived += 1;
   } else if (*code == kLtoT) {
     TargetRefLCOSetLtoTData *input =
@@ -96,6 +98,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
+    expansion->release();
     lhs->arrived += 1;
   } else if (*code == kFinish) {
     lhs->finished = 1;

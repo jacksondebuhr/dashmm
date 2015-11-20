@@ -8,27 +8,36 @@
 #include "include/reductionops.h"
 
 
+/// \file src/expansion.cc
+/// \brief Implementation of expansion general framework
+
+
 namespace dashmm {
 
 
-//The range of Expansion type identifiers
+/// The lowest allowed expansion identifier for internal use
 constexpr int kFirstExpansionType = 1000;
+
+/// The highest allowed expansion identifier for internal use
 constexpr int kLastExpansionType = 1999;
+
 constexpr int kFirstUserExpansionType = 2000;
 constexpr int kLastUserExpansionType = 2999;
 
 
+/// A row of the table serving expansion creation functions
 struct ExpansionTableRow {
   hpx_action_t create;
   hpx_action_t interpret;
 }
 
 
-//map from type to description of that type
+/// A mapping from expansion type to creation functions
+///
+/// This is a local object relative to HPX-5. What this means is that each
+/// (traditional) process will have a copy of this table. Registering an
+/// action amounts to a broadcast.
 std::map<int, ExpansionTableRow> expansion_table_;
-
-
-//parameter types for user-marshalled actions
 
 
 /////////////////////////////////////////////////////////////////////
@@ -36,6 +45,18 @@ std::map<int, ExpansionTableRow> expansion_table_;
 /////////////////////////////////////////////////////////////////////
 
 
+/// Action to register an expansion with DASHMM
+///
+/// This action is invoked with a broadcast.
+///
+/// \param type - the type identifier being registered
+/// \param creator - the HPX function implementing creation of that type
+/// \param interpreter - the HPX function implementing interpretation of that
+///                      type
+/// \param check - the address of a reduction LCO that will be used for error
+///                reporting. It will have a nonzero contribution on error.
+///
+/// \returns - HPX_SUCCESS
 int register_expansion_handler(int type, hpx_action_t creator,
                                hpx_action_t interpreter, hpx_addr_t check) {
   int checkval = 0;
@@ -45,6 +66,8 @@ int register_expansion_handler(int type, hpx_action_t creator,
     expansion_table_[type] = ExpansionTableRow{creator, interpreter};
   }
   hpx_lco_set_lsync(check, sizeof(int), &checkval, HPX_NULL);
+
+  return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            register_expansion_action, register_expansion_handler,

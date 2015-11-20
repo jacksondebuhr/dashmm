@@ -64,6 +64,10 @@ void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
     //add the one to the other
     local->add_expansion(incoming.get());
 
+    //release the data, because these objects do not actually own those buffers
+    local->release();
+    incoming->release();
+
     //increment the counter
     head->arrived += 1;
   } else {
