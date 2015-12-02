@@ -58,20 +58,23 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
       bool can_use = MAC(i->expansion(), i->size(), comp_point);
 
       if (can_use) {
-        ExpansionRef expand = i->expansion();
-        TargetRef targets = curr.parts();
-        //NOTE: This operation is merely scheduled
-        expand.M_to_T(targets.first(), targets.last());
+        if (!curr_is_leaf) {
+          newcons.push_back(*i);
+        } else {
+          ExpansionRef expand = i->expansion();
+          TargetRef targets = curr.parts();
+          //NOTE: This operation is merely scheduled
+          expand.M_to_T(targets.first(), targets.last());
+        }
       } else if (i->is_leaf()) {
-        ExpansionRef expand = i->expansion();
-        TargetRef targets = curr.parts();
-        SourceRef sources = i->parts();
-        //NOTE: again, a scheduled operation
-        //NOTE: We also need to make sure the contributions to the points
-        // occur consistently. There might be multiple updates simultaneous
-        // here.
-        expand.S_to_T(sources.first(), sources.last(),
-                      targets.first(), targets.last());
+        if (curr_is_leaf) {
+          ExpansionRef expand = i->expansion();
+          TargetRef targets = curr.parts();
+          SourceRef sources = i->parts();
+          expand.S_to_T(sources, targets);
+        } else {
+          newcons.push_back(*i);
+        }
       } else {
         for (size_t j = 0; j < 8; ++j) {
           //NOTE: This line will create the SourceNode, and then pull in a

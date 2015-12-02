@@ -79,26 +79,43 @@ class ExpansionRef {
   std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
                                     Index t_index) const;
   std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
+  //end TODO comment
 
-  //NOTE: These *do* have to wait
-  // This is a call when on the expansion contained, that will perform the
-  // translation, and continue that with the correct code to the target LCO
+  /// Apply a multipole expansion to a set of target points.
+  ///
+  /// This will apply the multipole expansion to a set of target points.
+  /// This is an asynchronous call; when this returns, the application will
+  /// not be guaranteed to have happened. To be sure that all the contributions
+  /// to the target points are complete, one must wait on the target LCO.
+  ///
+  /// \params targets - a reference to the target points.
   void M_to_T(TargetRef targets) const;
+
+  /// Apply a local expansion to a set of target points.
+  ///
+  /// This will apply the local expansion to a set of target points.
+  /// This is an asynchronous call; when this returns, the application will
+  /// not be guaranteed to have happened. To be sure that all the contributions
+  /// to the target points are complete, one must wait on the target LCO.
+  ///
+  /// \params targets - a reference to the target points.
   void L_to_T(TargetRef targets) const;
 
-  //NOTE: This does not
-  // This is called at the target node, so it will have to call an action
-  // targeting the sources to set the target LCO. First, it will schedule
-  // on the target.
-  //
-  // this is where it gets tricky. We can call S->T on an internal node. So
-  // this also needs to take that into account. Calling a chain of actions
-  // down the target tree. But how can we be sure they are done?
+  /// Compute the direct effect of source points on target points.
+  ///
+  /// This will apply the multipole expansion to a set of target points.
+  /// This is an asynchronous call; when this returns, the application will
+  /// not be guaranteed to have happened. To be sure that all the contributions
+  /// to the target points are complete, one must wait on the target LCO.
+  ///
+  /// \params sources - a reference to the source points.
+  /// \params targets - a reference to the target points.
   void S_to_T(SourceRef sources, TargetRef targets) const;
 
   //NOTE: This needs to wait on the input expansion
+  //TODO
   void add_expansion(const Expansion *temp1);
-  //end TODO comment
+
 
   /// Create a new expansion of the same type referred to by this object.
   ///
@@ -140,6 +157,10 @@ class ExpansionRef {
 /// mechanism relies on the release() method of the particular expansion to
 /// provide a packed representation of the relevant data for the expansion.
 /// For more details, see the DASHMM Advanced User Guide.
+///
+/// \param exp - the expansion to globalize
+///
+/// \returns - an ExpansionRef for the globalized expansion
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp);
 
 

@@ -29,7 +29,7 @@ struct SourceNodeData {
   /// The global addresses of the children of this node.
   hpx_addr_t child[8];
   /// The global address of the expansion object for this node.
-  hpx_addr_t expansion;
+  ExpansionRef expansion;
   /// The global address of the method object for this node.
   hpx_addr_t method;
   /// A reference to the sources for this node. If this is an internal node,
@@ -156,11 +156,9 @@ struct TargetNodeData {
   /// The global address of the expansion object for this node.
   ExpansionRef expansion;
   /// The global address of the method object for this node.
-  hpx_addr_t method;
+  MethodRef method;
   /// A reference to the targets for this node.
   TargetRef targets;
-  /// An LCO to signal that any children of this node have been added
-  hpx_addr_t part_done;
 };
 
 

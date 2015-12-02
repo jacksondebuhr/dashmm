@@ -32,9 +32,14 @@ HPX_ACTION(HPX_DEFAULT, 0, node_delete_self_action, node_delete_self_handler,
            HPX_ADDR_T);
 
 
-int node_delete_handler(hpx_addr_t data) {
-  NodeData *local{nullptr};
+int source_node_delete_handler(hpx_addr_t data) {
+  SourceNodeData *local{nullptr};
   assert(hpx_gas_try_pin(data, (void **)&local));
+
+  local->expansion.destroy();
+  //TODO: If we really are making copies of the method always, go ahead and
+  // destoy it here. Otherwise, there is a single instance of it somewhere.
+  local->sources.destroy();
 
   int count{0};
   for (int i = 0; i < 8; ++i) {
@@ -48,7 +53,7 @@ int node_delete_handler(hpx_addr_t data) {
     done = hpx_lco_and_new(count);
     for (int i = 0; i < 8; ++i) {
       if (local->child[i] != HPX_NULL) {
-        hpx_call(local->child[i], node_delete_action, done,
+        hpx_call(local->child[i], source_node_delete_action, done,
                  &local->child[i]);
       }
     }
@@ -62,7 +67,49 @@ int node_delete_handler(hpx_addr_t data) {
   hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
                    &done);
 }
-HPX_ACTION(HPX_DEFAULT, 0, node_delete_action, node_delete_handler,
+HPX_ACTION(HPX_DEFAULT, 0,
+           source_node_delete_action, source_node_delete_handler,
+           HPX_ADDR_T);
+
+
+int target_node_delete_handler(hpx_addr_t data) {
+  TargetNodeData *local{nullptr};
+  assert(hpx_gas_try_pin(data, (void **)&local));
+
+  local->expansion.destroy();
+  //TODO: If we really are making copies of the method always, go ahead and
+  // destoy it here. Otherwise, there is a single instance of it somewhere.
+  local->targets.destroy();
+  hpx_lco_delete_sync(local->part_done);
+
+  int count{0};
+  for (int i = 0; i < 8; ++i) {
+    if (local->child[i] != HPX_NULL) {
+      ++count;
+    }
+  }
+
+  hpx_addr_t done{HPX_NULL};
+  if (count) {
+    done = hpx_lco_and_new(count);
+    for (int i = 0; i < 8; ++i) {
+      if (local->child[i] != HPX_NULL) {
+        hpx_call(local->child[i], target_node_delete_action, done,
+                 &local->child[i]);
+      }
+    }
+  }
+
+  hpx_gas_unpin(data);
+
+  //call when with current continuation
+  // This relies on the fact that HPX_NULL as the gate means this will
+  // be equivalent to hpx_call_cc.
+  hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
+                   &done);
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           target_node_delete_action, target_node_delete_handler,
            HPX_ADDR_T);
 
 
@@ -220,8 +267,9 @@ struct TargetNodePartitionParams {
   bool same_sources_and_targets;
   hpx_addr_t parts;
   int n_parts;
+  int n_parts_total;
   int limit;
-  hpx_addr_t expansion;
+  ExpansionRef expansion;
   int which_child;
   int n_consider;
   hpx_addr_t consider[];
@@ -250,7 +298,6 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
 int target_node_partition_handler(NodeData *node,
                                   TargetNodePartitionParams *parms,
                                   size_t bytes) {
-  bool refine = false;
   MethodRef method{node->method};
   TargetNode curr{hpx_thread_current_target()};
   std::vector<SourceNode> consider{};
@@ -258,21 +305,15 @@ int target_node_partition_handler(NodeData *node,
     consider.push_back(SourceNode{parms->consider[i]});
   }
 
+  bool refine = false;
   if (parms->n_parts > parms->limit) {
     refine = method.refine_test(parms->same_sources_and_targets, curr,
                                 consider);
   }
 
-  ExpansionRef expand{parms->expand};
-  method.inherit(curr, expand, parms->which_child);
-  //If we are not going to refine, then curr is a leaf
-  method.process(curr, consider, !refine);
-
-  //TODO: set the all scheduled input on the expansion
-
   if (refine) {
     //partition
-    Target *P{nullptr};
+    Target *T{nullptr};
     assert(hpx_gas_try_pin(parms->parts, (void **)T));
     Target *splits[9]{};
     splits[0] = T;
@@ -318,14 +359,14 @@ int target_node_partition_handler(NodeData *node,
       n_offset += n_per_child[i];
     }
 
-    node->part_done = hpx_lco_and_new(n_children);
-    assert(node->part_done != HPX_NULL);
+    hpx_addr_t cdone = hpx_lco_and_new(n_children);
+    assert(cdone != HPX_NULL);
 
     //set up the arguments to the partition actions; the constant parts
     TargetNodePartitionParams *args =
         target_node_partition_params_alloc(consider.size());
     size_t argssize = target_node_partition_params_size(consider.size());
-    args->done = node->part_done;
+    args->done = cdone;
     args->same_sources_and_targets = parms->same_sources_and_targets;
     args->n_parts_total = parms->n_parts_total;
     args->limit = parms->limit;
@@ -354,14 +395,29 @@ int target_node_partition_handler(NodeData *node,
                argssize);
     }
 
-    hpx_call_when(node->part_done, parms->done, hpx_lco_set_action, HPX_NULL,
+    hpx_call_when(cdone, node->part_done, hpx_lco_set_action, parms->done,
                   nullptr, 0);
+    hpx_call_when(cdone, cdone, hpx_lco_delete_action, HPX_NULL, nullptr, 0);
   } else {  // no refinement needed; so just set the input done LCO
     Targets *targs{nullptr};
     assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
     node->targets = TargetRef(targs, parms->n_parts);
 
     hpx_lco_and_set(parms->done, HPX_NULL);
+    hpx_lco_set(node->part_done, 0, nullptr, HPX_NULL, HPX_NULL);
+  }
+
+  ExpansionRef expand{parms->expansion};
+  method.inherit(curr, expand, parms->which_child);
+  method.process(curr, consider, !refine);
+
+  //At this point, all work on the current expansion will have been scheduled,
+  // so we mark the LCO as such.
+  expand.finalize();
+  //Also, all the work on the targets for this node will have been scheduled as
+  // well.
+  if (!refine) {
+    node->targets.finalize();
   }
 
   return HPX_SUCCESS;
@@ -399,7 +455,7 @@ SourceNode::~SourceNode() {
 
 
 void SourceNode::destroy() {
-  hpx_call_sync(data_, node_delete_action, nullptr, 0, &data_);
+  hpx_call_sync(data_, source_node_delete_action, nullptr, 0, &data_);
 }
 
 
@@ -556,8 +612,8 @@ void SourceNode::unpin() const {
 /////////////////////////////////////////////////////////////////////
 
 
-TargetNode::TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
-                       hpx_addr_t method, TargetNode *parent) {
+TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
+                       TargetNode *parent) {
   data_ = hpx_gas_alloc_local(sizeof(NodeData), 0);
   if (data_ == HPX_NULL) {
     return;
@@ -565,7 +621,7 @@ TargetNode::TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
 
   pin();
   local_->root_geo = g;
-  local_->idx = Index{ix, iy, iz, level};
+  local_->idx = idx;
   local_->parent = parent->data();
   for (int i = 0; i < 8; ++i) {
     local_->child[0] = HPX_NULL;
@@ -573,8 +629,6 @@ TargetNode::TargetNode(DomainGeometry g, int ix, int iy, int iz, int level,
   local_->expansion = HPX_NULL;
   local_->method = method;
   local_->targets = TargetRef{};
-  local_->part_done = hpx_lco_future_new(0);
-  assert(local_->part_done != HPX_NULL);
 }
 
 
@@ -584,7 +638,7 @@ TargetNode::~TargetNode() {
 
 
 void TargetNode::destroy() {
-  hpx_call_sync(data_, node_delete_action, nullptr, 0, &data_);
+  hpx_call_sync(data_, target_node_delete_action, nullptr, 0, &data_);
 }
 
 

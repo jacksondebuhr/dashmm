@@ -86,6 +86,54 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 /////////////////////////////////////////////////////////////////////
+// HPX Stuff
+/////////////////////////////////////////////////////////////////////
+
+
+int expansion_m_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
+  TargetRef targets{targ, n_targets};
+  //HACK: This action is local to the expansion, so we getref here with
+  // whatever as the size and things are okay...
+  ExpansionLCOHeader *ldata{nullptr};
+  hpx_lco_getref(hpx_thread_current_target(), 1, &ldata);
+  char *payload = static_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
+  targets.contribute_M_to_T(type, ldata->payload_size, payload);
+
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           expansion_m_to_t_action, expansion_m_to_t_handler,
+           HPX_INT, HPX_ADDR_T, HPX_INT);
+
+
+int expansion_l_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
+  TargetRef targets{targ, n_targets};
+  //HACK: This action is local to the expansion, so we getref here with
+  // whatever as the size and things are okay...
+  ExpansionLCOHeader *ldata{nullptr};
+  hpx_lco_getref(hpx_thread_current_target(), 1, &ldata);
+  char *payload = static_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
+  targets.contribute_L_to_T(type, ldata->payload_size, payload);
+
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           expansion_l_to_t_action, expansion_l_to_t_handler,
+           HPX_INT, HPX_ADDR_T, HPX_INT);
+
+
+int expansion_s_to_t_handler(Source *sources, int n_sources, hpx_addr_t target,
+                             int type) {
+  TargetRef targets{target, 0};
+  targets.contribute_S_to_T(type, n_sources, sources);
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+           expansion_s_to_t_action, expansion_s_to_t_handler,
+           HPX_POINTER, HPX_INT, HPX_ADDR_T, HPX_INT);
+
+
+/////////////////////////////////////////////////////////////////////
 // Interface
 /////////////////////////////////////////////////////////////////////
 
@@ -102,70 +150,68 @@ void ExpansionRef::destroy() {
 //TODO
 std::unique_ptr<Expansion> ExpansionRef::S_to_M(Point center,
                                       Source *first, Source *last) const {
-  setup_local_expansion();
-  return exp_->S_to_M(center, first, last);
+  //
 }
 
 
 //TODO
 std::unique_ptr<Expansion> ExpansionRef::S_to_L(Point center,
                                       Source *first, Source *last) const {
-  setup_local_expansion();
-  return exp_->S_to_L(center, first, last);
+  //
 }
 
 
 //TODO
 std::unique_ptr<Expansion> ExpansionRef::M_to_M(int from_child,
                                                 double s_size) const {
-  setup_local_expansion();
-  return exp_->M_to_M(from_child, s_size);
+  //
 }
 
 
 //TODO
 std::unique_ptr<Expansion> ExpansionRef::M_to_L(Index s_index, double s_size,
                                   Index t_index) const {
-  setup_local_expansion();
-  return exp_->M_to_L(s_index, s_size, t_index);
+  //
 }
 
 
 //TODO
 std::unique_ptr<Expansion> ExpansionRef::L_to_L(int to_child,
                                                 double t_size) const {
-  setup_local_expansion();
-  return exp_->L_to_L(to_child, t_size);
+  //
 }
 
 
-//TODO
-void ExpansionRef::M_to_T(Target *first, Target *last) const {
-  setup_local_expansion();
-  exp_->M_to_T(first, last);
+void ExpansionRef::M_to_T(TargetRef targets) const {
+  targets.schedule(1);
+  int nsend = targets.n();
+  hpx_addr_t tsend = targets.data();
+  hpx_call_when(data_, data_, expansion_m_to_t_action, HPX_NULL,
+                &nsend, &tsend, &type_);
 }
 
 
-//TODO
-void ExpansionRef::L_to_T(Target *first, Target *last) const {
-  setup_local_expansion();
-  exp_->L_to_T(first, last);
+void ExpansionRef::L_to_T(TargetRef targets) const {
+  targets.schedule(1);
+  int nsend = targets.n();
+  hpx_addr_t tsend = targets.data();
+  hpx_call_when(data_, data_, expansion_l_to_t_action, HPX_NULL,
+                &nsend, &tsend, &type_);
 }
 
 
-//TODO
-void ExpansionRef::S_to_T(Source *s_first, Source *s_last,
-                          Target *t_first, Target *t_last) const {
-  setup_local_expansion();
-  exp_->S_to_T(s_first, s_last, t_first, t_last);
+void ExpansionRef::S_to_T(SourceRef sources, TargetRef targets) const {
+  targets.schedule(1);
+  int n_src = sources.n();
+  hpx_addr_t tsend = targets.data();
+  hpx_call(sources.data(), expansion_s_to_t_action, HPX_NULL, &n_src, &tsend,
+           &type_);
 }
 
 
 //TODO
 void ExpansionRef::add_expansion(const Expansion *temp1) {
-  setup_local_expansion();
-  exp_->add_expansion(temp1);
-  save_to_global();
+  schedule();  //we are going to have another contribution
 }
 
 
@@ -198,17 +244,19 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
 
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
-  void *data = exp->release();
-  int *type = static_cast<int *>(data);
+  void *ldata = exp->release();
+  int *ptype = static_cast<int *>(ldata);
+  int type = *ptype;
 
   size_t total_size = sizeof(ExpansionLCOHeader) + bytes;
 
-  hpx_addr_t data = hpx_lco_user_new(total_size, expansion_lco_init,
-                                     expansion_lco_operation,
-                                     expansion_lco_predicate, data, bytes);
-  assert(data != HPX_NULL);
+  hpx_addr_t gdata = hpx_lco_user_new(total_size, expansion_lco_init,
+                                      expansion_lco_operation,
+                                      expansion_lco_predicate, data, bytes);
+  assert(gdata != HPX_NULL);
+  free(ldata);
 
-  return ExpansionRef{*type, data};
+  return ExpansionRef{type, data};
 }
 
 
