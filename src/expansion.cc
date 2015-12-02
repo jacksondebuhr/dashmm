@@ -16,13 +16,16 @@ namespace dashmm {
 
 
 /// The lowest allowed expansion identifier for internal use
-constexpr int kFirstExpansionType = 1000;
+constexpr int kFirstExpansionType = 2000;
 
 /// The highest allowed expansion identifier for internal use
-constexpr int kLastExpansionType = 1999;
+constexpr int kLastExpansionType = 2999;
 
-constexpr int kFirstUserExpansionType = 2000;
-constexpr int kLastUserExpansionType = 2999;
+/// The first allowed expansion identifier for user defined expansions
+constexpr int kFirstUserExpansionType = 3000;
+
+/// the highest allowed expansion identifier for user defined expansions
+constexpr int kLastUserExpansionType = 3999;
 
 
 /// A row of the table serving expansion creation functions
@@ -92,6 +95,7 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
   return std::unique_ptr<Expansion>{func(size, data)};
 }
 
+
 std::unique_ptr<Expansion> create_expansion(int type, Point center) {
   auto entry = expansion_table_.find(type);
   if (entry == expansion_table_.end()) {
@@ -110,11 +114,10 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center) {
 /////////////////////////////////////////////////////////////////////
 
 
-//TODO: extend this to have both in-HPX and outside-HPX versions.
-int register_expansion(int type, hpx_action_t creator,
+ReturnCode register_expansion(int type, hpx_action_t creator,
                                  hpx_action_t interpreter) {
   if (type < kFirstUserExpansionType || type > kLastUserExpansionType) {
-    return false;
+    return kDomainError;
   }
 
   int nlocs = hpx_get_num_ranks();
@@ -125,7 +128,7 @@ int register_expansion(int type, hpx_action_t creator,
                   &interpreter, &checker);
   int checkval{0};
   hpx_lco_get(checker, sizeof(int), &checkval);
-  return (checkval == 0);
+  return (checkval == 0 ? kSuccess : kDomainError);
 }
 
 

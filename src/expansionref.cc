@@ -54,12 +54,14 @@ void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
   } else if (*code == kContribute) {
     //create the expansion from the payload
     ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
-    char *payload = static_cast<char *>(i) + sizeof(ExpansionLCOHeader);
-    auto local = interpret_expansion(payload, head->payload_size);
+    char *payload = static_cast<char *>(lhs) + sizeof(ExpansionLCOHeader);
+    int *type = static_cast<int *>(payload + sizeof(int));
+    auto local = interpret_expansion(*type, payload, head->payload_size);
 
     //create an expansion from the rhs
-    char *input = static_cast<char *>(rhs) + sizeof(int);
-    auto incoming = interpret_expansion(input, bytes - sizeof(int));
+    char *input = static_cast<char *>(rhs);
+    int *rhstype = static_cast<int *>(input + sizeof(int));
+    auto incoming = interpret_expansion(*rhstype, input, bytes - sizeof(int));
 
     //add the one to the other
     local->add_expansion(incoming.get());
@@ -209,9 +211,13 @@ void ExpansionRef::S_to_T(SourceRef sources, TargetRef targets) const {
 }
 
 
-//TODO
-void ExpansionRef::add_expansion(const Expansion *temp1) {
+void ExpansionRef::add_expansion(std::unique_ptr<Expansion> summand) {
   schedule();  //we are going to have another contribution
+  size_t bytes = summand->bytes();
+  char *payload = summand->release();
+  int *code = static_cast<int *>(payload);
+  *code = kContribute;
+  hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
 }
 
 
@@ -245,7 +251,8 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
   void *ldata = exp->release();
-  int *ptype = static_cast<int *>(ldata);
+  char *offset = static_cast<char *>(ldata);
+  int *ptype = static_cast<int *>(offset + sizeof(int));
   int type = *ptype;
 
   size_t total_size = sizeof(ExpansionLCOHeader) + bytes;

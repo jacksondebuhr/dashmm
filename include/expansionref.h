@@ -79,43 +79,38 @@ class ExpansionRef {
   std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
                                     Index t_index) const;
   std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
-  //end TODO comment
 
-  /// Apply a multipole expansion to a set of target points.
+  /// Apply the effect of a multipole expansion to targets
   ///
-  /// This will apply the multipole expansion to a set of target points.
-  /// This is an asynchronous call; when this returns, the application will
-  /// not be guaranteed to have happened. To be sure that all the contributions
-  /// to the target points are complete, one must wait on the target LCO.
+  /// This will compute the effect of this multipole expansion on the given
+  /// @p targets. Note that this is an asynchronous operation. This will only
+  /// perform work once this expansion is ready.
   ///
-  /// \params targets - a reference to the target points.
+  /// \param targets - the target for which the multipole expansion is applied
   void M_to_T(TargetRef targets) const;
 
-  /// Apply a local expansion to a set of target points.
+  /// Apply the effect of a local expansion to targets
   ///
-  /// This will apply the local expansion to a set of target points.
-  /// This is an asynchronous call; when this returns, the application will
-  /// not be guaranteed to have happened. To be sure that all the contributions
-  /// to the target points are complete, one must wait on the target LCO.
+  /// This will compute the effect of this local expansion on the given
+  /// @p targets. Note that this is an asynchronous operation. This will
+  /// only perform work once this expansion is ready.
   ///
-  /// \params targets - a reference to the target points.
+  /// \param targets - the target for which the local expansion is applied
   void L_to_T(TargetRef targets) const;
 
-  /// Compute the direct effect of source points on target points.
+  /// Apply effect of sources to targets
   ///
-  /// This will apply the multipole expansion to a set of target points.
-  /// This is an asynchronous call; when this returns, the application will
-  /// not be guaranteed to have happened. To be sure that all the contributions
-  /// to the target points are complete, one must wait on the target LCO.
+  /// This will compute the effect of the given @p sources on the given
+  /// @p targets. Note that this is an asynchronous operation. This may
+  /// return before the contribution to the targets has been computed.
   ///
-  /// \params sources - a reference to the source points.
-  /// \params targets - a reference to the target points.
+  /// \param sources - a reference to the source points
+  /// \param targets - a reference to the target points
   void S_to_T(SourceRef sources, TargetRef targets) const;
 
   //NOTE: This needs to wait on the input expansion
-  //TODO
-  void add_expansion(const Expansion *temp1);
-
+  void add_expansion(std::unique_ptr<Expansion> summand);
+  //end TODO comment
 
   /// Create a new expansion of the same type referred to by this object.
   ///
@@ -157,10 +152,6 @@ class ExpansionRef {
 /// mechanism relies on the release() method of the particular expansion to
 /// provide a packed representation of the relevant data for the expansion.
 /// For more details, see the DASHMM Advanced User Guide.
-///
-/// \param exp - the expansion to globalize
-///
-/// \returns - an ExpansionRef for the globalized expansion
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp);
 
 

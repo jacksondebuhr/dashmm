@@ -66,6 +66,11 @@ class Expansion {
   /// versions of the expansion are used throughout the system. When release
   /// is called, the expansion object is then 'empty' in a sense, and the
   /// expansion no longer owns any data.
+  ///
+  /// At the beginning of the serialized version of the expansion must be
+  /// two integers. The first is a code that will be used internally by
+  /// DASHMM and does not need to be given a value. The second is the integer
+  /// type of this expansion, which should be given a value by the user.
   virtual void *release() = 0;
 
   /// The size in bytes of the serialized expansion data
@@ -229,10 +234,9 @@ class Expansion {
 /// \param interpreter - the action identifier of the interpretation function
 ///                      for the type being registered.
 ///
-/// \returns - true on success; false on failure. One typical failure is when
-///            the specified \p type is already in use, or if it is outside the
-///            user range.
-bool register_expansion(int type, hpx_action_t creator,
+/// \returns - kSuccess on success; kDomainError otherwise indicating that the
+///            specified type is either out of the user range, or already taken.
+ReturnCode register_expansion(int type, hpx_action_t creator,
                                   hpx_action_t interpreter);
 
 

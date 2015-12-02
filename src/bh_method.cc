@@ -40,7 +40,7 @@ void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
       //NOTE: This pair is essentially a call when
       // So we need a new sort of interface here. Call it connect? Schedule?
       auto term{kexp.M_to_M(i, 0.0)};        //this will need to wait on the readiness
-      curr->expansion().add_expansion(term.get());
+      curr->expansion().add_expansion(term);
     }
   }
 }

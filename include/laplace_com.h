@@ -18,6 +18,7 @@ namespace dashmm {
 
 
 struct LaplaceCOMData {
+  int reserved;
   int type;
   double mtot;
   double xcom[3];

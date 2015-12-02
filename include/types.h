@@ -23,7 +23,8 @@ enum ReturnCode {
   kIncompatible = 2,
   kAllocationError = 3,
   kInitError = 4,
-  kFiniError = 5
+  kFiniError = 5,
+  kDomainError = 6
   //etc...
 };
 

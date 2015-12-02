@@ -14,6 +14,7 @@ LaplaceCOM::LaplaceCOM(Point center) {
   bytes_ = sizeof(LaplaceCOMData);
   data_ = malloc(bytes_);
   assert(valid());
+  data_->type = type();
 }
 
 LaplaceCOM::~LaplaceCOM() {
@@ -80,7 +81,6 @@ void LaplaceCOM::M_to_T(Target *first, Target *last) const {
     qsum *= quaddenom;
     sum += qsum;
 
-    //TODO: We need a mechanism for making these not contend at the target
     i->set_phi(i->phi() + std::complex<double>{sum});
   }
 }
