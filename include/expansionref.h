@@ -50,35 +50,77 @@ class ExpansionRef {
   /// What type of expansion is this referring to.
   int type() const {return type_;}
 
-  //TODO: these...
-  // So all of these basically have the following pattern: once the LCO is
-  // ready, an action will spawn to continue the data to a relevant other
-  // action.
-  //
+  /// Set this expansion with the multpole expansion of the given sources
+  ///
+  /// This will set the expansion with the multipole expansion computed for
+  /// the given @p sources, and with the given @p center. Note that this is
+  /// an asynchronous operation. The contribution will be scheduled, but will
+  /// not necessarily be complete when this function returns.
+  ///
+  /// Note that this does not set the expansion to be equal to the computed
+  /// multipole expansion. Instead, it adds the computed multipole to the
+  /// current contents of the expansion. Further, this must not be called
+  /// after finalize().
+  ///
+  /// \param center - the center of the computed expansion
+  /// \param sources - a reference to the sources from which to compute the
+  ///                  multipole expansion
+  void S_to_M(Point center, SourceRef sources) const;
 
-  //NOTE: These do not need to wait on the expansion
-  // we will have access to the SourceRef, which knows counts. SO here we
-  // just get the source data, compute the S_to_M and then set the LCO
-  //
-  // TODO: This needs more thinking too...
-  //
-  // See next. This is generally called on the prototype, and it then
-  // contributes to the local.
-  std::unique_ptr<Expansion> S_to_M(Point center, SourceRef sources) const;
-  std::unique_ptr<Expansion> S_to_L(Point center, SourceRef sources) const;
+  /// Set this expansion with the local expansion of the given sources
+  ///
+  /// This will set the expansion with the local expansion computed for
+  /// the given @p sources, and with the given @p center. Note that this is
+  /// an asynchronous operation. The contribution will be scheduled, but will
+  /// not necessarily be complete when this function returns.
+  ///
+  /// Note that this does not set the expansion to be equal to the computed
+  /// local expansion. Instead, it adds the computed local to the
+  /// current contents of the expansion. Further, this must not be called
+  /// after finalize().
+  ///
+  /// \param center - the center of the computed expansion
+  /// \param sources - a reference to the sources from which to compute the
+  ///                  local expansion
+  void S_to_L(Point center, SourceRef sources) const;
 
-  //NOTE: These *do* have to wait for the expansion
-  // This is a call when on the expansion containted, that will perform the
-  // translation, and continue that with the correct code to the expansion LCO
-  //
-  //TODO: These need more thinking...
-  //
-  //The results of these are typically added to a particular target or
-  // something.
-  std::unique_ptr<Expansion> M_to_M(int from_child, double s_size) const;
-  std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
-                                    Index t_index) const;
-  std::unique_ptr<Expansion> L_to_L(int to_child, double t_size) const;
+  /// Contribute a translated multipole moment to this expansion
+  ///
+  /// This will translate the given multipole expansion and then add it to
+  /// this expansion. This is an asynchronous operation; this can return
+  /// before the contribution to this expansion has been made. This must not
+  /// be called after finalize().
+  ///
+  /// \param source - the multipole expansion to translate
+  /// \param from_child - the child from which the expansion will occur
+  /// \param s_size - the size of the child node for @p source
+  void M_to_M(ExpansionRef source, int from_child, double s_size) const;
+
+  /// Contribute a translated multipole moment to this local expansion
+  ///
+  /// This will translate a multipole expansion into a local expansion and
+  /// add it to this expansion. This operation is asynchronous; this can
+  /// return before the contribution has been made. This must not be called
+  /// after finalize().
+  ///
+  /// \param source - the multipole expansion to translate
+  /// \param s_index - the index of the node containing @p source
+  /// \param s_size - the size of the node containing @p source
+  /// \param t_index - the index of the node containing this expansion
+  void M_to_L(ExpansionRef source, Index s_index, double s_size,
+              Index t_index) const;
+
+  /// Contribute a translated local expansion to this local expansion
+  ///
+  /// This will translate the given local expansion into a local expansion
+  /// that can be added to this expansion. This operation is asynchronous;
+  /// this can return before the contribution to this expansion has been made.
+  /// This must not be called after finalize().
+  ///
+  /// \param source - the local expansion to translate
+  /// \param to_child - the child to which the expansion is being translated
+  /// \param t_size - the size of the child node
+  void L_to_L(ExpansionRef source, int to_child, double t_size) const;
 
   /// Apply the effect of a multipole expansion to targets
   ///
@@ -113,7 +155,8 @@ class ExpansionRef {
   /// This will add the @p summand to this expansion. This is an asynchronous
   /// operation, and will only complete once @p summand is set. This does
   /// schedule a contribution, so this should only be called before the call
-  /// to finalize().
+  /// to finalize(). This routine takes ownership of the supplied expansion,
+  /// and will free any resources associated with the expansion.
   ///
   /// \param summand - a reference to the expansion to add to this one
   void add_expansion(ExpansionRef summand);
@@ -124,21 +167,6 @@ class ExpansionRef {
   ///
   /// \returns - the resulting expansion.
   std::unique_ptr<Expansion> get_new_expansion(Point center) const;
-
-  //TODO: methods to make the inputs easy
-  // these will wrap up the HPX stuff so the user can do "obvious" seeming
-  // thigns instead.
-
-  //TODO: Should this be private? We don't expect users to use this...
-  /// Contribute to the referred expansion
-  ///
-  /// This will setup the given @p payload with the correct internal code
-  /// and will call the appropriate set operation on the referred LCO. This
-  /// will result in the add_expansion method of the expansion being called.
-  ///
-  /// \param bytes - the size of the input serialized expansion
-  /// \param payload - the serialized expansion data
-  void contribute(size_t bytes, char *payload);
 
   /// Signal to the expansion that all operations have been scheduled.
   ///
@@ -157,6 +185,16 @@ class ExpansionRef {
   void schedule() const;
 
  private:
+  /// Contribute to the referred expansion
+  ///
+  /// This will setup the given @p payload with the correct internal code
+  /// and will call the appropriate set operation on the referred LCO. This
+  /// will result in the add_expansion method of the expansion being called.
+  ///
+  /// \param bytes - the size of the input serialized expansion
+  /// \param payload - the serialized expansion data
+  void contribute(size_t bytes, char *payload);
+
   int type_;
   hpx_addr_t data_;     //this is the LCO
 };
