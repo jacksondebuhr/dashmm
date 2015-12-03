@@ -108,15 +108,15 @@ class ExpansionRef {
   /// \param targets - a reference to the target points
   void S_to_T(SourceRef sources, TargetRef targets) const;
 
-  //NOTE: This needs to wait on the input expansion
-  //
-  // Wait, this does not have to wait. But it should. So the interface is
-  // wrong.
-  //
-  //TODO: Work this problem out.
+  /// Add the given expansion to this expansion
+  ///
+  /// This will add the @p summand to this expansion. This is an asynchronous
+  /// operation, and will only complete once @p summand is set. This does
+  /// schedule a contribution, so this should only be called before the call
+  /// to finalize().
+  ///
+  /// \param summand - a reference to the expansion to add to this one
   void add_expansion(ExpansionRef summand);
-
-  void contribute(size_t bytes, char *payload);
 
   /// Create a new expansion of the same type referred to by this object.
   ///
@@ -128,6 +128,17 @@ class ExpansionRef {
   //TODO: methods to make the inputs easy
   // these will wrap up the HPX stuff so the user can do "obvious" seeming
   // thigns instead.
+
+  //TODO: Should this be private? We don't expect users to use this...
+  /// Contribute to the referred expansion
+  ///
+  /// This will setup the given @p payload with the correct internal code
+  /// and will call the appropriate set operation on the referred LCO. This
+  /// will result in the add_expansion method of the expansion being called.
+  ///
+  /// \param bytes - the size of the input serialized expansion
+  /// \param payload - the serialized expansion data
+  void contribute(size_t bytes, char *payload);
 
   /// Signal to the expansion that all operations have been scheduled.
   ///
