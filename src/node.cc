@@ -587,6 +587,7 @@ double SourceNode::size() const {
 
 
 void SourceNode::set_expansion(std::unique_ptr<Expansion> expand) {
+  //TODO: update this for new interface
   ExpansionRef globexp = globalize_expansion(expand.get(), data_);
   pin();
   local_->expansion = globexp.data();
@@ -787,6 +788,7 @@ double TargetNode::size() const {
 
 
 void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
+  //TODO: update this for new interface
   ExpansionRef globexp = globalize_expansion(expand.get(), data_);
   pin();
   local->expansion = globexp;

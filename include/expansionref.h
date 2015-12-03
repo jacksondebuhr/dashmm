@@ -207,7 +207,8 @@ class ExpansionRef {
 /// mechanism relies on the release() method of the particular expansion to
 /// provide a packed representation of the relevant data for the expansion.
 /// For more details, see the DASHMM Advanced User Guide.
-ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp);
+ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
+                                 hpx_addr_t where);
 
 
 } // namespace dashmm

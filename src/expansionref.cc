@@ -316,6 +316,19 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR_T, HPX_INT);
 
 
+int globalize_expansion_handler(void *payload, size_t bytes) {
+  size_t total_size = sizeof(ExpansionLCOHeader) + bytes;
+  hpx_addr_t gdata = hpx_lco_user_new(total_size, expansion_lco_init,
+                                      expansion_lco_operation,
+                                      expansion_lco_predicate, data, bytes);
+  assert(gdata != HPX_NULL);
+  HPX_THREAD_CONTINUE(gdata);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+           globalize_expansion_action, globalize_expansion_handler,
+           HPX_POINTER, HPX_SIZE_T);
+
+
 /////////////////////////////////////////////////////////////////////
 // Interface
 /////////////////////////////////////////////////////////////////////
@@ -443,7 +456,8 @@ void ExpansionRef::schedule() const {
 
 
 //NOTE that this function takes ownership of the Expansion.
-ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
+ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
+                                 hpx_addr_t where) {
   if (exp == nullptr) {
     return ExpansionRef{0, HPX_NULL};
   }
@@ -455,12 +469,9 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp) {
   int *ptype = static_cast<int *>(offset + sizeof(int));
   int type = *ptype;
 
-  size_t total_size = sizeof(ExpansionLCOHeader) + bytes;
-
-  hpx_addr_t gdata = hpx_lco_user_new(total_size, expansion_lco_init,
-                                      expansion_lco_operation,
-                                      expansion_lco_predicate, data, bytes);
-  assert(gdata != HPX_NULL);
+  hpx_addr_t retval{HPX_NULL};
+  hpx_call_sync(where, globalize_expansion_action, &retval, sizeof(retval),
+                ldata, bytes);
   free(ldata);
 
   return ExpansionRef{type, data};
