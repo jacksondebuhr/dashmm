@@ -109,8 +109,14 @@ class ExpansionRef {
   void S_to_T(SourceRef sources, TargetRef targets) const;
 
   //NOTE: This needs to wait on the input expansion
-  void add_expansion(std::unique_ptr<Expansion> summand);
-  //end TODO comment
+  //
+  // Wait, this does not have to wait. But it should. So the interface is
+  // wrong.
+  //
+  //TODO: Work this problem out.
+  void add_expansion(ExpansionRef summand);
+
+  void contribute(size_t bytes, char *payload);
 
   /// Create a new expansion of the same type referred to by this object.
   ///

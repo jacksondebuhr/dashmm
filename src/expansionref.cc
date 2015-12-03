@@ -100,6 +100,7 @@ int expansion_m_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
   hpx_lco_getref(hpx_thread_current_target(), 1, &ldata);
   char *payload = static_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
   targets.contribute_M_to_T(type, ldata->payload_size, payload);
+  hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
 }
@@ -116,6 +117,7 @@ int expansion_l_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
   hpx_lco_getref(hpx_thread_current_target(), 1, &ldata);
   char *payload = static_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
   targets.contribute_L_to_T(type, ldata->payload_size, payload);
+  hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
 }
@@ -133,6 +135,24 @@ int expansion_s_to_t_handler(Source *sources, int n_sources, hpx_addr_t target,
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_t_action, expansion_s_to_t_handler,
            HPX_POINTER, HPX_INT, HPX_ADDR_T, HPX_INT);
+
+
+int expansion_add_handler(hpx_addr_t expand, int type) {
+  ExpansionRef total{type, expand};
+
+  ExpansionLCOHeader *ldata{nullptr};
+  //HACK: This action is local to the expansion, so we getref here with
+  // whatever as the size and things are okay...
+  hpx_lco_getref(hpx_thread_current_target(), 1, &ldata);
+  char *payload = static_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
+  total.contribute(ldata->payload_size, payload);
+  hpx_lco_release(hpx_thread_current_target(), ldata);
+
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           expansion_add_action, expansion_add_handler,
+           HPX_ADDR_T, HPX_INT);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -211,10 +231,14 @@ void ExpansionRef::S_to_T(SourceRef sources, TargetRef targets) const {
 }
 
 
-void ExpansionRef::add_expansion(std::unique_ptr<Expansion> summand) {
+void ExpansionRef::add_expansion(ExpansionRef summand) {
   schedule();  //we are going to have another contribution
-  size_t bytes = summand->bytes();
-  char *payload = summand->release();
+  hpx_call_when(summand.data(), summand.data(), expansion_add_action,
+                HPX_NULL, &data_, &type_);
+}
+
+
+void ExpansionRef::contribute(size_t bytes, char *payload) {
   int *code = static_cast<int *>(payload);
   *code = kContribute;
   hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
