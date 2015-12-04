@@ -1,3 +1,6 @@
+/// \file src/method.cc
+/// \brief Implementation of method
+
 #include "include/method.h"
 
 //C++
@@ -10,12 +13,18 @@
 namespace dashmm {
 
 
-//The mapping from type to table entries
+/// The mapping from method type identifier into creation actions
+///
+/// This is local data that is replicated at each locality in the system.
 std::map<int, hpx_action_t> method_table_;
 
 
+/// The first built-in method type identifier
 constexpr int kFirstMethodType = 0;
+
+/// The last built-in method type identifier
 constexpr int kLastMethodType = 999;
+
 constexpr int kFirstUserMethodType = 1000;
 constexpr int kLastUserMethodType = 1999;
 

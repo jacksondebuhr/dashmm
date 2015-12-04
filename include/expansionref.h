@@ -207,6 +207,12 @@ class ExpansionRef {
 /// mechanism relies on the release() method of the particular expansion to
 /// provide a packed representation of the relevant data for the expansion.
 /// For more details, see the DASHMM Advanced User Guide.
+///
+/// \param exp - the expansion to globalize
+/// \param where - an HPX address indicating an address which should be local
+///                to the globalized expansion
+///
+/// \returns - a reference to the resulting expansion
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
                                  hpx_addr_t where);
 

@@ -89,7 +89,7 @@ void MethodRef::setup_local_method() {
 }
 
 
-MethodRef globalize_method(Method *met, hpx_addr_t where) {
+MethodRef globalize_method(std::unique_ptr<Method> met, hpx_addr_t where) {
   if (met == nullptr) {
     return HPX_NULL;
   }
