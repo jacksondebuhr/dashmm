@@ -21,16 +21,11 @@ typedef Method *(*method_creation_function_t)(size_t, void *);
 
 
 struct MethodSerial {
+  int reserved;
   int type;
   size_t size;      //NOTE: This refers to the data, not the overall size here
   char data[];
 };
-
-
-//TODO
-//This really should be made into a full class, so that errors and so on
-// do not expose the implementation...
-using MethodSerialPtr = std::unique_ptr<MethodSerial, void (*)(MethodSerial *)>;
 
 
 class Method {
@@ -38,7 +33,7 @@ class Method {
   virtual ~Method() { }
 
   virtual int type() const = 0;
-  virtual MethodSerialPtr serialize(bool alloc) const = 0;
+  virtual MethodSerial *release() const = 0;
 
   virtual bool compatible_with(const ExpansionRef expand) const = 0;
   virtual void generate(SourceNode &curr, const ExpansionRef expand) const = 0;
@@ -54,16 +49,11 @@ class Method {
 
 
 //returns true on success
-bool register_method(int type, hpx_action_t creator);
-
-
-//intended use is for serialize methods to use this as an allocator
-//This is a smart pointer, that will delete itself when appropriate
-MethodSerialPtr method_serialization_allocator(size_t size, bool alloc);
+ReturnCode register_method(int type, hpx_action_t creator);
 
 
 //NOTE: Not intended for end-user use
-std::unique_ptr<Method> create_method(int type, size_t size, void *data);
+std::unique_ptr<Method> create_method(int type, MethodSerial *data);
 
 
 } // namespace dashmm

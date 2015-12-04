@@ -40,14 +40,14 @@ void MethodRef::aggregate(SourceNode &curr, const ExpansionRef expand) const {
 
 
 void MethodRef::inherit(TargetNode &curr, const ExpansionRef expand,
-             size_t which_child) const {
+                        size_t which_child) const {
   setup_local_method();
   met_->inherit(curr, expand, which_child);
 }
 
 
 void MethodRef::process(TargetNode &curr, std::vector<SourceNode> &consider,
-             bool curr_is_leaf) const {
+                        bool curr_is_leaf) const {
   setup_local_method();
   met_->process(curr, consider, curr_is_leaf);
 }
@@ -84,8 +84,7 @@ void MethodRef::setup_local_method() {
     return;
   }
   MethodSerial *local = pin();
-  met_ = create_method(local->type, local->size,
-                      static_cast<void *>local->data);
+  met_ = create_method(local->type, local->size, local);
   unpin();
 }
 
@@ -94,10 +93,13 @@ MethodRef globalize_method(Method *met, hpx_addr_t where) {
   if (met == nullptr) {
     return HPX_NULL;
   }
-  MethodSerialPtr serial = met->serialize(true);
+  MethodSerial *serial = met->release();
   size_t size = serial->size + sizeof(MethodSerial);
   hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
   assert(data != HPX_NULL);
+  //NOTE: This will be slow as the memory like did not get allocated as
+  // registered memory. However, this will not happen often, so this is perhaps
+  // okay.
   hpx_gas_memput_rsync(data, serial.get(), size);
   return MethodRef{data};
 }
