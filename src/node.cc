@@ -37,8 +37,6 @@ int source_node_delete_handler(hpx_addr_t data) {
   assert(hpx_gas_try_pin(data, (void **)&local));
 
   local->expansion.destroy();
-  //TODO: If we really are making copies of the method always, go ahead and
-  // destoy it here. Otherwise, there is a single instance of it somewhere.
   local->sources.destroy();
 
   int count{0};
@@ -77,8 +75,6 @@ int target_node_delete_handler(hpx_addr_t data) {
   assert(hpx_gas_try_pin(data, (void **)&local));
 
   local->expansion.destroy();
-  //TODO: If we really are making copies of the method always, go ahead and
-  // destoy it here. Otherwise, there is a single instance of it somewhere.
   local->targets.destroy();
 
   int count{0};
@@ -395,16 +391,14 @@ int target_node_partition_handler(NodeData *node,
                argssize);
     }
 
-    hpx_call_when(cdone, node->part_done, hpx_lco_set_action, parms->done,
-                  nullptr, 0);
-    hpx_call_when(cdone, cdone, hpx_lco_delete_action, HPX_NULL, nullptr, 0);
+    hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
   } else {  // no refinement needed; so just set the input done LCO
     Targets *targs{nullptr};
     assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
     node->targets = TargetRef(targs, parms->n_parts);
 
-    hpx_lco_and_set(parms->done, HPX_NULL);
-    hpx_lco_set(node->part_done, 0, nullptr, HPX_NULL, HPX_NULL);
+    hpx_call_when(node->targets.data(), parms->done, hpx_lco_set_action,
+                  HPX_NULL, nullptr, 0);
   }
 
   ExpansionRef expand{parms->expansion};
