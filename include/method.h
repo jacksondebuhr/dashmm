@@ -84,6 +84,14 @@ class Method {
   /// the expansions for the sources. Typically, these will be multipole
   /// expansions.
   ///
+  /// It is assumed that generate will either create the expansion with the
+  /// needed data, or it will create an empty expansion and schedule the
+  /// contribution to the expansion. Internally, DASHMM will call finalize on
+  /// the expansion after generate() is called for a particular node.
+  /// Further, generate will not return until the expansion for @p curr has
+  /// been set. This does not require that all contributions have been made to
+  /// that expansion.
+  ///
   /// \param curr - the current node of the source tree (will be a leaf)
   /// \param expand - a reference to a prototype expansion that can be used
   ///                 to generate the expansion for the given node.
@@ -94,6 +102,9 @@ class Method {
   /// This operation is invoked on internal nodes of the source tree to
   /// combine the expansions of the children on the given node into the
   /// expansion for the internal node.
+  ///
+  /// It is assumed that aggregate creates the expansion and schedules all
+  /// contributions to that expansion.
   ///
   /// \param curr - the current node of the source tree (will be internal)
   /// \param expand - a reference to a prototype expansion that can be used

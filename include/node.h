@@ -99,10 +99,8 @@ class SourceNode {
   ///
   /// This will return the address of an LCO that represents completion of the
   /// partitioning of this node.
-  ///
-  /// TODO: Is this correct?
-  hpx_addr_t partition(hpx_addr_t parts, int n_parts, int limit,
-                       hpx_addr_t expand);
+  hpx_addr_t partition(Source *parts, int n_parts, int limit,
+                       int type, hpx_addr_t expand);
 
   /// Is the referred to node a leaf?
   bool is_leaf() const;
@@ -121,7 +119,6 @@ class SourceNode {
   ExpansionRef expansion() const;
   SourceRef parts() const;
   int n_parts() const;
-  int n_parts_total() const;
   Point low() const;
   Point high() const;
   Point center() const;
@@ -196,7 +193,6 @@ class TargetNode {
   ExpansionRef expansion() const;
   TargetRef parts() const;
   int n_parts() const;
-  int n_parts_total() const;
   Point low() const;
   Point high() const;
   Point center() const;

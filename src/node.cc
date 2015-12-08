@@ -80,7 +80,6 @@ int target_node_delete_handler(hpx_addr_t data) {
   //TODO: If we really are making copies of the method always, go ahead and
   // destoy it here. Otherwise, there is a single instance of it somewhere.
   local->targets.destroy();
-  hpx_lco_delete_sync(local->part_done);
 
   int count{0};
   for (int i = 0; i < 8; ++i) {
@@ -113,29 +112,29 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR_T);
 
 
-int source_node_child_generation_done_handler(NodeData *node,
-                                              hpx_addr_t gendone,
+int source_node_child_partition_done_handler(NodeData *node,
+                                              hpx_addr_t partdone,
+                                              int type,
                                               hpx_addr_t expand) {
-  ExpansionRef expref{expand};
+  ExpansionRef expref{type, expand};
   MethodRef method{node->method};
   SourceNode snode{hpx_thread_current_target()};
 
   method.aggregate(snode, expref);
 
-  //TODO: set the all scheduled input on the expansion
+  node->expansion.finalize();
 
-  hpx_lco_delete_sync(gendone);
+  hpx_lco_delete_sync(partdone);
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
-           source_node_child_generation_done_action,
-           source_node_child_generation_done_handler,
-           HPX_POINTER, HPX_ADDR, HPX_ADDR);
+           source_node_child_partition_done_action,
+           source_node_child_partition_done_handler,
+           HPX_POINTER, HPX_ADDR, HPX_INT, HPX_ADDR);
 
 
 struct SourceNodePartitionParams {
   hpx_addr_t partdone;
-  hpx_addr_t gendone;
   int limit;
   int type;
   hpx_addr_t expand;
@@ -159,10 +158,16 @@ int source_node_partition_handler(NodeData *node,
 
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
-    ExpansionRef expref{parms->type, parms->expand};
+    ExpansionRef expref{parms->type, parms->expand}; //this is the prototype
+
+    //This will cause the creation of a new expansion, that will be globalized
+    // and then set as the expansion for this node. It will be created with
+    // initial data, and so there is no need to schedule any contributions to
+    // the expansion.
     method.generate(curr, expref);
 
-    //TODO: set the all scheduled input on the expansion
+    //We are done scheduling contributions to the expansion for this node.
+    node->expansion.finalize();
 
     hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
     if (parms->gendone != HPX_NULL) {
@@ -179,7 +184,8 @@ int source_node_partition_handler(NodeData *node,
   splits[0] = parms->sources;
   splits[8] = &parms->sources[n_parts];
 
-  Point cen{center()};
+  Point cen{node->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
+                                       local_->idx.z(), local_->idx.level())};
   double z_center = cen.z();
   auto z_comp = [&z_center](Source a) {
     return a.z() < z_center;
@@ -202,9 +208,8 @@ int source_node_partition_handler(NodeData *node,
   splits[5] = std::partition(splits[4], splits[6], x_comp);
   splits[7] = std::partition(splits[6], splits[8], x_comp);
 
-  //copy sections of particles into their own allocations
-  // This will be needed in distributed mode.
-  Source *cparts[8];
+  //Find some counts
+  Source *cparts[8]{};
   int n_per_child[8]{0, 0, 0, 0, 0, 0, 0, 0};
   int n_children{0};
   int n_offset{0};
@@ -221,8 +226,6 @@ int source_node_partition_handler(NodeData *node,
 
   hpx_addr_t childpartdone = hpx_lco_and_new(n_children);
   assert(childpartdone != HPX_NULL);
-  hpx_addr_t childgendone = hpx_lco_and_new(n_children);
-  assert(childgendone != HPX_NULL);
 
   for (int i = 0; i < 8; ++i) {
     if (n_per_child[i] == 0) {
@@ -242,7 +245,6 @@ int source_node_partition_handler(NodeData *node,
     SourceNodePartitionParams *args = malloc(argsz);
     assert(args != nullptr);
     args->partdone = childpartdone;
-    args-gendone = childgendone;
     args->limit = parms->limit;
     args->type = parms->type;
     args->expand = parms->expand;
@@ -252,11 +254,9 @@ int source_node_partition_handler(NodeData *node,
     free(args);
   }
 
-  hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
-                parms->partdone, nullptr, 0);
-  hpx_call_when(childgendone, hpx_thread_current_target(),
-                source_node_child_generation_done_action, parms->gendone,
-                &childgendone, &parms->expand);
+  hpx_call_when(childpartdone, hpx_thread_current_target(),
+                source_node_child_partition_done_action, parms->partdone,
+                &childpartdone, &parms->type, &parms->expand);
 
   return HPX_SUCCESS;
 }
@@ -455,18 +455,28 @@ SourceNode::~SourceNode() {
 
 
 void SourceNode::destroy() {
+  unpin();
   hpx_call_sync(data_, source_node_delete_action, nullptr, 0, &data_);
 }
 
 
 hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
-                                 hpx_addr_t expand) {
+                                 int type, hpx_addr_t expand) {
   hpx_addr_t retval = hpx_lco_future_new(0);
   assert(retval != HPX_NULL);
 
-  hpx_addr_t empty{HPX_NULL};
+  size_t bytes = sizeof(SourceNodePartitionParams) + n_sources * sizeof(Source);
+  SourceNodePartitionParams *args = malloc(bytes);
+  assert(args);
+  args->partdone = retval;
+  args->limit = limit;
+  args->type = type;
+  args->expand = expand;
+  args->n_sources = n_sources;
+  memcpy(args->sources, sources, sizeof(Source) * n_sources);
   hpx_call(data_, source_node_partition_action, HPX_NULL,
-           &retval, &empty, &parts, &n_parts, &limit, &expand);
+           args, bytes);
+  free(args);
 
   return retval;
 }
@@ -543,19 +553,13 @@ ExpansionRef SourceNode::expansion() const {
 
 SourceRef SourceNode::parts() const {
   pin();
-  return SourceRef{local->parts, local->n_parts, local->n_parts_total};
+  return local->sources;
 }
 
 
 int SourceNode::n_parts() const {
   pin();
-  return local_->n_parts;
-}
-
-
-int SourceNode::n_parts_total() const {
-  pin();
-  return local_->n_parts_total;
+  return local_->sources.n();
 }
 
 
@@ -587,8 +591,7 @@ double SourceNode::size() const {
 
 
 void SourceNode::set_expansion(std::unique_ptr<Expansion> expand) {
-  //TODO: update this for new interface
-  ExpansionRef globexp = globalize_expansion(expand.get(), data_);
+  ExpansionRef globexp = globalize_expansion(expand, HPX_HERE);
   pin();
   local_->expansion = globexp.data();
 }
@@ -639,6 +642,7 @@ TargetNode::~TargetNode() {
 
 
 void TargetNode::destroy() {
+  unpin();
   hpx_call_sync(data_, target_node_delete_action, nullptr, 0, &data_);
 }
 
@@ -667,6 +671,7 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
   }
 
   hpx_call(data_, target_node_partition_action, HPX_NULL, parms, parms_size);
+  free(parms);
 
   hpx_lco_wait(done);
   hpx_lco_delete_sync(done);
@@ -744,19 +749,13 @@ ExpansionRef TargetNode::expansion() const {
 
 TargetRef TargetNode::parts() const {
   pin();
-  return TargetRef{local->parts, local->n_parts, local->n_parts_total};;
+  return local->targets;
 }
 
 
 int TargetNode::n_parts() const {
   pin();
-  return local_->n_parts;
-}
-
-
-int TargetNode::n_parts_total() const {
-  pin();
-  return local_->n_parts_total;
+  return local_->targets.n();
 }
 
 
@@ -788,8 +787,7 @@ double TargetNode::size() const {
 
 
 void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
-  //TODO: update this for new interface
-  ExpansionRef globexp = globalize_expansion(expand.get(), data_);
+  ExpansionRef globexp = globalize_expansion(expand, data_);
   pin();
   local->expansion = globexp;
 }
