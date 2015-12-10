@@ -75,15 +75,12 @@ class LaplaceCOM : public Expansion {
               Target *t_first, Target *t_last) const override;
 
   void add_expansion(const Expansion *temp1) override;
-  void from_sum(const std::vector<const Expansion *> &exps) override;
 
   std::unique_ptr<Expansion> get_new_expansion(Point center) const override {
     return std::unique_ptr<Expansion>{new LaplaceCOM{center}};
   }
 
-
-  //These are private in the serial version, but are exposed for
-  // deserialize
+ private:
   void set_mtot(double m) {data->mtot = m;}
   void set_xcom(const double c[3]) {
     data->xcom[0] = c[0]; data->xcom[1] = c[1]; data->xcom[2] = c[2];
@@ -93,7 +90,6 @@ class LaplaceCOM : public Expansion {
     data->Q[3] = q[3]; data->Q[4] = q[4]; data->Q[5] = q[5];
   }
 
- private:
   void calc_mtot(Source *first, Source *last);
   void calc_xcom(Source *first, Source *last);
   void calc_Q(Source *first, Source *last);

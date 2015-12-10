@@ -8,39 +8,22 @@
 namespace dashmm {
 
 
-MethodSerialPtr BHMethod::serialize(bool alloc) const {
-  size_t size = sizeof(MethodSerial) + sizeof(double);
-  MethodSerialPtr retval = method_serialization_allocator(size, alloc);
-  retval->type = type();
-  retval->size = sizeof(double);
-  double theta = static_cast<double *>{retval->data};
-  *theta = theta_;
-  return retval;
-}
-
-
 void BHMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
+  curr->set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  ExpansionRef curr->expansion();
   SourceRef sources = curr.parts();
-  auto multi = expand.S_to_M(Point{0.0, 0.0, 0.0},
-                             sources.first(), sources.last());
-
-  //NOTE: This can happen directly. There will not be any waiting as the
-  // input is local
-  curr.set_expansion(multi);
+  sources.S_to_M(Point{0.0, 0.0, 0.0}, sources);
 }
 
 
 void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
   curr->set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  ExpansionRef currexp = curr->expansion();
   for (size_t i = 0; i < 8; ++i) {
     SourceNode kid = curr.child(i);
     if (kid.is_valid()) {
       ExpansionRef kexp = kid->expansion();  //this data is available in the node
-
-      //NOTE: This pair is essentially a call when
-      // So we need a new sort of interface here. Call it connect? Schedule?
-      auto term{kexp.M_to_M(i, 0.0)};        //this will need to wait on the readiness
-      curr->expansion().add_expansion(term);
+      currexp.M_to_M(kexp, i, 0.0);
     }
   }
 }
@@ -63,8 +46,7 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
         } else {
           ExpansionRef expand = i->expansion();
           TargetRef targets = curr.parts();
-          //NOTE: This operation is merely scheduled
-          expand.M_to_T(targets.first(), targets.last());
+          expand.M_to_T(targets);
         }
       } else if (i->is_leaf()) {
         if (curr_is_leaf) {

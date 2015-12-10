@@ -32,7 +32,7 @@ struct MethodSerial {
   int reserved;
   int type;
   size_t size;      //NOTE: This refers to the data, not the overall size here
-  char data[];
+  double data[];
 };
 
 

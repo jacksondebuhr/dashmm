@@ -13,13 +13,22 @@ namespace dashmm {
 
 class BHMethod {
  public:
-  //
-  BHMethod(double theta) : theta_{theta} { }
+  BHMethod(double theta) : local_{nullptr} {
+    local_ = malloc(sizeof(MethodSerial) + sizeof(double));
+    assert(local_);
+    local_->type = kMethodBH;
+    local_->size = sizeof(double);
+    local_->data[0] = theta;
+  }
+
+  MethodSerial *release() const override {
+    MethodSerial *retval{local_};
+    local_ = nullptr;
+    return retval;
+  }
 
   int type() const override {return kMethodBH;}
-  MethodSerialPtr serialize(bool alloc) const override;
 
-  //BHMethod has no special requirements
   bool compatible_with(const ExpansionRef expand) const override {return true;}
 
   void generate(SourceNode &curr, const ExpansionRef expand) const override;
@@ -43,7 +52,7 @@ class BHMethod {
   Point nearest(Point scenter, Point tcenter, double tsize) const;
 
  private:
-  double theta_;
+  MethodSerial *local_;
 }
 
 

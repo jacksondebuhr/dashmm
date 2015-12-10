@@ -50,7 +50,7 @@ class ExpansionRef {
   /// What type of expansion is this referring to.
   int type() const {return type_;}
 
-  /// Set this expansion with the multpole expansion of the given sources
+  /// Set this expansion with the multipole expansion of the given sources
   ///
   /// This will set the expansion with the multipole expansion computed for
   /// the given @p sources, and with the given @p center. Note that this is
