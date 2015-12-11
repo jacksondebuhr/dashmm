@@ -41,6 +41,8 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj) {
   meta->size = size;
 
   meta->data = hpx_gas_alloc(1, count * size, 0, HPX_DIST_TYPE_LOCAL);
+  assert(meta->data != HPX_NULL);
+
   hpx_gas_unpin(retval);
   hpx_exit(HPX_SUCCESS);
 }
@@ -54,6 +56,7 @@ int deallocate_array_handler(hpx_addr_t obj) {
     hpx_exit(HPX_ERROR);
   }
 
+  assert(meta->data != HPX_NULL);
   hpx_gas_free_sync(meta->data);
   hpx_gas_unpin(obj);
 
@@ -130,9 +133,11 @@ HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
 ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
   int runcode = hpx_run(allocate_array_action, &records, &size, &obj);
   if (runcode != HPX_SUCCESS) {
-    return kRuntimeError;
-  } else if (obj == HPX_NULL) {
-    return kAllocationError;
+    if (obj == HPX_NULL) {
+      return kAllocationError;
+    } else {
+      return kRuntimeError;
+    }
   }
   return kSuccess;
 }

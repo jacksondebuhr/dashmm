@@ -242,6 +242,15 @@ ReturnCode register_expansion(int type, hpx_action_t creator,
 
 //NOTE: not intended for end-user use
 
+
+/// Initialize the expansion registration table
+void init_expansion_table();
+
+
+/// Finalize (clean up) the expansion registration table
+void fini_expansion_table();
+
+
 /// Interpret some data as an expansion object
 ///
 /// This will interpret the given data as an expansion of the given type.

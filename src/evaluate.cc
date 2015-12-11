@@ -1,5 +1,7 @@
 //C++ stuff
 
+#include <memory>
+
 #include "include/expansion.h"
 #include "include/method.h"
 #include "include/node.h"
@@ -53,8 +55,6 @@ struct PackDataResult {
   int count;
 };
 
-
-//TODO make this continue a sourceref
 int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
   //NOTE: SMP assumptions all over this function
   ArrayMetaData *meta{nullptr};
@@ -127,35 +127,6 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
 HPX_ACTION(HPX_DEFAULT, 0,
            pack_targets_action, pack_targets_handler,
            HPX_ADDR, HPX_INT);
-
-
-int unpack_targets_handler(hpx_addr_t results, hpx_addr_t user_data, int phi_offset) {
-  //NOTE: SMP assumptions
-  ArrayMetaData *meta{nullptr};
-  assert(hpx_gas_try_pin(user_data, (void **)meta));
-
-  char *user{nullptr};
-  assert(hpx_gas_try_pin(meta->data, (void **)&user));
-
-  Target *targets{nullptr};
-  assert(hpx_gas_try_pin(results, (void **)&targets));
-
-  for (size_t i = 0; i < meta->count; ++i) {
-    size_t idx = targets[i].index();
-    char *record_base = user[idx * meta->size];
-    double *phi = static_cast<double *>(record_base + phi_offset);
-    *phi = targets[i].phi();
-  }
-
-  hpx_gas_unpin(results);
-  hpx_gas_unpin(meta->data);
-  hpx_gas_unpin(user_data);
-
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           unpack_targets_action, unpack_targets_handler,
-           HPX_ADDR, HPX_ADDR, HPX_INT);
 
 
 int find_source_domain_handler(Source *sources, int n_sources) {
@@ -241,48 +212,47 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
 
   //create our method and expansion from the parameters
   MethodSerial *method_serial = static_cast<MethodSerial *>(parms->data);
-  hpx_addr_t method =
-      hpx_gas_alloc_local_at_sync(1, parms->method_size, 0, HPX_HERE);
-  hpx_gas_memput_rsync(method, method_serial, parms->method_size);
+  auto local_method = create_method(method_serial->type, method_serial);
+  MethodRef method = globalize_method(local_method, HPX_HERE);
 
-  ExpansionSerial *expansion_serial =
-      static_cast<ExpansionSerial *>(parms->data + parms->method_size);
-  hpx_addr_t expansion =
-      hpx_gas_alloc_local_at_sync(1, parms->expansion_size, 0, HPX_HERE);
-  hpx_gas_memput_rsync(expansion, expansion_serial, parms->expansion_size);
+  char *expansion_base = parms->data + parms->method_size;
+  int *type = static_cast<int *>(expansion_base + sizeof(int));
+  auto local_expansion =
+      interpret_expansion(*type, expansion_base, parms->expansion_size);
+  ExpansionRef expansion = globalize_expansion(local_expansion, HPX_HERE);
 
   //collect results of actions
   PackDataResult res{};
   hpx_lco_get(source_packed, sizeof(res), &res);
   hpx_lco_delete_sync(source_packed);
-  int n_sources = res.count;
-  hpx_addr_t source_parts = res.packed;
+  SourceRef sources{res.packed, res.count};
 
   hpx_lco_get(target_packed, sizeof(res), &res);
   hpx_lco_delete_sync(target_packed);
-  int n_targets = res.count;
-  hpx_addr_t target_parts = res.packed;
+  TargetRef targets{res.packed, res.count};
 
   DomainGeometry root_vol = cubify_domain(source_bounds, target_bounds);
   hpx_lco_delete_sync(source_bounds);
   hpx_lco_delete_sync(target_bounds);
 
-  //build trees/do work
-  SourceNode source_root{root_vol, 0, 0, 0, 0, method, nullptr};
+  //build trees/do work - NOTE the awkwardness with source reference... This
+  // really ought to be improved.
+  SourceNode source_root{root_vol, Index{0, 0, 0, 0}, method, nullptr};
+  Source *source_parts{nullptr};
+  assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts))
   hpx_addr_t partitiondone =
-      source_root.partition(source_parts, n_sources, parms->refinement_limit,
+      source_root.partition(source_parts, sources.n(), parms->refinement_limit,
                             expansion);
-  TargetNode target_root{root_vol, 0, 0, 0, 0, method, nullptr};
+  hpx_gas_unpin(sources.data());
+
+  TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method, nullptr};
   hpx_lco_wait(partitiondone);
   hpx_lco_delete_sync(partitiondone);
-  target_root.partition(target_parts, n_targets, parms->refinement_limit,
+  target_root.partition(targets.data(), n_targets, parms->refinement_limit,
                         expansion, 0, std::vector<SourceNode>{});
 
   //copy results back into user data
-  hpx_addr_t unpackdone = hpx_lco_future_new(0);
-  assert(unpackdone != HPX_NULL);
-  hpx_call(target_parts, unpack_targets_action, unpackdone,
-           &target_parts, &parms->targets, &parms->phi_offset);
+  target_root.collect_results(parms->targets, parms->phi_offset);
 
   //clean up
   source_root.destroy();
@@ -306,16 +276,17 @@ HPX_ACTION(HPX_ACTION, HPX_MARSHALLED,
 ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
                     ObjectHandle targets, int tpos_offset, int phi_offset,
                     int refinement_limit,
-                    Method *method, Expansion *expansion) {
+                    std::unique_ptr<Method> method,
+                    std::unique_ptr<Expansion> expansion) {
   if (!method->compatible_with(expansion)) {
     return kIncompatible;
   }
 
   //Marshall our arguments
-  MethodSerialPtr method_serial = method->serialize(false);
-  ExpansionSerialPtr expansion_serial = expansion->serialize(false);
-  size_t method_size = sizeof(MethodSerial) + method_serial->size;
-  size_t expansion_size = sizeof(ExpansionSerial) + expansion_serial->size;
+  size_t method_size = method->bytes();
+  MethodSerial *method_serial = method->release();
+  size_t expansion_size = expansion->bytes();
+  char *expansion_serial = static_cast<char *>(expansion->release());
   size_t total_size = method_size + expansion_size + sizeof(EvaluateParms);
   EvaluateParms *args = static_cast<EvaluateParms *>(malloc(total_size));
   assert(args);
@@ -328,8 +299,8 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
   args->refinement_limit = refinement_limit;
   args->method_size = method_size;
   args->expansion_size = expansion_size;
-  memcpy(data, method_serial.get(), method_size);
-  memcpy(data + method_size, expansion_serial.get(), expansion_size);
+  memcpy(args->data, method_serial.get(), method_size);
+  memcpy(args->data + method_size, expansion_serial.get(), expansion_size);
 
   if (HPX_SUCCESS != hpx_run(evaluate_action, args, total_size)) {
     return kRuntimeError;

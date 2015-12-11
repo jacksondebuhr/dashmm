@@ -48,7 +48,7 @@ struct SourceNodeData {
 class SourceNode {
  public:
   /// Construct from basic node data.
-  SourceNode(DomainGeometry g, int ix, int iy, int iz, int level,
+  SourceNode(DomainGeometry g, Index idx,
              hpx_addr_t met, SourceNode *parent);
 
   /// Construct from a global address.
@@ -326,6 +326,9 @@ class TargetNode {
   /// This will set this node's expansion to be a reference to the globalized
   /// form of the given expansion.
   void set_expansion(std::unique_ptr<Expansion> expand);
+
+  /// Collect results into user's array
+  void collect_results(hpx_addr_t user_array, size_t phi_offset);
 
  private:
   void pin() const;

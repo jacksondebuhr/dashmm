@@ -108,7 +108,7 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR_T);
 
 
-int source_node_child_partition_done_handler(NodeData *node,
+int source_node_child_partition_done_handler(SourceNodeData *node,
                                               hpx_addr_t partdone,
                                               int type,
                                               hpx_addr_t expand) {
@@ -138,14 +138,14 @@ struct SourceNodePartitionParams {
   Source sources[];
 };
 
-int source_node_partition_handler(NodeData *node,
+int source_node_partition_handler(SourceNodeData *node,
                                   SourceNodePartitionParams *parms,
                                   size_t bytes);
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
            source_node_partition_action, source_node_partition_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-int source_node_partition_handler(NodeData *node,
+int source_node_partition_handler(SourceNodeData *node,
                                   SourceNodePartitionParams *parms,
                                   size_t bytes) {
   if (parms->n_sources <= parms->limit) {
@@ -284,14 +284,14 @@ TargetNodePartitionParams *target_node_partition_params_alloc(int n_consider) {
   return retval;
 }
 
-int target_node_partition_handler(NodeData *node,
+int target_node_partition_handler(TargetNodeData *node,
                                   TargetNodePartitionParams *parms,
                                   size_t bytes);
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
            target_node_partition_action, target_node_partition_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-int target_node_partition_handler(NodeData *node,
+int target_node_partition_handler(TargetNodeData *node,
                                   TargetNodePartitionParams *parms,
                                   size_t bytes) {
   MethodRef method{node->method};
@@ -418,21 +418,82 @@ int target_node_partition_handler(NodeData *node,
 }
 
 
+int target_node_collect_results_handler(TargetNodeData *node,
+                      hpx_addr_t user_array, size_t phi_offset);
+HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+           target_node_collect_results_action,
+           target_node_collect_results_handler,
+           HPX_POINTER, HPX_ADDR_T, HPX_SIZE_T);
+
+int target_node_collect_results_handler(TargetNodeData *node,
+                      hpx_addr_t user_array, size_t phi_offset) {
+  //count children
+  int n_children{0};
+  for (int i = 0; i < 8; ++i) {
+    if (node->child[i] != HPX_NULL) {
+      ++n_children;
+    }
+  }
+
+  if (n_children == 0) {
+    //pin targets of this node
+    //HACK: This uses the size hack again.
+    char *lcodata{nullptr};
+    hpx_lco_getref(node->targets.data(), 1, &lcodata);
+    Target *targets = static_cast<Target *>(lcodata + 4 * sizeof(int));
+
+    //pin the user array
+    ArrayMetaData *meta{nullptr};
+    assert(hpx_gas_try_pin(user_array, (void **)&meta));
+    char *user_data{nullptr};
+    assert(hpx_gas_try_pin(meta->data, (void **)&user_data));
+
+    //copy over
+    for (int i = 0; i < node->targets.n(); ++i) {
+      size_t idx = targets[i].index();
+      char *record_base = user_data[idx * meta->size];
+      double *phi = static_cast<double *>(record_base + phi_offset);
+      *phi = targets[i].phi();
+    }
+
+    hpx_gas_unpin(meta->data);
+    hpx_gas_unpin(user_array);
+    hpx_lco_release(node->targets.data(), lcodata);
+
+    return HPX_SUCCESS;
+  } else {
+    //internal, so set up calls for children
+    hpx_addr_t coll_done = hpx_lco_and_new(n_children);
+    assert(coll_done != HPX_NULL);
+
+    for (int i = 0; i < 8; ++i) {
+      if (node->child[i] != HPX_NULL) {
+        hpx_call(node->child[i], target_node_collect_results_action, coll_done,
+                 &user_array, &phi_offset);
+      }
+    }
+
+    hpx_call_when_cc(coll_done, coll_done, hpx_lco_delete_action,
+                     nullptr, nullptr, nullptr, 0);
+  }
+}
+
+
 /////////////////////////////////////////////////////////////////////
 // SourceNode implementation
 /////////////////////////////////////////////////////////////////////
 
 
-SourceNode::SourceNode(DomainGeometry g, int ix, int iy, int iz, int level,
+SourceNode::SourceNode(DomainGeometry g, Index idx,
                        hpx_addr_t method, SourceNode *parent) {
-  data_ = hpx_gas_alloc_local(sizeof(NodeData), 0);
+  data_ = hpx_gas_alloc_local(sizeof(SourceNodeData), 0);
   if (data_ == HPX_NULL) {
     return;
   }
 
   pin();
   local_->root_geo = g;
-  local_->idx = Index{ix, iy, iz, level};
+  local_->idx = idx;
   local_->parent = parent->data();
   for (int i = 0; i < 8; ++i) {
     local_->child[0] = HPX_NULL;
@@ -612,7 +673,7 @@ void SourceNode::unpin() const {
 
 TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
                        TargetNode *parent) {
-  data_ = hpx_gas_alloc_local(sizeof(NodeData), 0);
+  data_ = hpx_gas_alloc_local(sizeof(TargetNodeData), 0);
   if (data_ == HPX_NULL) {
     return;
   }
@@ -784,6 +845,12 @@ void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
   ExpansionRef globexp = globalize_expansion(expand, data_);
   pin();
   local->expansion = globexp;
+}
+
+
+void TargetNode::collect_results(hpx_addr_t user_array, size_t phi_offset) {
+  hpx_call(data_, target_node_collect_results_action, nullptr, 0,
+           &user_array, &phi_offset);
 }
 
 

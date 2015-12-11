@@ -2,6 +2,8 @@
 #define __DASHMM_BASIC_INTERFACE_H__
 
 
+#include <memory>
+
 #include "include/expansion.h"
 #include "include/method.h"
 #include "include/types.h"
@@ -40,7 +42,9 @@ ReturnCode finalize();
 //TODO;
 ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
                     ObjectHandle targets, int tpos_offset, int phi_offset,
-                    int refinement_limit, Method *method, Expansion *expansion);
+                    int refinement_limit,
+                    std::unique_ptr<Method> method,
+                    std::unique_ptr<Expansion> expansion);
 
 
 /// \brief Allocate an array in DASHMM's global address space

@@ -170,6 +170,15 @@ ReturnCode register_method(int type, hpx_action_t creator);
 
 //NOTE: Not intended for end-user use
 
+
+/// Initialize the method registration table
+void init_method_table();
+
+
+/// Finalize (clean up) the method registration table
+void fini_method_table()
+
+
 /// Create a method object of the given type
 ///
 /// This will create a new method object of the given type. The returned
