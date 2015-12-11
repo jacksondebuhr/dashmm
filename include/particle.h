@@ -8,7 +8,6 @@
 
 #include <complex>
 
-#include "include/expansionref.h"
 #include "include/point.h"
 
 

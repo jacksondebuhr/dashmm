@@ -28,10 +28,13 @@ namespace dashmm {
 /// underlying Method object.
 class MethodRef {
  public:
-  explicit MethodRef(hpx_addr_t addr) : data_{ref}, met_{nullptr} { }
+  explicit MethodRef(hpx_addr_t addr) : data_{addr}, met_{nullptr} { }
 
   /// The type identifier of the method
   int type() const;
+
+  /// The global address of the stored data
+  hpx_addr_t data() const {return data_;}
 
   /// Determine if this method is compatible with a given expansion
   ///
@@ -103,7 +106,7 @@ class MethodRef {
   /// \param consider - the list of source nodes being considered at this node
   ///
   /// \returns - true if the refinement should proceed; false otherwise
-  void bool refine_test(bool same_sources_and_targets,
+  bool refine_test(bool same_sources_and_targets,
                         const TargetNode &curr,
                         const std::vector<SourceNode> &consider) const;
 

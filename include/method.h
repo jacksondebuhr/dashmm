@@ -17,13 +17,6 @@
 namespace dashmm {
 
 
-/// The smallest allowed method type identifier for user-defined methods
-extern constexpr int kFirstUserMethodType;
-
-/// The largest allowed method type identifier for user-defined methods
-extern constexpr int kLastUserMethodType;
-
-
 /// The type for a serialized method object
 ///
 /// Methods are all required to produce a serialized version of themselves
@@ -34,14 +27,6 @@ struct MethodSerial {
   size_t size;      //NOTE: This refers to the data, not the overall size here
   double data[];
 };
-
-
-/// The signature of a function that creates a method
-///
-/// To register a method with DASHMM, the user will need to provide a function
-/// that can be used to create that sort of Method given data in the form of
-/// a MethodSerial pointer.
-typedef Method *(*method_creation_function_t)(size_t, MethodSerial *);
 
 
 /// Abstract interface for Methods used in DASHMM
@@ -61,7 +46,10 @@ class Method {
   /// method in a contiguous chunk of memory. These serialized versions are
   /// used throughout the system. When release() is called, the method object
   /// is then 'empty' in a sense, and the method no longer owns any data.
-  virtual MethodSerial *release() const = 0;
+  virtual MethodSerial *release() = 0;
+
+  /// Return the size of the serialized data
+  virtual size_t bytes() const = 0;
 
   /// The type identifier of the method
   virtual int type() const = 0;
@@ -76,7 +64,7 @@ class Method {
   /// \param expand - a reference to the expansion in question
   ///
   /// \returns - true in case of compatability; false otherwise
-  virtual bool compatible_with(const ExpansionRef expand) const = 0;
+  virtual bool compatible_with(const Expansion *expand) const = 0;
 
   /// Generate the expansion at the leaf of the source tree
   ///
@@ -153,6 +141,14 @@ class Method {
 };
 
 
+/// The signature of a function that creates a method
+///
+/// To register a method with DASHMM, the user will need to provide a function
+/// that can be used to create that sort of Method given data in the form of
+/// a MethodSerial pointer.
+typedef Method *(*method_creation_function_t)(size_t, MethodSerial *);
+
+
 /// Register a user-defined method with DASHMM
 ///
 /// This will connect the specified creation function @p creator with the
@@ -176,7 +172,7 @@ void init_method_table();
 
 
 /// Finalize (clean up) the method registration table
-void fini_method_table()
+void fini_method_table();
 
 
 /// Create a method object of the given type

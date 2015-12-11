@@ -9,20 +9,20 @@ namespace dashmm {
 
 
 void BHMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
-  curr->set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
-  ExpansionRef curr->expansion();
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  ExpansionRef currexp = curr.expansion();
   SourceRef sources = curr.parts();
-  sources.S_to_M(Point{0.0, 0.0, 0.0}, sources);
+  currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources);
 }
 
 
 void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  curr->set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
-  ExpansionRef currexp = curr->expansion();
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
     SourceNode kid = curr.child(i);
     if (kid.is_valid()) {
-      ExpansionRef kexp = kid->expansion();  //this data is available in the node
+      ExpansionRef kexp = kid.expansion();  //this data is available in the node
       currexp.M_to_M(kexp, i, 0.0);
     }
   }
@@ -37,8 +37,8 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
 
   do {
     for (auto i = consider.begin(); i != consider.end(); ++i) {
-      Point comp_point = nearest(i->center(), curr->center(), curr->size());
-      bool can_use = MAC(i->expansion(), i->size(), comp_point);
+      Point comp_point = nearest(i->center(), curr.center(), curr.size());
+      bool can_use = MAC(i->center(), i->size(), comp_point);
 
       if (can_use) {
         if (!curr_is_leaf) {
@@ -61,7 +61,7 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
         for (size_t j = 0; j < 8; ++j) {
           //NOTE: This line will create the SourceNode, and then pull in a
           // local version.
-          SourceNode kid = i->child(i);
+          SourceNode kid = i->child(j);
           if (kid.is_valid()) {
             //NOTE: This will do the same thing. In distrib, that pull might
             // be costly.
@@ -77,16 +77,17 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
 }
 
 
-bool MAC(ExpansionRef &expand, double size, Point pos) const {
-  Point disp = point_sub(pos, expand.center());
+bool BHMethod::MAC(Point exp_point, double size, Point pos) const {
+  Point disp = point_sub(pos, exp_point);
   double theta = size / disp.norm();
-  return theta < theta_;
+  return theta < local_->data[0];
 }
 
 
-Point nearest(Point scenter, Point tcenter, double tsize) const {
+Point BHMethod::nearest(Point scenter, Point tcenter, double tsize) const {
   Point offset{point_sub(scenter, tcenter)};
 
+  double len{0.5 * tsize};
   double xval{fabs(offset.x()) > len ? len : offset.x()};
   xval += tcenter.x();
   double yval{fabs(offset.y()) > len ? len : offset.y()};

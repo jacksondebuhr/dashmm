@@ -10,32 +10,15 @@
 #include "include/expansion.h"
 #include "include/index.h"
 #include "include/particle.h"
+#include "include/types.h"
 
 
 namespace dashmm {
 
 
-/// The data for source nodes.
-///
-/// The data stored for SourceNode objects. This will be saved in a block in
-/// the GAS.
-struct SourceNodeData {
-  /// The geometry of the root for the tree of which this node is a part.
-  DomainGeometry root_geo;
-  /// The index giving which subdivision of the root this node is.
-  Index idx;
-  /// The global address of the parent of this node.
-  hpx_addr_t parent;
-  /// The global addresses of the children of this node.
-  hpx_addr_t child[8];
-  /// The global address of the expansion object for this node.
-  ExpansionRef expansion;
-  /// The global address of the method object for this node.
-  hpx_addr_t method;
-  /// A reference to the sources for this node. If this is an internal node,
-  /// this will be an invalid SourceRef.
-  SourceRef sources;
-};
+// Forward declaration of internal types
+struct SourceNodeData;
+struct TargetNodeData;
 
 
 /// A node of the source tree.
@@ -179,28 +162,6 @@ class SourceNode {
 };
 
 
-/// The data for target nodes.
-///
-/// The data stored for TargetNode objects. This will be saved in a block in
-/// the GAS.
-struct TargetNodeData {
-  /// The geometry of the root for the tree of which this node is a part.
-  DomainGeometry root_geo;
-  /// The index giving which subdivision of the root this node is.
-  Index idx;
-  /// The global address of the parent of this node.
-  hpx_addr_t parent;
-  /// The global addresses of the children of this node.
-  hpx_addr_t child[8];
-  /// The global address of the expansion object for this node.
-  ExpansionRef expansion;
-  /// The global address of the method object for this node.
-  MethodRef method;
-  /// A reference to the targets for this node.
-  TargetRef targets;
-};
-
-
 class TargetNode {
  public:
   /// Construct from basic node data.
@@ -334,7 +295,7 @@ class TargetNode {
   void pin() const;
   void unpin() const;
 
-  mutable NodeData *local_;
+  mutable TargetNodeData *local_;
 
   hpx_addr_t data_;
 };

@@ -3,19 +3,11 @@
 
 #include "hpx/hpx.h"
 
+#include "include/array.h"
 #include "include/types.h"
 
 
-/////////////////////////////////////////////////////////////////////
-// Definitions
-/////////////////////////////////////////////////////////////////////
-
-
-struct ArrayMetaData {
-  hpx_addr_t data;
-  size_t count;
-  size_t size;
-};
+namespace dashmm {
 
 
 /////////////////////////////////////////////////////////////////////
@@ -25,8 +17,8 @@ struct ArrayMetaData {
 
 int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj) {
   //create the metadata object
-  hpx_addr_t retval = hpx_gas_alloc(1, sizeof(ArrayMetaData), 0,
-                                    HPX_DIST_TYPE_LOCAL);
+  hpx_addr_t retval = hpx_gas_alloc_local_at_sync(1, sizeof(ArrayMetaData), 0,
+                                                  HPX_HERE);
   *obj = retval;
   if (retval == HPX_NULL) {
     hpx_exit(HPX_ERROR);
@@ -40,7 +32,7 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj) {
   meta->count = count;
   meta->size = size;
 
-  meta->data = hpx_gas_alloc(1, count * size, 0, HPX_DIST_TYPE_LOCAL);
+  meta->data = hpx_gas_alloc_local_at_sync(1, count * size, 0, HPX_HERE);
   assert(meta->data != HPX_NULL);
 
   hpx_gas_unpin(retval);
@@ -131,7 +123,7 @@ HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
 
 
 ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
-  int runcode = hpx_run(allocate_array_action, &records, &size, &obj);
+  int runcode = hpx_run(&allocate_array_action, &records, &size, &obj);
   if (runcode != HPX_SUCCESS) {
     if (obj == HPX_NULL) {
       return kAllocationError;
@@ -144,7 +136,7 @@ ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
 
 
 ReturnCode deallocate_array(ObjectHandle obj) {
-  if (HPX_SUCCESS == hpx_run(deallocate_array_action, &obj)) {
+  if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &obj)) {
     return kSuccess;
   } else {
     return kRuntimeError;
@@ -153,7 +145,7 @@ ReturnCode deallocate_array(ObjectHandle obj) {
 
 
 ReturnCode array_put(ObjectHandle obj, size_t first, size_t last, void *in_data) {
-  if (HPX_SUCCESS == hpx_run(array_put_action, &obj, &first, &last,
+  if (HPX_SUCCESS == hpx_run(&array_put_action, &obj, &first, &last,
                             &in_data)) {
     return kSuccess;
   } else {
@@ -163,10 +155,13 @@ ReturnCode array_put(ObjectHandle obj, size_t first, size_t last, void *in_data)
 
 
 ReturnCode array_get(ObjectHandle obj, size_t first, size_t last, void *out_data) {
-  if (HPX_SUCCESS == hpx_run(array_get_action, &obj, &first, &last,
+  if (HPX_SUCCESS == hpx_run(&array_get_action, &obj, &first, &last,
                              &out_data)) {
     return kSuccess;
   } else {
     return kRuntimeError;
   }
 }
+
+
+} // namespace dashmm

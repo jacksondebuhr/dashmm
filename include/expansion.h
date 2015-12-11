@@ -15,37 +15,10 @@
 
 #include "include/index.h"
 #include "include/particle.h"
+#include "include/types.h"
 
 
 namespace dashmm {
-
-
-/// The first available type identifier for user-defined expansions
-extern constexpr int kFirstUserExpansionType;
-
-/// The last (inclusive) available type identifier for user-defined expansions
-extern constexpr int kLastUserExpansionType;
-
-
-/// The signature of a function that creates an expansion
-///
-/// To register a user-defined expansion with DASHMM, the user will need to
-/// provide a function that can be used to create that sort of expansion
-/// given a Point indicating the center of the expansion.
-typedef Expansion *(*expansion_creation_function_t)(Point);
-
-/// The signature of a function that interprets existing data as an expansion
-///
-/// To register a user-defined expansion with DASHMM, the user will need to
-/// provide a function that can be used to interpret exisiting data as an
-/// expansion of the new type.
-///
-/// Some expansion methods do not need access to the particular data for the
-/// expansion, so this function must be able to support creating a 'thin' or
-/// 'empty' expansion of the new type. One example of this is the S_to_T
-/// function. The behavior of this function is the same for every instance of
-/// the same type of expansion.
-typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes);
 
 
 /// The abstract interface for expansions usable in DASHMM
@@ -220,6 +193,27 @@ class Expansion {
   /// \returns - the new expansion
   virtual std::unique_ptr<Expansion> get_new_expansion(Point center) const = 0;
 };
+
+
+/// The signature of a function that creates an expansion
+///
+/// To register a user-defined expansion with DASHMM, the user will need to
+/// provide a function that can be used to create that sort of expansion
+/// given a Point indicating the center of the expansion.
+typedef Expansion *(*expansion_creation_function_t)(double, double, double);
+
+/// The signature of a function that interprets existing data as an expansion
+///
+/// To register a user-defined expansion with DASHMM, the user will need to
+/// provide a function that can be used to interpret exisiting data as an
+/// expansion of the new type.
+///
+/// Some expansion methods do not need access to the particular data for the
+/// expansion, so this function must be able to support creating a 'thin' or
+/// 'empty' expansion of the new type. One example of this is the S_to_T
+/// function. The behavior of this function is the same for every instance of
+/// the same type of expansion.
+typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes);
 
 
 /// Register a user-defined expansion with DASHMM

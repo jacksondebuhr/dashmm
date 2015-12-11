@@ -1,9 +1,13 @@
-//C++ stuff
+#include <cstring>
 
 #include <memory>
 
+#include <hpx/hpx.h>
+
+#include "include/array.h"
 #include "include/expansion.h"
 #include "include/method.h"
+#include "include/methodref.h"
 #include "include/node.h"
 #include "include/types.h"
 
@@ -38,7 +42,7 @@ DomainGeometry cubify_domain(hpx_addr_t source_bounds,
   size = size > sizes.z() ? size : sizes.z();
   size *= 0.5001;
   Point offset{-size, -size, -size};
-  low = point_add(high, offset);
+  low = point_add(center, offset);
   size *= 2.0;
 
   return DomainGeometry{low, size};
@@ -73,11 +77,12 @@ int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
     assert(hpx_gas_try_pin(retval.packed, (void **)&sources));
 
     for (size_t i = 0; i < meta->count; ++i) {
-      char *record_base = user[i * meta->size];
-      double *pos = static_cast<double *>(record_base + pos_offset);
-      double *q = static_cast<double *>(record_base + q_offset);
-      sources[i]->set_position(Point{pos[0], pos[1], pos[2]});
-      sources[i]->set_charge(*q);
+      void *pos_base = static_cast<void *>(&user[i * meta->size] + pos_offset);
+      double *pos = static_cast<double *>(pos_base);
+      void *q_base = static_cast<void *>(&user[i * meta->size] + q_offset);
+      double *q = static_cast<double *>(q_base);
+      sources[i].position = Point{pos[0], pos[1], pos[2]};
+      sources[i].charge = *q;
     }
 
     hpx_gas_unpin(retval.packed);
@@ -107,16 +112,16 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
   retval.count = meta->count;
   if (retval.packed != HPX_NULL) {
     Target *targets{nullptr};
-    assert(hpx_gas_try_pin(retval, (void **)&targets));
+    assert(hpx_gas_try_pin(retval.packed, (void **)&targets));
 
     for (size_t i = 0; i < meta->count; ++i) {
-      char *record_base = user[i * meta->size];
-      double *pos = static_cast<double *>(record_base + pos_offset);
-      targets[i]->set_position(Point{pos[0], pos[1], pos[2]});
-      targets[i]->set_index(i);
+      void *pos_base = static_cast<void *>(&user[i * meta->size] + pos_offset);
+      double *pos = static_cast<double *>(pos_base);
+      targets[i].position = Point{pos[0], pos[1], pos[2]};
+      targets[i].index = i;
     }
 
-    hpx_gas_unpin(retval);
+    hpx_gas_unpin(retval.packed);
   }
 
   hpx_gas_unpin(meta->data);
@@ -136,7 +141,7 @@ int find_source_domain_handler(Source *sources, int n_sources) {
   double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
 
   for (int i = 0; i < n_sources; ++i) {
-    Point p = sources[i].position();
+    Point p = sources[i].position;
     if (p.x() < bounds[0]) bounds[0] = p.x();
     if (p.x() > bounds[3]) bounds[3] = p.x();
     if (p.y() < bounds[1]) bounds[1] = p.y();
@@ -159,7 +164,7 @@ int find_target_domain_handler(Target *targets, int n_targets) {
   double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
 
   for (int i = 0; i < n_targets; ++i) {
-    Point p = targets[i].position();
+    Point p = targets[i].position;
     if (p.x() < bounds[0]) bounds[0] = p.x();
     if (p.x() > bounds[3]) bounds[3] = p.x();
     if (p.y() < bounds[1]) bounds[1] = p.y();
@@ -211,15 +216,16 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
                 target_bounds, &target_packed);
 
   //create our method and expansion from the parameters
-  MethodSerial *method_serial = static_cast<MethodSerial *>(parms->data);
+  MethodSerial *method_serial = reinterpret_cast<MethodSerial *>(parms->data);
   auto local_method = create_method(method_serial->type, method_serial);
-  MethodRef method = globalize_method(local_method, HPX_HERE);
+  MethodRef method = globalize_method(std::move(local_method), HPX_HERE);
 
   char *expansion_base = parms->data + parms->method_size;
-  int *type = static_cast<int *>(expansion_base + sizeof(int));
+  int *type = reinterpret_cast<int *>(expansion_base + sizeof(int));
   auto local_expansion =
       interpret_expansion(*type, expansion_base, parms->expansion_size);
-  ExpansionRef expansion = globalize_expansion(local_expansion, HPX_HERE);
+  ExpansionRef expansion =
+      globalize_expansion(std::move(local_expansion), HPX_HERE);
 
   //collect results of actions
   PackDataResult res{};
@@ -237,19 +243,20 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
 
   //build trees/do work - NOTE the awkwardness with source reference... This
   // really ought to be improved.
-  SourceNode source_root{root_vol, Index{0, 0, 0, 0}, method, nullptr};
+  SourceNode source_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   Source *source_parts{nullptr};
-  assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts))
+  assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts));
   hpx_addr_t partitiondone =
       source_root.partition(source_parts, sources.n(), parms->refinement_limit,
-                            expansion);
+                            expansion.type(), expansion.data());
   hpx_gas_unpin(sources.data());
 
-  TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method, nullptr};
+  TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   hpx_lco_wait(partitiondone);
   hpx_lco_delete_sync(partitiondone);
-  target_root.partition(targets.data(), n_targets, parms->refinement_limit,
-                        expansion, 0, std::vector<SourceNode>{});
+  bool same_sandt = (parms->sources == parms->targets);
+  target_root.partition(targets.data(), targets.n(), parms->refinement_limit,
+                        expansion, 0, same_sandt, std::vector<SourceNode>{});
 
   //copy results back into user data
   target_root.collect_results(parms->targets, parms->phi_offset);
@@ -257,13 +264,11 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //clean up
   source_root.destroy();
   target_root.destroy();
-  hpx_gas_free_sync(source_parts);
-  hpx_gas_free_sync(target_parts);
 
   //return
   return HPX_SUCCESS;
 }
-HPX_ACTION(HPX_ACTION, HPX_MARSHALLED,
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            evaluate_action, evaluate_handler,
            HPX_POINTER, HPX_SIZE_T);
 
@@ -278,7 +283,7 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
                     int refinement_limit,
                     std::unique_ptr<Method> method,
                     std::unique_ptr<Expansion> expansion) {
-  if (!method->compatible_with(expansion)) {
+  if (!method->compatible_with(expansion.get())) {
     return kIncompatible;
   }
 
@@ -287,8 +292,8 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
   MethodSerial *method_serial = method->release();
   size_t expansion_size = expansion->bytes();
   char *expansion_serial = static_cast<char *>(expansion->release());
-  size_t total_size = method_size + expansion_size + sizeof(EvaluateParms);
-  EvaluateParms *args = static_cast<EvaluateParms *>(malloc(total_size));
+  size_t total_size = method_size + expansion_size + sizeof(EvaluateParams);
+  EvaluateParams *args = static_cast<EvaluateParams *>(malloc(total_size));
   assert(args);
   args->sources = sources;
   args->spos_offset = spos_offset;
@@ -299,10 +304,10 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
   args->refinement_limit = refinement_limit;
   args->method_size = method_size;
   args->expansion_size = expansion_size;
-  memcpy(args->data, method_serial.get(), method_size);
-  memcpy(args->data + method_size, expansion_serial.get(), expansion_size);
+  memcpy(args->data, method_serial, method_size);
+  memcpy(args->data + method_size, expansion_serial, expansion_size);
 
-  if (HPX_SUCCESS != hpx_run(evaluate_action, args, total_size)) {
+  if (HPX_SUCCESS != hpx_run(&evaluate_action, args, total_size)) {
     return kRuntimeError;
   }
 

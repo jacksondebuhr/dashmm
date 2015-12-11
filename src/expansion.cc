@@ -1,10 +1,11 @@
-#include "expansion.h"
+#include "include/expansion.h"
 
 #include <map>
 
 #include <hpx/hpx.h>
 
 #include "include/expansionref.h"
+#include "include/ids.h"
 #include "include/reductionops.h"
 
 
@@ -15,19 +16,6 @@
 namespace dashmm {
 
 
-/// The lowest allowed expansion identifier for internal use
-constexpr int kFirstExpansionType = 2000;
-
-/// The highest allowed expansion identifier for internal use
-constexpr int kLastExpansionType = 2999;
-
-/// The first allowed expansion identifier for user defined expansions
-constexpr int kFirstUserExpansionType = 3000;
-
-/// the highest allowed expansion identifier for user defined expansions
-constexpr int kLastUserExpansionType = 3999;
-
-
 constexpr int kAllocateExpansionTable = 0;
 constexpr int kDeleteExpansionTable = 1;
 
@@ -36,7 +24,7 @@ constexpr int kDeleteExpansionTable = 1;
 struct ExpansionTableRow {
   hpx_action_t create;
   hpx_action_t interpret;
-}
+};
 
 
 /// A mapping from expansion type to creation functions
@@ -68,7 +56,7 @@ int register_expansion_handler(int type, hpx_action_t creator,
                                hpx_action_t interpreter, hpx_addr_t check) {
   int checkval = 0;
   if (expansion_table_->count(type) != 0) {
-    int checkval = 1;
+    checkval = 1;
   } else {
     (*expansion_table_)[type] = ExpansionTableRow{creator, interpreter};
   }
@@ -105,11 +93,11 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
   if (entry == expansion_table_->end()) {
     return std::unique_ptr<Expansion>{nullptr};
   }
-  expansion_creation_function_t func =
-      reinterpret_cast<expansion_creation_function_t>(
+  expansion_interpret_function_t func =
+      reinterpret_cast<expansion_interpret_function_t>(
         hpx_action_get_handler(entry->second.interpret)
       );
-  return std::unique_ptr<Expansion>{func(size, data)};
+  return std::unique_ptr<Expansion>{func(data, size)};
 }
 
 
@@ -122,19 +110,19 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center) {
       reinterpret_cast<expansion_creation_function_t>(
         hpx_action_get_handler(entry->second.create)
       );
-  return std::unique_ptr<Expansion>{func(center)};
+  return std::unique_ptr<Expansion>{func(center.x(), center.y(), center.z())};
 }
 
 
 void init_expansion_table() {
   int input = kAllocateExpansionTable;
-  hpx_bcast_rsync(manage_expansion_table_handler, &input);
+  hpx_bcast_rsync(manage_expansion_table_action, &input);
 }
 
 
 void fini_expansion_table() {
   int input = kAllocateExpansionTable;
-  hpx_bcast_rsync(manage_expansion_table_handler, &input);
+  hpx_bcast_rsync(manage_expansion_table_action, &input);
 }
 
 

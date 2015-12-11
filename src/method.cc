@@ -19,16 +19,6 @@ namespace dashmm {
 std::map<int, hpx_action_t> *method_table_;
 
 
-/// The first built-in method type identifier
-constexpr int kFirstMethodType = 0;
-
-/// The last built-in method type identifier
-constexpr int kLastMethodType = 999;
-
-constexpr int kFirstUserMethodType = 1000;
-constexpr int kLastUserMethodType = 1999;
-
-
 constexpr int kAllocateMethodTable = 0;
 constexpr int kDeleteMethodTable = 1;
 

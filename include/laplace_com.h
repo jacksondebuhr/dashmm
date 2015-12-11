@@ -7,8 +7,8 @@
 #include <memory>
 #include <vector>
 
-#include "include/builtin_ids.h"
 #include "include/expansion.h"
+#include "include/ids.h"
 #include "include/index.h"
 #include "include/particle.h"
 #include "include/point.h"
@@ -34,7 +34,7 @@ class LaplaceCOM : public Expansion {
   ~LaplaceCOM();
 
   void *release() override {
-    retval = data_;
+    LaplaceCOMData *retval = data_;
     data_ = nullptr;
     return retval;
   }
@@ -80,16 +80,16 @@ class LaplaceCOM : public Expansion {
     return std::unique_ptr<Expansion>{new LaplaceCOM{center}};
   }
 
- private:
-  void set_mtot(double m) {data->mtot = m;}
+  void set_mtot(double m) {data_->mtot = m;}
   void set_xcom(const double c[3]) {
-    data->xcom[0] = c[0]; data->xcom[1] = c[1]; data->xcom[2] = c[2];
+    data_->xcom[0] = c[0]; data_->xcom[1] = c[1]; data_->xcom[2] = c[2];
   }
   void set_Q(const double q[6]) {
-    data->Q[0] = q[0]; data->Q[1] = q[1]; data->Q[2] = q[2];
-    data->Q[3] = q[3]; data->Q[4] = q[4]; data->Q[5] = q[5];
+    data_->Q[0] = q[0]; data_->Q[1] = q[1]; data_->Q[2] = q[2];
+    data_->Q[3] = q[3]; data_->Q[4] = q[4]; data_->Q[5] = q[5];
   }
 
+ private:
   void calc_mtot(Source *first, Source *last);
   void calc_xcom(Source *first, Source *last);
   void calc_Q(Source *first, Source *last);

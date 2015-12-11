@@ -15,6 +15,7 @@
 #include "include/index.h"
 #include "include/particle.h"
 #include "include/point.h"
+#include "include/types.h"
 
 
 namespace dashmm {

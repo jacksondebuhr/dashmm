@@ -1,3 +1,9 @@
+* First release TODO
+  - Be sure to complete the in-source documentation
+  - Make sure that all the includes are needed, and follow the style guide
+    in their ordering
+
+
 Some notes about issues or future features
 
 * In the future, we may want to have the ObjectHandle be something a little
