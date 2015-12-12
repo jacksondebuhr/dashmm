@@ -3,11 +3,13 @@
 
 #include "include/method.h"
 
-//C++
+#include <map>
 
 #include <hpx/hpx.h>
 
+#include "include/ids.h"
 #include "include/methodref.h"
+#include "include/reductionops.h"
 
 
 namespace dashmm {
@@ -31,7 +33,7 @@ constexpr int kDeleteMethodTable = 1;
 int register_method_handler(int type, hpx_action_t creator, hpx_addr_t check) {
   int checkval = 0;
   if (method_table_->count(type) != 0) {
-    int checkval = 1;
+    checkval = 1;
   } else {
     (*method_table_)[type] = creator;
   }

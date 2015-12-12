@@ -8,6 +8,8 @@
 
 #include <complex>
 
+#include <hpx/hpx.h>
+
 #include "include/point.h"
 
 

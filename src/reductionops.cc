@@ -10,7 +10,8 @@ void int_sum_ident_handler(int *input, const size_t bytes) {
     input[i] = 0;
   }
 }
-HPX_ACTION(HPX_FUNCTION, 0, int_sum_ident_op, int_sum_ident_handler);
+HPX_ACTION(HPX_FUNCTION, 0, int_sum_ident_op, int_sum_ident_handler,
+           HPX_POINTER, HPX_SIZE_T);
 
 
 void int_sum_op_handler(int *lhs, const int *rhs, size_t bytes) {
@@ -19,7 +20,8 @@ void int_sum_op_handler(int *lhs, const int *rhs, size_t bytes) {
     lhs[i] += rhs[i];
   }
 }
-HPX_ACTION(HPX_FUNCTION, 0, int_sum_op, int_sum_op_handler);
+HPX_ACTION(HPX_FUNCTION, 0, int_sum_op, int_sum_op_handler,
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
 
 } // namespace dashmm

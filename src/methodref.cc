@@ -54,7 +54,7 @@ void MethodRef::process(TargetNode &curr, std::vector<SourceNode> &consider,
 }
 
 
-void bool MethodRef::refine_test(bool same_sources_and_targets,
+bool MethodRef::refine_test(bool same_sources_and_targets,
                       const TargetNode &curr,
                       const std::vector<SourceNode> &consider) const {
   setup_local_method();
@@ -62,7 +62,7 @@ void bool MethodRef::refine_test(bool same_sources_and_targets,
 }
 
 
-MethodSerial *MethodRef::pin() {
+MethodSerial *MethodRef::pin() const {
   if (data_ == HPX_NULL) {
     return nullptr;
   }
@@ -72,7 +72,7 @@ MethodSerial *MethodRef::pin() {
 }
 
 
-void MethodRef::unpin() {
+void MethodRef::unpin() const {
   if (data_ == HPX_NULL) {
     return;
   }
@@ -80,28 +80,28 @@ void MethodRef::unpin() {
 }
 
 
-void MethodRef::setup_local_method() {
+void MethodRef::setup_local_method() const {
   if (met_ != nullptr) {
     return;
   }
   MethodSerial *local = pin();
-  met_ = create_method(local->type, local->size, local);
+  met_ = create_method(local->type, local);
   unpin();
 }
 
 
 MethodRef globalize_method(std::unique_ptr<Method> met, hpx_addr_t where) {
   if (met == nullptr) {
-    return HPX_NULL;
+    return MethodRef{HPX_NULL};
   }
   MethodSerial *serial = met->release();
   size_t size = serial->size + sizeof(MethodSerial);
-  hpx_addr_t data = hpx_gas_alloc_local_at_sync(size, 0, where);
+  hpx_addr_t data = hpx_gas_alloc_local_at_sync(1, size, 0, where);
   assert(data != HPX_NULL);
   //NOTE: This will be slow as the memory like did not get allocated as
   // registered memory. However, this will not happen often, so this is perhaps
   // okay.
-  hpx_gas_memput_rsync(data, serial.get(), size);
+  hpx_gas_memput_rsync(data, serial, size);
   return MethodRef{data};
 }
 

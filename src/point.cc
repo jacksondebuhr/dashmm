@@ -1,4 +1,4 @@
-#include "point.h"
+#include "include/point.h"
 
 
 namespace dashmm {

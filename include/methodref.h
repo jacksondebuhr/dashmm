@@ -111,12 +111,12 @@ class MethodRef {
                         const std::vector<SourceNode> &consider) const;
 
  private:
-  MethodSerial *pin();
-  void unpin();
-  void setup_local_method();
+  MethodSerial *pin() const;
+  void unpin() const;
+  void setup_local_method() const;
 
   hpx_addr_t data_;
-  std::unique_ptr<Method> met_;
+  mutable std::unique_ptr<Method> met_;
 };
 
 

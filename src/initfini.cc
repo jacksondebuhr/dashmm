@@ -2,7 +2,7 @@
 
 #include "hpx/hpx.h"
 
-#include "inlude/builtins.h"
+#include "include/builtins.h"
 #include "include/types.h"
 
 
@@ -55,7 +55,7 @@ ReturnCode init(int *argc, char ***argv) {
   }
 
   //now run the initialization action
-  if (HPX_SUCCESS != hpx_run(init_action, nullptr, 0)) {
+  if (HPX_SUCCESS != hpx_run(&init_action, nullptr, 0)) {
     return kInitError;
   }
 
@@ -65,7 +65,7 @@ ReturnCode init(int *argc, char ***argv) {
 
 ReturnCode finalize() {
   //run the finalization action
-  if (HPX_SUCCESS != hpx_run(fini_action, nullptr, 0)) {
+  if (HPX_SUCCESS != hpx_run(&fini_action, nullptr, 0)) {
     return kFiniError;
   }
 

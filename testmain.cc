@@ -4,7 +4,7 @@
 
 
 int main(void) {
-  fprintf(stdout, "Test main.\n")
+  fprintf(stdout, "Test main.\n");
 
   return 0;
 }

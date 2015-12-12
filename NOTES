@@ -2,6 +2,8 @@
   - Be sure to complete the in-source documentation
   - Make sure that all the includes are needed, and follow the style guide
     in their ordering
+  - Make sure that the user is aware that the potential comes out as a
+    complex number
 
 
 Some notes about issues or future features

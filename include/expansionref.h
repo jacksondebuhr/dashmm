@@ -185,7 +185,6 @@ class ExpansionRef {
   /// that a contribution is on the way.
   void schedule() const;
 
- private:
   /// Contribute to the referred expansion
   ///
   /// This will setup the given @p payload with the correct internal code
@@ -196,6 +195,7 @@ class ExpansionRef {
   /// \param payload - the serialized expansion data
   void contribute(size_t bytes, char *payload);
 
+ private:
   int type_;
   hpx_addr_t data_;     //this is the LCO
 };

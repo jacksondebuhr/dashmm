@@ -1,14 +1,19 @@
 #include "include/node.h"
 
-#include <cassert.h>
-#include <cstddef.h>
-#include <cstdint.h>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+
+#include <algorithm>
 
 #include "hpx/hpx.h"
 
+#include "include/array.h"
 #include "include/domaingeometry.h"
 #include "include/index.h"
 #include "include/method.h"
+#include "include/methodref.h"
 
 
 namespace dashmm {
@@ -76,8 +81,13 @@ int node_delete_self_handler(hpx_addr_t gate) {
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0, node_delete_self_action, node_delete_self_handler,
-           HPX_ADDR_T);
+           HPX_ADDR);
 
+
+int source_node_delete_handler(hpx_addr_t data);
+HPX_ACTION(HPX_DEFAULT, 0,
+           source_node_delete_action, source_node_delete_handler,
+           HPX_ADDR);
 
 int source_node_delete_handler(hpx_addr_t data) {
   SourceNodeData *local{nullptr};
@@ -112,10 +122,12 @@ int source_node_delete_handler(hpx_addr_t data) {
   hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
                    &done);
 }
-HPX_ACTION(HPX_DEFAULT, 0,
-           source_node_delete_action, source_node_delete_handler,
-           HPX_ADDR_T);
 
+
+int target_node_delete_handler(hpx_addr_t data);
+HPX_ACTION(HPX_DEFAULT, 0,
+           target_node_delete_action, target_node_delete_handler,
+           HPX_ADDR);
 
 int target_node_delete_handler(hpx_addr_t data) {
   TargetNodeData *local{nullptr};
@@ -150,9 +162,6 @@ int target_node_delete_handler(hpx_addr_t data) {
   hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
                    &done);
 }
-HPX_ACTION(HPX_DEFAULT, 0,
-           target_node_delete_action, target_node_delete_handler,
-           HPX_ADDR_T);
 
 
 int source_node_child_partition_done_handler(SourceNodeData *node,
@@ -213,9 +222,6 @@ int source_node_partition_handler(SourceNodeData *node,
     node->expansion.finalize();
 
     hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
-    if (parms->gendone != HPX_NULL) {
-      hpx_lco_set(parms->gendone, 0, nullptr, HPX_NULL, HPX_NULL);
-    }
     return HPX_SUCCESS;
   }
 
@@ -225,26 +231,25 @@ int source_node_partition_handler(SourceNodeData *node,
   //partition sources
   Source *splits[9]{};
   splits[0] = parms->sources;
-  splits[8] = &parms->sources[n_parts];
+  splits[8] = &parms->sources[parms->n_sources];
 
-  Point cen{node->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
-                                       local_->idx.z(), local_->idx.level())};
+  Point cen{node->root_geo.center_from_index(node->idx)};
   double z_center = cen.z();
-  auto z_comp = [&z_center](Source a) {
-    return a.z() < z_center;
+  auto z_comp = [&z_center](Source &a) {
+    return a.position.z() < z_center;
   };
   splits[4] = std::partition(splits[0], splits[8], z_comp);
 
   double y_center = cen.y();
-  auto y_comp = [&y_center](Source a) {
-    return a.y() < y_center;
+  auto y_comp = [&y_center](Source &a) {
+    return a.position.y() < y_center;
   };
   splits[2] = std::partition(splits[0], splits[4], y_comp);
   splits[6] = std::partition(splits[4], splits[8], y_comp);
 
   double x_center = cen.x();
-  auto x_comp = [&x_center](Source a) {
-    return a.x() < x_center;
+  auto x_comp = [&x_center](Source &a) {
+    return a.position.x() < x_center;
   };
   splits[1] = std::partition(splits[0], splits[2], x_comp);
   splits[3] = std::partition(splits[2], splits[4], x_comp);
@@ -277,15 +282,17 @@ int source_node_partition_handler(SourceNodeData *node,
     }
 
     Index cidx{node->idx.child(i)};
-    SourceNode kid{node->root_geo, cidx.x(), cidx.y(), cidx.z(), cidx.level(),
-                   node->method, hpx_thread_current_target()};
+    SourceNode thisnode{hpx_thread_current_target()};
+    SourceNode kid{node->root_geo, cidx,
+                   node->method, &thisnode};
     node->child[i] = kid.data();
 
     //TODO: can probably pretty easily remove this allocation/deallocation
     // overhead.
     size_t argsz = sizeof(SourceNodePartitionParams)
-                   + sizeof(Sourc) * n_per_child[i]);
-    SourceNodePartitionParams *args = malloc(argsz);
+                   + sizeof(Source) * n_per_child[i];
+    SourceNodePartitionParams *args =
+        static_cast<SourceNodePartitionParams *>(malloc(argsz));
     assert(args != nullptr);
     args->partdone = childpartdone;
     args->limit = parms->limit;
@@ -324,7 +331,7 @@ size_t target_node_partition_params_size(int n_consider) {
 
 TargetNodePartitionParams *target_node_partition_params_alloc(int n_consider) {
   TargetNodePartitionParams *retval = static_cast<TargetNodePartitionParams *>(
-      malloc(target_node_partition_params_size(n_consider));
+      malloc(target_node_partition_params_size(n_consider)));
   if (retval) {
     retval->n_consider = n_consider;
   }
@@ -341,10 +348,10 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
 int target_node_partition_handler(TargetNodeData *node,
                                   TargetNodePartitionParams *parms,
                                   size_t bytes) {
-  MethodRef method{node->method};
+  MethodRef method{node->method.data()};
   TargetNode curr{hpx_thread_current_target()};
   std::vector<SourceNode> consider{};
-  for (size_t i = 0; i < parms->n_consider; ++i) {
+  for (int i = 0; i < parms->n_consider; ++i) {
     consider.push_back(SourceNode{parms->consider[i]});
   }
 
@@ -362,28 +369,28 @@ int target_node_partition_handler(TargetNodeData *node,
     splits[0] = T;
     splits[8] = &T[parms->n_parts];
 
-    Point cen{center()};
+    Point cen{node->root_geo.center_from_index(node->idx)};
     double z_center = cen.z();
-    auto z_comp = [&z_center](Target a) {
-      return a.z() < z_center;
+    auto z_comp = [&z_center](Target &a) {
+      return a.position.z() < z_center;
     };
     splits[4] = std::partition(splits[0], splits[8], z_comp);
 
     double y_center = cen.y();
-    auto y_comp = [&y_center](Target a) {
-      return a.y() < y_center;
+    auto y_comp = [&y_center](Target &a) {
+      return a.position.y() < y_center;
     };
     splits[2] = std::partition(splits[0], splits[4], y_comp);
     splits[6] = std::partition(splits[4], splits[8], y_comp);
 
     double x_center = cen.x();
-    auto x_comp = [&x_center](Target a) {
-      return a.x() < x_center;
+    auto x_comp = [&x_center](Target &a) {
+      return a.position.x() < x_center;
     };
-    splits[1] = std::partition(splits[0], splits[2], z_comp);
-    splits[3] = std::partition(splits[2], splits[4], z_comp);
-    splits[5] = std::partition(splits[4], splits[6], z_comp);
-    splits[7] = std::partition(splits[6], splits[8], z_comp);
+    splits[1] = std::partition(splits[0], splits[2], x_comp);
+    splits[3] = std::partition(splits[2], splits[4], x_comp);
+    splits[5] = std::partition(splits[4], splits[6], x_comp);
+    splits[7] = std::partition(splits[6], splits[8], x_comp);
     hpx_gas_unpin(parms->parts);
 
     hpx_addr_t cparts[8];
@@ -394,7 +401,7 @@ int target_node_partition_handler(TargetNodeData *node,
       n_per_child[i] = splits[i + 1] - splits[i];
       if (n_per_child[i]) {
         ++n_children;
-        cparts[i] = hpx_addr_add(parts, sizeof(Source) * n_offset,
+        cparts[i] = hpx_addr_add(parms->parts, sizeof(Source) * n_offset,
                                         sizeof(Source) * parms->n_parts_total);
       } else {
         cparts[i] = HPX_NULL;
@@ -426,8 +433,8 @@ int target_node_partition_handler(TargetNodeData *node,
       }
 
       Index cidx{node->idx.child(i)};
-      TargetNode kid{node->root_geo, cidx, node->method,
-                     hpx_thread_current_target()};
+      TargetNode thisnode{hpx_thread_current_target()};
+      TargetNode kid{node->root_geo, cidx, node->method.data(), &thisnode};
       node->child[i] = kid.data();
 
       args->parts = cparts[i];
@@ -440,7 +447,7 @@ int target_node_partition_handler(TargetNodeData *node,
 
     hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
   } else {  // no refinement needed; so just set the input done LCO
-    Targets *targs{nullptr};
+    Target *targs{nullptr};
     assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
     node->targets = TargetRef(targs, parms->n_parts);
 
@@ -470,7 +477,7 @@ int target_node_collect_results_handler(TargetNodeData *node,
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            target_node_collect_results_action,
            target_node_collect_results_handler,
-           HPX_POINTER, HPX_ADDR_T, HPX_SIZE_T);
+           HPX_POINTER, HPX_ADDR, HPX_SIZE_T);
 
 int target_node_collect_results_handler(TargetNodeData *node,
                       hpx_addr_t user_array, size_t phi_offset) {
@@ -486,8 +493,8 @@ int target_node_collect_results_handler(TargetNodeData *node,
     //pin targets of this node
     //HACK: This uses the size hack again.
     char *lcodata{nullptr};
-    hpx_lco_getref(node->targets.data(), 1, &lcodata);
-    Target *targets = static_cast<Target *>(lcodata + 4 * sizeof(int));
+    hpx_lco_getref(node->targets.data(), 1, (void **)&lcodata);
+    Target *targets = reinterpret_cast<Target *>(lcodata + 4 * sizeof(int));
 
     //pin the user array
     ArrayMetaData *meta{nullptr};
@@ -497,10 +504,13 @@ int target_node_collect_results_handler(TargetNodeData *node,
 
     //copy over
     for (int i = 0; i < node->targets.n(); ++i) {
-      size_t idx = targets[i].index();
-      char *record_base = user_data[idx * meta->size];
-      double *phi = static_cast<double *>(record_base + phi_offset);
-      *phi = targets[i].phi();
+      size_t idx = targets[i].index;
+      char *record_base = &user_data[idx * meta->size];
+      double *phi = reinterpret_cast<double *>(record_base + phi_offset);
+      //TODO: check with Bo, is this the intended usage? Return the complex
+      // to the user?
+      phi[0] = targets[i].phi.real();
+      phi[1] = targets[i].phi.imag();
     }
 
     hpx_gas_unpin(meta->data);
@@ -533,7 +543,7 @@ int target_node_collect_results_handler(TargetNodeData *node,
 
 SourceNode::SourceNode(DomainGeometry g, Index idx,
                        hpx_addr_t method, SourceNode *parent) {
-  data_ = hpx_gas_alloc_local(sizeof(SourceNodeData), 0);
+  data_ = hpx_gas_alloc_local(1, sizeof(SourceNodeData), 0);
   if (data_ == HPX_NULL) {
     return;
   }
@@ -541,11 +551,15 @@ SourceNode::SourceNode(DomainGeometry g, Index idx,
   pin();
   local_->root_geo = g;
   local_->idx = idx;
-  local_->parent = parent->data();
+  if (parent) {
+    local_->parent = parent->data();
+  } else {
+    local_->parent = HPX_NULL;
+  }
   for (int i = 0; i < 8; ++i) {
     local_->child[0] = HPX_NULL;
   }
-  local_->expansion = HPX_NULL;
+  local_->expansion = ExpansionRef{0, HPX_NULL};
   local_->method = method;
   local_->sources = SourceRef{};
 }
@@ -568,7 +582,8 @@ hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
   assert(retval != HPX_NULL);
 
   size_t bytes = sizeof(SourceNodePartitionParams) + n_sources * sizeof(Source);
-  SourceNodePartitionParams *args = malloc(bytes);
+  SourceNodePartitionParams *args =
+      static_cast<SourceNodePartitionParams *>(malloc(bytes));
   assert(args);
   args->partdone = retval;
   args->limit = limit;
@@ -655,7 +670,7 @@ ExpansionRef SourceNode::expansion() const {
 
 SourceRef SourceNode::parts() const {
   pin();
-  return local->sources;
+  return local_->sources;
 }
 
 
@@ -667,35 +682,32 @@ int SourceNode::n_parts() const {
 
 Point SourceNode::low() const {
   pin();
-  return local->root_geo.low_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.low_from_index(local_->idx);
 }
 
 
 Point SourceNode::high() const {
   pin();
-  return local->root_geo.high_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.high_from_index(local_->idx);
 }
 
 
 Point SourceNode::center() const {
   pin();
-  return local->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.center_from_index(local_->idx);
 }
 
 
 double SourceNode::size() const {
   pin();
-  return local->root_geo.size_from_index(local_->idx.level());
+  return local_->root_geo.size_from_level(local_->idx.level());
 }
 
 
 void SourceNode::set_expansion(std::unique_ptr<Expansion> expand) {
-  ExpansionRef globexp = globalize_expansion(expand, HPX_HERE);
+  ExpansionRef globexp = globalize_expansion(std::move(expand), HPX_HERE);
   pin();
-  local_->expansion = globexp.data();
+  local_->expansion = globexp;
 }
 
 
@@ -720,7 +732,7 @@ void SourceNode::unpin() const {
 
 TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
                        TargetNode *parent) {
-  data_ = hpx_gas_alloc_local(sizeof(TargetNodeData), 0);
+  data_ = hpx_gas_alloc_local(1, sizeof(TargetNodeData), 0);
   if (data_ == HPX_NULL) {
     return;
   }
@@ -728,12 +740,16 @@ TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
   pin();
   local_->root_geo = g;
   local_->idx = idx;
-  local_->parent = parent->data();
+  if (parent) {
+    local_->parent = parent->data();
+  } else {
+    local_->parent = HPX_NULL;
+  }
   for (int i = 0; i < 8; ++i) {
     local_->child[0] = HPX_NULL;
   }
-  local_->expansion = HPX_NULL;
-  local_->method = method;
+  local_->expansion = ExpansionRef{0, HPX_NULL};
+  local_->method = MethodRef{method};
   local_->targets = TargetRef{};
 }
 
@@ -752,7 +768,7 @@ void TargetNode::destroy() {
 void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
                            ExpansionRef expand, int which_child,
                            bool same_sources_and_targets,
-                           std::vector<SourceNode *> consider) {
+                           std::vector<SourceNode> consider) {
   hpx_addr_t done = hpx_lco_future_new(0);
   assert(done != HPX_NULL);
 
@@ -769,7 +785,7 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
   parms->which_child = which_child;
   parms->n_consider = consider.size();
   for (size_t i = 0; i < consider.size(); ++i) {
-    parms->consider[i] = consider[i]->data();
+    parms->consider[i] = consider[i].data();
   }
 
   hpx_call(data_, target_node_partition_action, HPX_NULL, parms, parms_size);
@@ -845,13 +861,13 @@ TargetNode TargetNode::parent() const {
 
 ExpansionRef TargetNode::expansion() const {
   pin();
-  return ExpansionRef{local->expansion};
+  return local_->expansion;
 }
 
 
 TargetRef TargetNode::parts() const {
   pin();
-  return local->targets;
+  return local_->targets;
 }
 
 
@@ -863,52 +879,49 @@ int TargetNode::n_parts() const {
 
 Point TargetNode::low() const {
   pin();
-  return local_->root_geo.low_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.low_from_index(local_->idx);
 }
 
 
 Point TargetNode::high() const {
   pin();
-  return local_->root_geo.high_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.high_from_index(local_->idx);
 }
 
 
 Point TargetNode::center() const {
   pin();
-  return local_->root_geo.center_from_index(local_->idx.x(), local_->idx.y(),
-                                   local_->idx.z(), local_->idx.level());
+  return local_->root_geo.center_from_index(local_->idx);
 }
 
 
 double TargetNode::size() const {
   pin();
-  return local_->root_geo.size_from_index(local_->idx.level());
+  return local_->root_geo.size_from_level(local_->idx.level());
 }
 
 
 void TargetNode::set_expansion(std::unique_ptr<Expansion> expand) {
-  ExpansionRef globexp = globalize_expansion(expand, data_);
+  ExpansionRef globexp = globalize_expansion(std::move(expand), data_);
   pin();
-  local->expansion = globexp;
+  local_->expansion = globexp;
 }
 
 
 void TargetNode::collect_results(hpx_addr_t user_array, size_t phi_offset) {
-  hpx_call(data_, target_node_collect_results_action, nullptr, 0,
+  hpx_call_sync(data_, target_node_collect_results_action, nullptr, 0,
            &user_array, &phi_offset);
 }
 
 
-void TargetNode::pin() {
+void TargetNode::pin() const {
   if (!local_ && data_ != HPX_NULL) {
-    assert(hpx_gas_try_pin(data_, (void **)&local));
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
   }
 }
 
 
-void TargetNode::unpin() {
+void TargetNode::unpin() const {
   if (local_ && data_ != HPX_NULL) {
     hpx_gas_unpin(data_);
     local_ = nullptr;

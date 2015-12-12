@@ -8,6 +8,7 @@
 
 #include "include/domaingeometry.h"
 #include "include/expansion.h"
+#include "include/expansionref.h"
 #include "include/index.h"
 #include "include/particle.h"
 #include "include/types.h"

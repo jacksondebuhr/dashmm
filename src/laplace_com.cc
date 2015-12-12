@@ -12,7 +12,7 @@ namespace dashmm {
 
 LaplaceCOM::LaplaceCOM(Point center) {
   bytes_ = sizeof(LaplaceCOMData);
-  data_ = malloc(bytes_);
+  data_ = static_cast<LaplaceCOMData *>(malloc(bytes_));
   assert(valid());
   data_->type = type();
 }
@@ -62,7 +62,7 @@ std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,
 void LaplaceCOM::M_to_T(Target *first, Target *last) const {
   assert(valid());
   for (auto i = first; i != last; ++i) {
-    Point pos{i->position()};
+    Point pos{i->position};
 
     double sum = 0;
     double diff[3]{pos.x() - data_->xcom[0], pos.y() - data_->xcom[1],
@@ -81,7 +81,7 @@ void LaplaceCOM::M_to_T(Target *first, Target *last) const {
     qsum *= quaddenom;
     sum += qsum;
 
-    i->set_phi(i->phi() + std::complex<double>{sum});
+    i->phi += std::complex<double>{sum};
   }
 }
 
@@ -89,38 +89,39 @@ void LaplaceCOM::M_to_T(Target *first, Target *last) const {
 void LaplaceCOM::S_to_T(Source *s_first, Source *s_last,
                         Target *t_first, Target *t_last) const {
   for (auto targ = t_first; targ != t_last; ++targ) {
-    Point pos = targ->position();
+    Point pos = targ->position;
     double sum{0.0};
     for (auto i = s_first; i != s_last; ++i) {
-      double diff[3]{pos.x() - i->x(), pos.y() - i->y(), pos.z() - i->z()};
+      double diff[3]{pos.x() - i->position.x(),
+                     pos.y() - i->position.y(), pos.z() - i->position.z()};
       double mag{diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]};
       if (mag > 0) {
-        sum += i->charge() / sqrt(mag);
+        sum += i->charge / sqrt(mag);
       }
     }
 
-    targ->set_phi(targ->phi() + std::complex<double>{sum});
+    targ->phi += std::complex<double>{sum};
   }
 }
 
 
 void LaplaceCOM::add_expansion(const Expansion *temp1) {
   double M2 = temp1->term(0).real();
-  double D2[3] = {temp1->term(1).real(), temp1->term(2).real()
+  double D2[3] = {temp1->term(1).real(), temp1->term(2).real(),
                   temp1->term(3).real()};
-  double Q2[6] = {temp1->term(4).real(), temp1->term(5).real()
-                  temp1->term(6).real(), temp1->term(7).real()
+  double Q2[6] = {temp1->term(4).real(), temp1->term(5).real(),
+                  temp1->term(6).real(), temp1->term(7).real(),
                   temp1->term(8).real(), temp1->term(9).real()};
 
-  double Mprime = data->mtot + M2;
+  double Mprime = data_->mtot + M2;
 
   double Dprime[3]{};
-  Dprime[0] = (data->mtot * data->xcom[0] + M2 * D2[0]) / Mprime;
-  Dprime[1] = (data->mtot * data->xcom[1] + M2 * D2[1]) / Mprime;
-  Dprime[2] = (data->mtot * data->xcom[2] + M2 * D2[2]) / Mprime;
+  Dprime[0] = (data_->mtot * data_->xcom[0] + M2 * D2[0]) / Mprime;
+  Dprime[1] = (data_->mtot * data_->xcom[1] + M2 * D2[1]) / Mprime;
+  Dprime[2] = (data_->mtot * data_->xcom[2] + M2 * D2[2]) / Mprime;
 
-  double diff1[3] = {data->xcom[0] - Dprime[0], data->xcom[1] - Dprime[1],
-                     data->xcom[2] - Dprime[2]};
+  double diff1[3] = {data_->xcom[0] - Dprime[0], data_->xcom[1] - Dprime[1],
+                     data_->xcom[2] - Dprime[2]};
   double diff1mag = diff1[0] * diff1[0] + diff1[1] * diff1[1]
                     + diff1[2] * diff1[2];
   double diff2[3] = {D2[0] - Dprime[0], D2[1] - Dprime[1], D2[2] - Dprime[2]};
@@ -128,12 +129,15 @@ void LaplaceCOM::add_expansion(const Expansion *temp1) {
                     + diff2[2] * diff2[2];
 
   double Qprime[6]{};
-  Qprime[0] = data->mtot * (3.0 * diff1[0] * diff1[0] - diff1mag) + data->Q[0];
-  Qprime[1] = data->mtot * (3.0 * diff1[0] * diff1[1]) + data->Q[1];
-  Qprime[2] = data->mtot * (3.0 * diff1[0] * diff1[2]) + data->Q[2];
-  Qprime[3] = data->mtot * (3.0 * diff1[1] * diff1[1] - diff1mag) + data->Q[3];
-  Qprime[4] = data->mtot * (3.0 * diff1[1] * diff1[2]) + data->Q[4];
-  Qprime[5] = data->mtot * (3.0 * diff1[2] * diff1[2] - diff1mag) + data->Q[5];
+  Qprime[0] = data_->mtot * (3.0 * diff1[0] * diff1[0] - diff1mag)
+              + data_->Q[0];
+  Qprime[1] = data_->mtot * (3.0 * diff1[0] * diff1[1]) + data_->Q[1];
+  Qprime[2] = data_->mtot * (3.0 * diff1[0] * diff1[2]) + data_->Q[2];
+  Qprime[3] = data_->mtot * (3.0 * diff1[1] * diff1[1] - diff1mag)
+              + data_->Q[3];
+  Qprime[4] = data_->mtot * (3.0 * diff1[1] * diff1[2]) + data_->Q[4];
+  Qprime[5] = data_->mtot * (3.0 * diff1[2] * diff1[2] - diff1mag)
+              + data_->Q[5];
   Qprime[0] += M2 * (3.0 * diff2[0] * diff2[0] - diff2mag) +Q2[0];
   Qprime[1] += M2 * (3.0 * diff2[0] * diff2[1]) + Q2[1];
   Qprime[2] += M2 * (3.0 * diff2[0] * diff2[2]) + Q2[2];
@@ -149,28 +153,28 @@ void LaplaceCOM::add_expansion(const Expansion *temp1) {
 
 void LaplaceCOM::calc_mtot(Source *first, Source *last) {
   assert(valid());
-  data_->mtot_ = 0.0;
+  data_->mtot = 0.0;
   for (auto i = first; i != last; ++i) {
-    data_->mtot_ += i->charge();
+    data_->mtot += i->charge;
   }
 }
 
 
 void LaplaceCOM::calc_xcom(Source *first, Source *last) {
   assert(valid());
-  data_->xcom_[0] = 0.0;
-  data_->xcom_[1] = 0.0;
-  data_->xcom_[2] = 0.0;
+  data_->xcom[0] = 0.0;
+  data_->xcom[1] = 0.0;
+  data_->xcom[2] = 0.0;
   for (auto i = first; i != last; ++i) {
-    data_->xcom_[0] += i->charge() * i->x();
-    data_->xcom_[1] += i->charge() * i->y();
-    data_->xcom_[2] += i->charge() * i->z();
+    data_->xcom[0] += i->charge * i->position.x();
+    data_->xcom[1] += i->charge * i->position.y();
+    data_->xcom[2] += i->charge * i->position.z();
   }
-  if (data_->mtot_ != 0.0) {
-    double oomtot = 1.0 / mtot_;
-    data_->xcom_[0] *= oomtot;
-    data_->xcom_[1] *= oomtot;
-    data_->xcom_[2] *= oomtot;
+  if (data_->mtot != 0.0) {
+    double oomtot = 1.0 / data_->mtot;
+    data_->xcom[0] *= oomtot;
+    data_->xcom[1] *= oomtot;
+    data_->xcom[2] *= oomtot;
   }
 }
 
@@ -178,20 +182,21 @@ void LaplaceCOM::calc_xcom(Source *first, Source *last) {
 void LaplaceCOM::calc_Q(Source *first, Source *last) {
   assert(valid());
   for (int i = 0; i < 6; ++i) {
-    data_->Q_[i] = 0;
+    data_->Q[i] = 0;
   }
 
   for (auto i = first; i != last; ++i) {
-    double diff[3]{i->x() - data_->xcom_[0], i->y() - data_->xcom_[1],
-                   i->z() - data_->xcom_[2]};
+    double diff[3]{i->position.x() - data_->xcom[0],
+                   i->position.y() - data_->xcom[1],
+                   i->position.z() - data_->xcom[2]};
     double diffmag{diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]};
 
-    data_->Q_[0] += i->charge() * (3.0 * diff[0] * diff[0] - diffmag);   //Qxx
-    data_->Q_[1] += i->charge() * 3.0 * diff[0] * diff[1];               //Qxy
-    data_->Q_[2] += i->charge() * 3.0 * diff[0] * diff[2];               //Qxz
-    data_->Q_[3] += i->charge() * (3.0 * diff[1] * diff[1] - diffmag);   //Qyy
-    data_->Q_[4] += i->charge() * 3.0 * diff[1] * diff[2];               //Qyz
-    data_->Q_[5] += i->charge() * (3.0 * diff[2] * diff[2] - diffmag);   //Qzz
+    data_->Q[0] += i->charge * (3.0 * diff[0] * diff[0] - diffmag);   //Qxx
+    data_->Q[1] += i->charge * 3.0 * diff[0] * diff[1];               //Qxy
+    data_->Q[2] += i->charge * 3.0 * diff[0] * diff[2];               //Qxz
+    data_->Q[3] += i->charge * (3.0 * diff[1] * diff[1] - diffmag);   //Qyy
+    data_->Q[4] += i->charge * 3.0 * diff[1] * diff[2];               //Qyz
+    data_->Q[5] += i->charge * (3.0 * diff[2] * diff[2] - diffmag);   //Qzz
   }
 }
 

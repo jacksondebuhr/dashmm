@@ -5,7 +5,7 @@
 
 #include <hpx/hpx.h>
 
-// other dashmm
+#include "include/expansion.h"
 
 
 namespace dashmm {
@@ -34,21 +34,21 @@ struct TargetRefLCOSetStoTData {
   int type;
   int count;
   Source sources[];
-}
+};
 
 struct TargetRefLCOSetMtoTData {
   int code;
   int type;
   size_t bytes;
   char data[];
-}
+};
 
 struct TargetRefLCOSetLtoTData {
   int code;
   int type;
   size_t bytes;
   char data[];
-}
+};
 
 enum TargetRefLCOSetCodes {
   kSetOnly = 1,
@@ -68,7 +68,8 @@ void targetref_lco_init_handler(TargetRefLCOData *i, size_t bytes,
   memcpy(i->targets, init->targets, sizeof(Target) * init->count);
 }
 HPX_ACTION(HPX_FUNCTION, 0,
-           targetref_lco_init, targetref_lco_init_handler);
+           targetref_lco_init, targetref_lco_init_handler,
+           HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
 
 
 void targetref_lco_operation_handler(TargetRefLCOData *lhs,
@@ -77,24 +78,27 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
   if (*code == kSetOnly) {    //this is a pair of ints, a code and a count
     lhs->arrived += code[1];
   } else if (*code == kStoT) {
+    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetStoTData *input =
-        static_cast<TargetRefLCOSetStoTData *>(rhs + sizeof(int));
+        reinterpret_cast<TargetRefLCOSetStoTData *>(base);
     auto expansion = interpret_expansion(input->type, nullptr, 0);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kMtoT) {
+    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetMtoTData *input =
-        static_cast<TargetRefLCOSetMtoTData *>(rhs + sizeof(int));
+        reinterpret_cast<TargetRefLCOSetMtoTData *>(base);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kLtoT) {
+    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetLtoTData *input =
-        static_cast<TargetRefLCOSetLtoTData *>(rhs + sizeof(int));
+        reinterpret_cast<TargetRefLCOSetLtoTData *>(base);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
@@ -107,14 +111,16 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
   }
 }
 HPX_ACTION(HPX_FUNCTION, 0,
-           targetref_lco_operation, targetref_lco_operation_handler);
+           targetref_lco_operation, targetref_lco_operation_handler,
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
 
 bool targetref_lco_predicate_handler(TargetRefLCOData *i, size_t bytes) {
   return i->finished && (i->arrived == i->scheduled);
 }
 HPX_ACTION(HPX_FUNCTION, 0,
-           targetref_lco_predicate, targetref_lco_predicate_handler);
+           targetref_lco_predicate, targetref_lco_predicate_handler,
+           HPX_POINTER, HPX_SIZE_T);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -137,14 +143,15 @@ void SourceRef::destroy() {
   if (data_ != HPX_NULL) {
     hpx_gas_free_sync(data_);
     data_ = HPX_NULL;
-    n = 0;
+    n_ = 0;
   }
 }
 
 
 TargetRef::TargetRef(Target *targets, int n) {
   size_t init_size = sizeof(TargetRefLCOInitData) + sizeof(Target) * n;
-  TargetRefLCOInitData *init = malloc(init_size);
+  TargetRefLCOInitData *init =
+      static_cast<TargetRefLCOInitData *>(malloc(init_size));
   assert(init);
   init->count = n;
   memcpy(init->targets, targets, sizeof(Target) * n);
@@ -161,7 +168,7 @@ void TargetRef::destroy() {
   if (data_ != HPX_NULL) {
     hpx_lco_delete_sync(data_);
     data_ = HPX_NULL;
-    n = 0;
+    n_ = 0;
   }
 }
 
@@ -188,12 +195,13 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
   //NOTE: We assume this is called local to the sources
   size_t inputsize = sizeof(TargetRefLCOSetStoTData)
                      + sizeof(Source) * n;
-  TargetRefLCOSetStoTData *input = malloc(inputsize);
+  TargetRefLCOSetStoTData *input =
+      static_cast<TargetRefLCOSetStoTData *>(malloc(inputsize));
   assert(input);
   input->code = kStoT;
   input->type = type;
-  input->count = n;
-  memcpy(input->sources, sources, sizeof(Source) * sources.n());
+  input->count = n_;
+  memcpy(input->sources, sources, sizeof(Source) * n);
 
   //call set with appropriate data
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
@@ -204,7 +212,8 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
 
 void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
   size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
-  TargetRefLCOSetMtoTData *input = malloc(inputsize);
+  TargetRefLCOSetMtoTData *input =
+      static_cast<TargetRefLCOSetMtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kMtoT;
   input->type = type;
@@ -216,7 +225,8 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
 
 void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data) const {
   size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
-  TargetRefLCOSetLtoTData *input = malloc(inputsize);
+  TargetRefLCOSetLtoTData *input =
+      static_cast<TargetRefLCOSetLtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kLtoT;
   input->type = type;
