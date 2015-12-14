@@ -161,10 +161,27 @@ typedef Method *(*method_creation_function_t)(size_t, MethodSerial *);
 ///
 /// \returns - kSuccess on success; kDomainError otherwise, indicating that the
 ///            specified @p type is either out of range, or already in use.
-ReturnCode register_method(int type, hpx_action_t creator);
+ReturnCode register_user_method(int type, hpx_action_t creator);
 
 
 //NOTE: Not intended for end-user use
+
+
+/// Register a user-defined method with DASHMM
+///
+/// This will connect the specified creation function @p creator with the
+/// @p type for DASHMM. This will allow the system to interact with user-defined
+/// methods. For details, see the DASHMM Advanced User Guide.
+///
+/// \param type - the type identifier of the method being registered.
+/// \param creator - the action identifier of the creation function for the
+///                  method being registered.
+/// \param user - nonzero if this is a user defined method; zero for built-in
+///               methods
+///
+/// \returns - kSuccess on success; kDomainError otherwise, indicating that the
+///            specified @p type is either out of range, or already in use.
+ReturnCode register_method(int type, hpx_action_t creator, int user);
 
 
 /// Initialize the method registration table

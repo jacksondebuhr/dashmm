@@ -32,7 +32,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 void register_built_in_methods() {
-  assert(register_method(kMethodBH, bh_method_create_action));
+  assert(kSuccess == register_method(kMethodBH, bh_method_create_action, 0));
   //more here...
 }
 
@@ -71,9 +71,9 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 void register_built_in_expansions() {
-  assert(register_expansion(kExpansionLaplaceCOM,
-                            laplace_COM_create_action,
-                            laplace_COM_interpret_action));
+  assert(kSuccess == register_expansion(kExpansionLaplaceCOM,
+                                        laplace_COM_create_action,
+                                        laplace_COM_interpret_action, 0));
   //more here
 }
 

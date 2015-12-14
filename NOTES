@@ -4,6 +4,9 @@
     in their ordering
   - Make sure that the user is aware that the potential comes out as a
     complex number
+  - We should make the array get and put members of the basic interface not
+    give assertion failures on bad inputs. Instead, it should return one of
+    the return codes.
 
 
 Some notes about issues or future features

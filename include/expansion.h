@@ -230,11 +230,31 @@ typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes);
 ///
 /// \returns - kSuccess on success; kDomainError otherwise indicating that the
 ///            specified type is either out of the user range, or already taken.
-ReturnCode register_expansion(int type, hpx_action_t creator,
+ReturnCode register_usr_expansion(int type, hpx_action_t creator,
                                   hpx_action_t interpreter);
 
 
 //NOTE: not intended for end-user use
+
+
+/// Register a user-defined expansion with DASHMM
+///
+/// This will connect the two specified functions to the given \p type for
+/// DASHMM. This will allow the system to interact with user-defined expansions.
+/// For details, see the DASHMM Advanced User Guide.
+///
+/// \param type - the type identifier of the expansion being registered.
+/// \param creator - the action identifier of the creation function for the
+///                 type being registered.
+/// \param interpreter - the action identifier of the interpretation function
+///                      for the type being registered.
+/// \param user - nonzero if the expansion is a user defined expansion; 0
+///               for built-in expansions
+///
+/// \returns - kSuccess on success; kDomainError otherwise indicating that the
+///            specified type is either out of the user range, or already taken.
+ReturnCode register_expansion(int type, hpx_action_t creator,
+                                  hpx_action_t interpreter, int user);
 
 
 /// Initialize the expansion registration table

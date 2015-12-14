@@ -87,6 +87,43 @@ HPX_ACTION(HPX_DEFAULT, 0,
 /////////////////////////////////////////////////////////////////////
 
 
+
+ReturnCode register_expansion(int type, hpx_action_t creator,
+                                 hpx_action_t interpreter, int user) {
+  if (user) {
+    if (type < kFirstUserExpansionType || type > kLastUserExpansionType) {
+      return kDomainError;
+    }
+  } else {
+    if (type < kFirstExpansionType || type > kLastExpansionType) {
+      return kDomainError;
+    }
+  }
+
+  int nlocs = hpx_get_num_ranks();
+  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
+                                          int_sum_ident_op, int_sum_op);
+  assert(checker != HPX_NULL);
+  hpx_bcast_lsync(register_expansion_action, HPX_NULL, &type, &creator,
+                  &interpreter, &checker);
+  int checkval{0};
+  hpx_lco_get(checker, sizeof(int), &checkval);
+  return (checkval == 0 ? kSuccess : kDomainError);
+}
+
+
+void init_expansion_table() {
+  int input = kAllocateExpansionTable;
+  hpx_bcast_rsync(manage_expansion_table_action, &input);
+}
+
+
+void fini_expansion_table() {
+  int input = kAllocateExpansionTable;
+  hpx_bcast_rsync(manage_expansion_table_action, &input);
+}
+
+
 std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
                                                size_t size) {
   auto entry = expansion_table_->find(type);
@@ -114,39 +151,40 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center) {
 }
 
 
-void init_expansion_table() {
-  int input = kAllocateExpansionTable;
-  hpx_bcast_rsync(manage_expansion_table_action, &input);
-}
-
-
-void fini_expansion_table() {
-  int input = kAllocateExpansionTable;
-  hpx_bcast_rsync(manage_expansion_table_action, &input);
-}
-
-
 /////////////////////////////////////////////////////////////////////
 // Public Interface
 /////////////////////////////////////////////////////////////////////
 
 
-ReturnCode register_expansion(int type, hpx_action_t creator,
-                                 hpx_action_t interpreter) {
-  if (type < kFirstUserExpansionType || type > kLastUserExpansionType) {
-    return kDomainError;
-  }
-
-  int nlocs = hpx_get_num_ranks();
-  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
-                                          int_sum_ident_op, int_sum_op);
-  assert(checker != HPX_NULL);
-  hpx_bcast_lsync(register_expansion_action, HPX_NULL, &type, &creator,
-                  &interpreter, &checker);
-  int checkval{0};
-  hpx_lco_get(checker, sizeof(int), &checkval);
-  return (checkval == 0 ? kSuccess : kDomainError);
+ReturnCode register_user_expansion(int type, hpx_action_t creator,
+                                   hpx_action_t interpreter) {
+  return register_expansion(type, creator, interpreter, 1);
 }
+
+
+/////////////////////////////////////////////////////////////////////
+// Testing routines
+/////////////////////////////////////////////////////////////////////
+
+
+#ifdef DASHMM_TESTING
+
+
+void print_expansion_table() {
+  if (expansion_table_) {
+    fprintf(stdout, "Expansion Table: size %lu\n", expansion_table_->size());
+    for (auto i = expansion_table_->begin();
+              i != expansion_table_->end(); ++i) {
+      fprintf(stdout, "Expansion table entry ID: %d\n", i->first);
+    }
+    fprintf(stdout, "\n");
+  } else {
+    fprintf(stderr, "Error: expansion_table_ does not exist.\n");
+  }
+}
+
+
+#endif // DASHMM_TESTING
 
 
 } // namespace dashmm

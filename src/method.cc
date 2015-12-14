@@ -63,16 +63,25 @@ HPX_ACTION(HPX_DEFAULT, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-std::unique_ptr<Method> create_method(int type, MethodSerial *data) {
-  auto entry = method_table_->find(type);
-  if (entry == method_table_->end()) {
-    return std::unique_ptr<Method>{nullptr};
+ReturnCode register_method(int type, hpx_action_t creator, int user) {
+  if (user) {
+    if (type < kFirstUserMethodType || type > kLastUserMethodType) {
+      return kDomainError;
+    }
+  } else {
+    if (type < kFirstMethodType || type > kLastMethodType) {
+      return kDomainError;
+    }
   }
-  method_creation_function_t func =
-      reinterpret_cast<method_creation_function_t>(
-        hpx_action_get_handler(entry->second)
-      );
-  return std::unique_ptr<Method>{func(sizeof(MethodSerial) + data->size, data)};
+
+  int nlocs = hpx_get_num_ranks();
+  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
+                                          int_sum_ident_op, int_sum_op);
+  assert(checker != HPX_NULL);
+  hpx_bcast_lsync(register_method_action, HPX_NULL, &type, &creator, &checker);
+  int checkval{0};
+  hpx_lco_get(checker, sizeof(int), &checkval);
+  return (checkval == 0 ? kSuccess : kDomainError);
 }
 
 
@@ -88,25 +97,51 @@ void fini_method_table() {
 }
 
 
+std::unique_ptr<Method> create_method(int type, MethodSerial *data) {
+  auto entry = method_table_->find(type);
+  if (entry == method_table_->end()) {
+    return std::unique_ptr<Method>{nullptr};
+  }
+  method_creation_function_t func =
+      reinterpret_cast<method_creation_function_t>(
+        hpx_action_get_handler(entry->second)
+      );
+  return std::unique_ptr<Method>{func(sizeof(MethodSerial) + data->size, data)};
+}
+
+
 /////////////////////////////////////////////////////////////////////
 // In the public interface to dashmm
 /////////////////////////////////////////////////////////////////////
 
 
-ReturnCode register_method(int type, hpx_action_t creator) {
-  if (type < kFirstUserMethodType || type > kLastUserMethodType) {
-    return kDomainError;
-  }
-
-  int nlocs = hpx_get_num_ranks();
-  hpx_addr_t checker = hpx_lco_reduce_new(nlocs, sizeof(int),
-                                          int_sum_ident_op, int_sum_op);
-  assert(checker != HPX_NULL);
-  hpx_bcast_lsync(register_method_action, HPX_NULL, &type, &creator, &checker);
-  int checkval{0};
-  hpx_lco_get(checker, sizeof(int), &checkval);
-  return (checkval == 0 ? kSuccess : kDomainError);
+ReturnCode register_user_method(int type, hpx_action_t creator) {
+  return register_method(type, creator, 1);
 }
+
+
+/////////////////////////////////////////////////////////////////////
+// Testing routines
+/////////////////////////////////////////////////////////////////////
+
+
+#ifdef DASHMM_TESTING
+
+
+void print_method_table() {
+  if (method_table_) {
+    fprintf(stdout, "Method Table: size %lu\n", method_table_->size());
+    for (auto i = method_table_->begin(); i != method_table_->end(); ++i) {
+      fprintf(stdout, "Method table entry ID: %d\n", i->first);
+    }
+    fprintf(stdout, "\n");
+  } else {
+    fprintf(stderr, "Error: method_table_ does not exist.\n");
+  }
+}
+
+
+#endif // DASHMM_TESTING
 
 
 } // namespace dashmm
