@@ -44,6 +44,10 @@ class Expansion {
   /// two integers. The first is a code that will be used internally by
   /// DASHMM and does not need to be given a value. The second is the integer
   /// type of this expansion, which should be given a value by the user.
+  ///
+  /// The caller of this function assumes ownership of the released data,
+  /// and it is the caller's responsibility to free() that data. Note,
+  /// this means the data should be allocated with malloc().
   virtual void *release() = 0;
 
   /// The size in bytes of the serialized expansion data
@@ -230,7 +234,7 @@ typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes);
 ///
 /// \returns - kSuccess on success; kDomainError otherwise indicating that the
 ///            specified type is either out of the user range, or already taken.
-ReturnCode register_usr_expansion(int type, hpx_action_t creator,
+ReturnCode register_user_expansion(int type, hpx_action_t creator,
                                   hpx_action_t interpreter);
 
 

@@ -63,6 +63,8 @@ Method *fmm_method();
 Method *fmm_exp_method();
 
 
+// NOTE: Not intended for users
+
 /// Register the built in methods with DASHMM
 ///
 /// This method is not intended for end-users.

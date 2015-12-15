@@ -76,29 +76,26 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
                                      void *rhs, size_t bytes) {
   int *code = static_cast<int *>(rhs);
   if (*code == kSetOnly) {    //this is a pair of ints, a code and a count
-    lhs->arrived += code[1];
+    lhs->scheduled += code[1];
   } else if (*code == kStoT) {
-    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetStoTData *input =
-        reinterpret_cast<TargetRefLCOSetStoTData *>(base);
+        static_cast<TargetRefLCOSetStoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, nullptr, 0);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kMtoT) {
-    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetMtoTData *input =
-        reinterpret_cast<TargetRefLCOSetMtoTData *>(base);
+        static_cast<TargetRefLCOSetMtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kLtoT) {
-    char *base = static_cast<char *>(rhs) + sizeof(int);
     TargetRefLCOSetLtoTData *input =
-        reinterpret_cast<TargetRefLCOSetLtoTData *>(base);
+        static_cast<TargetRefLCOSetLtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
@@ -133,7 +130,7 @@ SourceRef::SourceRef(Source *sources, int n) {
   assert(data_ != HPX_NULL);
   n_ = n;
   Source *local{nullptr};
-  assert(hpx_gas_try_pin(data_, (void **)local));
+  assert(hpx_gas_try_pin(data_, (void **)&local));
   memcpy(local, sources, sizeof(Source) * n);
   hpx_gas_unpin(data_);
 }

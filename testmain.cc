@@ -2,10 +2,17 @@
 
 #include <algorithm>
 #include <map>
+#include <memory>
+
+#include <hpx/hpx.h>
 
 #include "dashmm.h"
 #include "include/testing.h"
 #include "include/array.h"
+#include "include/ids.h"
+#include "include/laplace_com.h"
+#include "include/reductionops.h"
+#include "include/particle.h"
 
 
 int test_init_handler(int UNUSED) {
@@ -44,7 +51,7 @@ HPX_ACTION(HPX_DEFAULT, 0,
 
 void perform_array_testing(void) {
   dashmm::ObjectHandle array_handle;
-  double some_data[100] = {10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
+  double some_data[10] = {10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0};
 
   auto err = dashmm::allocate_array(10, sizeof(double), &array_handle);
   if (err == dashmm::kRuntimeError) {
@@ -55,7 +62,7 @@ void perform_array_testing(void) {
     fprintf(stdout, "Allocation successful\n");
   }
 
-  err = dashmm::array_put(array_handle, 0, 20, some_data);
+  err = dashmm::array_put(array_handle, 0, 10, some_data);
 
   //call an action to print that stuff out
   hpx_run(&test_array_contents_action, &array_handle);
@@ -78,6 +85,155 @@ void perform_array_testing(void) {
 }
 
 
+void perform_builtins_testing() {
+  //Tests for BH
+  dashmm::Method *bhtest = dashmm::bh_method(0.6);
+  int bhtype = bhtest->type();
+  assert(bhtype == dashmm::kMethodBH);
+  //test the release mechanism
+  dashmm::MethodSerial *bhserial = bhtest->release();
+  assert(bhserial->type == dashmm::kMethodBH);
+  assert(bhserial->size == sizeof(double));
+  assert(bhserial->data[0] == 0.6);
+  delete bhtest;
+  //now recreate the method from the data
+  auto remade = dashmm::create_method(bhtype, bhserial);
+  auto willbenull =
+      dashmm::create_method(dashmm::kFirstUserMethodType, bhserial);
+  delete bhserial;
+  assert(remade->type() == dashmm::kMethodBH);
+  assert(willbenull == nullptr);
+
+  {
+    dashmm::Expansion *lapcom = dashmm::laplace_COM_expansion();
+    dashmm::LaplaceCOM *specific = dynamic_cast<dashmm::LaplaceCOM *>(lapcom);
+    specific->set_mtot(1.0);
+    specific = nullptr;
+    int lapcomtype = lapcom->type();
+    size_t lapcombytes = lapcom->bytes();
+    assert(lapcomtype == dashmm::kExpansionLaplaceCOM);
+    dashmm::LaplaceCOMData *lapcomserial =
+        static_cast<dashmm::LaplaceCOMData *>(lapcom->release());
+    assert(!lapcom->valid());
+    assert(lapcomserial->type == dashmm::kExpansionLaplaceCOM);
+    assert(lapcomserial->mtot == 1.0);
+    lapcomserial->mtot = 2.0;
+    delete lapcom;
+    auto remade =
+        dashmm::interpret_expansion(lapcomtype, lapcomserial, lapcombytes);
+    specific = dynamic_cast<dashmm::LaplaceCOM *>(remade.get());
+    assert(specific->term(0).real() == 2.0);
+    auto empty =
+        dashmm::interpret_expansion(lapcomtype, nullptr, 0);
+    auto nowayitworks =
+        dashmm::interpret_expansion(dashmm::kFirstUserExpansionType, nullptr, 0);
+    assert(remade->type() == lapcomtype);
+    assert(remade->bytes() == lapcombytes);
+    assert(empty->type() == lapcomtype);
+    assert(empty->bytes() == lapcombytes);
+    assert(nowayitworks == nullptr);
+    delete lapcomserial;
+
+    auto anotherone =
+        dashmm::create_expansion(lapcomtype, dashmm::Point{1.0, 2.0, 3.0});
+    assert(anotherone->type() == lapcomtype);
+    assert(anotherone->bytes() == lapcombytes);
+  }
+}
+
+
+int reduction_test_handler(int number) {
+  hpx_addr_t red = hpx_lco_reduce_new(number, 2 * sizeof(int),
+                                dashmm::int_sum_ident_op, dashmm::int_sum_op);
+  for (int i = 1; i <= number; ++i) {
+    int vals[2] = {i, 2*i};
+    hpx_lco_set_lsync(red, 2 * sizeof(int), vals, HPX_NULL);
+  }
+  int results[2];
+  hpx_lco_get(red, 2 * sizeof(int), results);
+  int compare = (number * (number + 1)) / 2;
+  assert(results[0] == compare);
+  assert(results[1] == compare * 2);
+
+  hpx_exit(HPX_SUCCESS);
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           reduction_test_action, reduction_test_handler, HPX_INT);
+
+
+void perform_reduction_testing() {
+  int terms = 10;
+  hpx_run(&reduction_test_action, &terms);
+}
+
+
+int particle_testing_handler(int UNUSED) {
+  //both the source and target refs...
+
+  //create some sources
+  dashmm::Source src[2] = {{1.0, dashmm::Point{0.0, 0.0, 0.0}},
+                           {1.0, dashmm::Point{1.0, 0.0, 0.0}}};
+  dashmm::SourceRef srcref{src, 2};
+  dashmm::SourceRef otherref{srcref.data(), srcref.n()};
+
+  //create some targets
+  dashmm::Target trg[2] = {
+      {dashmm::Point{0.5, 0.0, 0.0}, std::complex<double>(0.0, 0.0), 0},
+      {dashmm::Point{0.0, 1.0, 0.0}, std::complex<double>(0.0, 0.0), 1}};
+  dashmm::TargetRef trgref{trg, 2};
+  dashmm::TargetRef anotherref{trgref.data(), trgref.n()};
+  trgref.schedule(2);
+  trgref.finalize();
+  trgref.contribute_S_to_T(dashmm::kExpansionLaplaceCOM, 2, src);
+  dashmm::LaplaceCOM lapcom{dashmm::Point{0.0, 0.0, 0.0}};
+  lapcom.set_mtot(2.0);
+  double xcom[3] = {0.5, 1.0, 0.0};
+  double Q[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  lapcom.set_xcom(xcom);
+  lapcom.set_Q(Q);
+  dashmm::LaplaceCOMData *lapcomserial =
+      (dashmm::LaplaceCOMData *)lapcom.release();
+  anotherref.contribute_M_to_T(lapcom.type(), lapcom.bytes(), lapcomserial);
+  free(lapcomserial);
+  hpx_lco_wait(anotherref.data());
+  struct TargetRefLCOData {
+    int arrived;
+    int scheduled;
+    int finished;
+    int count;
+    dashmm::Target targets[];
+  } *tdata;
+  hpx_lco_getref(anotherref.data(), 1, (void **)&tdata);
+  //check results
+  assert(tdata->arrived == 2);
+  assert(tdata->scheduled == 2);
+  assert(tdata->finished == 1);
+  assert(tdata->count == 2);
+  fprintf(stdout, "Target 0: (%lg %lg %lg) - %lg\n",
+          tdata->targets[0].position.x(), tdata->targets[0].position.y(),
+          tdata->targets[0].position.z(), tdata->targets[0].phi.real());
+  fprintf(stdout, "Target 1: (%lg %lg %lg) - %lg\n",
+          tdata->targets[1].position.x(), tdata->targets[1].position.y(),
+          tdata->targets[1].position.z(), tdata->targets[1].phi.real());
+  hpx_lco_release(trgref.data(), tdata);
+
+  //clean up
+  srcref.destroy();
+  trgref.destroy();
+
+  hpx_exit(HPX_SUCCESS);
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           particle_testing_action, particle_testing_handler,
+           HPX_INT);
+
+
+void perform_particle_testing() {
+  int unused = 42;
+  hpx_run(&particle_testing_action, &unused);
+}
+
+
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   if (err == dashmm::kInitError) {
@@ -88,14 +244,24 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Woah! init() gave an unknown error\n");
   }
 
-
   //Do a quick test that init did something.
   int throwaway = 42;
   hpx_run(&test_init_action, &throwaway);
 
-
   //now let's work on the array stuff
   perform_array_testing();
+
+  //builtins testing
+  perform_builtins_testing();
+
+  //test reduction ops
+  perform_reduction_testing();
+
+  //test the particle types
+  perform_particle_testing();
+
+
+  //evaluate...
 
 
   err = dashmm::finalize();
