@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -O3 -g -I. -DDASHMM_TESTING
+CXXFLAGS = -std=c++11 -Wall -O0 -g -I. -DDASHMM_TESTING
 INCLUDE = $(shell pkg-config --cflags hpx)
 LIBS = $(shell pkg-config --libs hpx)
 

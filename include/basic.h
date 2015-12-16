@@ -40,6 +40,9 @@ ReturnCode finalize();
 
 
 //TODO;
+//
+// Should we change these to size_t? Should we remove the unique_ptr? Or
+// make the builtin routines provide a unique_ptr?
 ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
                     ObjectHandle targets, int tpos_offset, int phi_offset,
                     int refinement_limit,

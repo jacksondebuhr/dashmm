@@ -547,6 +547,7 @@ SourceNode::SourceNode(DomainGeometry g, Index idx,
   if (data_ == HPX_NULL) {
     return;
   }
+  local_ = nullptr;
 
   pin();
   local_->root_geo = g;
@@ -736,6 +737,7 @@ TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
   if (data_ == HPX_NULL) {
     return;
   }
+  local_ = nullptr;
 
   pin();
   local_->root_geo = g;

@@ -234,7 +234,81 @@ void perform_particle_testing() {
 }
 
 
+constexpr int source_test_count = 1;
+constexpr int target_test_count = 1;
+
+struct UserSourceData {
+  double pos[3];
+  double some_other_data_irrelevant_to_dashmm;
+  int more_extraneous_info;
+  double mass;
+};
+
+struct UserTargetData {
+  double this_data_is_irrelevant;
+  int why_is_this_even_here;
+  double pos[3];
+  double phi[2];    //real, imag
+};
+
+
+void perform_the_big_test() {
+  //create some arrays
+  UserSourceData sources[source_test_count] = {
+    {0.0, 0.0, 0.0, 13.0, 42, 1.0}
+  };
+
+  UserTargetData targets[target_test_count] = {
+    {47.9, 11, 1.0, 1.0, 1.0, 0.0, 0.0}
+  };
+
+  //prep sources
+  dashmm::ObjectHandle source_handle;
+  auto err = dashmm::allocate_array(source_test_count, sizeof(UserSourceData),
+                            &source_handle);
+  assert(err == dashmm::kSuccess);
+  err = dashmm::array_put(source_handle, 0, source_test_count, sources);
+  assert(err == dashmm::kSuccess);
+
+  //prep targets
+  dashmm::ObjectHandle target_handle;
+  err = dashmm::allocate_array(target_test_count, sizeof(UserTargetData),
+                               &target_handle);
+  assert(err == dashmm::kSuccess);
+  err = dashmm::array_put(target_handle, 0, target_test_count, targets);
+  assert(err == dashmm::kSuccess);
+
+  //get method and expansion
+  auto bhmethod = dashmm::bh_method(0.6);
+  assert(bhmethod != nullptr);
+  auto lapcomexp = dashmm::laplace_COM_expansion();
+  assert(lapcomexp != nullptr);
+
+  //evaluate
+  err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
+                         offsetof(UserSourceData, mass),
+                         target_handle, offsetof(UserTargetData, pos),
+                         offsetof(UserTargetData, phi),
+                         1,
+                         std::unique_ptr<dashmm::Method>{bhmethod},
+                         std::unique_ptr<dashmm::Expansion>{lapcomexp});
+
+  //get targets
+  err = dashmm::array_get(target_handle, 0, target_test_count, targets);
+  assert(err == dashmm::kSuccess);
+  //TODO: check that the data comes out
+
+  //free up stuff
+  err = dashmm::deallocate_array(source_handle);
+  assert(err == dashmm::kSuccess);
+  err = dashmm::deallocate_array(target_handle);
+  assert(err == dashmm::kSuccess);
+}
+
+
 int main(int argc, char **argv) {
+  int perform_other_tests = 0;
+
   auto err = dashmm::init(&argc, &argv);
   if (err == dashmm::kInitError) {
     fprintf(stderr, "dashmm::init gave an error!\n");
@@ -245,23 +319,25 @@ int main(int argc, char **argv) {
   }
 
   //Do a quick test that init did something.
-  int throwaway = 42;
-  hpx_run(&test_init_action, &throwaway);
+  if (perform_other_tests) {
+    int throwaway = 42;
+    hpx_run(&test_init_action, &throwaway);
 
-  //now let's work on the array stuff
-  perform_array_testing();
+    //now let's work on the array stuff
+    perform_array_testing();
 
-  //builtins testing
-  perform_builtins_testing();
+    //builtins testing
+    perform_builtins_testing();
 
-  //test reduction ops
-  perform_reduction_testing();
+    //test reduction ops
+    perform_reduction_testing();
 
-  //test the particle types
-  perform_particle_testing();
+    //test the particle types
+    perform_particle_testing();
+  }
 
 
-  //evaluate...
+  perform_the_big_test();
 
 
   err = dashmm::finalize();

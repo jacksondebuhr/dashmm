@@ -134,13 +134,18 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR, HPX_INT);
 
 
-int find_source_domain_handler(Source *sources, int n_sources) {
+int find_source_domain_handler(hpx_addr_t packed) {
   //NOTE: SMP assumptions
+  PackDataResult packed_data;
+  hpx_lco_get(packed, sizeof(packed_data), &packed_data);
+  //now pin the sources
+  Source *sources{nullptr};
+  assert(hpx_gas_try_pin(packed_data.packed, (void **)&sources));
 
   //These are the three low bounds, followed by the three high bounds
   double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
 
-  for (int i = 0; i < n_sources; ++i) {
+  for (int i = 0; i < packed_data.count; ++i) {
     Point p = sources[i].position;
     if (p.x() < bounds[0]) bounds[0] = p.x();
     if (p.x() > bounds[3]) bounds[3] = p.x();
@@ -150,20 +155,27 @@ int find_source_domain_handler(Source *sources, int n_sources) {
     if (p.z() > bounds[5]) bounds[5] = p.z();
   }
 
+  hpx_gas_unpin(packed_data.packed);
+
   hpx_thread_continue(bounds, sizeof(double) * 6);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+HPX_ACTION(HPX_DEFAULT, 0,
            find_source_domain_action, find_source_domain_handler,
-           HPX_POINTER, HPX_INT);
+           HPX_ADDR);
 
 
-int find_target_domain_handler(Target *targets, int n_targets) {
+int find_target_domain_handler(hpx_addr_t packed) {
   //NOTE: SMP assumptions
+  PackDataResult packed_data;
+  hpx_lco_get(packed, sizeof(packed_data), &packed_data);
+  //now pin the sources
+  Target *targets{nullptr};
+  assert(hpx_gas_try_pin(packed_data.packed, (void **)&targets));
 
   //These are the three low bounds, followed by the three high bounds
   double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
 
-  for (int i = 0; i < n_targets; ++i) {
+  for (int i = 0; i < packed_data.count; ++i) {
     Point p = targets[i].position;
     if (p.x() < bounds[0]) bounds[0] = p.x();
     if (p.x() > bounds[3]) bounds[3] = p.x();
@@ -173,11 +185,13 @@ int find_target_domain_handler(Target *targets, int n_targets) {
     if (p.z() > bounds[5]) bounds[5] = p.z();
   }
 
+  hpx_gas_unpin(packed_data.packed);
+
   hpx_thread_continue(bounds, sizeof(double) * 6);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
+HPX_ACTION(HPX_DEFAULT, 0,
            find_target_domain_action, find_target_domain_handler,
-           HPX_POINTER, HPX_INT);
+           HPX_ADDR);
 
 
 struct EvaluateParams {
@@ -266,7 +280,7 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   target_root.destroy();
 
   //return
-  return HPX_SUCCESS;
+  hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            evaluate_action, evaluate_handler,
