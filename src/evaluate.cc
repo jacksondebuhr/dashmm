@@ -270,7 +270,8 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   hpx_lco_delete_sync(partitiondone);
   bool same_sandt = (parms->sources == parms->targets);
   target_root.partition(targets.data(), targets.n(), parms->refinement_limit,
-                        expansion, 0, same_sandt, std::vector<SourceNode>{});
+                        expansion, 0, same_sandt,
+                        std::vector<SourceNode>{source_root});
 
   //copy results back into user data
   target_root.collect_results(parms->targets, parms->phi_offset);

@@ -197,7 +197,7 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
   assert(input);
   input->code = kStoT;
   input->type = type;
-  input->count = n_;
+  input->count = n;
   memcpy(input->sources, sources, sizeof(Source) * n);
 
   //call set with appropriate data

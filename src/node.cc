@@ -558,7 +558,7 @@ SourceNode::SourceNode(DomainGeometry g, Index idx,
     local_->parent = HPX_NULL;
   }
   for (int i = 0; i < 8; ++i) {
-    local_->child[0] = HPX_NULL;
+    local_->child[i] = HPX_NULL;
   }
   local_->expansion = ExpansionRef{0, HPX_NULL};
   local_->method = method;
@@ -748,7 +748,7 @@ TargetNode::TargetNode(DomainGeometry g, Index idx, hpx_addr_t method,
     local_->parent = HPX_NULL;
   }
   for (int i = 0; i < 8; ++i) {
-    local_->child[0] = HPX_NULL;
+    local_->child[i] = HPX_NULL;
   }
   local_->expansion = ExpansionRef{0, HPX_NULL};
   local_->method = MethodRef{method};
