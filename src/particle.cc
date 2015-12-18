@@ -153,7 +153,9 @@ TargetRef::TargetRef(Target *targets, int n) {
   init->count = n;
   memcpy(init->targets, targets, sizeof(Target) * n);
 
-  data_ = hpx_lco_user_new(init_size, targetref_lco_init,
+  size_t total_size = sizeof(TargetRefLCOData) + sizeof(Target) * n;
+
+  data_ = hpx_lco_user_new(total_size, targetref_lco_init,
                            targetref_lco_operation, targetref_lco_predicate,
                            init, init_size);
   assert(data_ != HPX_NULL);

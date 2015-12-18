@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 
 #include <algorithm>
 #include <map>
@@ -234,33 +235,52 @@ void perform_particle_testing() {
 }
 
 
-constexpr int source_test_count = 1;
-constexpr int target_test_count = 1;
+constexpr int source_test_count = 20;
+constexpr int target_test_count = 20;
 
 struct UserSourceData {
   double pos[3];
-  double some_other_data_irrelevant_to_dashmm;
-  int more_extraneous_info;
   double mass;
 };
 
 struct UserTargetData {
-  double this_data_is_irrelevant;
-  int why_is_this_even_here;
   double pos[3];
   double phi[2];    //real, imag
+  double phi_direct[2];
 };
 
 
 void perform_the_big_test() {
   //create some arrays
+  /*
   UserSourceData sources[source_test_count] = {
-    {0.0, 0.0, 0.0, 13.0, 42, 1.0}
+    {0.0, 0.0, 0.0, 1.0},
+    {0.0, 1.0, 0.0, 1.0}
   };
 
   UserTargetData targets[target_test_count] = {
-    {47.9, 11, 1.0, 1.0, 1.0, 0.0, 0.0}
+    {1.0, 1.0, 1.0, 0.0, 0.0},
+    {0.0, 0.0, 1.0, 0.0, 0.0}
   };
+  */
+  UserSourceData sources[source_test_count];
+  UserTargetData targets[target_test_count];
+  srand(12345);
+  for (int i = 0; i < source_test_count; ++i) {
+    sources[i].pos[0] = (double)rand() / RAND_MAX;
+    sources[i].pos[1] = (double)rand() / RAND_MAX;
+    sources[i].pos[2] = (double)rand() / RAND_MAX;
+    sources[i].mass = (double)rand() / RAND_MAX + 1.0;
+  }
+  for (int i = 0; i < target_test_count; ++i) {
+    targets[i].pos[0] = (double)rand() / RAND_MAX;
+    targets[i].pos[1] = (double)rand() / RAND_MAX;
+    targets[i].pos[2] = (double)rand() / RAND_MAX;
+    targets[i].phi[0] = 0.0;
+    targets[i].phi[1] = 0.0;
+    targets[i].phi_direct[0] = 0.0;
+    targets[i].phi_direct[1] = 0.0;
+  }
 
   //prep sources
   dashmm::ObjectHandle source_handle;
@@ -285,6 +305,7 @@ void perform_the_big_test() {
   assert(lapcomexp != nullptr);
 
   //evaluate
+  /*
   err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
                          offsetof(UserSourceData, mass),
                          target_handle, offsetof(UserTargetData, pos),
@@ -292,11 +313,29 @@ void perform_the_big_test() {
                          1,
                          std::unique_ptr<dashmm::Method>{bhmethod},
                          std::unique_ptr<dashmm::Expansion>{lapcomexp});
+  //*/
+
+  //*
+  auto direct = dashmm::bh_method(0.0001);
+  auto direxp = dashmm::laplace_COM_expansion();
+  err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
+                         offsetof(UserSourceData, mass),
+                         target_handle, offsetof(UserTargetData, pos),
+                         offsetof(UserTargetData, phi_direct),
+                         1,
+                         std::unique_ptr<dashmm::Method>{direct},
+                         std::unique_ptr<dashmm::Expansion>{direxp});
+  //*/
 
   //get targets
   err = dashmm::array_get(target_handle, 0, target_test_count, targets);
   assert(err == dashmm::kSuccess);
   //TODO: check that the data comes out
+  for (int i = 0; i < target_test_count; ++i) {
+    fprintf(stdout, "%d: %lg %lg %lg\n", i,
+        targets[i].phi[0], targets[i].phi_direct[0],
+        (targets[i].phi[0] - targets[i].phi_direct[0]));
+  }
 
   //free up stuff
   err = dashmm::deallocate_array(source_handle);

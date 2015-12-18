@@ -202,7 +202,7 @@ void fini_method_table();
 /// \param data - the serialized data around which the method will be created
 ///
 /// \returns - the resulting method object
-std::unique_ptr<Method> create_method(int type, MethodSerial *data);
+Method *create_method(int type, MethodSerial *data);
 
 
 } // namespace dashmm

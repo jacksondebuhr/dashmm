@@ -50,6 +50,7 @@ int manage_method_table_handler(int op) {
     method_table_ = new std::map<int, hpx_action_t>{};
   } else if (op == kDeleteMethodTable) {
     delete method_table_;
+    method_table_ = nullptr;
   }
   return HPX_SUCCESS;
 }
@@ -97,16 +98,16 @@ void fini_method_table() {
 }
 
 
-std::unique_ptr<Method> create_method(int type, MethodSerial *data) {
+Method *create_method(int type, MethodSerial *data) {
   auto entry = method_table_->find(type);
   if (entry == method_table_->end()) {
-    return std::unique_ptr<Method>{nullptr};
+    return nullptr;
   }
   method_creation_function_t func =
       reinterpret_cast<method_creation_function_t>(
         hpx_action_get_handler(entry->second)
       );
-  return std::unique_ptr<Method>{func(sizeof(MethodSerial) + data->size, data)};
+  return func(sizeof(MethodSerial) + data->size, data);
 }
 
 

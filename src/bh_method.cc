@@ -9,8 +9,6 @@ namespace dashmm {
 
 
 void BHMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
-fprintf(stdout, "generate for (%d %d %d %d)\n",
-curr.level(), curr.x_index(), curr.y_index(), curr.z_index());
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
   ExpansionRef currexp = curr.expansion();
   SourceRef sources = curr.parts();
@@ -19,8 +17,6 @@ curr.level(), curr.x_index(), curr.y_index(), curr.z_index());
 
 
 void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-fprintf(stdout, "aggregate for (%d %d %d %d)\n",
-curr.level(), curr.x_index(), curr.y_index(), curr.z_index());
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
   ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
@@ -37,8 +33,6 @@ curr.level(), curr.x_index(), curr.y_index(), curr.z_index());
 // been refined yet. Process happens during partition.
 void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
                        bool curr_is_leaf) const {
-fprintf(stdout, "process for (%d %d %d %d) - %lu\n",
-curr.level(), curr.x_index(), curr.y_index(), curr.z_index(), consider.size());
   std::vector<SourceNode> newcons{};
 
   do {

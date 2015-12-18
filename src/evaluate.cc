@@ -119,6 +119,7 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
       double *pos = static_cast<double *>(pos_base);
       targets[i].position = Point{pos[0], pos[1], pos[2]};
       targets[i].index = i;
+      targets[i].phi = std::complex<double>{0.0};
     }
 
     hpx_gas_unpin(retval.packed);
@@ -232,7 +233,7 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //create our method and expansion from the parameters
   MethodSerial *method_serial = reinterpret_cast<MethodSerial *>(parms->data);
   auto local_method = create_method(method_serial->type, method_serial);
-  MethodRef method = globalize_method(std::move(local_method), HPX_HERE);
+  MethodRef method = globalize_method(local_method, HPX_HERE);
 
   char *expansion_base = parms->data + parms->method_size;
   int *type = reinterpret_cast<int *>(expansion_base + sizeof(int));

@@ -15,6 +15,16 @@ LaplaceCOM::LaplaceCOM(Point center) {
   data_ = static_cast<LaplaceCOMData *>(malloc(bytes_));
   assert(valid());
   data_->type = type();
+  data_->mtot = 0.0;
+  data_->xcom[0] = 0.0;
+  data_->xcom[1] = 0.0;
+  data_->xcom[2] = 0.0;
+  data_->Q[0] = 0.0;
+  data_->Q[1] = 0.0;
+  data_->Q[2] = 0.0;
+  data_->Q[3] = 0.0;
+  data_->Q[4] = 0.0;
+  data_->Q[5] = 0.0;
 }
 
 LaplaceCOM::~LaplaceCOM() {

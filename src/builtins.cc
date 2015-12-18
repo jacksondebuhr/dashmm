@@ -53,16 +53,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 Expansion *laplace_COM_interpret_handler(void *data, size_t size) {
-  LaplaceCOM *retval = new LaplaceCOM{Point{0.0, 0.0, 0.0}};
-  if (data == nullptr) {
-    return retval;
-  }
-
-  assert(size == sizeof(LaplaceCOMData));
-  LaplaceCOMData *vals = static_cast<LaplaceCOMData *>(data);
-  retval->set_mtot(vals->mtot);
-  retval->set_xcom(vals->xcom);
-  retval->set_Q(vals->Q);
+  LaplaceCOM *retval = new LaplaceCOM{(LaplaceCOMData *)data, size};
   return retval;
 }
 HPX_ACTION(HPX_FUNCTION, 0,

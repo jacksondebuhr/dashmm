@@ -74,6 +74,7 @@ int manage_expansion_table_handler(int operation) {
     expansion_table_ = new std::map<int, ExpansionTableRow>{};
   } else if (operation == kDeleteExpansionTable) {
     delete expansion_table_;
+    expansion_table_ = nullptr;
   }
   return HPX_SUCCESS;
 }

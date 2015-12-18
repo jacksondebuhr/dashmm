@@ -36,7 +36,7 @@ void MethodRef::generate(SourceNode &curr, const ExpansionRef expand) const {
 
 void MethodRef::aggregate(SourceNode &curr, const ExpansionRef expand) const {
   setup_local_method();
-  met_->generate(curr, expand);
+  met_->aggregate(curr, expand);
 }
 
 
@@ -90,7 +90,7 @@ void MethodRef::setup_local_method() const {
 }
 
 
-MethodRef globalize_method(std::unique_ptr<Method> met, hpx_addr_t where) {
+MethodRef globalize_method(Method *met, hpx_addr_t where) {
   if (met == nullptr) {
     return MethodRef{HPX_NULL};
   }

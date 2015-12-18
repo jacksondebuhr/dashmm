@@ -88,7 +88,7 @@ void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
     int *rhstype = reinterpret_cast<int *>(input + sizeof(int));
-    auto incoming = interpret_expansion(*rhstype, input, bytes - sizeof(int));
+    auto incoming = interpret_expansion(*rhstype, input, bytes);
 
     //add the one to the other
     local->add_expansion(incoming.get());

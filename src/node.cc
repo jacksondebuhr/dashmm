@@ -364,7 +364,7 @@ int target_node_partition_handler(TargetNodeData *node,
   if (refine) {
     //partition
     Target *T{nullptr};
-    assert(hpx_gas_try_pin(parms->parts, (void **)T));
+    assert(hpx_gas_try_pin(parms->parts, (void **)&T));
     Target *splits[9]{};
     splits[0] = T;
     splits[8] = &T[parms->n_parts];
@@ -401,8 +401,8 @@ int target_node_partition_handler(TargetNodeData *node,
       n_per_child[i] = splits[i + 1] - splits[i];
       if (n_per_child[i]) {
         ++n_children;
-        cparts[i] = hpx_addr_add(parms->parts, sizeof(Source) * n_offset,
-                                        sizeof(Source) * parms->n_parts_total);
+        cparts[i] = hpx_addr_add(parms->parts, sizeof(Target) * n_offset,
+                                        sizeof(Target) * parms->n_parts_total);
       } else {
         cparts[i] = HPX_NULL;
       }

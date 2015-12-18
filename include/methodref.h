@@ -30,6 +30,24 @@ class MethodRef {
  public:
   explicit MethodRef(hpx_addr_t addr) : data_{addr}, met_{nullptr} { }
 
+  ~MethodRef() {
+    if (met_) {
+      free(met_);
+      met_ = nullptr;
+    }
+  }
+
+  MethodRef(const MethodRef &other) {
+    data_ = other.data();
+    met_ = nullptr;
+  }
+
+  MethodRef &operator=(MethodRef other) {
+    data_ = other.data();
+    met_ = nullptr;
+    return *this;
+  }
+
   /// The type identifier of the method
   int type() const;
 
@@ -116,7 +134,7 @@ class MethodRef {
   void setup_local_method() const;
 
   hpx_addr_t data_;
-  mutable std::unique_ptr<Method> met_;
+  mutable Method *met_;
 };
 
 
@@ -131,7 +149,7 @@ class MethodRef {
 ///                to the globalized method
 ///
 /// \returns - a reference to the resulting method
-MethodRef globalize_method(std::unique_ptr<Method> met, hpx_addr_t where);
+MethodRef globalize_method(Method *met, hpx_addr_t where);
 
 
 } // namespace dashmm
