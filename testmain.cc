@@ -305,7 +305,8 @@ void perform_the_big_test() {
   assert(lapcomexp != nullptr);
 
   //evaluate
-  /*
+  //TODO: Is it weird that evaluate eats the method and expansion?
+  //*
   err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
                          offsetof(UserSourceData, mass),
                          target_handle, offsetof(UserTargetData, pos),
@@ -314,6 +315,9 @@ void perform_the_big_test() {
                          std::unique_ptr<dashmm::Method>{bhmethod},
                          std::unique_ptr<dashmm::Expansion>{lapcomexp});
   //*/
+
+  fprintf(stdout, "=================First round done=============\n");
+  fflush(stdout);
 
   //*
   auto direct = dashmm::bh_method(0.0001);

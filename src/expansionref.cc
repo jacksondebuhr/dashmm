@@ -48,14 +48,14 @@ enum ExpansionLCOSetCodes {
 /// This initialized an Expansion LCO given an input serialized
 /// expansion. Often, this will just be the default constructed expansion,
 /// but might be otherwise in specific cases.
-void expansion_lco_init_handler(void *i, size_t bytes,
+void expansion_lco_init_handler(ExpansionLCOHeader *head, size_t bytes,
                                 void *init, size_t init_bytes) {
-  ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(i);
+  assert(bytes == init_bytes + sizeof(ExpansionLCOHeader));
   head->arrived = 0;
   head->scheduled = 0;
   head->finished = 0;
   head->payload_size = init_bytes;
-  char *payload = static_cast<char *>(i) + sizeof(ExpansionLCOHeader);
+  char *payload = reinterpret_cast<char *>(head + 1);
   memcpy(payload, init, init_bytes);
 }
 HPX_ACTION(HPX_FUNCTION, 0,
@@ -69,21 +69,19 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /// or a serialized Expansion. In the latter case, the reserved data at the
 /// beginning of the expansion serialization is used to give the operation
 /// code for the set.
-void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
+void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
+                                     size_t bytes) {
   int *code = static_cast<int *>(rhs);
   if (*code == kFinish) {
-    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
-    head->finished = 1;
+    lhs->finished = 1;
   } else if (*code == kSchedule) {
-    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
-    assert(head->finished == 0);
-    head->scheduled += 1;
+    assert(lhs->finished == 0);
+    lhs->scheduled += 1;
   } else if (*code == kContribute) {
     //create the expansion from the payload
-    ExpansionLCOHeader *head = static_cast<ExpansionLCOHeader *>(lhs);
-    char *payload = static_cast<char *>(lhs) + sizeof(ExpansionLCOHeader);
+    char *payload = reinterpret_cast<char *>(lhs + 1);
     int *type = reinterpret_cast<int *>(payload + sizeof(int));
-    auto local = interpret_expansion(*type, payload, head->payload_size);
+    auto local = interpret_expansion(*type, payload, lhs->payload_size);
 
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
@@ -98,7 +96,7 @@ void expansion_lco_operation_handler(void *lhs, void *rhs, size_t bytes) {
     incoming->release();
 
     //increment the counter
-    head->arrived += 1;
+    lhs->arrived += 1;
   } else {
     assert(0 && "Incorrect code to expansion LCO");
   }
@@ -259,7 +257,7 @@ int expansion_m_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
+  char *payload = reinterpret_cast<char *>(ldata + 1);
   targets.contribute_M_to_T(type, ldata->payload_size, payload);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 

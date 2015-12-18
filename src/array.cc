@@ -85,7 +85,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
 int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
@@ -114,7 +114,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
 /////////////////////////////////////////////////////////////////////

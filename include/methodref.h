@@ -32,7 +32,7 @@ class MethodRef {
 
   ~MethodRef() {
     if (met_) {
-      free(met_);
+      delete met_;
       met_ = nullptr;
     }
   }
