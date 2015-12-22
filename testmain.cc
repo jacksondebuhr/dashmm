@@ -8,7 +8,6 @@
 #include <hpx/hpx.h>
 
 #include "dashmm.h"
-#include "include/testing.h"
 #include "include/array.h"
 #include "include/ids.h"
 #include "include/laplace_com.h"
@@ -17,8 +16,6 @@
 
 
 int test_init_handler(int UNUSED) {
-  dashmm::print_method_table();
-  dashmm::print_expansion_table();
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, 0, test_init_action, test_init_handler, HPX_INT);
@@ -235,8 +232,8 @@ void perform_particle_testing() {
 }
 
 
-constexpr int source_test_count = 1000;
-constexpr int target_test_count = 1000;
+constexpr int source_test_count = 100000;
+constexpr int target_test_count = 100000;
 
 struct UserSourceData {
   double pos[3];
@@ -252,8 +249,10 @@ struct UserTargetData {
 
 void perform_the_big_test() {
   //create some arrays
-  UserSourceData sources[source_test_count];
-  UserTargetData targets[target_test_count];
+  UserSourceData *sources = static_cast<UserSourceData *>(
+        malloc(sizeof(UserSourceData) * source_test_count));
+  UserTargetData *targets = static_cast<UserTargetData *>(
+        malloc(sizeof(UserTargetData) * target_test_count));
   srand(12345);
   for (int i = 0; i < source_test_count; ++i) {
     sources[i].pos[0] = (double)rand() / RAND_MAX;
@@ -300,7 +299,7 @@ void perform_the_big_test() {
                          offsetof(UserSourceData, mass),
                          target_handle, offsetof(UserTargetData, pos),
                          offsetof(UserTargetData, phi),
-                         1,
+                         40,
                          std::unique_ptr<dashmm::Method>{bhmethod},
                          std::unique_ptr<dashmm::Expansion>{lapcomexp});
   //*/
@@ -312,7 +311,7 @@ void perform_the_big_test() {
                          offsetof(UserSourceData, mass),
                          target_handle, offsetof(UserTargetData, pos),
                          offsetof(UserTargetData, phi_direct),
-                         1,
+                         40,
                          std::unique_ptr<dashmm::Method>{direct},
                          std::unique_ptr<dashmm::Expansion>{direxp});
   //*/
@@ -333,6 +332,9 @@ void perform_the_big_test() {
   assert(err == dashmm::kSuccess);
   err = dashmm::deallocate_array(target_handle);
   assert(err == dashmm::kSuccess);
+
+  free(sources);
+  free(targets);
 }
 
 
