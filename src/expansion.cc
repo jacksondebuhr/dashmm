@@ -109,6 +109,7 @@ ReturnCode register_expansion(int type, hpx_action_t creator,
                   &interpreter, &checker);
   int checkval{0};
   hpx_lco_get(checker, sizeof(int), &checkval);
+  hpx_lco_delete_sync(checker);
   return (checkval == 0 ? kSuccess : kDomainError);
 }
 
@@ -120,7 +121,7 @@ void init_expansion_table() {
 
 
 void fini_expansion_table() {
-  int input = kAllocateExpansionTable;
+  int input = kDeleteExpansionTable;
   hpx_bcast_rsync(manage_expansion_table_action, &input);
 }
 

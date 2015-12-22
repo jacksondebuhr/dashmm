@@ -82,6 +82,7 @@ ReturnCode register_method(int type, hpx_action_t creator, int user) {
   hpx_bcast_lsync(register_method_action, HPX_NULL, &type, &creator, &checker);
   int checkval{0};
   hpx_lco_get(checker, sizeof(int), &checkval);
+  hpx_lco_delete_sync(checker);
   return (checkval == 0 ? kSuccess : kDomainError);
 }
 

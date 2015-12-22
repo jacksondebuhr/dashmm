@@ -48,6 +48,12 @@ class MethodRef {
     return *this;
   }
 
+  void destroy() {
+    if (data_ != HPX_NULL) {
+      hpx_gas_free_sync(data_);
+    }
+  }
+
   /// The type identifier of the method
   int type() const;
 

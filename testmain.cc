@@ -235,8 +235,8 @@ void perform_particle_testing() {
 }
 
 
-constexpr int source_test_count = 20;
-constexpr int target_test_count = 20;
+constexpr int source_test_count = 1000;
+constexpr int target_test_count = 1000;
 
 struct UserSourceData {
   double pos[3];
@@ -252,17 +252,6 @@ struct UserTargetData {
 
 void perform_the_big_test() {
   //create some arrays
-  /*
-  UserSourceData sources[source_test_count] = {
-    {0.0, 0.0, 0.0, 1.0},
-    {0.0, 1.0, 0.0, 1.0}
-  };
-
-  UserTargetData targets[target_test_count] = {
-    {1.0, 1.0, 1.0, 0.0, 0.0},
-    {0.0, 0.0, 1.0, 0.0, 0.0}
-  };
-  */
   UserSourceData sources[source_test_count];
   UserTargetData targets[target_test_count];
   srand(12345);
@@ -316,9 +305,6 @@ void perform_the_big_test() {
                          std::unique_ptr<dashmm::Expansion>{lapcomexp});
   //*/
 
-  fprintf(stdout, "=================First round done=============\n");
-  fflush(stdout);
-
   //*
   auto direct = dashmm::bh_method(0.0001);
   auto direxp = dashmm::laplace_COM_expansion();
@@ -338,7 +324,8 @@ void perform_the_big_test() {
   for (int i = 0; i < target_test_count; ++i) {
     fprintf(stdout, "%d: %lg %lg %lg\n", i,
         targets[i].phi[0], targets[i].phi_direct[0],
-        (targets[i].phi[0] - targets[i].phi_direct[0]));
+        fabs(targets[i].phi[0] - targets[i].phi_direct[0])
+                / targets[i].phi_direct[0]);
   }
 
   //free up stuff

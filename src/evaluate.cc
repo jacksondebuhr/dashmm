@@ -234,25 +234,30 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   MethodSerial *method_serial = reinterpret_cast<MethodSerial *>(parms->data);
   auto local_method = create_method(method_serial->type, method_serial);
   MethodRef method = globalize_method(local_method, HPX_HERE);
+  delete local_method;
 
   char *expansion_base = parms->data + parms->method_size;
   int *type = reinterpret_cast<int *>(expansion_base + sizeof(int));
+  char *local_copy = static_cast<char *>(malloc(parms->expansion_size));
+  memcpy(local_copy, expansion_base, parms->expansion_size);
   auto local_expansion =
-      interpret_expansion(*type, expansion_base, parms->expansion_size);
+      interpret_expansion(*type, local_copy, parms->expansion_size);
   ExpansionRef expansion =
-      globalize_expansion(std::move(local_expansion), HPX_HERE);
+    globalize_expansion(std::move(local_expansion), HPX_HERE);
+  expansion.finalize();
 
   //collect results of actions
   PackDataResult res{};
   hpx_lco_get(source_packed, sizeof(res), &res);
-  hpx_lco_delete_sync(source_packed);
   SourceRef sources{res.packed, res.count};
 
   hpx_lco_get(target_packed, sizeof(res), &res);
-  hpx_lco_delete_sync(target_packed);
-  TargetRef targets{res.packed, res.count};
+  hpx_addr_t target_data = res.packed;
+  int target_count = res.count;
 
   DomainGeometry root_vol = cubify_domain(source_bounds, target_bounds);
+  hpx_lco_delete_sync(source_packed);
+  hpx_lco_delete_sync(target_packed);
   hpx_lco_delete_sync(source_bounds);
   hpx_lco_delete_sync(target_bounds);
 
@@ -265,14 +270,17 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
       source_root.partition(source_parts, sources.n(), parms->refinement_limit,
                             expansion.type(), expansion.data());
   hpx_gas_unpin(sources.data());
+  sources.destroy();
 
   TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   hpx_lco_wait(partitiondone);
   hpx_lco_delete_sync(partitiondone);
   bool same_sandt = (parms->sources == parms->targets);
-  target_root.partition(targets.data(), targets.n(), parms->refinement_limit,
+  target_root.partition(target_data, target_count, parms->refinement_limit,
                         expansion, 0, same_sandt,
                         std::vector<SourceNode>{source_root});
+  hpx_gas_free_sync(target_data);
+
 
   //copy results back into user data
   target_root.collect_results(parms->targets, parms->phi_offset);
@@ -280,6 +288,8 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //clean up
   source_root.destroy();
   target_root.destroy();
+  expansion.destroy();
+  method.destroy();
 
   //return
   hpx_exit(HPX_SUCCESS);
@@ -326,6 +336,10 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
   if (HPX_SUCCESS != hpx_run(&evaluate_action, args, total_size)) {
     return kRuntimeError;
   }
+
+  free(method_serial);
+  free(expansion_serial);
+  free(args);
 
   return kSuccess;
 }

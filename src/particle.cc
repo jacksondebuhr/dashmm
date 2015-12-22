@@ -159,6 +159,7 @@ TargetRef::TargetRef(Target *targets, int n) {
                            targetref_lco_operation, targetref_lco_predicate,
                            init, init_size);
   assert(data_ != HPX_NULL);
+  free(init);
   n_ = n;
 }
 
@@ -219,6 +220,7 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
+  free(input);
 }
 
 

@@ -98,10 +98,11 @@ MethodRef globalize_method(Method *met, hpx_addr_t where) {
   size_t size = serial->size + sizeof(MethodSerial);
   hpx_addr_t data = hpx_gas_alloc_local_at_sync(1, size, 0, where);
   assert(data != HPX_NULL);
-  //NOTE: This will be slow as the memory like did not get allocated as
+  //NOTE: This will be slow as the memory likely did not get allocated as
   // registered memory. However, this will not happen often, so this is perhaps
   // okay.
   hpx_gas_memput_rsync(data, serial, size);
+  free(serial);
   return MethodRef{data};
 }
 

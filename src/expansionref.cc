@@ -28,6 +28,7 @@ struct ExpansionLCOHeader {
   int scheduled;
   int finished;
   size_t payload_size;
+  char payload[];
 };
 
 /// Behavior codes for the Expansion LCO
@@ -55,8 +56,7 @@ void expansion_lco_init_handler(ExpansionLCOHeader *head, size_t bytes,
   head->scheduled = 0;
   head->finished = 0;
   head->payload_size = init_bytes;
-  char *payload = reinterpret_cast<char *>(head + 1);
-  memcpy(payload, init, init_bytes);
+  memcpy(head->payload, init, init_bytes);
 }
 HPX_ACTION(HPX_FUNCTION, 0,
            expansion_lco_init, expansion_lco_init_handler,
@@ -73,15 +73,15 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
                                      size_t bytes) {
   int *code = static_cast<int *>(rhs);
   if (*code == kFinish) {
+    assert(lhs->finished == 0);
     lhs->finished = 1;
   } else if (*code == kSchedule) {
     assert(lhs->finished == 0);
     lhs->scheduled += 1;
   } else if (*code == kContribute) {
     //create the expansion from the payload
-    char *payload = reinterpret_cast<char *>(lhs + 1);
-    int *type = reinterpret_cast<int *>(payload + sizeof(int));
-    auto local = interpret_expansion(*type, payload, lhs->payload_size);
+    int *type = reinterpret_cast<int *>(lhs->payload + sizeof(int));
+    auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size);
 
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
@@ -97,6 +97,9 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
 
     //increment the counter
     lhs->arrived += 1;
+    if (lhs->finished) {
+      assert(lhs->arrived <= lhs->scheduled);
+    }
   } else {
     assert(0 && "Incorrect code to expansion LCO");
   }
@@ -168,8 +171,7 @@ int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
-  auto lexp = interpret_expansion(type, payload, ldata->payload_size);
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size);
   auto translated = lexp->M_to_M(from_child, s_size);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -202,8 +204,7 @@ int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
-  auto lexp = interpret_expansion(parms->total.type(), payload,
+  auto lexp = interpret_expansion(parms->total.type(), ldata->payload,
                                   ldata->payload_size);
   auto translated = lexp->M_to_L(parms->s_index, parms->s_size, parms->t_index);
   lexp->release();
@@ -230,8 +231,7 @@ int expansion_l_to_l_handler(int type, hpx_addr_t expand, int to_child,
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
-  auto lexp = interpret_expansion(type, payload, ldata->payload_size);
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size);
   auto translated = lexp->L_to_L(to_child, t_size);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -257,8 +257,7 @@ int expansion_m_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata + 1);
-  targets.contribute_M_to_T(type, ldata->payload_size, payload);
+  targets.contribute_M_to_T(type, ldata->payload_size, ldata->payload);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
@@ -274,8 +273,7 @@ int expansion_l_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
-  targets.contribute_L_to_T(type, ldata->payload_size, payload);
+  targets.contribute_L_to_T(type, ldata->payload_size, ldata->payload);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
@@ -304,11 +302,8 @@ int expansion_add_handler(hpx_addr_t expand, int type) {
   // whatever as the size and things are okay...
   hpx_addr_t target = hpx_thread_current_target();
   hpx_lco_getref(target, 1, (void **)&ldata);
-  char *payload = reinterpret_cast<char *>(ldata) + sizeof(ExpansionLCOHeader);
-  total.contribute(ldata->payload_size, payload);
+  total.contribute(ldata->payload_size, ldata->payload);
   hpx_lco_release(target, ldata);
-
-  hpx_lco_delete_sync(target);
 
   return HPX_SUCCESS;
 }
@@ -465,10 +460,8 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
 
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
+  int type = exp->type();
   void *ldata = exp->release();
-  char *offset = static_cast<char *>(ldata);
-  int *ptype = reinterpret_cast<int *>(offset + sizeof(int));
-  int type = *ptype;
 
   hpx_addr_t retval{HPX_NULL};
   hpx_call_sync(where, globalize_expansion_action, &retval, sizeof(retval),

@@ -444,6 +444,7 @@ int target_node_partition_handler(TargetNodeData *node,
       hpx_call(kid.data(), target_node_partition_action, HPX_NULL, args,
                argssize);
     }
+    free(args);
 
     hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
   } else {  // no refinement needed; so just set the input done LCO
@@ -507,8 +508,6 @@ int target_node_collect_results_handler(TargetNodeData *node,
       size_t idx = targets[i].index;
       char *record_base = &user_data[idx * meta->size];
       double *phi = reinterpret_cast<double *>(record_base + phi_offset);
-      //TODO: check with Bo, is this the intended usage? Return the complex
-      // to the user?
       phi[0] = targets[i].phi.real();
       phi[1] = targets[i].phi.imag();
     }

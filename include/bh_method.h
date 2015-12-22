@@ -22,6 +22,13 @@ class BHMethod : public Method {
     local_->data[0] = theta;
   }
 
+  ~BHMethod() {
+    if (local_) {
+      free(local_);
+      local_ = nullptr;
+    }
+  }
+
   MethodSerial *release() override {
     MethodSerial *retval{local_};
     local_ = nullptr;
