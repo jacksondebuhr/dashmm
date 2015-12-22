@@ -164,29 +164,4 @@ ReturnCode register_user_expansion(int type, hpx_action_t creator,
 }
 
 
-/////////////////////////////////////////////////////////////////////
-// Testing routines
-/////////////////////////////////////////////////////////////////////
-
-
-#ifdef DASHMM_TESTING
-
-
-void print_expansion_table() {
-  if (expansion_table_) {
-    fprintf(stdout, "Expansion Table: size %lu\n", expansion_table_->size());
-    for (auto i = expansion_table_->begin();
-              i != expansion_table_->end(); ++i) {
-      fprintf(stdout, "Expansion table entry ID: %d\n", i->first);
-    }
-    fprintf(stdout, "\n");
-  } else {
-    fprintf(stderr, "Error: expansion_table_ does not exist.\n");
-  }
-}
-
-
-#endif // DASHMM_TESTING
-
-
 } // namespace dashmm

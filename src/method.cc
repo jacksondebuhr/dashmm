@@ -122,28 +122,4 @@ ReturnCode register_user_method(int type, hpx_action_t creator) {
 }
 
 
-/////////////////////////////////////////////////////////////////////
-// Testing routines
-/////////////////////////////////////////////////////////////////////
-
-
-#ifdef DASHMM_TESTING
-
-
-void print_method_table() {
-  if (method_table_) {
-    fprintf(stdout, "Method Table: size %lu\n", method_table_->size());
-    for (auto i = method_table_->begin(); i != method_table_->end(); ++i) {
-      fprintf(stdout, "Method table entry ID: %d\n", i->first);
-    }
-    fprintf(stdout, "\n");
-  } else {
-    fprintf(stderr, "Error: method_table_ does not exist.\n");
-  }
-}
-
-
-#endif // DASHMM_TESTING
-
-
 } // namespace dashmm
