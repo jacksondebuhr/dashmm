@@ -38,7 +38,6 @@ struct SourceNodeData {
   hpx_addr_t child[8];
   /// The global address of the expansion object for this node.
   ExpansionRef expansion;
-  //TODO: Should this be MethodRef?
   /// The global address of the method object for this node.
   hpx_addr_t method;
   /// A reference to the sources for this node. If this is an internal node,
@@ -290,8 +289,6 @@ int source_node_partition_handler(SourceNodeData *node,
                    node->method, &thisnode};
     node->child[i] = kid.data();
 
-    //TODO: can probably pretty easily remove this allocation/deallocation
-    // overhead.
     size_t argsz = sizeof(SourceNodePartitionParams)
                    + sizeof(Source) * n_per_child[i];
     SourceNodePartitionParams *args =
