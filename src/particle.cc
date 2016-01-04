@@ -1,3 +1,7 @@
+/// \file src/particle.cc
+/// \brief Source and Target object implementations
+
+
 #include "include/particle.h"
 
 #include <cassert>

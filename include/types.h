@@ -6,7 +6,7 @@
 /// \brief Basic type definitions used throughout DASHMM
 
 
-#include "hpx/hpx.h"
+#include <hpx/hpx.h>
 
 
 namespace dashmm {

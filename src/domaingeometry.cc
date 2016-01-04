@@ -1,3 +1,7 @@
+/// \file src/domaingeometry.cc
+/// \brief Implementation of DomainGeometry
+
+
 #include "include/domaingeometry.h"
 
 #include <cmath>

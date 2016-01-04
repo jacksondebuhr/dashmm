@@ -1,6 +1,8 @@
-//C++ stuff
+/// \file src/initfini.cc
+/// \brief Implemention of DASHMM initialization and finalization
 
-#include "hpx/hpx.h"
+
+#include <hpx/hpx.h>
 
 #include "include/builtins.h"
 #include "include/types.h"
@@ -15,8 +17,6 @@ namespace dashmm {
 
 
 int init_handler(void *UNUSED, size_t UNWANTED) {
-  //do a broadcast of some stuff, who knows...
-
   //Create the registration tables
   init_method_table();
   init_expansion_table();
@@ -32,8 +32,6 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, init_action, init_handler,
 
 
 int fini_handler(void *UNUSED, size_t UNWANTED) {
-  //do a broadcast of something?
-
   //Clear out the registrations
   fini_method_table();
   fini_expansion_table();

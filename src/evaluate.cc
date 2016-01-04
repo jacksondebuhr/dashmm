@@ -1,3 +1,7 @@
+/// \file src/evaluate.cc
+/// \brief Implementation of dashmm::evaluate()
+
+
 #include <cstring>
 
 #include <memory>
@@ -20,6 +24,19 @@ namespace dashmm {
 /////////////////////////////////////////////////////////////////////
 
 
+/// Cubifies the given domain boundaries
+///
+/// Given LCO addresses that hold the source and target domain boundaries,
+/// this routine will compute a cubical volume that encompasses all source
+/// and target points. The computed volume will extend slightly past the minmal
+/// size that would contain the points.
+///
+/// \param source_bounds - an LCO that holds six double values that contain
+///                        the domain bounds for the source points.
+/// \param target_bounds - an LCO that holds six double values that contain
+///                        the domain bounds for the target points.
+///
+/// \returns - a DomainGeometry that encompasses all sources and targets
 DomainGeometry cubify_domain(hpx_addr_t source_bounds,
                              hpx_addr_t target_bounds) {
   double s_bounds[6];
@@ -28,7 +45,6 @@ DomainGeometry cubify_domain(hpx_addr_t source_bounds,
   double t_bounds[6];
   hpx_lco_get(target_bounds, sizeof(double) * 6, t_bounds);
 
-  //TODO Can't I use the DomainGeometry Constructor here?
   //cubify the domain
   Point low{s_bounds[0] < t_bounds[0] ? s_bounds[0] : t_bounds[0],
             s_bounds[1] < t_bounds[1] ? s_bounds[1] : t_bounds[1],
@@ -59,6 +75,21 @@ struct PackDataResult {
   int count;
 };
 
+/// Action that packs the needed source data
+///
+/// To allow for the user's use of GAS to store more information with their
+/// source records, DASHMM packs the required data into an internal structure.
+/// This allows DASHMM to redistribute and sort the source data for performance.
+///
+/// This action continues the global address of the packed data and the count
+/// of the packed records.
+///
+/// \param user_data - global address of the DASHMM array storing the user
+///                    source data.
+/// \param pos_offset - the offset in the source records to the three doubles
+///                    giving the position of the source.
+/// \param q_offset - the offset in the source records to the charge of the
+///                   source
 int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
   //NOTE: SMP assumptions all over this function
   ArrayMetaData *meta{nullptr};
@@ -97,7 +128,19 @@ HPX_ACTION(HPX_DEFAULT, 0,
            pack_sources_action, pack_sources_handler,
            HPX_ADDR, HPX_INT, HPX_INT);
 
-
+/// Action that packs the needed target data
+///
+/// To allow for the user's use of GAS to store more information with their
+/// target records, DASHMM packs the required data into an internal structure.
+/// This allows DASHMM to redistribute and sort the target data for performance.
+///
+/// This action continues the global address of the packed data and the count
+/// of the packed records.
+///
+/// \param user_data - global address of the DASHMM array storing the user
+///                    target data.
+/// \param pos_offset - the offset in the target records to the three doubles
+///                    giving the position of the target.
 int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
   //NOTE: SMP assumptions
   ArrayMetaData *meta{nullptr};
@@ -135,6 +178,11 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR, HPX_INT);
 
 
+/// Action to find the bounding domain for the source points
+///
+/// This action continues the bounds as six doubles.
+///
+/// \param packed - an LCO containing the packed source data's address
 int find_source_domain_handler(hpx_addr_t packed) {
   //NOTE: SMP assumptions
   PackDataResult packed_data;
@@ -164,7 +212,11 @@ HPX_ACTION(HPX_DEFAULT, 0,
            find_source_domain_action, find_source_domain_handler,
            HPX_ADDR);
 
-
+/// Action to find the bounding domain for the target points
+///
+/// This action continues the bounds as six doubles.
+///
+/// \param packed - an LCO containing the packed target data's address
 int find_target_domain_handler(hpx_addr_t packed) {
   //NOTE: SMP assumptions
   PackDataResult packed_data;
@@ -208,6 +260,15 @@ struct EvaluateParams {
   char data[];
 };
 
+/// Action accomplishing the evaluation
+///
+/// This action takes a marshalled argument containing an EvaluateParams
+/// structure.
+///
+/// This action continues nothing.
+///
+/// \param parms - the parameters
+/// \param total_size - the size of the parameters in bytes
 int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //copy user data into internal data
   hpx_addr_t source_packed = hpx_lco_future_new(sizeof(PackDataResult));

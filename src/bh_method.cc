@@ -1,8 +1,8 @@
+/// \file src/bh_method.cc
+/// \brief Implementation of BHMethod
+
+
 #include "include/bh_method.h"
-
-//C/C++
-
-// other DASHMM
 
 
 namespace dashmm {

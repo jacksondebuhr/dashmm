@@ -1,3 +1,7 @@
+/// \file src/reductionops.cc
+/// \brief Implemention of common reduction operations
+
+
 #include "include/reductionops.h"
 
 

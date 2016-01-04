@@ -1,3 +1,7 @@
+/// \file src/node.cc
+/// \brief implementation of SourceNode and TargetNode
+
+
 #include "include/node.h"
 
 #include <cassert>
@@ -7,7 +11,7 @@
 
 #include <algorithm>
 
-#include "hpx/hpx.h"
+#include <hpx/hpx.h>
 
 #include "include/array.h"
 #include "include/domaingeometry.h"
@@ -19,7 +23,6 @@
 namespace dashmm {
 
 
-//
 /// The data for source nodes.
 ///
 /// The data stored for SourceNode objects. This will be saved in a block in

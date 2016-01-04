@@ -2,6 +2,10 @@
 #define __DASHMM_BH_METHOD_H__
 
 
+/// \file include/bh_method.h
+/// \brief Declaration of BHMethod
+
+
 #include "include/ids.h"
 #include "include/expansionref.h"
 #include "include/method.h"
@@ -11,6 +15,11 @@
 namespace dashmm {
 
 
+/// A Method to implement class Barnes-Hut
+///
+/// It uses the simple critical angle criterion to decide if a given expansion
+/// is usable. There is little that needs explanation in this class, as the
+/// methods are essentially just those of the abstract base class Method.
 class BHMethod : public Method {
  public:
   BHMethod(double theta) : local_{nullptr} {
@@ -56,11 +65,29 @@ class BHMethod : public Method {
     return true;
   }
 
-  //Note that this is pretty weird. We pass a reference to a reference.
-  // This is because MAC may cause a local version of the expansion to be
-  // created, and so we do not want to pass the ExpansionRef by value and
-  // create that local copy twice.
+  /// Decide on the usability of an expansion
+  ///
+  /// This performs the traditional critical angle comparison.
+  ///
+  /// \param exp_point - the position of the expansion center
+  /// \param size - the size of the containing node
+  /// \param pos - the position of the point to check for usability.
+  ///
+  /// \returns - true if the expansion is usable; false otherwise
   bool MAC(Point exp_point, double size, Point pos) const;
+
+  /// Finds the point nearest the given point in a given node
+  ///
+  /// This is used to compute the point in a target node that is nearest
+  /// the source expansion center inside a given target node. This allows the
+  /// MAC to be used once to verify for all possible points inside the target
+  /// node.
+  ///
+  /// \param scenter - the center of the source expansion
+  /// \param tcenter - the center of the target node
+  /// \param tsize - the size of the target node
+  ///
+  /// \returns - the point in the target node closest to the expansion center
   Point nearest(Point scenter, Point tcenter, double tsize) const;
 
  private:

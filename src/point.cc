@@ -1,3 +1,7 @@
+/// \file src/point.cc
+/// \brief Implemention of Point operations
+
+
 #include "include/point.h"
 
 

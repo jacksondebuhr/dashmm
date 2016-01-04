@@ -1,3 +1,7 @@
+/// \file src/laplace_com.cc
+/// \brief Implementation of LaplaceCOM
+
+
 #include "include/laplace_com.h"
 
 #include <cassert>
@@ -26,6 +30,7 @@ LaplaceCOM::LaplaceCOM(Point center) {
   data_->Q[4] = 0.0;
   data_->Q[5] = 0.0;
 }
+
 
 LaplaceCOM::~LaplaceCOM() {
   if (valid()) {
