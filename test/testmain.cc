@@ -115,8 +115,6 @@ void perform_the_big_test() {
 
 
 int main(int argc, char **argv) {
-  int perform_other_tests = 0;
-
   auto err = dashmm::init(&argc, &argv);
   if (err == dashmm::kInitError) {
     fprintf(stderr, "dashmm::init gave an error!\n");
