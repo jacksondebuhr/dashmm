@@ -192,7 +192,7 @@ ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
   int runcode;
   int *arg = &runcode;
   hpx_run(&allocate_array_action, &records, &size, &obj, &arg);
-  return runcode;
+  return static_cast<ReturnCode>(runcode);
 }
 
 
@@ -210,7 +210,7 @@ ReturnCode array_put(ObjectHandle obj, size_t first, size_t last,
   int runcode;
   int *arg = &runcode;
   hpx_run(&array_put_action, &obj, &first, &last, &arg, &in_data);
-  return runcode;
+  return static_cast<ReturnCode>(runcode);
 }
 
 
@@ -219,7 +219,7 @@ ReturnCode array_get(ObjectHandle obj, size_t first, size_t last,
   int runcode;
   int *arg = &runcode;
   hpx_run(&array_get_action, &obj, &first, &last, &arg, &out_data);
-  return runcode;
+  return static_cast<ReturnCode>(runcode);
 }
 
 
