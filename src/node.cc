@@ -118,11 +118,11 @@ int source_node_delete_handler(hpx_addr_t data) {
 
   hpx_gas_unpin(data);
 
-  //call when with current continuation
-  // This relies on the fact that HPX_NULL as the gate means this will
-  // be equivalent to hpx_call_cc.
-  hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
-                   &done);
+  if (done == HPX_NULL) {
+    return hpx_call_cc(data, node_delete_self_action, &done);
+  } else {
+    return hpx_call_when_cc(done, data, node_delete_self_action, &done);
+  }
 }
 
 
@@ -161,8 +161,11 @@ int target_node_delete_handler(hpx_addr_t data) {
   //call when with current continuation
   // This relies on the fact that HPX_NULL as the gate means this will
   // be equivalent to hpx_call_cc.
-  hpx_call_when_cc(done, data, node_delete_self_action, nullptr, nullptr,
-                   &done);
+  if (done == HPX_NULL) {
+    return hpx_call_cc(data, node_delete_self_action, &done);
+  } else {
+    return hpx_call_when_cc(done, data, node_delete_self_action, &done);
+  }
 }
 
 
@@ -529,8 +532,8 @@ int target_node_collect_results_handler(TargetNodeData *node,
       }
     }
 
-    hpx_call_when_cc(coll_done, coll_done, hpx_lco_delete_action,
-                     nullptr, nullptr, nullptr, 0);
+    return hpx_call_when_cc(coll_done, coll_done, hpx_lco_delete_action,
+                     nullptr, 0);
   }
 }
 

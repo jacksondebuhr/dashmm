@@ -115,7 +115,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   }
 
   //Do some simple bounds checking
-  if (last <= meta->count || last >= first) {
+  if (last > meta->count || last < first) {
     *err = kDomainError;
     hpx_gas_unpin(meta->data);
     hpx_gas_unpin(obj);
@@ -164,7 +164,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   }
 
   //Do some simple bounds checking
-  if (last <= meta->count || last >= first) {
+  if (last > meta->count || last < first) {
     *err = kDomainError;
     hpx_gas_unpin(meta->data);
     hpx_gas_unpin(obj);

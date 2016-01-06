@@ -1,16 +1,7 @@
 * First release TODO
-  - Be sure to complete the in-source documentation
-  - Make sure that all the includes are needed, and follow the style guide
-    in their ordering
-  - look at all of the TODOs in the code - see if any can be treated
   - create a build system for making DASHMM into a library
   - enlist Matt as an end-user for testing the ease of the build system
   - create the basic testing code for running some numbers
-  - Make sure that the user is aware that the potential comes out as a
-    complex number
-  - We should make the array get and put members of the basic interface not
-    give assertion failures on bad inputs. Instead, it should return one of
-    the return codes.
   - Update the Basic user guide
   - Start to work on the Advanced User Guide (we have a few of the advanced
     features implemented.) Also, having a guide for implementing new internal

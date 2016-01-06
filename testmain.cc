@@ -232,8 +232,8 @@ void perform_particle_testing() {
 }
 
 
-constexpr int source_test_count = 100000;
-constexpr int target_test_count = 100000;
+constexpr int source_test_count = 10000;
+constexpr int target_test_count = 10000;
 
 struct UserSourceData {
   double pos[3];
