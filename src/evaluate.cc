@@ -122,7 +122,7 @@ int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
   hpx_gas_unpin(meta->data);
   hpx_gas_unpin(user_data);
 
-  HPX_THREAD_CONTINUE(retval);
+  return HPX_THREAD_CONTINUE(retval);
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            pack_sources_action, pack_sources_handler,
@@ -171,7 +171,7 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
   hpx_gas_unpin(meta->data);
   hpx_gas_unpin(user_data);
 
-  HPX_THREAD_CONTINUE(retval);
+  return HPX_THREAD_CONTINUE(retval);
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            pack_targets_action, pack_targets_handler,
@@ -206,7 +206,7 @@ int find_source_domain_handler(hpx_addr_t packed) {
 
   hpx_gas_unpin(packed_data.packed);
 
-  hpx_thread_continue(bounds, sizeof(double) * 6);
+  return hpx_thread_continue(bounds, sizeof(double) * 6);
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            find_source_domain_action, find_source_domain_handler,
@@ -240,7 +240,7 @@ int find_target_domain_handler(hpx_addr_t packed) {
 
   hpx_gas_unpin(packed_data.packed);
 
-  hpx_thread_continue(bounds, sizeof(double) * 6);
+  return hpx_thread_continue(bounds, sizeof(double) * 6);
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            find_target_domain_action, find_target_domain_handler,

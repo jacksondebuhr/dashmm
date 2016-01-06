@@ -318,7 +318,7 @@ int globalize_expansion_handler(void *payload, size_t bytes) {
                                       expansion_lco_operation,
                                       expansion_lco_predicate, payload, bytes);
   assert(gdata != HPX_NULL);
-  HPX_THREAD_CONTINUE(gdata);
+  return HPX_THREAD_CONTINUE(gdata);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            globalize_expansion_action, globalize_expansion_handler,
