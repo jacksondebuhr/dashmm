@@ -1,19 +1,20 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -O3 -g -I. 
+CXXFLAGS = -std=c++11 -Wall -O3 -g -I.
 INCLUDE = $(shell pkg-config --cflags hpx)
 LIBS = $(shell pkg-config --libs hpx)
 
-SRC = $(shell ls src/*.cc) testmain.cc
+SRC = $(shell ls src/*.cc)
 OBJ = $(SRC:.cc=.o)
-EXEC = testmain
 
-all: $(EXEC)
+DASHMM = libdashmm.a
 
-$(EXEC): $(OBJ)
-	$(CXX) -o $(EXEC) $(OBJ) $(LIBS)
+all: $(DASHMM)
+
+$(DASHMM): $(OBJ)
+	ar -cvq $(DASHMM) $(OBJ)
 
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -c $< -o $@ $(INCLUDE)
 
 clean:
-	rm -rf $(EXEC) $(OBJ) *~
+	rm -rf $(DASHMM) $(OBJ) *~
