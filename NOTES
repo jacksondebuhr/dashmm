@@ -49,3 +49,23 @@ Interface Ideas
  * We should also in the near term get a base nearest neighbor search. This will
  be essential for SPH and Phil's MFV methods.
   This would be useful in much wider contexts, however.
+
+
+
+HOW TO ADD A NEW BUILT-IN METHOD
+
+1. Pick a name for it and create files include/****.h and src/****.cc
+
+2. Create the ID symbol in include/ids.h and choose a unique value for that id
+
+3. Implement the new method (.h .cc)
+
+4. Add factory method in include/builtins.h and implement the factory in
+   src/builtins.cc
+
+5. Implement the creation action for that method in src/builtins.cc
+
+6. Add a line to register_built_in_methods() registering the method with
+   DASHMM
+
+7. Test the new method until you are satisfied it works.
