@@ -7,6 +7,7 @@
 #include <hpx/hpx.h>
 
 #include "include/bh_method.h"
+#include "include/direct_method.h"
 #include "include/expansion.h"
 #include "include/laplace_com.h"
 #include "include/method.h"
@@ -33,9 +34,25 @@ HPX_ACTION(HPX_FUNCTION, 0,
            HPX_SIZE_T, HPX_POINTER);
 
 
+Method *direct_method() {
+  Method *retval = new DirectMethod{};
+  return retval;
+}
+
+
+Method *direct_method_create_handler(size_t size, MethodSerial *data) {
+  assert(size == sizeof(MethodSerial));
+  return direct_method();
+}
+HPX_ACTION(HPX_FUNCTION, 0,
+           direct_method_create_action, direct_method_create_handler,
+           HPX_SIZE_T, HPX_POINTER);
+
+
 void register_built_in_methods() {
   assert(kSuccess == register_method(kMethodBH, bh_method_create_action, 0));
-  //more here...
+  assert(kSuccess == register_method(
+                        kMethodDirect, direct_method_create_action, 0));
 }
 
 

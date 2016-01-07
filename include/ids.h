@@ -23,7 +23,7 @@ constexpr int kLastUserMethodType = 1999;
 
 /// The identifier for the BH Method
 constexpr int kMethodBH = kFirstMethodType;
-// etc...
+constexpr int kMethodDirect = kMethodBH + 1;
 
 
 /// The lowest allowed expansion identifier for internal use
@@ -40,7 +40,6 @@ constexpr int kLastUserExpansionType = 3999;
 
 /// The identifier for the Laplace Center of Mass Expansion
 constexpr int kExpansionLaplaceCOM = kFirstExpansionType;
-//constexpr int kExpansionEtc.. = kExpansionLaplaceCOM + 1;
 
 
 

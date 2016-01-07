@@ -44,7 +44,7 @@ class BHMethod : public Method {
     return retval;
   }
 
-  size_t bytes() const {
+  size_t bytes() const override {
     return (sizeof(MethodSerial) + sizeof(double));
   }
 

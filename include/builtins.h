@@ -45,6 +45,14 @@ Expansion *laplace_sph_exp_expansion(int n_digits);
 /// \returns - the method; caller assumes ownership
 Method *bh_method(double theta);
 
+/// Provide a direct summation method object
+///
+/// This creates a new object, the caller assumes ownership of the returned
+/// object. This method is the direct summation method.
+///
+/// \returns - the method; caller assumes ownership
+Method *direct_method();
+
 /// Provide an FMM method object
 ///
 /// This creates a new object, the caller assumes ownership of the returned

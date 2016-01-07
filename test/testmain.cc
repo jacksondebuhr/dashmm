@@ -164,13 +164,12 @@ void perform_evaluation_test(int source_count, int source_type,
   assert(err == dashmm::kSuccess);
 
   //get method and expansion
-  //TODO: generalize based on the inputs
   dashmm::Method *test_method{nullptr};
   dashmm::Expansion *test_expansion{nullptr};
   if (test_case == 0) {
     test_method = dashmm::bh_method(0.6);
     test_expansion = dashmm::laplace_COM_expansion();
-  } //more cases once they are implemented
+  } //TODO: more cases once they are implemented
   assert(test_method && test_expansion);
 
   //evaluate - first for the approximate version
@@ -185,9 +184,7 @@ void perform_evaluation_test(int source_count, int source_type,
   //This is effectively the exact potential computation - these are not
   // subject to the input case_type because we just want to do the direct
   // computation here.
-  //TODO: change this to use the direct summation method, once that is
-  // implemented
-  auto direct = dashmm::bh_method(0.00001);
+  auto direct = dashmm::direct_method();
   auto direxp = dashmm::laplace_COM_expansion();
   err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
                          offsetof(UserSourceData, mass),
