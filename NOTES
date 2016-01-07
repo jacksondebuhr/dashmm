@@ -26,10 +26,6 @@ exposed in header files separate from the users.
 
 Interface Ideas
 
- * We should add kDomainError where it makes sense
-
- * Do we want a direct sum method?
-
  * For the array get and put, should we perhaps have a template function that
    accepts iterators here? This would make it work nicely with the STL
 
