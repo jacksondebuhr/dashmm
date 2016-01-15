@@ -162,7 +162,7 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
       double *pos = static_cast<double *>(pos_base);
       targets[i].position = Point{pos[0], pos[1], pos[2]};
       targets[i].index = i;
-      targets[i].phi = std::complex<double>{0.0};
+      targets[i].phi = dcomplex_t{0.0}; 
     }
 
     hpx_gas_unpin(retval.packed);

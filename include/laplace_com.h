@@ -68,13 +68,14 @@ class LaplaceCOM : public Expansion {
     assert(valid());
     return Point{data_->xcom[0], data_->xcom[1], data_->xcom[2]};
   }
-  std::complex<double> term(size_t i) const override;
+  dcomplex_t term(size_t i) const override;
 
 
   std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
-                                    Source *last) const override;
+                                    Source *last, double scale) const override;
   std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
-                                    Source *last) const override {
+                                    Source *last, double scale) const override 
+  {
     return std::unique_ptr<Expansion>{new LaplaceCOM{nullptr, 0}};
   }
 
@@ -89,8 +90,8 @@ class LaplaceCOM : public Expansion {
     return std::unique_ptr<Expansion>{new LaplaceCOM{nullptr, 0}};
   }
 
-  void M_to_T(Target *first, Target *last) const override;
-  void L_to_T(Target *first, Target *last) const override {  }
+  void M_to_T(Target *first, Target *last, double scale) const override;
+  void L_to_T(Target *first, Target *last, double scale) const override {  }
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const override;
 

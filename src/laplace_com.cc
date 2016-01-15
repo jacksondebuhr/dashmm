@@ -40,20 +40,21 @@ LaplaceCOM::~LaplaceCOM() {
 }
 
 
-std::complex<double> LaplaceCOM::term(size_t i) const {
+dcomplex_t LaplaceCOM::term(size_t i) const {
   if (i == 0) {
-    return std::complex<double>{data_->mtot};
+    return dcomplex_t{data_->mtot};
   } else if (i < 4) {
-    return std::complex<double>{data_->xcom[i - 1]};
+    return dcomplex_t{data_->xcom[i - 1]};
   } else {
-    return std::complex<double>{data_->Q[i - 4]};
+    return dcomplex_t{data_->Q[i - 4]};
   }
 }
 
 
 std::unique_ptr<Expansion> LaplaceCOM::S_to_M(Point center,
                                               Source *first,
-                                              Source *last) const {
+                                              Source *last, 
+                                              double unused) const {
   LaplaceCOM *retval{new LaplaceCOM{center}};
   assert(retval);
   retval->calc_mtot(first, last);
@@ -74,7 +75,7 @@ std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,
 }
 
 
-void LaplaceCOM::M_to_T(Target *first, Target *last) const {
+void LaplaceCOM::M_to_T(Target *first, Target *last, double unused) const {
   assert(valid());
   for (auto i = first; i != last; ++i) {
     Point pos{i->position};
@@ -96,7 +97,7 @@ void LaplaceCOM::M_to_T(Target *first, Target *last) const {
     qsum *= quaddenom;
     sum += qsum;
 
-    i->phi += std::complex<double>{sum};
+    i->phi += dcomplex_t{sum};
   }
 }
 
@@ -115,7 +116,7 @@ void LaplaceCOM::S_to_T(Source *s_first, Source *s_last,
       }
     }
 
-    targ->phi += std::complex<double>{sum};
+    targ->phi += dcomplex_t{sum};
   }
 }
 

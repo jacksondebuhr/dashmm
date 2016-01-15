@@ -20,9 +20,9 @@ namespace dashmm {
 /// It uses the simple critical angle criterion to decide if a given expansion
 /// is usable. There is little that needs explanation in this class, as the
 /// methods are essentially just those of the abstract base class Method.
-class BHMethod : public Method {
+class BH : public Method {
  public:
-  BHMethod(double theta) : local_{nullptr} {
+  BH(double theta) : local_{nullptr} {
     local_ = static_cast<MethodSerial *>(
             malloc(sizeof(MethodSerial) + sizeof(double)));
     assert(local_);
@@ -31,7 +31,7 @@ class BHMethod : public Method {
     local_->data[0] = theta;
   }
 
-  ~BHMethod() {
+  ~BH() {
     if (local_) {
       free(local_);
       local_ = nullptr;

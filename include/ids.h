@@ -25,6 +25,8 @@ constexpr int kLastUserMethodType = 1999;
 constexpr int kMethodBH = kFirstMethodType;
 constexpr int kMethodDirect = kMethodBH + 1;
 
+/// The identifier for the FMM Method
+constexpr int kMethodFMM = kMethodDirect + 1;
 
 /// The lowest allowed expansion identifier for internal use
 constexpr int kFirstExpansionType = 2000;
@@ -41,7 +43,8 @@ constexpr int kLastUserExpansionType = 3999;
 /// The identifier for the Laplace Center of Mass Expansion
 constexpr int kExpansionLaplaceCOM = kFirstExpansionType;
 
-
+/// The identifier for the Laplace Spherical Harmonic Expansion
+constexpr int kExpansionLaplaceSPH = kExpansionLaplaceCOM + 1; 
 
 } // namespace dashmm
 

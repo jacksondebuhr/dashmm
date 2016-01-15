@@ -66,7 +66,8 @@ class ExpansionRef {
   /// \param center - the center of the computed expansion
   /// \param sources - a reference to the sources from which to compute the
   ///                  multipole expansion
-  void S_to_M(Point center, SourceRef sources) const;
+  /// \param scale - scaling factor
+  void S_to_M(Point center, SourceRef sources, double scale) const;
 
   /// Set this expansion with the local expansion of the given sources
   ///
@@ -83,7 +84,8 @@ class ExpansionRef {
   /// \param center - the center of the computed expansion
   /// \param sources - a reference to the sources from which to compute the
   ///                  local expansion
-  void S_to_L(Point center, SourceRef sources) const;
+  /// \param scale - scaling factor
+  void S_to_L(Point center, SourceRef sources, double scale) const;
 
   /// Contribute a translated multipole moment to this expansion
   ///
@@ -130,7 +132,8 @@ class ExpansionRef {
   /// perform work once this expansion is ready.
   ///
   /// \param targets - the target for which the multipole expansion is applied
-  void M_to_T(TargetRef targets) const;
+  /// \param scale - scaling factor
+  void M_to_T(TargetRef targets, double scale) const;
 
   /// Apply the effect of a local expansion to targets
   ///
@@ -139,7 +142,8 @@ class ExpansionRef {
   /// only perform work once this expansion is ready.
   ///
   /// \param targets - the target for which the local expansion is applied
-  void L_to_T(TargetRef targets) const;
+  /// \param scale - scaling factor
+  void L_to_T(TargetRef targets, double scale) const;
 
   /// Apply effect of sources to targets
   ///

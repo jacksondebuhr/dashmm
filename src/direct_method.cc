@@ -8,20 +8,20 @@
 namespace dashmm {
 
 
-void DirectMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
+void Direct::generate(SourceNode &curr, const ExpansionRef expand) const {
   //We must at least create an expansion here, otherwise the S->T will not have
   // anything to work from.
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
 }
 
 
-void DirectMethod::aggregate(SourceNode &curr,
-                             const ExpansionRef expand) const {
+void Direct::aggregate(SourceNode &curr,
+                       const ExpansionRef expand) const {
   //
 }
 
 
-void DirectMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
+void Direct::process(TargetNode &curr, std::vector<SourceNode> &consider,
                      bool curr_is_leaf) const {
   std::vector<SourceNode> newcons{};
   do {

@@ -15,6 +15,7 @@
 
 namespace dashmm {
 
+using dcomplex_t = std::complex<double>; 
 
 /// The data needed for source particles.
 struct Source {
@@ -66,7 +67,7 @@ class SourceRef {
 /// The data needed for target locations.
 struct Target {
   Point position;
-  std::complex<double> phi;
+  dcomplex_t phi;
   /// DASHMM rearranges the input locations so we store the index from the
   /// original data so that we can copy results into the correct place.
   size_t index;
@@ -119,14 +120,18 @@ class TargetRef {
   /// \param type - the type of expansion serving the M->T operation
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_M_to_T(int type, size_t bytes, void *data) const;
+  /// \param scale - scaling factor
+  void contribute_M_to_T(int type, size_t bytes, void *data, 
+                         double scale) const;
 
   /// Contribute a L->T operation to the referred targets
   ///
   /// \param type - the type of expansion serving the L->T operation
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_L_to_T(int type, size_t bytes, void *data) const;
+  /// \param scale - scaling factor
+  void contribute_L_to_T(int type, size_t bytes, void *data, 
+                         double scale) const;
 
  private:
   hpx_addr_t data_;

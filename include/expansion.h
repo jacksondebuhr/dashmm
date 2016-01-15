@@ -20,6 +20,7 @@
 
 namespace dashmm {
 
+using dcomplex_t = std::complex<double>; 
 
 /// The abstract interface for expansions usable in DASHMM
 ///
@@ -75,6 +76,8 @@ class Expansion {
 
   /// The number of terms in the expansion.
   virtual size_t size() const = 0;
+  //virtual size_t accuracy() const = 0;
+  
 
   /// The point around which the expansion is defined.
   virtual Point center() const = 0;
@@ -90,7 +93,7 @@ class Expansion {
   /// \returns - the complex double version of the term; real expansions should
   ///            nevertheless return terms as a complex number for compatibility
   //             with complex expansions.
-  virtual std::complex<double> term(size_t i) const = 0;
+  virtual dcomplex_t term(size_t i) const = 0;
 
   /// Create a multipole expansion for a given set of source points
   ///
@@ -101,10 +104,12 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
+  /// \param scale - scaling factor
   ///
   /// \returns - The resulting multipole expansion
-  virtual std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
-                                            Source *last) const = 0;
+  virtual std::unique_ptr<Expansion> S_to_M(Point center, 
+                                            Source *first, Source *last, 
+                                            double scale) const = 0;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -115,10 +120,12 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
+  /// \param scale - scaling factor
   ///
   /// \returns - The resulting local expansion
-  virtual std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
-                                            Source *last) const = 0;
+  virtual std::unique_ptr<Expansion> S_to_L(Point center, 
+                                            Source *first, Source *last,
+                                            double scale) const = 0;
 
   /// Change center of a multipole expansion
   ///
@@ -164,13 +171,15 @@ class Expansion {
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  virtual void M_to_T(Target *first, Target *last) const = 0;
+  /// \param scale - scaling factor
+  virtual void M_to_T(Target *first, Target *last, double scale) const = 0;
 
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  virtual void L_to_T(Target *first, Target *last) const = 0;
+  /// \param scale - scaling factor
+  virtual void L_to_T(Target *first, Target *last, double scale) const = 0;
 
   /// Compute the direct interaction between sources and targets
   ///

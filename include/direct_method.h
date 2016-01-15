@@ -15,16 +15,16 @@
 namespace dashmm {
 
 //
-class DirectMethod : public Method {
+class Direct : public Method {
  public:
-  DirectMethod() : local_{nullptr} {
+  Direct() : local_{nullptr} {
     local_ = static_cast<MethodSerial *>(malloc(sizeof(MethodSerial)));
     assert(local_);
     local_->type = kMethodDirect;
     local_->size = 0;
   }
 
-  ~DirectMethod() {
+  ~Direct() {
     if (local_) {
       free(local_);
       local_ = nullptr;
@@ -48,9 +48,9 @@ class DirectMethod : public Method {
   void generate(SourceNode &curr, const ExpansionRef expand) const override;
   void aggregate(SourceNode &curr, const ExpansionRef expand) const override;
   void inherit(TargetNode &curr, const ExpansionRef expand,
-                       size_t which_child) const override { }
+               size_t which_child) const override { }
   void process(TargetNode &curr, std::vector<SourceNode> &consider,
-                       bool curr_is_leaf) const override;
+               bool curr_is_leaf) const override;
 
   //One option would be to cause this test to always return false, meaning the
   // trees would not refine at all, and thus create two huge nodes, and then

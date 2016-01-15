@@ -43,6 +43,7 @@ struct TargetRefLCOSetStoTData {
 struct TargetRefLCOSetMtoTData {
   int code;
   int type;
+  double scale; 
   size_t bytes;
   char data[];
 };
@@ -50,6 +51,7 @@ struct TargetRefLCOSetMtoTData {
 struct TargetRefLCOSetLtoTData {
   int code;
   int type;
+  double scale; 
   size_t bytes;
   char data[];
 };
@@ -94,7 +96,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
         static_cast<TargetRefLCOSetMtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
-    expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count]);
+    expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kLtoT) {
@@ -102,7 +104,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
         static_cast<TargetRefLCOSetLtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
                                          input->bytes);
-    expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count]);
+    expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
   } else if (*code == kFinish) {
@@ -214,13 +216,15 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
 }
 
 
-void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
+void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data, 
+                                  double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
   TargetRefLCOSetMtoTData *input =
       static_cast<TargetRefLCOSetMtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kMtoT;
   input->type = type;
+  input->scale = scale; 
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
@@ -228,13 +232,15 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data) const {
 }
 
 
-void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data) const {
+void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data, 
+                                  double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
   TargetRefLCOSetLtoTData *input =
       static_cast<TargetRefLCOSetLtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kLtoT;
   input->type = type;
+  input->scale = scale; 
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);

@@ -126,10 +126,11 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-int expansion_s_to_m_handler(Source *sources, int n_src, double cx, double cy,
-                             double cz, hpx_addr_t expand, int type) {
+int expansion_s_to_m_handler(Source *sources, int n_src, 
+                             double cx, double cy, double cz, double scale, 
+                             hpx_addr_t expand, int type) {
   auto local = interpret_expansion(type, nullptr, 0);
-  auto multi = local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src]);
+  auto multi = local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
@@ -141,14 +142,15 @@ int expansion_s_to_m_handler(Source *sources, int n_src, double cx, double cy,
 }
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_m_action, expansion_s_to_m_handler,
-           HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
-           HPX_ADDR, HPX_INT);
+           HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, 
+           HPX_DOUBLE, HPX_ADDR, HPX_INT);
 
 
-int expansion_s_to_l_handler(Source *sources, int n_src, double cx, double cy,
-                             double cz, hpx_addr_t expand, int type) {
+int expansion_s_to_l_handler(Source *sources, int n_src, 
+                             double cx, double cy, double cz, double scale, 
+                             hpx_addr_t expand, int type) {
   auto local = interpret_expansion(type, nullptr, 0);
-  auto multi = local->S_to_L(Point{cx, cy, cz}, sources, &sources[n_src]);
+  auto multi = local->S_to_L(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
@@ -161,7 +163,7 @@ int expansion_s_to_l_handler(Source *sources, int n_src, double cx, double cy,
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_l_action, expansion_s_to_l_handler,
            HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
-           HPX_ADDR, HPX_INT);
+           HPX_DOUBLE, HPX_ADDR, HPX_INT);
 
 
 int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
@@ -251,29 +253,31 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_INT, HPX_ADDR, HPX_INT, HPX_DOUBLE);
 
 
-int expansion_m_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
+int expansion_m_to_t_handler(int n_targets, double scale, 
+                             hpx_addr_t targ, int type) {
   TargetRef targets{targ, n_targets};
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  targets.contribute_M_to_T(type, ldata->payload_size, ldata->payload);
+  targets.contribute_M_to_T(type, ldata->payload_size, ldata->payload, scale);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            expansion_m_to_t_action, expansion_m_to_t_handler,
-           HPX_INT, HPX_ADDR, HPX_INT);
+           HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
 
 
-int expansion_l_to_t_handler(int n_targets, hpx_addr_t targ, int type) {
+int expansion_l_to_t_handler(int n_targets, double scale, 
+                             hpx_addr_t targ, int type) {
   TargetRef targets{targ, n_targets};
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  targets.contribute_L_to_T(type, ldata->payload_size, ldata->payload);
+  targets.contribute_L_to_T(type, ldata->payload_size, ldata->payload, scale);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
   return HPX_SUCCESS;
@@ -339,25 +343,27 @@ void ExpansionRef::destroy() {
 }
 
 
-void ExpansionRef::S_to_M(Point center, SourceRef sources) const {
+void ExpansionRef::S_to_M(Point center, SourceRef sources, 
+                          double scale) const {
   schedule();
   int nsrc = sources.n();
   double cx = center.x();
   double cy = center.y();
   double cz = center.z();
   hpx_call(sources.data(), expansion_s_to_m_action, HPX_NULL,
-           &nsrc, &cx, &cy, &cz, &data_, &type_);
+           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_);
 }
 
 
-void ExpansionRef::S_to_L(Point center, SourceRef sources) const {
+void ExpansionRef::S_to_L(Point center, SourceRef sources, 
+                          double scale) const {
   schedule();
   int nsrc = sources.n();
   double cx = center.x();
   double cy = center.y();
   double cz = center.z();
   hpx_call(sources.data(), expansion_s_to_l_action, HPX_NULL,
-           &nsrc, &cx, &cy, &cz, &data_, &type_);
+           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_);
 }
 
 
@@ -389,21 +395,21 @@ void ExpansionRef::L_to_L(ExpansionRef source, int to_child,
 }
 
 
-void ExpansionRef::M_to_T(TargetRef targets) const {
+void ExpansionRef::M_to_T(TargetRef targets, double scale) const {
   targets.schedule(1);
   int nsend = targets.n();
   hpx_addr_t tsend = targets.data();
   hpx_call_when(data_, data_, expansion_m_to_t_action, HPX_NULL,
-                &nsend, &tsend, &type_);
+                &nsend, &scale, &tsend, &type_);
 }
 
 
-void ExpansionRef::L_to_T(TargetRef targets) const {
+void ExpansionRef::L_to_T(TargetRef targets, double scale) const {
   targets.schedule(1);
   int nsend = targets.n();
   hpx_addr_t tsend = targets.data();
   hpx_call_when(data_, data_, expansion_l_to_t_action, HPX_NULL,
-                &nsend, &tsend, &type_);
+                &nsend, &scale, &tsend, &type_);
 }
 
 

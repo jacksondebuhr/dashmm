@@ -8,8 +8,10 @@
 
 #include "include/bh_method.h"
 #include "include/direct_method.h"
+#include "include/fmm_method.h"
 #include "include/expansion.h"
 #include "include/laplace_com.h"
+#include "include/laplace_sph.h"
 #include "include/method.h"
 
 
@@ -18,7 +20,7 @@ namespace dashmm {
 
 
 Method *bh_method(double theta) {
-  Method *retval = new BHMethod{theta};
+  Method *retval = new BH{theta};
   return retval;
 }
 
@@ -35,7 +37,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 
 Method *direct_method() {
-  Method *retval = new DirectMethod{};
+  Method *retval = new Direct{};
   return retval;
 }
 
@@ -48,11 +50,24 @@ HPX_ACTION(HPX_FUNCTION, 0,
            direct_method_create_action, direct_method_create_handler,
            HPX_SIZE_T, HPX_POINTER);
 
+Method *fmm_method() {
+  Method *retval = new FMM{};
+  return retval;
+}
+
+Method *fmm_method_create_handler(size_t size, MethodSerial *data) {
+  assert(size == sizeof(MethodSerial)); 
+  return fmm_method();
+}
+HPX_ACTION(HPX_FUNCTION, 0, 
+           fmm_method_create_action, fmm_method_create_handler, 
+           HPX_SIZE_T, HPX_POINTER);
 
 void register_built_in_methods() {
   assert(kSuccess == register_method(kMethodBH, bh_method_create_action, 0));
   assert(kSuccess == register_method(
                         kMethodDirect, direct_method_create_action, 0));
+  //assert(kSuccess == register_method(kMethodFMM, fmm_method_create_action, 0));
 }
 
 
@@ -78,6 +93,14 @@ Expansion *laplace_COM_interpret_handler(void *data, size_t size) {
 HPX_ACTION(HPX_FUNCTION, 0,
            laplace_COM_interpret_action, laplace_COM_interpret_handler,
            HPX_SIZE_T, HPX_POINTER);
+
+Expansion *laplace_sph_expansion(int n_digits) {
+  Expansion *retval = new LaplaceSPH{Point{0.0, 0.0, 0.0}, n_digits}; 
+  return retval;
+}
+
+  
+
 
 
 void register_built_in_expansions() {

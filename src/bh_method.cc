@@ -8,15 +8,16 @@
 namespace dashmm {
 
 
-void BHMethod::generate(SourceNode &curr, const ExpansionRef expand) const {
+void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
   ExpansionRef currexp = curr.expansion();
   SourceRef sources = curr.parts();
-  currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources);
+  double unused = 0.0; 
+  currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, unused);
 }
 
 
-void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
+void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
   ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
@@ -31,9 +32,10 @@ void BHMethod::aggregate(SourceNode &curr, const ExpansionRef expand) const {
 
 //NOTE: We pass in curr_is_leaf separate here, as the TargetNode will not have
 // been refined yet. Process happens during partition.
-void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
-                       bool curr_is_leaf) const {
+void BH::process(TargetNode &curr, std::vector<SourceNode> &consider,
+                 bool curr_is_leaf) const {
   std::vector<SourceNode> newcons{};
+  double unused = 0.0; 
 
   do {
     for (auto i = consider.begin(); i != consider.end(); ++i) {
@@ -46,7 +48,7 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
         } else {
           ExpansionRef expand = i->expansion();
           TargetRef targets = curr.parts();
-          expand.M_to_T(targets);
+          expand.M_to_T(targets, unused);
         }
       } else if (i->is_leaf()) {
         if (curr_is_leaf) {
@@ -77,14 +79,14 @@ void BHMethod::process(TargetNode &curr, std::vector<SourceNode> &consider,
 }
 
 
-bool BHMethod::MAC(Point exp_point, double size, Point pos) const {
+bool BH::MAC(Point exp_point, double size, Point pos) const {
   Point disp = point_sub(pos, exp_point);
   double theta = size / disp.norm();
   return theta < local_->data[0];
 }
 
 
-Point BHMethod::nearest(Point scenter, Point tcenter, double tsize) const {
+Point BH::nearest(Point scenter, Point tcenter, double tsize) const {
   Point offset{point_sub(scenter, tcenter)};
 
   double len{0.5 * tsize};
