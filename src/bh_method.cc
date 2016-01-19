@@ -9,7 +9,8 @@ namespace dashmm {
 
 
 void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
-  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  int n_digits = -1; 
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
   SourceRef sources = curr.parts();
   double unused = 0.0; 
@@ -18,7 +19,8 @@ void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
 
 
 void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}));
+  int n_digits = -1; 
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
     SourceNode kid = curr.child(i);

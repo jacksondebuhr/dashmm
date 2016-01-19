@@ -134,7 +134,8 @@ int expansion_s_to_m_handler(Source *sources, int n_src,
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
-  ExpansionRef total{type, expand};
+  int n_digits = -1; 
+  ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, serial);
   free(serial);
 
@@ -154,7 +155,8 @@ int expansion_s_to_l_handler(Source *sources, int n_src,
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
-  ExpansionRef total{type, expand};
+  int n_digits = -1; 
+  ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, serial);
   free(serial);
 
@@ -181,7 +183,8 @@ int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
   size_t bytes = translated->bytes();
   void *transexpand = translated->release();
 
-  ExpansionRef total{type, expand};
+  int n_digits = -1; 
+  ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
   free(transexpand);
@@ -241,7 +244,8 @@ int expansion_l_to_l_handler(int type, hpx_addr_t expand, int to_child,
   size_t bytes = translated->bytes();
   void *transexpand = translated->release();
 
-  ExpansionRef total{type, expand};
+  int n_digits = -1; 
+  ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
   free(transexpand);
@@ -299,7 +303,8 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
 
 
 int expansion_add_handler(hpx_addr_t expand, int type) {
-  ExpansionRef total{type, expand};
+  int n_digits = -1; 
+  ExpansionRef total{type, expand, n_digits};
 
   ExpansionLCOHeader *ldata{nullptr};
   //HACK: This action is local to the expansion, so we getref here with
@@ -436,8 +441,9 @@ void ExpansionRef::contribute(size_t bytes, char *payload) {
 }
 
 
-std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center) const {
-  return create_expansion(type_, center);
+std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center, 
+                                                           int n_digits) const {
+  return create_expansion(type_, center, n_digits);
 }
 
 
@@ -461,20 +467,22 @@ void ExpansionRef::schedule() const {
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
                                  hpx_addr_t where) {
   if (exp == nullptr) {
-    return ExpansionRef{0, HPX_NULL};
+    int n_digits = -1; 
+    return ExpansionRef{0, HPX_NULL, n_digits};
   }
 
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
   int type = exp->type();
   void *ldata = exp->release();
+  int n_digits = exp->accuracy(); 
 
   hpx_addr_t retval{HPX_NULL};
   hpx_call_sync(where, globalize_expansion_action, &retval, sizeof(retval),
                 ldata, bytes);
   free(ldata);
 
-  return ExpansionRef{type, retval};
+  return ExpansionRef{type, retval, n_digits};
 }
 
 

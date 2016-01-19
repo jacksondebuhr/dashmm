@@ -82,6 +82,7 @@ public:
   size_t bytes() const override {return bytes_;}
   bool valid() const override {return data_ != nullptr;}
   int type() const override {return kExpansionLaplaceSPH;}
+  int accuracy() const override {return data_->n_digits;}
   bool provides_L() const override {return true;}
   bool provides_exp() const override {return false;}
   size_t size() const override {

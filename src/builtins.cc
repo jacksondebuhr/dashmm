@@ -95,8 +95,9 @@ HPX_ACTION(HPX_FUNCTION, 0,
            HPX_SIZE_T, HPX_POINTER);
 
 Expansion *laplace_sph_expansion(int n_digits) {
-  Expansion *retval = new LaplaceSPH{Point{0.0, 0.0, 0.0}, n_digits}; 
-  return retval;
+  //Expansion *retval = new LaplaceSPH{Point{0.0, 0.0, 0.0}, n_digits}; 
+  //return retval;
+  return nullptr; 
 }
 
   

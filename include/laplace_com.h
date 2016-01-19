@@ -61,6 +61,7 @@ class LaplaceCOM : public Expansion {
   size_t bytes() const override {return bytes_;}
   bool valid() const override {return data_ != nullptr;}
   int type() const override {return kExpansionLaplaceCOM;}
+  int accuracy() const override {return -1;} 
   bool provides_L() const override {return false;}
   bool provides_exp() const override {return false;}
   size_t size() const override {return 10;}

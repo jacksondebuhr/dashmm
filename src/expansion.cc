@@ -136,11 +136,12 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
       reinterpret_cast<expansion_interpret_function_t>(
         hpx_action_get_handler(entry->second.interpret)
       );
-  return std::unique_ptr<Expansion>{func(data, size)};
+  int n_digits = -1; 
+  return std::unique_ptr<Expansion>{func(data, size, n_digits)};
 }
 
 
-std::unique_ptr<Expansion> create_expansion(int type, Point center) {
+std::unique_ptr<Expansion> create_expansion(int type, Point center, int n_digits) {
   auto entry = expansion_table_->find(type);
   if (entry == expansion_table_->end()) {
     return nullptr;
@@ -149,7 +150,8 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center) {
       reinterpret_cast<expansion_creation_function_t>(
         hpx_action_get_handler(entry->second.create)
       );
-  return std::unique_ptr<Expansion>{func(center.x(), center.y(), center.z())};
+  //int n_digits = -1; 
+  return std::unique_ptr<Expansion>{func(center.x(), center.y(), center.z(), n_digits)};
 }
 
 

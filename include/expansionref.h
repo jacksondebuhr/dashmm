@@ -37,7 +37,8 @@ namespace dashmm {
 class ExpansionRef {
  public:
   /// Construct the expansion from a given global address.
-  ExpansionRef(int type, hpx_addr_t addr) : type_{type}, data_{addr} { }
+  ExpansionRef(int type, hpx_addr_t addr, int n_digits) 
+    : type_{type}, data_{addr}, n_digits_{n_digits} { }
 
   /// Destroy the GAS data referred by the object.
   void destroy();
@@ -50,6 +51,9 @@ class ExpansionRef {
 
   /// What type of expansion is this referring to.
   int type() const {return type_;}
+
+  /// Accuracy of expansion
+  int accuracy() const {return n_digits_;}
 
   /// Set this expansion with the multipole expansion of the given sources
   ///
@@ -171,7 +175,7 @@ class ExpansionRef {
   /// \param center - the center point for the next expansion.
   ///
   /// \returns - the resulting expansion.
-  std::unique_ptr<Expansion> get_new_expansion(Point center) const;
+  std::unique_ptr<Expansion> get_new_expansion(Point center, int n_digits) const;
 
   /// Signal to the expansion that all operations have been scheduled.
   ///
@@ -202,6 +206,7 @@ class ExpansionRef {
  private:
   int type_;
   hpx_addr_t data_;     //this is the LCO
+  int n_digits_; 
 };
 
 

@@ -329,7 +329,8 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts));
   hpx_addr_t partitiondone =
       source_root.partition(source_parts, sources.n(), parms->refinement_limit,
-                            expansion.type(), expansion.data());
+                            expansion.type(), expansion.data(), 
+                            expansion.accuracy());
   hpx_gas_unpin(sources.data());
   sources.destroy();
 

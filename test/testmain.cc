@@ -31,6 +31,7 @@ struct InputArguments {
   int refinement_limit;
   std::string test_case;
   bool verify;
+  int accuracy; 
 };
 
 
@@ -39,7 +40,7 @@ void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s --method=[bh] "
           "--nsources=num --sourcedata=[cube/sphere/plummer] "
           "--ntargets=num --targetdata=[cube/sphere/plummer] "
-          "--threshold=num --verify=[yes/no]\n",
+          "--threshold=num --verify=[yes/no] --accuracy=num\n",
           progname);
 }
 
@@ -53,6 +54,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   retval.refinement_limit = 40;
   retval.test_case = std::string{"bh"};
   retval.verify = true;
+  retval.accuracy = 3; 
 
   int opt = 0;
   static struct option long_options[] = {
@@ -63,6 +65,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     {"targetdata", required_argument, 0, 'g'},
     {"threshold", required_argument, 0, 'l'},
     {"verify", required_argument, 0, 'v'},
+    {"accuracy", required_argument, 0, 'a'}, 
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
@@ -280,7 +283,11 @@ void perform_evaluation_test(InputArguments args) {
   if (args.test_case == std::string{"bh"}) {
     test_method = dashmm::bh_method(0.6);
     test_expansion = dashmm::laplace_COM_expansion();
+  } else if (args.test_case == std::string{"fmm"}) {
+    test_method = dashmm::fmm_method(); 
+    test_expansion = dashmm::laplace_sph_expansion(args.accuracy); 
   } //TODO: more cases once they are implemented
+
   assert(test_method && test_expansion);
 
   //evaluate - first for the approximate version
