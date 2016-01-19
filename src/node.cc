@@ -469,7 +469,7 @@ int target_node_partition_handler(TargetNodeData *node,
 
   //At this point, all work on the current expansion will have been scheduled,
   // so we mark the LCO as such.
-  expand.finalize();
+  node->expansion.finalize();
   //Also, all the work on the targets for this node will have been scheduled as
   // well.
   if (!refine) {
@@ -791,7 +791,7 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
   parms->n_parts = n_parts;
   parms->n_parts_total = n_parts;
   parms->limit = limit;
-  parms->expansion = expansion();
+  parms->expansion = expand; 
   parms->which_child = which_child;
   parms->n_consider = consider.size();
   for (size_t i = 0; i < consider.size(); ++i) {

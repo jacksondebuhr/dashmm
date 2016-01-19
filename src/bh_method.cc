@@ -31,6 +31,12 @@ void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
   }
 }
 
+void BH::inherit(TargetNode &curr, const ExpansionRef expand,
+                 size_t which_child) const { 
+  int n_digits = -1; 
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
+}
+
 
 //NOTE: We pass in curr_is_leaf separate here, as the TargetNode will not have
 // been refined yet. Process happens during partition.
