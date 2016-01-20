@@ -90,7 +90,7 @@ HPX_ACTION(HPX_DEFAULT, 0,
 
 
 ReturnCode register_expansion(int type, hpx_action_t creator,
-                                 hpx_action_t interpreter, int user) {
+                              hpx_action_t interpreter, int user) {
   if (user) {
     if (type < kFirstUserExpansionType || type > kLastUserExpansionType) {
       return kDomainError;
@@ -127,7 +127,7 @@ void fini_expansion_table() {
 
 
 std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
-                                               size_t size) {
+                                               size_t size, int n_digits) {
   auto entry = expansion_table_->find(type);
   if (entry == expansion_table_->end()) {
     return std::unique_ptr<Expansion>{nullptr};
@@ -136,12 +136,12 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
       reinterpret_cast<expansion_interpret_function_t>(
         hpx_action_get_handler(entry->second.interpret)
       );
-  int n_digits = -1; 
   return std::unique_ptr<Expansion>{func(data, size, n_digits)};
 }
 
 
-std::unique_ptr<Expansion> create_expansion(int type, Point center, int n_digits) {
+std::unique_ptr<Expansion> create_expansion(int type, Point center, 
+                                            int n_digits) {
   auto entry = expansion_table_->find(type);
   if (entry == expansion_table_->end()) {
     return nullptr;
@@ -150,8 +150,8 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center, int n_digits
       reinterpret_cast<expansion_creation_function_t>(
         hpx_action_get_handler(entry->second.create)
       );
-  //int n_digits = -1; 
-  return std::unique_ptr<Expansion>{func(center.x(), center.y(), center.z(), n_digits)};
+  return std::unique_ptr<Expansion>{
+    func(center.x(), center.y(), center.z(), n_digits)};
 }
 
 

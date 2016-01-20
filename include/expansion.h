@@ -214,7 +214,8 @@ class Expansion {
 /// To register a user-defined expansion with DASHMM, the user will need to
 /// provide a function that can be used to create that sort of expansion
 /// given a Point indicating the center of the expansion.
-typedef Expansion *(*expansion_creation_function_t)(double, double, double, int);
+typedef Expansion *(*expansion_creation_function_t)(double, double, double, 
+                                                    int);
 
 /// The signature of a function that interprets existing data as an expansion
 ///
@@ -227,7 +228,8 @@ typedef Expansion *(*expansion_creation_function_t)(double, double, double, int)
 /// 'empty' expansion of the new type. One example of this is the S_to_T
 /// function. The behavior of this function is the same for every instance of
 /// the same type of expansion.
-typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes, int size);
+typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes, 
+                                                     int n_digits); 
 
 
 /// Register a user-defined expansion with DASHMM
@@ -301,7 +303,7 @@ void fini_expansion_table();
 ///
 /// \returns - the resulting expansion
 std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
-                                               size_t size);
+                                               size_t size, int n_digits);
 
 /// Create an expansion of the given type
 ///
@@ -313,7 +315,8 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
 /// \param center - the Point around which to create the expansion
 ///
 /// \returns - the resulting expansion
-std::unique_ptr<Expansion> create_expansion(int type, Point center, int n_digits);
+std::unique_ptr<Expansion> create_expansion(int type, Point center, 
+                                            int n_digits); 
 
 
 } // namespace dashmm
