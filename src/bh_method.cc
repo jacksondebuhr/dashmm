@@ -33,7 +33,7 @@ void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
 
 void BH::inherit(TargetNode &curr, const ExpansionRef expand,
                  size_t which_child) const { 
-  int n_digits = -1; 
+  int n_digits = expand.accuracy(); 
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
 }
 
