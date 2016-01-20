@@ -205,6 +205,7 @@ struct ExpansionMtoLParams {
   Index s_index;
   double s_size;
   Index t_index;
+  int n_digits; 
 };
 
 int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
@@ -214,10 +215,8 @@ int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
 
-  int n_digits = -1; 
-
   auto lexp = interpret_expansion(parms->total.type(), ldata->payload,
-                                  ldata->payload_size, n_digits);
+                                  ldata->payload_size, parms->n_digits);
   auto translated = lexp->M_to_L(parms->s_index, parms->s_size, parms->t_index);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -393,7 +392,7 @@ void ExpansionRef::M_to_L(ExpansionRef source, Index s_index, double s_size,
                           Index t_index) const {
   assert(type_ == source.type());
   schedule();
-  ExpansionMtoLParams args{*this, s_index, s_size, t_index};
+  ExpansionMtoLParams args{*this, s_index, s_size, t_index, n_digits_};
   hpx_call_when(source.data(), source.data(), expansion_m_to_l_action, HPX_NULL,
                 &args, sizeof(args));
 }
