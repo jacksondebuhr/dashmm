@@ -62,8 +62,8 @@ extern std::map<int, uLaplaceSPHTable> builtin_laplace_table_;
 struct LaplaceSPHData {
   int reserved;
   int type; 
-  Point center; 
   int n_digits; 
+  Point center; 
   dcomplex_t expansion[];
 }; 
 
