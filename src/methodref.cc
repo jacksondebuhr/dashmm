@@ -26,7 +26,8 @@ int MethodRef::type() const {
 
 bool MethodRef::compatible_with(const ExpansionRef expand) const {
   setup_local_method();
-  auto locexp = interpret_expansion(expand.type(), nullptr, 0);
+  int n_digits = -1; 
+  auto locexp = interpret_expansion(expand.type(), nullptr, 0, n_digits);
   return met_->compatible_with(locexp.get());
 }
 

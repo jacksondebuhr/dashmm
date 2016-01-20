@@ -257,6 +257,7 @@ struct EvaluateParams {
   int refinement_limit;
   size_t method_size;
   size_t expansion_size;
+  int n_digits; 
   char data[];
 };
 
@@ -302,7 +303,8 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   char *local_copy = static_cast<char *>(malloc(parms->expansion_size));
   memcpy(local_copy, expansion_base, parms->expansion_size);
   auto local_expansion =
-      interpret_expansion(*type, local_copy, parms->expansion_size);
+    interpret_expansion(*type, local_copy, parms->expansion_size, 
+                        parms->n_digits);
   ExpansionRef expansion =
     globalize_expansion(std::move(local_expansion), HPX_HERE);
   expansion.finalize();
@@ -392,6 +394,7 @@ ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
   args->refinement_limit = refinement_limit;
   args->method_size = method_size;
   args->expansion_size = expansion_size;
+  args->n_digits = expansion->accuracy(); 
   memcpy(args->data, method_serial, method_size);
   memcpy(args->data + method_size, expansion_serial, expansion_size);
 

@@ -80,13 +80,15 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 void targetref_lco_operation_handler(TargetRefLCOData *lhs,
                                      void *rhs, size_t bytes) {
+  int n_digits = -1; // FIXME
+
   int *code = static_cast<int *>(rhs);
   if (*code == kSetOnly) {    //this is a pair of ints, a code and a count
     lhs->scheduled += code[1];
   } else if (*code == kStoT) {
     TargetRefLCOSetStoTData *input =
         static_cast<TargetRefLCOSetStoTData *>(rhs);
-    auto expansion = interpret_expansion(input->type, nullptr, 0);
+    auto expansion = interpret_expansion(input->type, nullptr, 0, n_digits);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
@@ -95,7 +97,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     TargetRefLCOSetMtoTData *input =
         static_cast<TargetRefLCOSetMtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
-                                         input->bytes);
+                                         input->bytes, n_digits);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
@@ -103,7 +105,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     TargetRefLCOSetLtoTData *input =
         static_cast<TargetRefLCOSetLtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
-                                         input->bytes);
+                                         input->bytes, n_digits);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
