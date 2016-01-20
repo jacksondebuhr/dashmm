@@ -173,8 +173,8 @@ int source_node_child_partition_done_handler(SourceNodeData *node,
                                              hpx_addr_t partdone,
                                              int type,
                                              hpx_addr_t expand, 
-                                             int accuracy) {
-  ExpansionRef expref{type, expand, accuracy};
+                                             int n_digits) {
+  ExpansionRef expref{type, expand, n_digits};
   MethodRef method{node->method};
   SourceNode snode{hpx_thread_current_target()};
 
@@ -196,7 +196,7 @@ struct SourceNodePartitionParams {
   int limit;
   int type;
   hpx_addr_t expand;
-  int accuracy; 
+  int n_digits; 
   int n_sources;
   Source sources[];
 };
@@ -218,7 +218,7 @@ int source_node_partition_handler(SourceNodeData *node,
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
     //this is the prototype
-    ExpansionRef expref{parms->type, parms->expand, parms->accuracy}; 
+    ExpansionRef expref{parms->type, parms->expand, parms->n_digits}; 
 
     //This will cause the creation of a new expansion, that will be globalized
     // and then set as the expansion for this node. It will be created with
@@ -304,7 +304,7 @@ int source_node_partition_handler(SourceNodeData *node,
     args->limit = parms->limit;
     args->type = parms->type;
     args->expand = parms->expand;
-    args->accuracy = parms->accuracy;
+    args->n_digits = parms->n_digits;
     args->n_sources = n_per_child[i];
     memcpy(args->sources, cparts[i], sizeof(Source) * n_per_child[i]);
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, args, argsz);
@@ -313,7 +313,7 @@ int source_node_partition_handler(SourceNodeData *node,
 
   hpx_call_when(childpartdone, hpx_thread_current_target(),
                 source_node_child_partition_done_action, parms->partdone,
-                &childpartdone, &parms->type, &parms->expand, &parms->accuracy);
+                &childpartdone, &parms->type, &parms->expand, &parms->n_digits);
 
   return HPX_SUCCESS;
 }
@@ -566,8 +566,7 @@ SourceNode::SourceNode(DomainGeometry g, Index idx,
   for (int i = 0; i < 8; ++i) {
     local_->child[i] = HPX_NULL;
   }
-  int n_digits = -1; 
-  local_->expansion = ExpansionRef{0, HPX_NULL, n_digits};
+  local_->expansion = ExpansionRef{0, HPX_NULL, -1};
   local_->method = method;
   local_->sources = SourceRef{};
 }
@@ -585,7 +584,7 @@ void SourceNode::destroy() {
 
 
 hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
-                                 int type, hpx_addr_t expand, int accuracy) {
+                                 int type, hpx_addr_t expand, int n_digits) {
   hpx_addr_t retval = hpx_lco_future_new(0);
   assert(retval != HPX_NULL);
 
@@ -597,7 +596,7 @@ hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
   args->limit = limit;
   args->type = type;
   args->expand = expand;
-  args->accuracy = accuracy; 
+  args->n_digits = n_digits; 
   args->n_sources = n_sources;
   memcpy(args->sources, sources, sizeof(Source) * n_sources);
   hpx_call(data_, source_node_partition_action, HPX_NULL,

@@ -85,9 +85,9 @@ class SourceNode {
   /// \param limit - the refinement limit for the partitioning
   /// \param type - the type of the expansion
   /// \param expand - global address to the prototype expansion data
-  /// \param accuracy - accuracy of the expansion
+  /// \param n_digits - accuracy of the expansion
   hpx_addr_t partition(Source *parts, int n_parts, int limit,
-                       int type, hpx_addr_t expand, int accuracy);
+                       int type, hpx_addr_t expand, int n_digits);
 
   /// Is the referred to node a leaf?
   bool is_leaf() const;
