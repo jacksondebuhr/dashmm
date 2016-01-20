@@ -43,6 +43,7 @@ struct TargetRefLCOSetStoTData {
 struct TargetRefLCOSetMtoTData {
   int code;
   int type;
+  int n_digits; 
   double scale; 
   size_t bytes;
   char data[];
@@ -51,6 +52,7 @@ struct TargetRefLCOSetMtoTData {
 struct TargetRefLCOSetLtoTData {
   int code;
   int type;
+  int n_digits; 
   double scale; 
   size_t bytes;
   char data[];
@@ -80,15 +82,13 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 void targetref_lco_operation_handler(TargetRefLCOData *lhs,
                                      void *rhs, size_t bytes) {
-  int n_digits = -1; // FIXME
-
   int *code = static_cast<int *>(rhs);
   if (*code == kSetOnly) {    //this is a pair of ints, a code and a count
     lhs->scheduled += code[1];
   } else if (*code == kStoT) {
     TargetRefLCOSetStoTData *input =
         static_cast<TargetRefLCOSetStoTData *>(rhs);
-    auto expansion = interpret_expansion(input->type, nullptr, 0, n_digits);
+    auto expansion = interpret_expansion(input->type, nullptr, 0, -1);
     expansion->S_to_T(input->sources, &input->sources[input->count],
                       lhs->targets, &lhs->targets[lhs->count]);
     expansion->release();
@@ -97,7 +97,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     TargetRefLCOSetMtoTData *input =
         static_cast<TargetRefLCOSetMtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
-                                         input->bytes, n_digits);
+                                         input->bytes, input->n_digits);
     expansion->M_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
@@ -105,7 +105,7 @@ void targetref_lco_operation_handler(TargetRefLCOData *lhs,
     TargetRefLCOSetLtoTData *input =
         static_cast<TargetRefLCOSetLtoTData *>(rhs);
     auto expansion = interpret_expansion(input->type, input->data,
-                                         input->bytes, n_digits);
+                                         input->bytes, input->n_digits);
     expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
     expansion->release();
     lhs->arrived += 1;
@@ -219,13 +219,14 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
 
 
 void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data, 
-                                  double scale) const {
+                                  int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
   TargetRefLCOSetMtoTData *input =
       static_cast<TargetRefLCOSetMtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kMtoT;
   input->type = type;
+  input->n_digits = n_digits; 
   input->scale = scale; 
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
@@ -235,13 +236,14 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
 
 
 void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data, 
-                                  double scale) const {
+                                  int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
   TargetRefLCOSetLtoTData *input =
       static_cast<TargetRefLCOSetLtoTData *>(malloc(inputsize));
   assert(input);
   input->code = kLtoT;
   input->type = type;
+  input->n_digits = n_digits; 
   input->scale = scale; 
   input->bytes = bytes;
   memcpy(input->data, data, bytes);

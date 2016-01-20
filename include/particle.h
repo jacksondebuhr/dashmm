@@ -120,18 +120,20 @@ class TargetRef {
   /// \param type - the type of expansion serving the M->T operation
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
+  /// \param n_digits - accuracy of the expansion 
   /// \param scale - scaling factor
   void contribute_M_to_T(int type, size_t bytes, void *data, 
-                         double scale) const;
+                         int n_digits, double scale) const;
 
   /// Contribute a L->T operation to the referred targets
   ///
   /// \param type - the type of expansion serving the L->T operation
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
+  /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
   void contribute_L_to_T(int type, size_t bytes, void *data, 
-                         double scale) const;
+                         int n_digits, double scale) const;
 
  private:
   hpx_addr_t data_;
