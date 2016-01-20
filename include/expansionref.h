@@ -175,7 +175,8 @@ class ExpansionRef {
   /// \param center - the center point for the next expansion.
   ///
   /// \returns - the resulting expansion.
-  std::unique_ptr<Expansion> get_new_expansion(Point center, int n_digits) const;
+  std::unique_ptr<Expansion> get_new_expansion(Point center, 
+                                               int n_digits) const;
 
   /// Signal to the expansion that all operations have been scheduled.
   ///

@@ -79,14 +79,19 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
     assert(lhs->finished == 0);
     lhs->scheduled += 1;
   } else if (*code == kContribute) {
+    int n_digits = -1; 
+
+
     //create the expansion from the payload
     int *type = reinterpret_cast<int *>(lhs->payload + sizeof(int));
-    auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size);
+    auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size, 
+                                     n_digits);
 
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
     int *rhstype = reinterpret_cast<int *>(input + sizeof(int));
-    auto incoming = interpret_expansion(*rhstype, input, bytes);
+    auto incoming = interpret_expansion(*rhstype, input, bytes, 
+                                        n_digits);
 
     //add the one to the other
     local->add_expansion(incoming.get());
@@ -128,13 +133,12 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 int expansion_s_to_m_handler(Source *sources, int n_src, 
                              double cx, double cy, double cz, double scale, 
-                             hpx_addr_t expand, int type) {
-  auto local = interpret_expansion(type, nullptr, 0);
+                             hpx_addr_t expand, int type, int n_digits) {
+  auto local = interpret_expansion(type, nullptr, 0, n_digits);
   auto multi = local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
-  int n_digits = -1; 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, serial);
   free(serial);
@@ -144,18 +148,17 @@ int expansion_s_to_m_handler(Source *sources, int n_src,
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_m_action, expansion_s_to_m_handler,
            HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, 
-           HPX_DOUBLE, HPX_ADDR, HPX_INT);
+           HPX_DOUBLE, HPX_ADDR, HPX_INT, HPX_INT);
 
 
 int expansion_s_to_l_handler(Source *sources, int n_src, 
                              double cx, double cy, double cz, double scale, 
-                             hpx_addr_t expand, int type) {
-  auto local = interpret_expansion(type, nullptr, 0);
+                             hpx_addr_t expand, int type, int n_digits) {
+  auto local = interpret_expansion(type, nullptr, 0, n_digits);
   auto multi = local->S_to_L(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
-  int n_digits = -1; 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, serial);
   free(serial);
@@ -165,17 +168,18 @@ int expansion_s_to_l_handler(Source *sources, int n_src,
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_l_action, expansion_s_to_l_handler,
            HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
-           HPX_DOUBLE, HPX_ADDR, HPX_INT);
+           HPX_DOUBLE, HPX_ADDR, HPX_INT, HPX_INT);
 
 
-int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
-                             double s_size) {
+int expansion_m_to_m_handler(int type, hpx_addr_t expand, int n_digits, 
+                             int from_child, double s_size) {
   hpx_addr_t target = hpx_thread_current_target();
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size);
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size, 
+                                  n_digits);
   auto translated = lexp->M_to_M(from_child, s_size);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -183,7 +187,6 @@ int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
   size_t bytes = translated->bytes();
   void *transexpand = translated->release();
 
-  int n_digits = -1; 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
@@ -193,7 +196,7 @@ int expansion_m_to_m_handler(int type, hpx_addr_t expand, int from_child,
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            expansion_m_to_m_action, expansion_m_to_m_handler,
-           HPX_INT, HPX_ADDR, HPX_INT, HPX_DOUBLE);
+           HPX_INT, HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
 
 
 struct ExpansionMtoLParams {
@@ -209,8 +212,11 @@ int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
+
+  int n_digits = -1; 
+
   auto lexp = interpret_expansion(parms->total.type(), ldata->payload,
-                                  ldata->payload_size);
+                                  ldata->payload_size, n_digits);
   auto translated = lexp->M_to_L(parms->s_index, parms->s_size, parms->t_index);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -229,14 +235,15 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            HPX_POINTER, HPX_SIZE_T);
 
 
-int expansion_l_to_l_handler(int type, hpx_addr_t expand, int to_child,
-                             double t_size) {
+int expansion_l_to_l_handler(int type, hpx_addr_t expand, int n_digits, 
+                             int to_child, double t_size) {
   hpx_addr_t target = hpx_thread_current_target();
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size);
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size, 
+                                  n_digits);
   auto translated = lexp->L_to_L(to_child, t_size);
   lexp->release();
   hpx_lco_release(target, ldata);
@@ -244,7 +251,6 @@ int expansion_l_to_l_handler(int type, hpx_addr_t expand, int to_child,
   size_t bytes = translated->bytes();
   void *transexpand = translated->release();
 
-  int n_digits = -1; 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
@@ -254,7 +260,7 @@ int expansion_l_to_l_handler(int type, hpx_addr_t expand, int to_child,
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            expansion_l_to_l_action, expansion_l_to_l_handler,
-           HPX_INT, HPX_ADDR, HPX_INT, HPX_DOUBLE);
+           HPX_INT, HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
 
 
 int expansion_m_to_t_handler(int n_targets, double scale, 
@@ -302,8 +308,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
 
 
-int expansion_add_handler(hpx_addr_t expand, int type) {
-  int n_digits = -1; 
+int expansion_add_handler(hpx_addr_t expand, int type, int n_digits) {
   ExpansionRef total{type, expand, n_digits};
 
   ExpansionLCOHeader *ldata{nullptr};
@@ -318,7 +323,7 @@ int expansion_add_handler(hpx_addr_t expand, int type) {
 }
 HPX_ACTION(HPX_DEFAULT, 0,
            expansion_add_action, expansion_add_handler,
-           HPX_ADDR, HPX_INT);
+           HPX_ADDR, HPX_INT, HPX_INT);
 
 
 int globalize_expansion_handler(void *payload, size_t bytes) {
@@ -356,7 +361,7 @@ void ExpansionRef::S_to_M(Point center, SourceRef sources,
   double cy = center.y();
   double cz = center.z();
   hpx_call(sources.data(), expansion_s_to_m_action, HPX_NULL,
-           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_);
+           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_, &n_digits_);
 }
 
 
@@ -368,7 +373,7 @@ void ExpansionRef::S_to_L(Point center, SourceRef sources,
   double cy = center.y();
   double cz = center.z();
   hpx_call(sources.data(), expansion_s_to_l_action, HPX_NULL,
-           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_);
+           &nsrc, &cx, &cy, &cz, &scale, &data_, &type_, &n_digits_);
 }
 
 
@@ -377,7 +382,7 @@ void ExpansionRef::M_to_M(ExpansionRef source, int from_child,
   assert(type_ == source.type());
   schedule();
   hpx_call_when(source.data(), source.data(), expansion_m_to_m_action, HPX_NULL,
-                &type_, &data_, &from_child, &s_size);
+                &type_, &data_, &n_digits_, &from_child, &s_size);
 }
 
 
@@ -396,7 +401,7 @@ void ExpansionRef::L_to_L(ExpansionRef source, int to_child,
   assert(type_ == source.type());
   schedule();
   hpx_call_when(source.data(), source.data(), expansion_l_to_l_action, HPX_NULL,
-                &type_, &data_, &to_child, &t_size);
+                &type_, &data_, &n_digits_, &to_child, &t_size);
 }
 
 
@@ -430,7 +435,7 @@ void ExpansionRef::S_to_T(SourceRef sources, TargetRef targets) const {
 void ExpansionRef::add_expansion(ExpansionRef summand) {
   schedule();  //we are going to have another contribution
   hpx_call_when(summand.data(), summand.data(), expansion_add_action,
-                HPX_NULL, &data_, &type_);
+                HPX_NULL, &data_, &type_, &n_digits_);
 }
 
 
@@ -467,8 +472,7 @@ void ExpansionRef::schedule() const {
 ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
                                  hpx_addr_t where) {
   if (exp == nullptr) {
-    int n_digits = -1; 
-    return ExpansionRef{0, HPX_NULL, n_digits};
+    return ExpansionRef{0, HPX_NULL, -1};
   }
 
   //This is the init data for the LCO
