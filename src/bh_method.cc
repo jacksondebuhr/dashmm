@@ -9,12 +9,12 @@ namespace dashmm {
 
 
 void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = -1; 
+  int n_digits = expand.accuracy(); 
+  double scale = 0.0; // unused for bh
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
   SourceRef sources = curr.parts();
-  double unused = 0.0; 
-  currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, unused);
+  currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, scale);
 }
 
 

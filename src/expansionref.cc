@@ -72,6 +72,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
                                      size_t bytes) {
   int *code = static_cast<int *>(rhs);
+
   if (*code == kFinish) {
     assert(lhs->finished == 0);
     lhs->finished = 1;
@@ -79,19 +80,18 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
     assert(lhs->finished == 0);
     lhs->scheduled += 1;
   } else if (*code == kContribute) {
-    int n_digits = -1; 
+    //create an expansion from the rhs
+    char *input = static_cast<char *>(rhs);
+    int *rhstype = reinterpret_cast<int *>(input + sizeof(int));
+    int *n_digits = reinterpret_cast<int *>(input + sizeof(int) * 2); 
 
+    auto incoming = interpret_expansion(*rhstype, input, bytes, 
+                                        *n_digits);
 
     //create the expansion from the payload
     int *type = reinterpret_cast<int *>(lhs->payload + sizeof(int));
     auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size, 
-                                     n_digits);
-
-    //create an expansion from the rhs
-    char *input = static_cast<char *>(rhs);
-    int *rhstype = reinterpret_cast<int *>(input + sizeof(int));
-    auto incoming = interpret_expansion(*rhstype, input, bytes, 
-                                        n_digits);
+                                     *n_digits);
 
     //add the one to the other
     local->add_expansion(incoming.get());
@@ -135,7 +135,8 @@ int expansion_s_to_m_handler(Source *sources, int n_src,
                              double cx, double cy, double cz, double scale, 
                              hpx_addr_t expand, int type, int n_digits) {
   auto local = interpret_expansion(type, nullptr, 0, n_digits);
-  auto multi = local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
+  auto multi = 
+    local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
 
