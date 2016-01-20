@@ -19,7 +19,7 @@ void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
 
 
 void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = -1; 
+  int n_digits = expand.accuracy(); 
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
