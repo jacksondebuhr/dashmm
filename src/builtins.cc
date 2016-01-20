@@ -85,6 +85,17 @@ HPX_ACTION(HPX_FUNCTION, 0,
            laplace_COM_create_action, laplace_COM_create_handler,
            HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE);
 
+#if 0
+Expansion *laplace_COM_create_handler(double x, double y, double z, 
+                                      int n_digits) {
+  LaplaceCOM *retval = new LaplaceCOM{Point{x, y, z}};
+  return retval;
+}
+HPX_ACTION(HPX_FUNCTION, 0, 
+           laplace_COM_create_action, laplace_COM_create_handler, 
+           HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_INT); 
+#endif
+
 
 Expansion *laplace_COM_interpret_handler(void *data, size_t size) {
   LaplaceCOM *retval = new LaplaceCOM{(LaplaceCOMData *)data, size};
@@ -92,7 +103,18 @@ Expansion *laplace_COM_interpret_handler(void *data, size_t size) {
 }
 HPX_ACTION(HPX_FUNCTION, 0,
            laplace_COM_interpret_action, laplace_COM_interpret_handler,
-           HPX_SIZE_T, HPX_POINTER);
+           HPX_POINTER, HPX_SIZE_T);
+
+#if 0
+Expansion *laplace_COM_interpret_handler(void *data, size_t size, 
+                                         int n_digits) {
+  LaplaceCOM *retval = new LaplaceCOM{(LaplaceCOMData *)data, size}; 
+  return retval;
+}
+HPX_ACTION(HPX_FUNCTION, 0, 
+           laplace_COM_interpret_action, laplace_COM_interpret_handler, 
+           HPX_POINTER, HPX_SIZE_T, HPX_INT); 
+#endif
 
 Expansion *laplace_sph_expansion(int n_digits) {
   //Expansion *retval = new LaplaceSPH{Point{0.0, 0.0, 0.0}, n_digits}; 
