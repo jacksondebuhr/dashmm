@@ -48,7 +48,7 @@ class Direct : public Method {
   void generate(SourceNode &curr, const ExpansionRef expand) const override;
   void aggregate(SourceNode &curr, const ExpansionRef expand) const override;
   void inherit(TargetNode &curr, const ExpansionRef expand,
-               size_t which_child) const override { }
+               size_t which_child) const override;
   void process(TargetNode &curr, std::vector<SourceNode> &consider,
                bool curr_is_leaf) const override;
 

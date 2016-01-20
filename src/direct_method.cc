@@ -21,6 +21,11 @@ void Direct::aggregate(SourceNode &curr,
   //
 }
 
+void Direct::inherit(TargetNode &curr, const ExpansionRef expand,
+                     size_t which_child) const { 
+  int n_digits = -1; 
+  curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
+}
 
 void Direct::process(TargetNode &curr, std::vector<SourceNode> &consider,
                      bool curr_is_leaf) const {
