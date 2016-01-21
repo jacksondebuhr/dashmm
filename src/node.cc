@@ -172,7 +172,7 @@ int target_node_delete_handler(hpx_addr_t data) {
 int source_node_child_partition_done_handler(SourceNodeData *node,
                                              hpx_addr_t partdone,
                                              int type,
-                                             hpx_addr_t expand, 
+                                             hpx_addr_t expand,
                                              int n_digits) {
   ExpansionRef expref{type, expand, n_digits};
   MethodRef method{node->method};
@@ -196,7 +196,7 @@ struct SourceNodePartitionParams {
   int limit;
   int type;
   hpx_addr_t expand;
-  int n_digits; 
+  int n_digits;
   int n_sources;
   Source sources[];
 };
@@ -218,7 +218,7 @@ int source_node_partition_handler(SourceNodeData *node,
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
     //this is the prototype
-    ExpansionRef expref{parms->type, parms->expand, parms->n_digits}; 
+    ExpansionRef expref{parms->type, parms->expand, parms->n_digits};
 
     //This will cause the creation of a new expansion, that will be globalized
     // and then set as the expansion for this node. It will be created with
@@ -368,6 +368,19 @@ int target_node_partition_handler(TargetNodeData *node,
                                 consider);
   }
 
+  if (!refine) {
+    Target *targs{nullptr};
+    assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
+    node->targets = TargetRef(targs, parms->n_parts);
+
+    hpx_call_when(node->targets.data(), parms->done, hpx_lco_set_action,
+                  HPX_NULL, nullptr, 0);
+  }
+
+  ExpansionRef expand{parms->expansion};
+  method.inherit(curr, expand, parms->which_child);
+  method.process(curr, consider, !refine);
+
   if (refine) {
     //partition
     Target *T{nullptr};
@@ -454,18 +467,7 @@ int target_node_partition_handler(TargetNodeData *node,
     free(args);
 
     hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
-  } else {  // no refinement needed; so just set the input done LCO
-    Target *targs{nullptr};
-    assert(hpx_gas_try_pin(parms->parts, (void **)&targs));
-    node->targets = TargetRef(targs, parms->n_parts);
-
-    hpx_call_when(node->targets.data(), parms->done, hpx_lco_set_action,
-                  HPX_NULL, nullptr, 0);
   }
-
-  ExpansionRef expand{parms->expansion};
-  method.inherit(curr, expand, parms->which_child);
-  method.process(curr, consider, !refine);
 
   //At this point, all work on the current expansion will have been scheduled,
   // so we mark the LCO as such.
@@ -596,7 +598,7 @@ hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
   args->limit = limit;
   args->type = type;
   args->expand = expand;
-  args->n_digits = n_digits; 
+  args->n_digits = n_digits;
   args->n_sources = n_sources;
   memcpy(args->sources, sources, sizeof(Source) * n_sources);
   hpx_call(data_, source_node_partition_action, HPX_NULL,
@@ -790,7 +792,7 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
   parms->n_parts = n_parts;
   parms->n_parts_total = n_parts;
   parms->limit = limit;
-  parms->expansion = expand; 
+  parms->expansion = expand;
   parms->which_child = which_child;
   parms->n_consider = consider.size();
   for (size_t i = 0; i < consider.size(); ++i) {
