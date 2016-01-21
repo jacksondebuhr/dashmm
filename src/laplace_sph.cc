@@ -41,9 +41,9 @@ LaplaceSPH::~LaplaceSPH() {
 std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center, 
                                               Source *first, Source *last, 
                                               double scale) const {
-  LaplaceSPH *retval{new LaplaceSPH{center, data_->n_digits}}; 
+  LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}}; 
   dcomplex_t *expansion = &retval->data_->expansion[0]; 
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
   const double *sqf = table->sqf(); 
 
@@ -54,7 +54,7 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
   powers_ephi[0] = dcomplex_t{1.0, 0.0}; 
 
   for (auto i = first; i != last; ++i) {
-    Point dist = point_sub(i->position, data_->center); 
+    Point dist = point_sub(i->position, center); 
     double q = i->charge;
     double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
     double r = dist.norm();
@@ -95,9 +95,9 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
 std::unique_ptr<Expansion> LaplaceSPH::S_to_L(Point center, 
                                               Source *first, Source *last, 
                                               double scale) const {
-  LaplaceSPH *retval{new LaplaceSPH{center, data_->n_digits}}; 
+  LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}}; 
   dcomplex_t *expansion = &retval->data_->expansion[0]; 
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
   const double *sqf = table->sqf(); 
 
@@ -107,7 +107,7 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_L(Point center,
   powers_ephi[0] = dcomplex_t{1.0, 0.0}; 
 
   for (auto i = first; i != last; ++i) {
-    Point dist = point_sub(i->position, data_->center);
+    Point dist = point_sub(i->position, center);
     double q = i->charge;
     double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
     double r = dist.norm();
@@ -157,9 +157,9 @@ std::unique_ptr<Expansion> LaplaceSPH::M_to_M(int from_child,
   double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
   double pz = data_->center.z() + (from_child < 4 ? h : -h);
 
-  LaplaceSPH *retval{new LaplaceSPH{Point{px, py, pz}, data_->n_digits}};
+  LaplaceSPH *retval{new LaplaceSPH{Point{px, py, pz}, n_digits_}};
 
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p(); 
   const double *sqbinom = table->sqbinom(); 
 
@@ -240,8 +240,8 @@ std::unique_ptr<Expansion> LaplaceSPH::M_to_L(Index s_index, double s_size,
   double ty = data_->center.y() - t2s_y * s_size;
   double tz = data_->center.z() - t2s_z * s_size;
 
-  LaplaceSPH *retval{new LaplaceSPH{Point{tx, ty, tz}, data_->n_digits}}; 
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  LaplaceSPH *retval{new LaplaceSPH{Point{tx, ty, tz}, n_digits_}}; 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
 
 
@@ -304,9 +304,9 @@ std::unique_ptr<Expansion> LaplaceSPH::L_to_L(int to_child,
   double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
   double cz = data_->center.z() + (to_child < 4 ? -h : h);
 
-  LaplaceSPH *retval{new LaplaceSPH{Point{cx, cy, cz}, data_->n_digits}}; 
+  LaplaceSPH *retval{new LaplaceSPH{Point{cx, cy, cz}, n_digits_}}; 
 
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p(); 
   const double *sqbinom = table->sqbinom(); 
 
@@ -379,7 +379,7 @@ std::unique_ptr<Expansion> LaplaceSPH::L_to_L(int to_child,
 }
 
 void LaplaceSPH::M_to_T(Target *first, Target *last, double scale) const {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p(); 
   const double *sqf = table->sqf(); 
 
@@ -437,7 +437,7 @@ void LaplaceSPH::M_to_T(Target *first, Target *last, double scale) const {
 }
 
 void LaplaceSPH::L_to_T(Target *first, Target *last, double scale) const {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p(); 
   const double *sqf = table->sqf(); 
 
@@ -516,13 +516,13 @@ void LaplaceSPH::add_expansion(const Expansion *temp1) {
 }
 
 std::unique_ptr<Expansion> LaplaceSPH::get_new_expansion(Point center) const {
-  LaplaceSPH *retval{new LaplaceSPH{center, data_->n_digits}};
+  LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}};
   return std::unique_ptr<Expansion>{retval};
 }
 
 void LaplaceSPH::rotate_sph_z(const dcomplex_t *M, double alpha, 
                               dcomplex_t *MR) {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
 
   // Compute exp(i * alpha)
@@ -548,7 +548,7 @@ void LaplaceSPH::rotate_sph_z(const dcomplex_t *M, double alpha,
 
 void LaplaceSPH::rotate_sph_y(const dcomplex_t *M, const double *d, 
                               dcomplex_t *MR) {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
 
   int offset = 0;
@@ -574,7 +574,7 @@ void LaplaceSPH::rotate_sph_y(const dcomplex_t *M, const double *d,
 
 void LaplaceSPH::M_to_L_zp(const dcomplex_t *M, const double *rho, 
                            double scale, dcomplex_t *L) {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
   const double *sqbinom = table->sqbinom(); 
 
@@ -594,7 +594,7 @@ void LaplaceSPH::M_to_L_zp(const dcomplex_t *M, const double *rho,
 
 void LaplaceSPH::M_to_L_zm(const dcomplex_t *M, const double *rho, 
                            double scale, dcomplex_t *L) {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits); 
+  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
   int p = table->p(); 
   const double *sqbinom = table->sqbinom(); 
 
@@ -654,7 +654,7 @@ LaplaceSPHTable::~LaplaceSPHTable() {
 double *LaplaceSPHTable::generate_sqf() {
   double *sqf = new double[2 * p_ + 1]; 
   sqf[0] = 1.0; 
-  for (int i = 0; i <= p_ * 2; ++i) 
+  for (int i = 1; i <= p_ * 2; ++i) 
     sqf[i] = sqf[i - 1] * sqrt(i);
   return sqf;
 }
