@@ -37,7 +37,7 @@ struct InputArguments {
 
 void print_usage(char *progname) {
   //TODO: Improve formatting; add other methods when available
-  fprintf(stdout, "Usage: %s --method=[bh] "
+  fprintf(stdout, "Usage: %s --method=[bh/fmm] "
           "--nsources=num --sourcedata=[cube/sphere/plummer] "
           "--ntargets=num --targetdata=[cube/sphere/plummer] "
           "--threshold=num --verify=[yes/no] --accuracy=num\n",
@@ -47,12 +47,12 @@ void print_usage(char *progname) {
 
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
-  retval.source_count = 10000;
+  retval.source_count = 2;
   retval.source_type = std::string{"cube"};
-  retval.target_count = 10000;
+  retval.target_count = 2;
   retval.target_type = std::string{"cube"};
-  retval.refinement_limit = 40;
-  retval.test_case = std::string{"bh"};
+  retval.refinement_limit = 1;
+  retval.test_case = std::string{"fmm"};
   retval.verify = true;
   retval.accuracy = 3; 
 
@@ -115,7 +115,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     return -1;
   }
   //TODO add other cases when available
-  if (retval.test_case != "bh") {
+  if (retval.test_case != "bh" && retval.test_case != "fmm") {
     fprintf(stderr, "Usage ERROR: unknown method '%s'\n",
             retval.test_case.c_str());
     return -1;
