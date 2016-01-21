@@ -67,7 +67,7 @@ void register_built_in_methods() {
   assert(kSuccess == register_method(kMethodBH, bh_method_create_action, 0));
   assert(kSuccess == register_method(
                         kMethodDirect, direct_method_create_action, 0));
-  //assert(kSuccess == register_method(kMethodFMM, fmm_method_create_action, 0));
+  assert(kSuccess == register_method(kMethodFMM, fmm_method_create_action, 0));
 }
 
 
@@ -95,18 +95,43 @@ HPX_ACTION(HPX_FUNCTION, 0,
            HPX_POINTER, HPX_SIZE_T, HPX_INT); 
 
 Expansion *laplace_sph_expansion(int n_digits) {
+  // If we are not running on SMP, the following needs to be wrapped and
+  // broadcasted inside an hpx_run 
+  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits); 
+  if (entry == builtin_laplace_table_.end()) {
+    builtin_laplace_table_[n_digits] = 
+      std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}}; 
+  }
+
   Expansion *retval = new LaplaceSPH{Point{0.0, 0.0, 0.0}, n_digits}; 
   return retval;
 }
 
-  
+Expansion *laplace_sph_create_handler(double x, double y, double z, 
+                                      int n_digits) {
+  LaplaceSPH *retval = new LaplaceSPH{Point{x, y, z}, n_digits}; 
+  return retval;
+}
+HPX_ACTION(HPX_FUNCTION, 0, 
+           laplace_sph_create_action, laplace_sph_create_handler, 
+           HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_INT); 
 
-
+Expansion *laplace_sph_interpret_handler(void *data, size_t size, 
+                                         int n_digits) {
+  LaplaceSPH *retval = new LaplaceSPH{(LaplaceSPHData *)data, size, n_digits};
+  return retval;
+}
+HPX_ACTION(HPX_FUNCTION, 0, 
+           laplace_sph_interpret_action, laplace_sph_interpret_handler, 
+           HPX_POINTER, HPX_SIZE_T, HPX_INT); 
 
 void register_built_in_expansions() {
   assert(kSuccess == register_expansion(kExpansionLaplaceCOM,
                                         laplace_COM_create_action,
                                         laplace_COM_interpret_action, 0));
+  assert(kSuccess == register_expansion(kExpansionLaplaceSPH, 
+                                        laplace_sph_create_action, 
+                                        laplace_sph_interpret_action, 0)); 
   //more here
 }
 

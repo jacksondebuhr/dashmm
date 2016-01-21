@@ -57,6 +57,8 @@ private:
 };
 
 using uLaplaceSPHTable = std::unique_ptr<LaplaceSPHTable>; 
+using LaplaceSPHTableIterator = std::map<int, uLaplaceSPHTable>::iterator; 
+
 extern std::map<int, uLaplaceSPHTable> builtin_laplace_table_; 
 
 struct LaplaceSPHData {
@@ -70,7 +72,7 @@ struct LaplaceSPHData {
 class LaplaceSPH : public Expansion {
 public:
   LaplaceSPH(Point center, int n_digits);
-  LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits) {}
+  LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits); 
   ~LaplaceSPH(); 
 
   void *release() override {
@@ -82,7 +84,7 @@ public:
   size_t bytes() const override {return bytes_;}
   bool valid() const override {return data_ != nullptr;}
   int type() const override {return kExpansionLaplaceSPH;}
-  int accuracy() const override {return data_->n_digits;}
+  int accuracy() const override {return n_digits_;}
   bool provides_L() const override {return true;}
   bool provides_exp() const override {return false;}
   size_t size() const override {
@@ -120,6 +122,7 @@ public:
 private: 
   LaplaceSPHData *data_; 
   size_t bytes_; 
+  int n_digits_; 
 
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR); 
   void rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR); 

@@ -480,8 +480,8 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
   int type = exp->type();
-  void *ldata = exp->release();
   int n_digits = exp->accuracy(); 
+  void *ldata = exp->release();
 
   hpx_addr_t retval{HPX_NULL};
   hpx_call_sync(where, globalize_expansion_action, &retval, sizeof(retval),

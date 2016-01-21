@@ -7,19 +7,28 @@ namespace dashmm {
 
 std::map<int, uLaplaceSPHTable> builtin_laplace_table_; 
 
-LaplaceSPH::LaplaceSPH(Point center, int n_digits) {
-  uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
+LaplaceSPH::LaplaceSPH(Point center, int n_digits) : n_digits_{n_digits} {
+  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits); 
+  assert(entry != builtin_laplace_table_.end()); 
+  uLaplaceSPHTable &table = entry->second; 
   int p = table->p(); 
   int n_terms = (p + 1) * (p + 2) / 2; 
-
   bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms; 
   data_ = static_cast<LaplaceSPHData *>(malloc(bytes_)); 
   assert(valid()); 
   data_->type = type(); 
-  data_->center = center; 
   data_->n_digits = n_digits; 
+  data_->center = center; 
   for (int i = 0; i < n_terms; ++i) 
     data_->expansion[i] = 0; 
+}
+
+LaplaceSPH::LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits) 
+  : n_digits_{n_digits} {
+  data_ = ptr; 
+  bytes_ = bytes; 
+  if (data_) 
+    data_->n_digits = n_digits; 
 }
 
 LaplaceSPH::~LaplaceSPH() {
