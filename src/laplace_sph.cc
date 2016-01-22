@@ -631,7 +631,8 @@ void legendre_Plm(int n, double x, double *P) {
 
 
 LaplaceSPHTable::LaplaceSPHTable(int n_digits) {
-  int expan_length[] = {0, 0, 0, 9, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0}; 
+  int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29, 
+                        33, 36, 40, 43, 46}; 
   p_ = expan_length[n_digits]; 
   sqf_ = generate_sqf(); 
   sqbinom_ = generate_sqbinom(); 
