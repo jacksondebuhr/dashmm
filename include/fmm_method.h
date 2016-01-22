@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #ifndef __DASHMM_FMM_METHOD_H__
 #define __DASHMM_FMM_METHOD_H__
 
@@ -18,20 +32,20 @@ class FMM : public Method {
  public:
   FMM() : local_{nullptr} {
     local_ = static_cast<MethodSerial *>(malloc(sizeof(MethodSerial)));
-    assert(local_); 
+    assert(local_);
     local_->type = kMethodFMM;
     local_->size = 0;
   }
 
   ~FMM() {
     if (local_) {
-      free(local_); 
+      free(local_);
       local_ = nullptr;
     }
   }
-   
+
   MethodSerial *release() override {
-    MethodSerial *retval = local_; 
+    MethodSerial *retval = local_;
     local_ = nullptr;
     return retval;
   }
@@ -43,27 +57,27 @@ class FMM : public Method {
   int type() const override {return kMethodFMM;}
 
   bool compatible_with(const Expansion *expand) const override {
-    return expand->provides_L(); 
+    return expand->provides_L();
   }
 
-  void generate(SourceNode &curr, const ExpansionRef expand) const override; 
+  void generate(SourceNode &curr, const ExpansionRef expand) const override;
   void aggregate(SourceNode &curr, const ExpansionRef expand) const override;
-  void inherit(TargetNode &curr, const ExpansionRef expand, 
+  void inherit(TargetNode &curr, const ExpansionRef expand,
                size_t which_child) const override;
-  void process(TargetNode &curr, std::vector<SourceNode> &consider, 
+  void process(TargetNode &curr, std::vector<SourceNode> &consider,
                bool curr_is_leaf) const override;
-  
-  bool refine_test(bool same_sources_and_targets, const TargetNode &curr, 
+
+  bool refine_test(bool same_sources_and_targets, const TargetNode &curr,
                    const std::vector<SourceNode> &consider) const override;
 
-  bool well_sep_test_asymmetric(Index smaller, Index larger) const; 
+  bool well_sep_test_asymmetric(Index smaller, Index larger) const;
   bool well_sep_test(Index source, Index target) const;
 
-  void proc_coll_recur(TargetNode &T, SourceNode &S) const; 
+  void proc_coll_recur(TargetNode &T, SourceNode &S) const;
 
-private: 
-  MethodSerial *local_; 
-}; 
+private:
+  MethodSerial *local_;
+};
 
 } // namespace dashmm
 

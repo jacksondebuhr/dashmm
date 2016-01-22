@@ -1,7 +1,6 @@
 * First release TODO
   - create a build system for making DASHMM into a library
   - enlist Matt as an end-user for testing the ease of the build system
-  - create the basic testing code for running some numbers
   - Update the Basic user guide
   - Start to work on the Advanced User Guide (we have a few of the advanced
     features implemented.) Also, having a guide for implementing new internal

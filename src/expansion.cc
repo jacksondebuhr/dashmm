@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #include "include/expansion.h"
 
 #include <map>
@@ -140,7 +154,7 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
 }
 
 
-std::unique_ptr<Expansion> create_expansion(int type, Point center, 
+std::unique_ptr<Expansion> create_expansion(int type, Point center,
                                             int n_digits) {
   auto entry = expansion_table_->find(type);
   if (entry == expansion_table_->end()) {

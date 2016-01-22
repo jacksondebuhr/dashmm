@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #ifndef __DASHMM_LAPLACE_COM_EXPANSION_H__
 #define __DASHMM_LAPLACE_COM_EXPANSION_H__
 
@@ -62,7 +76,7 @@ class LaplaceCOM : public Expansion {
   size_t bytes() const override {return bytes_;}
   bool valid() const override {return data_ != nullptr;}
   int type() const override {return kExpansionLaplaceCOM;}
-  int accuracy() const override {return -1;} 
+  int accuracy() const override {return -1;}
   bool provides_L() const override {return false;}
   bool provides_exp() const override {return false;}
   size_t size() const override {return 10;}
@@ -76,7 +90,7 @@ class LaplaceCOM : public Expansion {
   std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
                                     Source *last, double scale) const override;
   std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
-                                    Source *last, double scale) const override 
+                                    Source *last, double scale) const override
   {
     return std::unique_ptr<Expansion>{new LaplaceCOM{nullptr, 0}};
   }

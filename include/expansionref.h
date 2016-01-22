@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #ifndef __DASHMM_EXPANSION_REF_H__
 #define __DASHMM_EXPANSION_REF_H__
 
@@ -37,7 +51,7 @@ namespace dashmm {
 class ExpansionRef {
  public:
   /// Construct the expansion from a given global address.
-  ExpansionRef(int type, hpx_addr_t addr, int n_digits) 
+  ExpansionRef(int type, hpx_addr_t addr, int n_digits)
     : type_{type}, data_{addr}, n_digits_{n_digits} { }
 
   /// Destroy the GAS data referred by the object.
@@ -175,7 +189,7 @@ class ExpansionRef {
   /// \param center - the center point for the next expansion.
   ///
   /// \returns - the resulting expansion.
-  std::unique_ptr<Expansion> get_new_expansion(Point center, 
+  std::unique_ptr<Expansion> get_new_expansion(Point center,
                                                int n_digits) const;
 
   /// Signal to the expansion that all operations have been scheduled.
@@ -207,7 +221,7 @@ class ExpansionRef {
  private:
   int type_;
   hpx_addr_t data_;     //this is the LCO
-  int n_digits_; 
+  int n_digits_;
 };
 
 

@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/evaluate.cc
 /// \brief Implementation of dashmm::evaluate()
 
@@ -162,7 +176,7 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
       double *pos = static_cast<double *>(pos_base);
       targets[i].position = Point{pos[0], pos[1], pos[2]};
       targets[i].index = i;
-      targets[i].phi = dcomplex_t{0.0}; 
+      targets[i].phi = dcomplex_t{0.0};
     }
 
     hpx_gas_unpin(retval.packed);
@@ -299,11 +313,11 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
 
   char *expansion_base = parms->data + parms->method_size;
   int *type = reinterpret_cast<int *>(expansion_base + sizeof(int));
-  int *n_digits = reinterpret_cast<int *>(expansion_base + sizeof(int) * 2); 
+  int *n_digits = reinterpret_cast<int *>(expansion_base + sizeof(int) * 2);
   char *local_copy = static_cast<char *>(malloc(parms->expansion_size));
   memcpy(local_copy, expansion_base, parms->expansion_size);
-  auto local_expansion = 
-    interpret_expansion(*type, local_copy, parms->expansion_size, *n_digits); 
+  auto local_expansion =
+    interpret_expansion(*type, local_copy, parms->expansion_size, *n_digits);
   ExpansionRef expansion =
     globalize_expansion(std::move(local_expansion), HPX_HERE);
   expansion.finalize();
@@ -330,7 +344,7 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts));
   hpx_addr_t partitiondone =
       source_root.partition(source_parts, sources.n(), parms->refinement_limit,
-                            expansion.type(), expansion.data(), 
+                            expansion.type(), expansion.data(),
                             expansion.accuracy());
   hpx_gas_unpin(sources.data());
   sources.destroy();

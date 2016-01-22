@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #ifndef __DASHMM_PARTICLE_H__
 #define __DASHMM_PARTICLE_H__
 
@@ -15,7 +29,7 @@
 
 namespace dashmm {
 
-using dcomplex_t = std::complex<double>; 
+using dcomplex_t = std::complex<double>;
 
 /// The data needed for source particles.
 struct Source {
@@ -120,9 +134,9 @@ class TargetRef {
   /// \param type - the type of expansion serving the M->T operation
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  /// \param n_digits - accuracy of the expansion 
+  /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_M_to_T(int type, size_t bytes, void *data, 
+  void contribute_M_to_T(int type, size_t bytes, void *data,
                          int n_digits, double scale) const;
 
   /// Contribute a L->T operation to the referred targets
@@ -132,7 +146,7 @@ class TargetRef {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_L_to_T(int type, size_t bytes, void *data, 
+  void contribute_L_to_T(int type, size_t bytes, void *data,
                          int n_digits, double scale) const;
 
  private:

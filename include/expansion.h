@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 #ifndef __DASHMM_EXPANSION_H__
 #define __DASHMM_EXPANSION_H__
 
@@ -20,7 +34,7 @@
 
 namespace dashmm {
 
-using dcomplex_t = std::complex<double>; 
+using dcomplex_t = std::complex<double>;
 
 /// The abstract interface for expansions usable in DASHMM
 ///
@@ -69,7 +83,7 @@ class Expansion {
   virtual int type() const = 0;
 
   /// Returns the accuracy of the expansion
-  virtual int accuracy() const = 0; 
+  virtual int accuracy() const = 0;
 
   /// Indicates if the expansion provides local expansion operators.
   virtual bool provides_L() const = 0;
@@ -79,7 +93,7 @@ class Expansion {
 
   /// The number of terms in the expansion.
   virtual size_t size() const = 0;
-  
+
   /// The point around which the expansion is defined.
   virtual Point center() const = 0;
 
@@ -108,8 +122,8 @@ class Expansion {
   /// \param scale - scaling factor
   ///
   /// \returns - The resulting multipole expansion
-  virtual std::unique_ptr<Expansion> S_to_M(Point center, 
-                                            Source *first, Source *last, 
+  virtual std::unique_ptr<Expansion> S_to_M(Point center,
+                                            Source *first, Source *last,
                                             double scale) const = 0;
 
   /// Create a local expansion for a given set of source points
@@ -124,7 +138,7 @@ class Expansion {
   /// \param scale - scaling factor
   ///
   /// \returns - The resulting local expansion
-  virtual std::unique_ptr<Expansion> S_to_L(Point center, 
+  virtual std::unique_ptr<Expansion> S_to_L(Point center,
                                             Source *first, Source *last,
                                             double scale) const = 0;
 
@@ -214,7 +228,7 @@ class Expansion {
 /// To register a user-defined expansion with DASHMM, the user will need to
 /// provide a function that can be used to create that sort of expansion
 /// given a Point indicating the center of the expansion.
-typedef Expansion *(*expansion_creation_function_t)(double, double, double, 
+typedef Expansion *(*expansion_creation_function_t)(double, double, double,
                                                     int);
 
 /// The signature of a function that interprets existing data as an expansion
@@ -228,8 +242,8 @@ typedef Expansion *(*expansion_creation_function_t)(double, double, double,
 /// 'empty' expansion of the new type. One example of this is the S_to_T
 /// function. The behavior of this function is the same for every instance of
 /// the same type of expansion.
-typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes, 
-                                                     int n_digits); 
+typedef Expansion *(*expansion_interpret_function_t)(void *data, size_t bytes,
+                                                     int n_digits);
 
 
 /// Register a user-defined expansion with DASHMM
@@ -315,8 +329,8 @@ std::unique_ptr<Expansion> interpret_expansion(int type, void *data,
 /// \param center - the Point around which to create the expansion
 ///
 /// \returns - the resulting expansion
-std::unique_ptr<Expansion> create_expansion(int type, Point center, 
-                                            int n_digits); 
+std::unique_ptr<Expansion> create_expansion(int type, Point center,
+                                            int n_digits);
 
 
 } // namespace dashmm

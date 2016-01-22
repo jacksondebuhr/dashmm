@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/particle.cc
 /// \brief Source and Target object implementations
 
@@ -43,8 +57,8 @@ struct TargetRefLCOSetStoTData {
 struct TargetRefLCOSetMtoTData {
   int code;
   int type;
-  int n_digits; 
-  double scale; 
+  int n_digits;
+  double scale;
   size_t bytes;
   char data[];
 };
@@ -52,8 +66,8 @@ struct TargetRefLCOSetMtoTData {
 struct TargetRefLCOSetLtoTData {
   int code;
   int type;
-  int n_digits; 
-  double scale; 
+  int n_digits;
+  double scale;
   size_t bytes;
   char data[];
 };
@@ -218,7 +232,7 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
 }
 
 
-void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data, 
+void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
                                   int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
   TargetRefLCOSetMtoTData *input =
@@ -226,8 +240,8 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
   assert(input);
   input->code = kMtoT;
   input->type = type;
-  input->n_digits = n_digits; 
-  input->scale = scale; 
+  input->n_digits = n_digits;
+  input->scale = scale;
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
@@ -235,7 +249,7 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
 }
 
 
-void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data, 
+void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data,
                                   int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
   TargetRefLCOSetLtoTData *input =
@@ -243,8 +257,8 @@ void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data,
   assert(input);
   input->code = kLtoT;
   input->type = type;
-  input->n_digits = n_digits; 
-  input->scale = scale; 
+  input->n_digits = n_digits;
+  input->scale = scale;
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);

@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/fmm_method.cc
 /// \brief Implementation of FMM Method
 
@@ -6,108 +20,108 @@
 namespace dashmm {
 
 void FMM::generate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = expand.accuracy(); 
+  int n_digits = expand.accuracy();
   curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits));
-  ExpansionRef currexp = curr.expansion(); 
-  SourceRef sources = curr.parts(); 
-  double scale = 1.0 / curr.size(); 
-  currexp.S_to_M(curr.center(), sources, scale); 
+  ExpansionRef currexp = curr.expansion();
+  SourceRef sources = curr.parts();
+  double scale = 1.0 / curr.size();
+  currexp.S_to_M(curr.center(), sources, scale);
 }
 
 void FMM::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = expand.accuracy(); 
-  curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits)); 
-  ExpansionRef currexp = curr.expansion(); 
+  int n_digits = expand.accuracy();
+  curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits));
+  ExpansionRef currexp = curr.expansion();
 
   for (size_t i = 0; i < 8; ++i) {
-    SourceNode kid = curr.child(i); 
+    SourceNode kid = curr.child(i);
     if (kid.is_valid()) {
-      ExpansionRef kexp = kid.expansion(); 
+      ExpansionRef kexp = kid.expansion();
       currexp.M_to_M(kexp, i, kid.size());
     }
   }
 }
 
-void FMM::inherit(TargetNode &curr, const ExpansionRef expand, 
+void FMM::inherit(TargetNode &curr, const ExpansionRef expand,
                   size_t which_child) const {
-  int n_digits = expand.accuracy(); 
-  curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits)); 
-  ExpansionRef currexp = curr.expansion(); 
+  int n_digits = expand.accuracy();
+  curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits));
+  ExpansionRef currexp = curr.expansion();
 
   if (curr.parent().is_valid()) {
-    ExpansionRef pexp = curr.parent().expansion(); 
-    currexp.L_to_L(pexp, which_child, curr.size()); 
+    ExpansionRef pexp = curr.parent().expansion();
+    currexp.L_to_L(pexp, which_child, curr.size());
   } else {
     curr.set_expansion(expand.get_new_expansion(curr.center(), n_digits));
-  } 
+  }
 }
 
-void FMM::process(TargetNode &curr, std::vector<SourceNode> &consider, 
+void FMM::process(TargetNode &curr, std::vector<SourceNode> &consider,
                   bool curr_is_leaf) const {
-  ExpansionRef currexp = curr.expansion(); 
-  double scale = 1.0 / curr.size(); 
-  TargetRef targets = curr.parts(); 
-  Index t_index = curr.index(); 
+  ExpansionRef currexp = curr.expansion();
+  double scale = 1.0 / curr.size();
+  TargetRef targets = curr.parts();
+  Index t_index = curr.index();
 
   if (curr_is_leaf) {
     for (auto S = consider.begin(); S != consider.end(); ++S) {
       if (S->level() < curr.level()) {
         if (well_sep_test_asymmetric(t_index, S->index())) {
-          SourceRef sources = S->parts(); 
-          currexp.S_to_L(curr.center(), sources, scale); 
+          SourceRef sources = S->parts();
+          currexp.S_to_L(curr.center(), sources, scale);
         } else {
-          SourceRef sources = S->parts(); 
-          ExpansionRef expand = S->expansion(); 
+          SourceRef sources = S->parts();
+          ExpansionRef expand = S->expansion();
           expand.S_to_T(sources, targets);
         }
       } else {
         if (well_sep_test(S->index(), curr.index())) {
-          ExpansionRef expand = S->expansion();           
-          double s_size = S->size(); 
-          Index s_index = S->index(); 
-          currexp.M_to_L(expand, s_index, s_size, t_index); 
+          ExpansionRef expand = S->expansion();
+          double s_size = S->size();
+          Index s_index = S->index();
+          currexp.M_to_L(expand, s_index, s_size, t_index);
         } else {
-          proc_coll_recur(curr, *S); 
+          proc_coll_recur(curr, *S);
         }
       }
     }
 
-    currexp.L_to_T(targets, scale); 
+    currexp.L_to_T(targets, scale);
   } else {
-    std::vector<SourceNode> newcons{}; 
-    
+    std::vector<SourceNode> newcons{};
+
     for (auto S = consider.begin(); S != consider.end(); ++S) {
       if (S->level() < curr.level()) {
         if (well_sep_test_asymmetric(t_index, S->index())) {
-          SourceRef sources = S->parts(); 
-          currexp.S_to_L(curr.center(), sources, scale); 
+          SourceRef sources = S->parts();
+          currexp.S_to_L(curr.center(), sources, scale);
         } else {
           // a 1; add it to newcons
-          newcons.push_back(*S); 
+          newcons.push_back(*S);
         }
       } else {
         if (well_sep_test(S->index(), curr.index())) {
-          ExpansionRef expand = S->expansion(); 
-          double s_size = S->size(); 
-          Index s_index = S->index(); 
-          currexp.M_to_L(expand, s_index, s_size, t_index); 
+          ExpansionRef expand = S->expansion();
+          double s_size = S->size();
+          Index s_index = S->index();
+          currexp.M_to_L(expand, s_index, s_size, t_index);
         } else {
-          bool S_is_leaf = true; 
+          bool S_is_leaf = true;
           for (size_t i = 0; i < 8; ++i) {
-            SourceNode child = S->child(i); 
+            SourceNode child = S->child(i);
             if (child.is_valid()) {
-              newcons.push_back(child); 
+              newcons.push_back(child);
               S_is_leaf = false;
             }
           }
 
-          if (S_is_leaf) 
+          if (S_is_leaf)
             newcons.push_back(*S);
         }
       }
     }
 
-    consider = std::move(newcons); 
+    consider = std::move(newcons);
   }
 
 }
@@ -159,20 +173,20 @@ bool FMM::well_sep_test(Index source, Index target) const {
 
 void FMM::proc_coll_recur(TargetNode &T, SourceNode &S) const {
   if (well_sep_test_asymmetric(S.index(), T.index())) {
-    ExpansionRef expand = S.expansion(); 
-    TargetRef targets = T.parts(); 
-    double scale = 1.0 / S.size(); 
-    expand.M_to_T(targets, scale); 
+    ExpansionRef expand = S.expansion();
+    TargetRef targets = T.parts();
+    double scale = 1.0 / S.size();
+    expand.M_to_T(targets, scale);
   } else {
     if (S.is_leaf()) {
-      ExpansionRef expand = S.expansion(); 
-      TargetRef targets = T.parts(); 
-      SourceRef sources = S.parts(); 
-      expand.S_to_T(sources, targets); 
+      ExpansionRef expand = S.expansion();
+      TargetRef targets = T.parts();
+      SourceRef sources = S.parts();
+      expand.S_to_T(sources, targets);
     } else {
       for (size_t i = 0; i < 8; ++i) {
-        SourceNode child = S.child(i); 
-        if (child.is_valid()) 
+        SourceNode child = S.child(i);
+        if (child.is_valid())
           proc_coll_recur(T, child);
       }
     }

@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/bh_method.cc
 /// \brief Implementation of BHMethod
 
@@ -9,7 +23,7 @@ namespace dashmm {
 
 
 void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = expand.accuracy(); 
+  int n_digits = expand.accuracy();
   double scale = 0.0; // unused for bh
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
@@ -19,7 +33,7 @@ void BH::generate(SourceNode &curr, const ExpansionRef expand) const {
 
 
 void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
-  int n_digits = expand.accuracy(); 
+  int n_digits = expand.accuracy();
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
   ExpansionRef currexp = curr.expansion();
   for (size_t i = 0; i < 8; ++i) {
@@ -32,8 +46,8 @@ void BH::aggregate(SourceNode &curr, const ExpansionRef expand) const {
 }
 
 void BH::inherit(TargetNode &curr, const ExpansionRef expand,
-                 size_t which_child) const { 
-  int n_digits = expand.accuracy(); 
+                 size_t which_child) const {
+  int n_digits = expand.accuracy();
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
 }
 
@@ -43,7 +57,7 @@ void BH::inherit(TargetNode &curr, const ExpansionRef expand,
 void BH::process(TargetNode &curr, std::vector<SourceNode> &consider,
                  bool curr_is_leaf) const {
   std::vector<SourceNode> newcons{};
-  double unused = 0.0; 
+  double unused = 0.0;
 
   do {
     for (auto i = consider.begin(); i != consider.end(); ++i) {

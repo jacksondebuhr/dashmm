@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/expansionref.cc
 /// \brief Implementation of Expansion reference object
 
@@ -83,14 +97,14 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
     int *rhstype = reinterpret_cast<int *>(input + sizeof(int));
-    int *n_digits = reinterpret_cast<int *>(input + sizeof(int) * 2); 
+    int *n_digits = reinterpret_cast<int *>(input + sizeof(int) * 2);
 
-    auto incoming = interpret_expansion(*rhstype, input, bytes, 
+    auto incoming = interpret_expansion(*rhstype, input, bytes,
                                         *n_digits);
 
     //create the expansion from the payload
     int *type = reinterpret_cast<int *>(lhs->payload + sizeof(int));
-    auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size, 
+    auto local = interpret_expansion(*type, lhs->payload, lhs->payload_size,
                                      *n_digits);
 
     //add the one to the other
@@ -131,11 +145,11 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-int expansion_s_to_m_handler(Source *sources, int n_src, 
-                             double cx, double cy, double cz, double scale, 
+int expansion_s_to_m_handler(Source *sources, int n_src,
+                             double cx, double cy, double cz, double scale,
                              hpx_addr_t expand, int type, int n_digits) {
   auto local = interpret_expansion(type, nullptr, 0, n_digits);
-  auto multi = 
+  auto multi =
     local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
   size_t bytes = multi->bytes();
   char *serial = static_cast<char *>(multi->release());
@@ -148,12 +162,12 @@ int expansion_s_to_m_handler(Source *sources, int n_src,
 }
 HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            expansion_s_to_m_action, expansion_s_to_m_handler,
-           HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, 
+           HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
            HPX_DOUBLE, HPX_ADDR, HPX_INT, HPX_INT);
 
 
-int expansion_s_to_l_handler(Source *sources, int n_src, 
-                             double cx, double cy, double cz, double scale, 
+int expansion_s_to_l_handler(Source *sources, int n_src,
+                             double cx, double cy, double cz, double scale,
                              hpx_addr_t expand, int type, int n_digits) {
   auto local = interpret_expansion(type, nullptr, 0, n_digits);
   auto multi = local->S_to_L(Point{cx, cy, cz}, sources, &sources[n_src], scale);
@@ -172,14 +186,14 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
            HPX_DOUBLE, HPX_ADDR, HPX_INT, HPX_INT);
 
 
-int expansion_m_to_m_handler(int type, hpx_addr_t expand, int n_digits, 
+int expansion_m_to_m_handler(int type, hpx_addr_t expand, int n_digits,
                              int from_child, double s_size) {
   hpx_addr_t target = hpx_thread_current_target();
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size, 
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size,
                                   n_digits);
   auto translated = lexp->M_to_M(from_child, s_size);
   lexp->release();
@@ -205,7 +219,7 @@ struct ExpansionMtoLParams {
   Index s_index;
   double s_size;
   Index t_index;
-  int n_digits; 
+  int n_digits;
 };
 
 int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
@@ -235,14 +249,14 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            HPX_POINTER, HPX_SIZE_T);
 
 
-int expansion_l_to_l_handler(int type, hpx_addr_t expand, int n_digits, 
+int expansion_l_to_l_handler(int type, hpx_addr_t expand, int n_digits,
                              int to_child, double t_size) {
   hpx_addr_t target = hpx_thread_current_target();
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(target, 1, (void **)&ldata);
-  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size, 
+  auto lexp = interpret_expansion(type, ldata->payload, ldata->payload_size,
                                   n_digits);
   auto translated = lexp->L_to_L(to_child, t_size);
   lexp->release();
@@ -263,14 +277,14 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_INT, HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
 
 
-int expansion_m_to_t_handler(int n_targets, int n_digits, double scale, 
+int expansion_m_to_t_handler(int n_targets, int n_digits, double scale,
                              hpx_addr_t targ, int type) {
   TargetRef targets{targ, n_targets};
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  targets.contribute_M_to_T(type, ldata->payload_size, ldata->payload, 
+  targets.contribute_M_to_T(type, ldata->payload_size, ldata->payload,
                             n_digits, scale);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
@@ -281,14 +295,14 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_INT, HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
 
 
-int expansion_l_to_t_handler(int n_targets, int n_digits, double scale, 
+int expansion_l_to_t_handler(int n_targets, int n_digits, double scale,
                              hpx_addr_t targ, int type) {
   TargetRef targets{targ, n_targets};
   //HACK: This action is local to the expansion, so we getref here with
   // whatever as the size and things are okay...
   ExpansionLCOHeader *ldata{nullptr};
   hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-  targets.contribute_L_to_T(type, ldata->payload_size, ldata->payload, 
+  targets.contribute_L_to_T(type, ldata->payload_size, ldata->payload,
                             n_digits, scale);
   hpx_lco_release(hpx_thread_current_target(), ldata);
 
@@ -355,7 +369,7 @@ void ExpansionRef::destroy() {
 }
 
 
-void ExpansionRef::S_to_M(Point center, SourceRef sources, 
+void ExpansionRef::S_to_M(Point center, SourceRef sources,
                           double scale) const {
   schedule();
   int nsrc = sources.n();
@@ -367,7 +381,7 @@ void ExpansionRef::S_to_M(Point center, SourceRef sources,
 }
 
 
-void ExpansionRef::S_to_L(Point center, SourceRef sources, 
+void ExpansionRef::S_to_L(Point center, SourceRef sources,
                           double scale) const {
   schedule();
   int nsrc = sources.n();
@@ -448,7 +462,7 @@ void ExpansionRef::contribute(size_t bytes, char *payload) {
 }
 
 
-std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center, 
+std::unique_ptr<Expansion> ExpansionRef::get_new_expansion(Point center,
                                                            int n_digits) const {
   return create_expansion(type_, center, n_digits);
 }
@@ -480,7 +494,7 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
   //This is the init data for the LCO
   size_t bytes = exp->bytes();
   int type = exp->type();
-  int n_digits = exp->accuracy(); 
+  int n_digits = exp->accuracy();
   void *ldata = exp->release();
 
   hpx_addr_t retval{HPX_NULL};

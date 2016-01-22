@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 /// \file src/direct_method.cc
 /// \brief Implementation of the direct summation method
 
@@ -11,7 +25,7 @@ namespace dashmm {
 void Direct::generate(SourceNode &curr, const ExpansionRef expand) const {
   //We must at least create an expansion here, otherwise the S->T will not have
   // anything to work from.
-  int n_digits = expand.accuracy(); 
+  int n_digits = expand.accuracy();
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
 }
 
@@ -22,8 +36,8 @@ void Direct::aggregate(SourceNode &curr,
 }
 
 void Direct::inherit(TargetNode &curr, const ExpansionRef expand,
-                     size_t which_child) const { 
-  int n_digits = expand.accuracy(); 
+                     size_t which_child) const {
+  int n_digits = expand.accuracy();
   curr.set_expansion(expand.get_new_expansion(Point{0.0, 0.0, 0.0}, n_digits));
 }
 
