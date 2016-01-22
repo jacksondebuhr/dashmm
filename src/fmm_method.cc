@@ -161,7 +161,7 @@ void FMM::proc_coll_recur(TargetNode &T, SourceNode &S) const {
   if (well_sep_test_asymmetric(S.index(), T.index())) {
     ExpansionRef expand = S.expansion(); 
     TargetRef targets = T.parts(); 
-    double scale = 1.0 / T.size(); 
+    double scale = 1.0 / S.size(); 
     expand.M_to_T(targets, scale); 
   } else {
     if (S.is_leaf()) {
