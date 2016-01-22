@@ -40,6 +40,8 @@ Expansion *laplace_COM_expansion();
 /// This creates a new object, the caller assumes ownership of the returned
 /// object.
 ///
+/// \param n_digits - the number of digits of accuracy requested
+///
 /// \returns - the expansion; caller assumes ownership
 Expansion *laplace_sph_expansion(int n_digits);
 
@@ -48,6 +50,8 @@ Expansion *laplace_sph_expansion(int n_digits);
 /// This creates a new object, the caller assumes ownership of the returned
 /// object.
 ///
+/// \param n_digits - the number of digits of accuracy requested
+///
 /// \returns - the expansion; caller assumes ownership
 Expansion *laplace_sph_exp_expansion(int n_digits);
 
@@ -55,6 +59,8 @@ Expansion *laplace_sph_exp_expansion(int n_digits);
 ///
 /// This creates a new object, the caller assumes ownership of the returned
 /// object. This method is the classic Barnes-Hut method.
+///
+/// \param theta - the critical opening angle
 ///
 /// \returns - the method; caller assumes ownership
 Method *bh_method(double theta);
@@ -74,15 +80,6 @@ Method *direct_method();
 ///
 /// \returns - the method; caller assumes ownership
 Method *fmm_method();
-
-/// Provide an FMM method object that uses exponential operators
-///
-/// This creates a new object, the caller assumes ownership of the returned
-/// object. This method is the Fast Multipole Method that uses Merge-and-shift
-/// to reduce the arithmetic complexity.
-///
-/// \returns - the method; caller assumes ownership
-Method *fmm_exp_method();
 
 
 // NOTE: Not intended for users

@@ -15,11 +15,15 @@
 /// \file src/laplace_sph.cc
 /// \brief Implementation of LaplaceSPH
 
+
 #include "include/laplace_sph.h"
+
 
 namespace dashmm {
 
+
 std::map<int, uLaplaceSPHTable> builtin_laplace_table_;
+
 
 LaplaceSPH::LaplaceSPH(Point center, int n_digits) : n_digits_{n_digits} {
   LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
@@ -37,6 +41,7 @@ LaplaceSPH::LaplaceSPH(Point center, int n_digits) : n_digits_{n_digits} {
     data_->expansion[i] = 0;
 }
 
+
 LaplaceSPH::LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits)
   : n_digits_{n_digits} {
   data_ = ptr;
@@ -45,12 +50,14 @@ LaplaceSPH::LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits)
     data_->n_digits = n_digits;
 }
 
+
 LaplaceSPH::~LaplaceSPH() {
   if (valid()) {
     free(data_);
     data_ = nullptr;
   }
 }
+
 
 std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
                                               Source *first, Source *last,
@@ -105,6 +112,7 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
   delete [] powers_ephi;
   return std::unique_ptr<Expansion>{retval};
 }
+
 
 std::unique_ptr<Expansion> LaplaceSPH::S_to_L(Point center,
                                               Source *first, Source *last,
@@ -161,6 +169,7 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_L(Point center,
 
   return std::unique_ptr<Expansion>{retval};
 }
+
 
 std::unique_ptr<Expansion> LaplaceSPH::M_to_M(int from_child,
                                               double s_size) const {
@@ -245,6 +254,7 @@ std::unique_ptr<Expansion> LaplaceSPH::M_to_M(int from_child,
   return std::unique_ptr<Expansion>{retval};
 }
 
+
 std::unique_ptr<Expansion> LaplaceSPH::M_to_L(Index s_index, double s_size,
                                               Index t_index) const {
   int t2s_x = s_index.x() - t_index.x();
@@ -309,6 +319,7 @@ std::unique_ptr<Expansion> LaplaceSPH::M_to_L(Index s_index, double s_size,
   delete [] powers_rho;
   return std::unique_ptr<Expansion>{retval};
 }
+
 
 std::unique_ptr<Expansion> LaplaceSPH::L_to_L(int to_child,
                                               double t_size) const {
@@ -392,6 +403,7 @@ std::unique_ptr<Expansion> LaplaceSPH::L_to_L(int to_child,
   return std::unique_ptr<Expansion>{retval};
 }
 
+
 void LaplaceSPH::M_to_T(Target *first, Target *last, double scale) const {
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p();
@@ -449,6 +461,7 @@ void LaplaceSPH::M_to_T(Target *first, Target *last, double scale) const {
   delete [] powers_ephi;
   delete [] legendre;
 }
+
 
 void LaplaceSPH::L_to_T(Target *first, Target *last, double scale) const {
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
@@ -509,6 +522,7 @@ void LaplaceSPH::L_to_T(Target *first, Target *last, double scale) const {
   delete [] legendre;
 }
 
+
 void LaplaceSPH::S_to_T(Source *s_first, Source *s_last,
                         Target *t_first, Target *t_last) const {
   for (auto i = t_first; i != t_last; ++i) {
@@ -523,16 +537,19 @@ void LaplaceSPH::S_to_T(Source *s_first, Source *s_last,
   }
 }
 
+
 void LaplaceSPH::add_expansion(const Expansion *temp1) {
   dcomplex_t *expansion = &data_->expansion[0];
   for (size_t i = 0; i < temp1->size(); ++i)
     expansion[i] += temp1->term(i);
 }
 
+
 std::unique_ptr<Expansion> LaplaceSPH::get_new_expansion(Point center) const {
   LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}};
   return std::unique_ptr<Expansion>{retval};
 }
+
 
 void LaplaceSPH::rotate_sph_z(const dcomplex_t *M, double alpha,
                               dcomplex_t *MR) {
@@ -560,6 +577,7 @@ void LaplaceSPH::rotate_sph_z(const dcomplex_t *M, double alpha,
   delete [] powers_ealpha;
 }
 
+
 void LaplaceSPH::rotate_sph_y(const dcomplex_t *M, const double *d,
                               dcomplex_t *MR) {
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
@@ -586,6 +604,7 @@ void LaplaceSPH::rotate_sph_y(const dcomplex_t *M, const double *d,
   }
 }
 
+
 void LaplaceSPH::M_to_L_zp(const dcomplex_t *M, const double *rho,
                            double scale, dcomplex_t *L) {
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
@@ -606,6 +625,7 @@ void LaplaceSPH::M_to_L_zp(const dcomplex_t *M, const double *rho,
   }
 }
 
+
 void LaplaceSPH::M_to_L_zm(const dcomplex_t *M, const double *rho,
                            double scale, dcomplex_t *L) {
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
@@ -625,6 +645,7 @@ void LaplaceSPH::M_to_L_zm(const dcomplex_t *M, const double *rho,
     }
   }
 }
+
 
 void legendre_Plm(int n, double x, double *P) {
   double u = -sqrt(1.0 - x * x);
@@ -655,6 +676,7 @@ LaplaceSPHTable::LaplaceSPHTable(int n_digits) {
   generate_wigner_dmatrix(dmat_plus_, dmat_minus_);
 }
 
+
 LaplaceSPHTable::~LaplaceSPHTable() {
   delete [] sqf_;
   delete [] sqbinom_;
@@ -666,6 +688,7 @@ LaplaceSPHTable::~LaplaceSPHTable() {
   delete dmat_minus_;
 }
 
+
 double *LaplaceSPHTable::generate_sqf() {
   double *sqf = new double[2 * p_ + 1];
   sqf[0] = 1.0;
@@ -673,6 +696,7 @@ double *LaplaceSPHTable::generate_sqf() {
     sqf[i] = sqf[i - 1] * sqrt(i);
   return sqf;
 }
+
 
 double *LaplaceSPHTable::generate_sqbinom() {
   int N = 2 * p_;
@@ -706,6 +730,7 @@ double *LaplaceSPHTable::generate_sqbinom() {
   return sqbinom;
 }
 
+
 void LaplaceSPHTable::generate_wigner_dmatrix(laplace_map_t *&dp,
                                               laplace_map_t *&dm) {
   double cbeta[24] = {1.0 / sqrt(5.0), 1.0 / sqrt(6.0), 1.0 / sqrt(9.0),
@@ -735,6 +760,7 @@ void LaplaceSPHTable::generate_wigner_dmatrix(laplace_map_t *&dp,
     (*dm)[-cbeta[i]] = dm_data;
   }
 }
+
 
 void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
                                                double *dp, double *dm) {
@@ -847,5 +873,6 @@ void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
     }
   }
 }
+
 
 } // namespace dashmm

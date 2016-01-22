@@ -15,8 +15,10 @@
 #ifndef __DASHMM_LAPLACE_SPH_EXPANSION_H__
 #define __DASHMM_LAPLACE_SPH_EXPANSION_H__
 
+
 /// \file include/laplace_sph.h
 /// \brief Declaration of LaplaceSPH
+
 
 #include <cmath>
 #include <complex>
@@ -29,7 +31,9 @@
 #include "include/particle.h"
 #include "include/point.h"
 
+
 namespace dashmm {
+
 
 struct laplace_cmp {
   bool operator()(const double &a, const double &b) const {
@@ -44,10 +48,12 @@ struct laplace_cmp {
   }
 };
 
+
 using laplace_map_t = std::map<double, double *, laplace_cmp>;
 
+
 class LaplaceSPHTable {
-public:
+ public:
   LaplaceSPHTable(int n_digits);
   ~LaplaceSPHTable();
 
@@ -57,7 +63,7 @@ public:
   const double *dmat_plus(double v) const {return dmat_plus_->at(v);}
   const double *dmat_minus(double v) const {return dmat_minus_->at(v);}
 
-private:
+ private:
   int p_;
   double *sqf_;
   double *sqbinom_;
@@ -70,10 +76,13 @@ private:
   void generate_dmatrix_of_beta(double beta, double *dp, double *dm);
 };
 
+
 using uLaplaceSPHTable = std::unique_ptr<LaplaceSPHTable>;
 using LaplaceSPHTableIterator = std::map<int, uLaplaceSPHTable>::iterator;
 
+
 extern std::map<int, uLaplaceSPHTable> builtin_laplace_table_;
+
 
 struct LaplaceSPHData {
   int reserved;
@@ -83,8 +92,9 @@ struct LaplaceSPHData {
   dcomplex_t expansion[];
 };
 
+
 class LaplaceSPH : public Expansion {
-public:
+ public:
   LaplaceSPH(Point center, int n_digits);
   LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits);
   ~LaplaceSPH();
@@ -100,7 +110,6 @@ public:
   int type() const override {return kExpansionLaplaceSPH;}
   int accuracy() const override {return n_digits_;}
   bool provides_L() const override {return true;}
-  bool provides_exp() const override {return false;}
   size_t size() const override {
     uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
     int p = table->p();
@@ -133,7 +142,7 @@ public:
   void add_expansion(const Expansion *temp1) override;
   std::unique_ptr<Expansion> get_new_expansion(Point center) const override;
 
-private:
+ private:
   LaplaceSPHData *data_;
   size_t bytes_;
   int n_digits_;
@@ -148,20 +157,25 @@ private:
 
 };
 
+
 void legendre_Plm(int n, double x, double *P);
+
 
 inline int midx(const int n, const int m) {
   return n * (n + 1) / 2 + m;
 }
 
+
 inline int didx(const int n, const int mp, const int m) {
   return n * (n + 1) * (4 * n - 1) / 6 + mp * (2 * n + 1) + n + m;
 }
+
 
 inline double pow_m1(const int m) {
   return (m % 2 ? -1.0 : 1.0);
 }
 
+
 } // namespace dashmm
 
-#endif
+#endif // __DASHMM_LAPLACE_SPH_EXPANSION_H__

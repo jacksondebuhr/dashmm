@@ -29,7 +29,9 @@
 
 namespace dashmm {
 
+
 using dcomplex_t = std::complex<double>;
+
 
 /// The data needed for source particles.
 struct Source {

@@ -37,6 +37,8 @@ constexpr int kLastUserMethodType = 1999;
 
 /// The identifier for the BH Method
 constexpr int kMethodBH = kFirstMethodType;
+
+/// The identifier for the direct summation Method
 constexpr int kMethodDirect = kMethodBH + 1;
 
 /// The identifier for the FMM Method
@@ -59,6 +61,7 @@ constexpr int kExpansionLaplaceCOM = kFirstExpansionType;
 
 /// The identifier for the Laplace Spherical Harmonic Expansion
 constexpr int kExpansionLaplaceSPH = kExpansionLaplaceCOM + 1;
+
 
 } // namespace dashmm
 

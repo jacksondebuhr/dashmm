@@ -47,8 +47,8 @@ struct MethodSerial {
 ///
 /// This interface specifies the requirements for methods that a user
 /// may add to DASHMM. In general, the user will need to implement the method
-/// and then somewhere in their program call register_method() providing the
-/// creation functions that the user also implements. For details, see the
+/// and then somewhere in their program call register_user_method() providing
+/// the creation functions that the user also implements. For details, see the
 /// DASHMM Advanced User Guide.
 class Method {
  public:

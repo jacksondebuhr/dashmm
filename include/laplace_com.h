@@ -78,7 +78,6 @@ class LaplaceCOM : public Expansion {
   int type() const override {return kExpansionLaplaceCOM;}
   int accuracy() const override {return -1;}
   bool provides_L() const override {return false;}
-  bool provides_exp() const override {return false;}
   size_t size() const override {return 10;}
   Point center() const override {
     assert(valid());

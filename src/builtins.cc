@@ -64,10 +64,12 @@ HPX_ACTION(HPX_FUNCTION, 0,
            direct_method_create_action, direct_method_create_handler,
            HPX_SIZE_T, HPX_POINTER);
 
+
 Method *fmm_method() {
   Method *retval = new FMM{};
   return retval;
 }
+
 
 Method *fmm_method_create_handler(size_t size, MethodSerial *data) {
   assert(size == sizeof(MethodSerial));
@@ -76,6 +78,7 @@ Method *fmm_method_create_handler(size_t size, MethodSerial *data) {
 HPX_ACTION(HPX_FUNCTION, 0,
            fmm_method_create_action, fmm_method_create_handler,
            HPX_SIZE_T, HPX_POINTER);
+
 
 void register_built_in_methods() {
   assert(kSuccess == register_method(kMethodBH, bh_method_create_action, 0));
@@ -90,6 +93,7 @@ Expansion *laplace_COM_expansion() {
   return retval;
 }
 
+
 Expansion *laplace_COM_create_handler(double x, double y, double z,
                                       int n_digits) {
   LaplaceCOM *retval = new LaplaceCOM{Point{x, y, z}};
@@ -99,6 +103,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
            laplace_COM_create_action, laplace_COM_create_handler,
            HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_INT);
 
+
 Expansion *laplace_COM_interpret_handler(void *data, size_t size,
                                          int n_digits) {
   LaplaceCOM *retval = new LaplaceCOM{(LaplaceCOMData *)data, size};
@@ -107,6 +112,7 @@ Expansion *laplace_COM_interpret_handler(void *data, size_t size,
 HPX_ACTION(HPX_FUNCTION, 0,
            laplace_COM_interpret_action, laplace_COM_interpret_handler,
            HPX_POINTER, HPX_SIZE_T, HPX_INT);
+
 
 Expansion *laplace_sph_expansion(int n_digits) {
   // If we are not running on SMP, the following needs to be wrapped and
@@ -121,6 +127,7 @@ Expansion *laplace_sph_expansion(int n_digits) {
   return retval;
 }
 
+
 Expansion *laplace_sph_create_handler(double x, double y, double z,
                                       int n_digits) {
   LaplaceSPH *retval = new LaplaceSPH{Point{x, y, z}, n_digits};
@@ -129,6 +136,7 @@ Expansion *laplace_sph_create_handler(double x, double y, double z,
 HPX_ACTION(HPX_FUNCTION, 0,
            laplace_sph_create_action, laplace_sph_create_handler,
            HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_INT);
+
 
 Expansion *laplace_sph_interpret_handler(void *data, size_t size,
                                          int n_digits) {
@@ -139,6 +147,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
            laplace_sph_interpret_action, laplace_sph_interpret_handler,
            HPX_POINTER, HPX_SIZE_T, HPX_INT);
 
+
 void register_built_in_expansions() {
   assert(kSuccess == register_expansion(kExpansionLaplaceCOM,
                                         laplace_COM_create_action,
@@ -146,7 +155,6 @@ void register_built_in_expansions() {
   assert(kSuccess == register_expansion(kExpansionLaplaceSPH,
                                         laplace_sph_create_action,
                                         laplace_sph_interpret_action, 0));
-  //more here
 }
 
 

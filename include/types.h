@@ -39,7 +39,6 @@ enum ReturnCode {
   kInitError = 4,
   kFiniError = 5,
   kDomainError = 6
-  //etc...
 };
 
 

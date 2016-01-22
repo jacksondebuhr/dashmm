@@ -15,6 +15,7 @@
 /// \file src/method.cc
 /// \brief Implementation of method
 
+
 #include "include/method.h"
 
 #include <map>

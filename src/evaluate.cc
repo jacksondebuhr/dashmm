@@ -142,6 +142,7 @@ HPX_ACTION(HPX_DEFAULT, 0,
            pack_sources_action, pack_sources_handler,
            HPX_ADDR, HPX_INT, HPX_INT);
 
+
 /// Action that packs the needed target data
 ///
 /// To allow for the user's use of GAS to store more information with their
@@ -225,6 +226,7 @@ int find_source_domain_handler(hpx_addr_t packed) {
 HPX_ACTION(HPX_DEFAULT, 0,
            find_source_domain_action, find_source_domain_handler,
            HPX_ADDR);
+
 
 /// Action to find the bounding domain for the target points
 ///

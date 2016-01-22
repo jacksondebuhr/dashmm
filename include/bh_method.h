@@ -29,7 +29,7 @@
 namespace dashmm {
 
 
-/// A Method to implement class Barnes-Hut
+/// A Method to implement classic Barnes-Hut
 ///
 /// It uses the simple critical angle criterion to decide if a given expansion
 /// is usable. There is little that needs explanation in this class, as the
@@ -73,7 +73,7 @@ class BH : public Method {
   void process(TargetNode &curr, std::vector<SourceNode> &consider,
                        bool curr_is_leaf) const override;
 
-  //BHMethod always calls for refinement
+  //BH always calls for refinement
   bool refine_test(bool same_sources_and_targets, const TargetNode &curr,
                    const std::vector<SourceNode> &consider) const override {
     return true;

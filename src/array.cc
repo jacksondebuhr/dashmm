@@ -41,6 +41,7 @@ namespace dashmm {
 /// \param count - the number of records to allocate
 /// \param size - the size in bytes of each record
 /// \param obj [out] - the address of the global address of the meta data
+/// \param err [out] - the address of an integer in which to report errors
 ///
 /// \returns - HPX_SUCCESS
 int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
@@ -157,7 +158,7 @@ HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
 /// \param obj - the global address of the ArrayMetaData
 /// \param first - the first record to read
 /// \param last - the last (exclusive) record to read
-/// \param in_data - a buffer into which the read data is stored
+/// \param out_data - a buffer into which the read data is stored
 ///
 /// \returns - HPX_SUCCESS
 int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,

@@ -28,7 +28,7 @@
 
 namespace dashmm {
 
-//
+
 class Direct : public Method {
  public:
   Direct() : local_{nullptr} {

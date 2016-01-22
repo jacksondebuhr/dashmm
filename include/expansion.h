@@ -34,13 +34,15 @@
 
 namespace dashmm {
 
+
 using dcomplex_t = std::complex<double>;
+
 
 /// The abstract interface for expansions usable in DASHMM
 ///
 /// This interface specifies the requirements for expansions that a user
 /// may add to DASHMM. In general, the user will need to implement the
-/// expansion and then somewhere in their program call register_expansion()
+/// expansion and then somewhere in their program call register_user_expansion()
 /// providing the creation and interpretation functions that the user also
 /// implements. For details, see the DASHMM Advanced User Guide.
 class Expansion {
@@ -87,9 +89,6 @@ class Expansion {
 
   /// Indicates if the expansion provides local expansion operators.
   virtual bool provides_L() const = 0;
-
-  /// Indicates if the expansion provides exponential expansion operators.
-  virtual bool provides_exp() const = 0;
 
   /// The number of terms in the expansion.
   virtual size_t size() const = 0;

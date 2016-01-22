@@ -15,16 +15,20 @@
 #ifndef __DASHMM_FMM_METHOD_H__
 #define __DASHMM_FMM_METHOD_H__
 
+
 /// \file include/fmm_method.h
 /// \brief Declaration of FMM Method
 
-#include "include/ids.h"
+
 #include "include/expansionref.h"
+#include "include/ids.h"
+#include "include/index.h"
 #include "include/method.h"
 #include "include/node.h"
-#include "include/index.h"
+
 
 namespace dashmm {
+
 
 /// A Method to implement classic FMM
 ///
@@ -75,10 +79,12 @@ class FMM : public Method {
 
   void proc_coll_recur(TargetNode &T, SourceNode &S) const;
 
-private:
+ private:
   MethodSerial *local_;
 };
 
+
 } // namespace dashmm
+
 
 #endif // __DASHMM_FMM_METHOD_H__

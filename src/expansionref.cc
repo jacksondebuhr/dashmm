@@ -15,6 +15,7 @@
 /// \file src/expansionref.cc
 /// \brief Implementation of Expansion reference object
 
+
 #include "include/expansionref.h"
 
 #include <cassert>
@@ -130,7 +131,7 @@ HPX_ACTION(HPX_FUNCTION, 0,
 
 /// The predicate to detect triggering of the Expansion LCO
 ///
-/// The expansion LCO is triggered if it has been finalized() and the number
+/// The expansion LCO is triggered if it has been finalized and the number
 /// of contributions match the number of scheduled operations.
 bool expansion_lco_predicate_handler(ExpansionLCOHeader *i, size_t bytes) {
   return (i->finished && (i->arrived == i->scheduled));
