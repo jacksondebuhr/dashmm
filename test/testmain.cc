@@ -31,17 +31,26 @@ struct InputArguments {
   int refinement_limit;
   std::string test_case;
   bool verify;
-  int accuracy; 
+  int accuracy;
 };
 
 
 void print_usage(char *progname) {
   //TODO: Improve formatting; add other methods when available
-  fprintf(stdout, "Usage: %s --method=[bh/fmm] "
-          "--nsources=num --sourcedata=[cube/sphere/plummer] "
-          "--ntargets=num --targetdata=[cube/sphere/plummer] "
-          "--threshold=num --verify=[yes/no] --accuracy=num\n",
-          progname);
+  fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
+"Options available: [possible/values] (default value)\n"
+"  --method=[fmm/bh]            method to use (fmm)\n"
+"  --nsources=num               number of source points to generate (10000)\n"
+"  --sourcedata=[cube/sphere/plummer]\n"
+"                               source distribution type (cube)\n"
+"  --ntargets=num               number of target points to generate (10000)\n"
+"  --targetdata=[cube/sphere/plummer]\n"
+"                               target distribution type (cube)\n"
+"  --threshold=num              source and target tree partition refinement\n"
+"                                 limit (40)\n"
+"  --accuracy=num               number of digits of accuracy for fmm (3)\n"
+"  --verify=[yes/no]            perform an accuracy test comparing to direct\n"
+"                                 summation (yes)\n", progname);
 }
 
 
@@ -54,7 +63,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   retval.refinement_limit = 40;
   retval.test_case = std::string{"fmm"};
   retval.verify = true;
-  retval.accuracy = 3; 
+  retval.accuracy = 3;
 
   int opt = 0;
   static struct option long_options[] = {
@@ -65,7 +74,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     {"targetdata", required_argument, 0, 'g'},
     {"threshold", required_argument, 0, 'l'},
     {"verify", required_argument, 0, 'v'},
-    {"accuracy", required_argument, 0, 'a'}, 
+    {"accuracy", required_argument, 0, 'a'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
@@ -287,9 +296,9 @@ void perform_evaluation_test(InputArguments args) {
     test_method = dashmm::bh_method(0.6);
     test_expansion = dashmm::laplace_COM_expansion();
   } else if (args.test_case == std::string{"fmm"}) {
-    test_method = dashmm::fmm_method(); 
-    test_expansion = dashmm::laplace_sph_expansion(args.accuracy); 
-  } 
+    test_method = dashmm::fmm_method();
+    test_expansion = dashmm::laplace_sph_expansion(args.accuracy);
+  }
 
   assert(test_method && test_expansion);
 
