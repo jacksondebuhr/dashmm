@@ -49,7 +49,6 @@ struct InputArguments {
 
 
 void print_usage(char *progname) {
-  //TODO: Improve formatting; add other methods when available
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
 "Options available: [possible/values] (default value)\n"
 "  --method=[fmm/bh]            method to use (fmm)\n"
@@ -200,8 +199,12 @@ void pick_sphere_position(double *pos) {
 }
 
 
-double pick_mass() {
-  return (double)rand() / RAND_MAX + 1.0;
+double pick_mass(bool use_negative) {
+  double retval = (double)rand() / RAND_MAX + 1.0;
+  if (use_negative && (rand() % 2)) {
+    retval *= -1.0;
+  }
+  return retval;
 }
 
 
@@ -225,17 +228,18 @@ double pick_plummer_mass(int count) {
 
 
 void set_sources(UserSourceData *sources, int source_count,
-                 std::string source_type) {
+                 std::string source_type, std::string test_case) {
+  bool use_negative = test_case == std::string{"fmm"};
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       pick_cube_position(sources[i].pos);
-      sources[i].mass = pick_mass();
+      sources[i].mass = pick_mass(use_negative);
     }
   } else if (source_type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < source_count; ++i) {
       pick_sphere_position(sources[i].pos);
-      sources[i].mass = pick_mass();
+      sources[i].mass = pick_mass(use_negative);
     }
   } else {
     //Plummer
@@ -283,7 +287,7 @@ void perform_evaluation_test(InputArguments args) {
   UserTargetData *targets = static_cast<UserTargetData *>(
         malloc(sizeof(UserTargetData) * args.target_count));
 
-  set_sources(sources, args.source_count, args.source_type);
+  set_sources(sources, args.source_count, args.source_type, args.test_case);
   set_targets(targets, args.target_count, args.target_type);
 
   //prep sources
