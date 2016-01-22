@@ -47,11 +47,11 @@ void print_usage(char *progname) {
 
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
-  retval.source_count = 2;
+  retval.source_count = 10000;
   retval.source_type = std::string{"cube"};
-  retval.target_count = 2;
+  retval.target_count = 10000;
   retval.target_type = std::string{"cube"};
-  retval.refinement_limit = 1;
+  retval.refinement_limit = 40;
   retval.test_case = std::string{"fmm"};
   retval.verify = true;
   retval.accuracy = 3; 
@@ -71,7 +71,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   };
 
   int long_index = 0;
-  while ((opt = getopt_long(argc, argv, "m:s:w:t:g:l:v:h",
+  while ((opt = getopt_long(argc, argv, "m:s:w:t:g:l:v:a:h",
                             long_options, &long_index)) != -1) {
     std::string verifyarg{};
     switch (opt) {
@@ -96,6 +96,9 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     case 'v':
       verifyarg = optarg;
       retval.verify = (verifyarg == std::string{"yes"});
+      break;
+    case 'a':
+      retval.accuracy = atoi(optarg);
       break;
     case 'h':
       print_usage(argv[0]);
@@ -286,7 +289,7 @@ void perform_evaluation_test(InputArguments args) {
   } else if (args.test_case == std::string{"fmm"}) {
     test_method = dashmm::fmm_method(); 
     test_expansion = dashmm::laplace_sph_expansion(args.accuracy); 
-  } //TODO: more cases once they are implemented
+  } 
 
   assert(test_method && test_expansion);
 
