@@ -110,7 +110,7 @@ class User : public dashmm::Expansion {
 
   // This returns a specific term in the expansion. dcomplex_t is an
   // alias for std::complex<double>.
-  dcomplex_t term(size_t i) const override;
+  dashmm::dcomplex_t term(size_t i) const override;
 
   // This routine will generate the multipole expansion about the given
   // center for the given points.
@@ -192,6 +192,10 @@ dashmm::Expansion *create_user_expansion(double cx, double cy, double cz,
 // second constructor for this Expansion type. Note that this will return the
 // new object as a pointer to the base class.
 dashmm::Expansion *interpret_user_expansion(void *data, size_t bytes, int acc);
+
+
+// This is a helper routine to perform the registration of User with DASHMM.
+void register_user_with_dashmm();
 
 
 #endif // __USER_EXPANSION_H__

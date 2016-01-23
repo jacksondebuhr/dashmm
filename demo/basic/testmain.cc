@@ -138,7 +138,6 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stderr, "Usage ERROR: ntargets must be positive\n");
     return -1;
   }
-  //TODO add other cases when available
   if (retval.test_case != "bh" && retval.test_case != "fmm") {
     fprintf(stderr, "Usage ERROR: unknown method '%s'\n",
             retval.test_case.c_str());

@@ -22,5 +22,8 @@
 // The built in kernels and methods
 #include "include/builtins.h"
 
+// Some other stuff
+#include "include/ids.h"
+
 
 #endif // __DASHMM_USER_INTERFACE_H__

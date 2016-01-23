@@ -12,6 +12,7 @@ using dashmm::Point;
 using dashmm::Source;
 using dashmm::Index;
 using dashmm::Target;
+using dashmm::dcomplex_t;
 
 
 // This is the specific detail of the implementation of the data for the
@@ -81,7 +82,7 @@ size_t User::size() const {
 
 Point User::center() const {
   if (valid()) {
-    return data_->center();
+    return data_->center;
   } else {
     return Point(0.0, 0.0, 0.0);
   }
@@ -117,46 +118,60 @@ dcomplex_t User::term(size_t i) const {return dcomplex_t{};}
 std::unique_ptr<Expansion> User::S_to_M(Point center,
                                           Source *first, Source *last,
                                           double scale) const {
-  fprintf(stdout, "S->M for %d sources\n", last - first);
-  return std::unique_ptr<Expansion>{new User(center, acc_)};
+  fprintf(stdout, "S->M for %ld sources\n", last - first);
+  return std::unique_ptr<Expansion>{new User{center, acc_}};
 }
 
 std::unique_ptr<Expansion> User::S_to_L(Point center,
                                           Source *first, Source *last,
                                           double scale) const {
-  fprintf(stdout, "S->L for %d sources\n", last - first);
-  return std::unique_ptr<Expansion>{new User(center, acc_)};
+  fprintf(stdout, "S->L for %ld sources\n", last - first);
+  return std::unique_ptr<Expansion>{new User{center, acc_}};
 }
 
-virtual std::unique_ptr<Expansion> User::M_to_M(int from_child,
+std::unique_ptr<Expansion> User::M_to_M(int from_child,
                                           double s_size) const {
   fprintf(stdout, "M->M from child %d\n", from_child);
-  return std::unique_ptr<Expansion>{new User(center, acc_)};
+  double h = s_size / 2;
+  double px = data_->center.x() + (from_child % 2 == 0 ? h : -h);
+  double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
+  double pz = data_->center.z() + (from_child < 4 ? h : -h);
+  return std::unique_ptr<Expansion>{new User{Point{px, py, pz}, acc_}};
 }
 
 std::unique_ptr<Expansion> User::M_to_L(Index s_index, double s_size,
                                            Index t_index) const {
   fprintf(stdout, "M->L\n");
-  return std::unique_ptr<Expansion>{new User(center, acc_)};
+  int t2s_x = s_index.x() - t_index.x();
+  int t2s_y = s_index.y() - t_index.y();
+  int t2s_z = s_index.z() - t_index.z();
+  double tx = data_->center.x() - t2s_x * s_size;
+  double ty = data_->center.y() - t2s_y * s_size;
+  double tz = data_->center.z() - t2s_z * s_size;
+  return std::unique_ptr<Expansion>{new User{Point{tx, ty, tz}, acc_}};
 }
 
 std::unique_ptr<Expansion> User::L_to_L(int to_child,
                                           double t_size) const {
   fprintf(stdout, "L->L to child %d\n", to_child);
-  return std::unique_ptr<Expansion>{new User(center, acc_)};
+  double h = t_size / 2;
+  double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
+  double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
+  double cz = data_->center.z() + (to_child < 4 ? -h : h);
+  return std::unique_ptr<Expansion>{new User{Point{cx, cy, cz}, acc_}};
 }
 
 void User::M_to_T(Target *first, Target *last, double scale) const {
-  fprintf(stdout, "M->T for %d targets\n", last - first);
+  fprintf(stdout, "M->T for %ld targets\n", last - first);
 }
 
 void User::L_to_T(Target *first, Target *last, double scale) const {
-  fprintf(stdout, "L->T for %d targets\n", last - first);
+  fprintf(stdout, "L->T for %ld targets\n", last - first);
 }
 
 void User::S_to_T(Source *s_first, Source *s_last,
                   Target *t_first, Target *t_last) const {
-  fprintf(stdout, "S->T for %d sources and %d targets\n",
+  fprintf(stdout, "S->T for %ld sources and %ld targets\n",
           s_last - s_first, t_last - t_first);
 }
 
@@ -206,9 +221,17 @@ HPX_ACTION(HPX_FUNCTION, 0,
 // function name and the chosen identifier. This identifier is also used
 // when the Expansion is registered via dashmm::register_user_expansion().
 Expansion *interpret_user_expansion(void *data, size_t bytes, int acc) {
-  Expansion *retval = new User{data, bytes, acc};
+  Expansion *retval = new User{(UserData *)data, bytes, acc};
   return retval;
 }
 HPX_ACTION(HPX_FUNCTION, 0,
            interpret_user_expansion_action, interpret_user_expansion,
            HPX_POINTER, HPX_SIZE_T, HPX_INT);
+
+
+void register_user_with_dashmm() {
+  dashmm::ReturnCode ret = dashmm::register_user_expansion(
+      kUserExpansionType, create_user_expansion_action,
+      interpret_user_expansion_action);
+  assert(ret == dashmm::kSuccess);
+}

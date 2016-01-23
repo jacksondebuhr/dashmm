@@ -49,6 +49,11 @@ struct ExpansionTableRow {
 std::map<int, ExpansionTableRow> *expansion_table_;
 
 
+// Forward declare this for use by an action below.
+ReturnCode register_expansion(int type, hpx_action_t creator,
+                              hpx_action_t interpreter, int user);
+
+
 /////////////////////////////////////////////////////////////////////
 // Actions
 /////////////////////////////////////////////////////////////////////
@@ -95,6 +100,16 @@ int manage_expansion_table_handler(int operation) {
 HPX_ACTION(HPX_DEFAULT, 0,
            manage_expansion_table_action, manage_expansion_table_handler,
            HPX_INT);
+
+
+int user_registration_handler(int type, hpx_action_t creator,
+                              hpx_action_t interpreter, int *err) {
+  *err = register_expansion(type, creator, interpreter, 1);
+  hpx_exit(HPX_SUCCESS);
+}
+HPX_ACTION(HPX_DEFAULT, 0,
+           user_registration_action, user_registration_handler,
+           HPX_INT, HPX_ACTION_T, HPX_ACTION_T, HPX_POINTER);
 
 
 /////////////////////////////////////////////////////////////////////
@@ -176,7 +191,10 @@ std::unique_ptr<Expansion> create_expansion(int type, Point center,
 
 ReturnCode register_user_expansion(int type, hpx_action_t creator,
                                    hpx_action_t interpreter) {
-  return register_expansion(type, creator, interpreter, 1);
+  int err{};
+  int *arg = &err;
+  hpx_run(&user_registration_action, &type, &creator, &interpreter, &arg);
+  return static_cast<ReturnCode>(err);
 }
 
 
