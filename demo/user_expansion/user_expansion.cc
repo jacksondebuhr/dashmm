@@ -3,7 +3,10 @@
 #include <cstdio>
 
 
-//We import only what we are using from the dashmm namespace
+//We import only what we are using from the dashmm namespace. Details of
+// Point and Target are in comments below. Expansion is just the abstract
+// base from which User is derived. For details on Point and Index, please
+// see ../../include/point.h and ../../include/index.h.
 using dashmm::Expansion;
 using dashmm::Point;
 using dashmm::Source;
@@ -94,6 +97,22 @@ dcomplex_t User::term(size_t i) const {return dcomplex_t{};}
 // would all have to be implemented for the the specific use-case. For now,
 // these all have a simple implementation that spits out a message for each
 // operation.
+//
+// Source is a structure that holds the relevant source point information. The
+// relevant portions of its declaration are reproduced here.
+//
+// struct Source {
+//   double charge;
+//   Point position;
+// };
+//
+// Similarly, Target holds target data:
+//
+// struct Target {
+//   Point position;
+//   dcomplet_t phi;
+// }
+//
 
 std::unique_ptr<Expansion> User::S_to_M(Point center,
                                           Source *first, Source *last,
