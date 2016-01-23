@@ -1,0 +1,61 @@
+------------------------------
+userdemo demonstration program
+------------------------------
+
+This demo contains a simple utility to demonstrate the means by which a user
+of DASHMM can define and register their own Expansion type with the library.
+The class User is defined as a subclass of the abstract base Expansion type.
+The minimal set of functions is implemented to produce a working code. There
+are plentiful comments in user_expansion.h and user_expansion.cc describing
+what needs to be done to register an Expansion with DASHMM. In usermain.cc
+is a demo program similar to the one in ../basic/, but specialized to show
+off the Expansion registration.
+
+The intent of this demo is to either serve as either a sample with documentation
+for extending DASHMM to include new Expansion types, or as a code to modify
+directly for a specific use-case.
+
+
+-----------------
+Building the Demo
+------------------
+
+To build the demo follow these steps:
+
+1) Build the DASHMM library.
+
+2) In this folder, run 'make'.
+
+
+--------------
+Using the demo
+--------------
+
+To run the demo, type './userdemo'. This will run the utility with a set
+of default arguments. The behavior of the demo can be controlled by a set of
+command line arguments.
+
+Options available: [possible/values] (default value)
+  --nsources=num               number of source points to generate (10000)
+  --ntargets=num               number of target points to generate (10000)
+  --threshold=num              source and target tree partition refinement
+                                 limit (40)
+  --accuracy=num               number of digits of accuracy for fmm (3)
+
+The current implementation of User just produces output indicating which
+operations have been invoked.
+
+There is one HPX-5 command line argument that may be of use. Specifying
+--hpx-threads=num on the command line will control how many scheduler threads
+HPX-5 is using. If this is not specified, then HPX-5 will use one thread per
+available core on the system. In principle, the number of scheduler threads
+is limited only by the available system resources. In practive, you will not
+improve performance using more HPX-5 threads than there are cores on your
+system.
+
+The asynchronous nature of HPX-5 can be examined by running the demo with
+multiple HPX-5 threads and examining that on subsequent runs, the output is
+in a different order. Nonetheless, the same set of outputs occur. The graph
+of the computation is traversed in each run, but the specific ordering of
+operations is not guaranteed to be identical. By contrast, running multiple
+times with a single HPX-5 thread will give the same output exactly.
