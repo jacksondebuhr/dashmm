@@ -1,0 +1,64 @@
+-----------------------------------
+Installation Instruction for DASHMM
+-----------------------------------
+
+This document outlines briefly the instructions for building DASHMM and using
+it in applications.
+
+
+Prerequisites:
+
+DASHMM depends on HPX-5 (version 2.1.0) available at https://hpx.crest.iu.edu/.
+It is possible to build DASHMM on any system and environment on which HPX-5
+can be built. DASHMM v. 0.5 is specialized to SMP operation, so building HPX-5
+is very straightforward. The default values during configuration of HPX-5 are
+likely sufficient, though one may perfer to control the installation location
+by setting the prefix.
+
+Once HPX-5 is installed, and the environment is set up (see
+https://hpx.crest.iu.edu/users_guide#configuring_your_environment_to_use_hpx_5
+for details) DASHMM is ready to be built.
+
+
+---- Building DASHMM ----
+
+It is assumed that the source code has been unpacked into some directory. This
+guide shall use /path/to/dashmm/ to represent this location. The library can be
+built by performing the following steps:
+
+1) Change to the root directory of the unpacked code:
+
+   'cd /path/to/dashmm/'
+
+2) (OPTIONAL) DASHMM uses the GNU C++ compiler by default. If another compiler
+   is desired, modify the first line of Makefile to your selection. For example,
+   to use the Intel compiler, the first line should read:
+
+   'CXX = icpc'
+
+3) Run make:
+
+   'make'
+
+   This will build the library statically, producing
+   /path/to/dashmm/libdashmm.a. This can then be linked into your application.
+
+Please note that the build system uses pkg-config to set up correct compilation
+and linking options for HPX-5. So it is important to add the correct path to
+your PKG_CONFIG_PATH environment variable.
+
+
+---- Demo Code ----
+
+There is a basic demonstration of DASHMM provided in /path/to/dashmm/demo/basic/
+that can be built after DASHMM has been built. For instruction, see the
+README file in that directory.  It should be sufficient to change to that
+directory and make the code. Then running './testdashmm' should perform a quick
+test of the library.
+
+
+---- Using DASHMM in your application ----
+
+To use DASHMM, one need merely link against libdashmm.a. You will also need to
+link against the HPX-5 library. An example of this is provided in
+/path/to/dashmm/demo/basic/Makefile.

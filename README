@@ -1,10 +1,18 @@
-This is the main repository for the DASHMM project.
+-------------------------------------------------------------------
+Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+-------------------------------------------------------------------
 
-To keep this repository clean, we shall adopt a similar workflow model as for
-the development of HPX-5. The master branch will only be used for releases of
-the code. All other commits should appear in the 'dev' branch. Individual
-developers will work in their own branches and merge into 'dev.' Merging
-incomplete or non-working code into 'dev' *will not happen.* Doing so will 
-cause a change in the offenders permissions. Merging non-release code into
-'master' *will not happen.*
+DASHMM is a library implementing a general framework for multipole methods
+that leverages the dynamic adaptive runtime system HPX-5 for increased
+efficiency and scalability. DASHMM is an easy-to-use, extensible library
+that comes with a number of built in methods and expansion.
 
+Quick installation instruction can be found in INSTALL. More complete
+documentation for DASHMM can be found in the doc/ subfolder.
+
+For the latest information about DASHMM, and for some tutorials about its use,
+please visit the website: https://www.crest.iu.edu/projects/dashmm/.
+
+
+DASHMM was created at the Center for Research in Extreme Scale Technologies
+(CREST) and Indiana University, and is supported by the NSF.
