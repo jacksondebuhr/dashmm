@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall -O3 -g
 INCLUDE = -I../../. $(shell pkg-config --cflags hpx)
-LIBS = ../../libdashmm.a $(shell pkg-config --libs hpx)
+LIBS = -L../../. -ldashmm $(shell pkg-config --libs hpx)
 
 SRC = testmain.cc
 OBJ = $(SRC:.cc=.o)
