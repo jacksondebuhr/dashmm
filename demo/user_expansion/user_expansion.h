@@ -1,3 +1,17 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+
 // The contents of this file (and of user_expansion.cc) are intended to be a
 // skeleton of what is required to define an Expansion subclass that can be
 // registered with DASHMM. The comments in these files will explain what is
@@ -183,6 +197,10 @@ class User : public dashmm::Expansion {
 // function should construct the object via the first constructor for this
 // Expansion type. Note that this will return the new object as a pointer
 // to the base class.
+//
+// Note that for the current demo, there is no reason to expose this
+// function in this header. It was done to provide a place for the previous
+// comment.
 dashmm::Expansion *create_user_expansion(double cx, double cy, double cz,
                                          int acc);
 
@@ -191,6 +209,10 @@ dashmm::Expansion *create_user_expansion(double cx, double cy, double cz,
 // correct type. Generally, this function should construct the object via the
 // second constructor for this Expansion type. Note that this will return the
 // new object as a pointer to the base class.
+//
+// Note that for the current demo, there is no reason to expose this
+// function in this header. It was done to provide a place for the previous
+// comment.
 dashmm::Expansion *interpret_user_expansion(void *data, size_t bytes, int acc);
 
 

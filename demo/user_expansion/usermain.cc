@@ -155,7 +155,9 @@ void set_targets(UserTargetData *targets, int target_count) {
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
-  //register User with DASHMM
+  // To use a user-defined expansion in DASHMM one must register that expansion
+  // with the library. For simplicity, we have implemented a small utility
+  // routine to perform the necessary library call.
   register_user_with_dashmm();
 
   //create some arrays
@@ -185,6 +187,11 @@ void perform_evaluation_test(InputArguments args) {
 
   //get method and expansion
   auto method = dashmm::fmm_method();
+
+  // Once the user-defined type is registered with DASHMM, it can be used
+  // like any of the built-in expansions. We did not write a factory method
+  // to produce a User expansion, so we create it directly. The library
+  // provides a factory for all built-in expansion types.
   dashmm::Expansion *test_expansion{
     new User{dashmm::Point{0.0, 0.0, 0.0}, args.accuracy}
   };
@@ -192,6 +199,8 @@ void perform_evaluation_test(InputArguments args) {
   assert(method && test_expansion);
 
 
+  // The newly created expansion object is passed into evaluate(). Having been
+  // registered, the expansion can be understood and used by DASHMM.
   err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
                          offsetof(UserSourceData, mass),
                          target_handle, offsetof(UserTargetData, pos),
