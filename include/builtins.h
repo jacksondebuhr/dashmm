@@ -45,16 +45,6 @@ Expansion *laplace_COM_expansion();
 /// \returns - the expansion; caller assumes ownership
 Expansion *laplace_sph_expansion(int n_digits);
 
-/// Provide a Laplace spherical harmonic with exponential operators expansion
-///
-/// This creates a new object, the caller assumes ownership of the returned
-/// object.
-///
-/// \param n_digits - the number of digits of accuracy requested
-///
-/// \returns - the expansion; caller assumes ownership
-Expansion *laplace_sph_exp_expansion(int n_digits);
-
 /// Provide a BH method object
 ///
 /// This creates a new object, the caller assumes ownership of the returned

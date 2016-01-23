@@ -89,8 +89,7 @@ class LaplaceCOM : public Expansion {
   std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
                                     Source *last, double scale) const override;
   std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
-                                    Source *last, double scale) const override
-  {
+                                    Source *last, double scale) const override {
     return std::unique_ptr<Expansion>{new LaplaceCOM{nullptr, 0}};
   }
 

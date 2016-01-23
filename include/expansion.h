@@ -47,6 +47,23 @@ using dcomplex_t = std::complex<double>;
 /// implements. For details, see the DASHMM Advanced User Guide.
 class Expansion {
  public:
+  /// Generally speaking, subclasses will want to provide two constructors
+  /// for an expansion. They would have signatures like the following:
+  ///
+  /// The first creates the subclass with the given center and the given
+  /// accuracy parameter. For FMM, this might be the number of digits
+  /// requested.
+  ///
+  /// The second creates the expansion from previously existing data. The
+  /// type of the first argument should be whatever is appropriate for the
+  /// type of the expansion. Internally, HPX-5 passes this data around as
+  /// a void *, which can be cast into whatever form is most useful for
+  /// the specific expansion. The size of the expansion is provided to allow
+  /// for variable length data.
+  ///
+  /// Expansion(Point center, int n_digits)
+  /// Expansion(ExpansionData *ptr, size_t bytes, int n_digits)
+
   virtual ~Expansion() { }
 
   /// Release the internal data for an expansion
