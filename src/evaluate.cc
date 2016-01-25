@@ -327,7 +327,7 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //collect results of actions
   PackDataResult res{};
   hpx_lco_get(source_packed, sizeof(res), &res);
-  SourceRef sources{res.packed, res.count};
+  SourceRef sources{res.packed, res.count, res.count};
 
   hpx_lco_get(target_packed, sizeof(res), &res);
   hpx_addr_t target_data = res.packed;
@@ -342,14 +342,10 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //build trees/do work - NOTE the awkwardness with source reference... This
   // really ought to be improved.
   SourceNode source_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
-  Source *source_parts{nullptr};
-  assert(hpx_gas_try_pin(sources.data(), (void **)&source_parts));
   hpx_addr_t partitiondone =
-      source_root.partition(source_parts, sources.n(), parms->refinement_limit,
+      source_root.partition(sources, parms->refinement_limit,
                             expansion.type(), expansion.data(),
                             expansion.accuracy());
-  hpx_gas_unpin(sources.data());
-  sources.destroy();
 
   TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   hpx_lco_wait(partitiondone);
@@ -369,6 +365,7 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   target_root.destroy();
   expansion.destroy();
   method.destroy();
+  sources.destroy();
 
   //return
   hpx_exit(HPX_SUCCESS);

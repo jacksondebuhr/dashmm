@@ -59,7 +59,8 @@ class SourceRef {
   SourceRef(Source *sources, int n);
 
   /// Construct from a specific address and count.
-  SourceRef(hpx_addr_t data, int n) : data_{data}, n_{n} { }
+  SourceRef(hpx_addr_t data, int n, int n_tot)
+      : data_{data}, n_{n}, n_tot_{n_tot} { }
 
 
   /// Destroy the particle data in GAS.
@@ -71,12 +72,16 @@ class SourceRef {
   /// Returns the number of Source records referred to.
   int n() const {return n_;}
 
+  /// Returns the total number of Source records.
+  int n_tot() const {return n_tot_;}
+
   /// Returns the global address of the referred to data.
   hpx_addr_t data() const {return data_;}
 
  private:
   hpx_addr_t data_;
   int n_;
+  int n_tot_;
 };
 
 

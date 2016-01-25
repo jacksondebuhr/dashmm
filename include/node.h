@@ -100,7 +100,7 @@ class SourceNode {
   /// \param type - the type of the expansion
   /// \param expand - global address to the prototype expansion data
   /// \param n_digits - accuracy of the expansion
-  hpx_addr_t partition(Source *parts, int n_parts, int limit,
+  hpx_addr_t partition(SourceRef sources, int limit,
                        int type, hpx_addr_t expand, int n_digits);
 
   /// Is the referred to node a leaf?

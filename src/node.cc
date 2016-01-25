@@ -110,7 +110,7 @@ int source_node_delete_handler(hpx_addr_t data) {
   assert(hpx_gas_try_pin(data, (void **)&local));
 
   local->expansion.destroy();
-  local->sources.destroy();
+  //NOTE: We do not destroy sources, as it is a shared resource.
 
   int count{0};
   for (int i = 0; i < 8; ++i) {
@@ -211,8 +211,7 @@ struct SourceNodePartitionParams {
   int type;
   hpx_addr_t expand;
   int n_digits;
-  int n_sources;
-  Source sources[];
+  SourceRef sources;
 };
 
 int source_node_partition_handler(SourceNodeData *node,
@@ -225,9 +224,9 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
 int source_node_partition_handler(SourceNodeData *node,
                                   SourceNodePartitionParams *parms,
                                   size_t bytes) {
-  if (parms->n_sources <= parms->limit) {
+  if (parms->sources.n() <= parms->limit) {
     assert(node->sources.data() == HPX_NULL);
-    node->sources = SourceRef(parms->sources, parms->n_sources);
+    node->sources = parms->sources;
 
     MethodRef method{node->method};
     SourceNode curr{hpx_thread_current_target()};
@@ -251,9 +250,12 @@ int source_node_partition_handler(SourceNodeData *node,
   // distributed.
 
   //partition sources
+  Source *source_parts{nullptr};
+  assert(hpx_gas_try_pin(parms->sources.data(), (void **)&source_parts));
+
   Source *splits[9]{};
-  splits[0] = parms->sources;
-  splits[8] = &parms->sources[parms->n_sources];
+  splits[0] = source_parts;
+  splits[8] = &source_parts[parms->sources.n()];
 
   Point cen{node->root_geo.center_from_index(node->idx)};
   double z_center = cen.z();
@@ -278,8 +280,10 @@ int source_node_partition_handler(SourceNodeData *node,
   splits[5] = std::partition(splits[4], splits[6], x_comp);
   splits[7] = std::partition(splits[6], splits[8], x_comp);
 
+  hpx_gas_unpin(parms->sources.data());
+
   //Find some counts
-  Source *cparts[8]{};
+  hpx_addr_t cparts[8]{};
   int n_per_child[8]{0, 0, 0, 0, 0, 0, 0, 0};
   int n_children{0};
   int n_offset{0};
@@ -287,9 +291,11 @@ int source_node_partition_handler(SourceNodeData *node,
     n_per_child[i] = splits[i + 1] - splits[i];
     if (n_per_child[i]) {
       ++n_children;
-      cparts[i] = &parms->sources[n_offset];
+      cparts[i] = hpx_addr_add(parms->sources.data(),
+                               sizeof(Source) * n_offset,
+                               sizeof(Source) * parms->sources.n_tot());
     } else {
-      cparts[i] = nullptr;
+      cparts[i] = HPX_NULL;
     }
     n_offset += n_per_child[i];
   }
@@ -309,8 +315,7 @@ int source_node_partition_handler(SourceNodeData *node,
                    node->method, &thisnode};
     node->child[i] = kid.data();
 
-    size_t argsz = sizeof(SourceNodePartitionParams)
-                   + sizeof(Source) * n_per_child[i];
+    size_t argsz = sizeof(SourceNodePartitionParams);
     SourceNodePartitionParams *args =
         static_cast<SourceNodePartitionParams *>(malloc(argsz));
     assert(args != nullptr);
@@ -319,8 +324,8 @@ int source_node_partition_handler(SourceNodeData *node,
     args->type = parms->type;
     args->expand = parms->expand;
     args->n_digits = parms->n_digits;
-    args->n_sources = n_per_child[i];
-    memcpy(args->sources, cparts[i], sizeof(Source) * n_per_child[i]);
+    args->sources = SourceRef(cparts[i], n_per_child[i],
+                              parms->sources.n_tot());
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, args, argsz);
     free(args);
   }
@@ -599,12 +604,12 @@ void SourceNode::destroy() {
 }
 
 
-hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
+hpx_addr_t SourceNode::partition(SourceRef sources, int limit,
                                  int type, hpx_addr_t expand, int n_digits) {
   hpx_addr_t retval = hpx_lco_future_new(0);
   assert(retval != HPX_NULL);
 
-  size_t bytes = sizeof(SourceNodePartitionParams) + n_sources * sizeof(Source);
+  size_t bytes = sizeof(SourceNodePartitionParams);
   SourceNodePartitionParams *args =
       static_cast<SourceNodePartitionParams *>(malloc(bytes));
   assert(args);
@@ -613,8 +618,7 @@ hpx_addr_t SourceNode::partition(Source *sources, int n_sources, int limit,
   args->type = type;
   args->expand = expand;
   args->n_digits = n_digits;
-  args->n_sources = n_sources;
-  memcpy(args->sources, sources, sizeof(Source) * n_sources);
+  args->sources = sources;
   hpx_call(data_, source_node_partition_action, HPX_NULL,
            args, bytes);
   free(args);

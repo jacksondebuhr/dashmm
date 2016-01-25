@@ -151,6 +151,7 @@ SourceRef::SourceRef(Source *sources, int n) {
   data_ = hpx_gas_alloc_local(1, sizeof(Source) * n, 0);
   assert(data_ != HPX_NULL);
   n_ = n;
+  n_tot_ = n;
   Source *local{nullptr};
   assert(hpx_gas_try_pin(data_, (void **)&local));
   memcpy(local, sources, sizeof(Source) * n);
