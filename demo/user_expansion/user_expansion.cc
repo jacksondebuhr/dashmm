@@ -48,6 +48,10 @@ struct UserData {
   // For a real number expansion with count terms. The form of this
   // extra data will be dictated by the details of the expansion.
   //
+  // Another example is that one might require an offset into a table of
+  // precomputed values. (For more on this, see register_user_with_dashmm()
+  // below.)
+  //
   // For now, we settle for the center point.
   Point center;
 };
@@ -243,6 +247,10 @@ HPX_ACTION(HPX_FUNCTION, 0,
            HPX_POINTER, HPX_SIZE_T, HPX_INT);
 
 
+// If there is a table of values required by the expansion, one good place to
+// initialize that table is here. Of course, other options are possible, but
+// this is convenient. It could be that this function would have to be extended
+// to accept an accuracy parameter, but that is a simple change.
 void register_user_with_dashmm() {
   dashmm::ReturnCode ret = dashmm::register_user_expansion(
       kUserExpansionType, create_user_expansion_action,
