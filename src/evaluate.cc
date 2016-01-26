@@ -45,20 +45,14 @@ namespace dashmm {
 /// and target points. The computed volume will extend slightly past the minmal
 /// size that would contain the points.
 ///
-/// \param source_bounds - an LCO that holds six double values that contain
+/// \param s_bounds - an array that holds six double values that contain
 ///                        the domain bounds for the source points.
-/// \param target_bounds - an LCO that holds six double values that contain
+/// \param t_bounds - an array that holds six double values that contain
 ///                        the domain bounds for the target points.
 ///
 /// \returns - a DomainGeometry that encompasses all sources and targets
-DomainGeometry cubify_domain(hpx_addr_t source_bounds,
-                             hpx_addr_t target_bounds) {
-  double s_bounds[6];
-  hpx_lco_get(source_bounds, sizeof(double) * 6, s_bounds);
-
-  double t_bounds[6];
-  hpx_lco_get(target_bounds, sizeof(double) * 6, t_bounds);
-
+DomainGeometry cubify_domain(double s_bounds[6],
+                             double t_bounds[6]) {
   //cubify the domain
   Point low{s_bounds[0] < t_bounds[0] ? s_bounds[0] : t_bounds[0],
             s_bounds[1] < t_bounds[1] ? s_bounds[1] : t_bounds[1],
@@ -87,9 +81,10 @@ DomainGeometry cubify_domain(hpx_addr_t source_bounds,
 struct PackDataResult {
   hpx_addr_t packed;
   int count;
+  double bounds[6]; 
 };
 
-/// Action that packs the needed source data
+/// Action that packs the needed source data and finds the bounding domain
 ///
 /// To allow for the user's use of GAS to store more information with their
 /// source records, DASHMM packs the required data into an internal structure.
@@ -112,13 +107,15 @@ int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
   char *user{nullptr};
   assert(hpx_gas_try_pin(meta->data, (void **)&user));
 
-  PackDataResult retval{};
-  retval.packed =
-      hpx_gas_alloc_local_at_sync(1, meta->count * sizeof(Source), 0, HPX_HERE);
-  retval.count = meta->count;
+  PackDataResult retval{}; 
+  retval.packed = hpx_gas_alloc_local_at_sync(1, meta->count * sizeof(Source), 
+                                              0, HPX_HERE); 
+  retval.count = meta->count; 
+
+  double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34}; 
 
   if (retval.packed != HPX_NULL) {
-    Source *sources{nullptr};
+    Source *sources{nullptr}; 
     assert(hpx_gas_try_pin(retval.packed, (void **)&sources));
 
     for (size_t i = 0; i < meta->count; ++i) {
@@ -128,10 +125,19 @@ int pack_sources_handler(hpx_addr_t user_data, int pos_offset, int q_offset) {
       double *q = static_cast<double *>(q_base);
       sources[i].position = Point{pos[0], pos[1], pos[2]};
       sources[i].charge = *q;
+      
+      if (pos[0] < bounds[0]) bounds[0] = pos[0]; 
+      if (pos[0] > bounds[3]) bounds[3] = pos[0]; 
+      if (pos[1] < bounds[1]) bounds[1] = pos[1]; 
+      if (pos[1] > bounds[4]) bounds[4] = pos[1]; 
+      if (pos[2] < bounds[2]) bounds[2] = pos[2]; 
+      if (pos[2] > bounds[5]) bounds[5] = pos[2]; 
     }
-
     hpx_gas_unpin(retval.packed);
   }
+
+  for (size_t i = 0; i < 6; ++i) 
+    retval.bounds[i] = bounds[i]; 
 
   hpx_gas_unpin(meta->data);
   hpx_gas_unpin(user_data);
@@ -143,7 +149,7 @@ HPX_ACTION(HPX_DEFAULT, 0,
            HPX_ADDR, HPX_INT, HPX_INT);
 
 
-/// Action that packs the needed target data
+/// Action that packs the needed target data and finds the bounding domain
 ///
 /// To allow for the user's use of GAS to store more information with their
 /// target records, DASHMM packs the required data into an internal structure.
@@ -165,9 +171,12 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
   assert(hpx_gas_try_pin(meta->data, (void **)&user));
 
   PackDataResult retval{};
-  retval.packed =
-      hpx_gas_alloc_local_at_sync(1, meta->count * sizeof(Target), 0, HPX_HERE);
+  retval.packed = hpx_gas_alloc_local_at_sync(1, meta->count * sizeof(Target), 
+                                              0, HPX_HERE);
   retval.count = meta->count;
+
+  double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34}; 
+
   if (retval.packed != HPX_NULL) {
     Target *targets{nullptr};
     assert(hpx_gas_try_pin(retval.packed, (void **)&targets));
@@ -178,10 +187,19 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
       targets[i].position = Point{pos[0], pos[1], pos[2]};
       targets[i].index = i;
       targets[i].phi = dcomplex_t{0.0};
-    }
 
+      if (pos[0] < bounds[0]) bounds[0] = pos[0]; 
+      if (pos[0] > bounds[3]) bounds[3] = pos[0]; 
+      if (pos[1] < bounds[1]) bounds[1] = pos[1]; 
+      if (pos[1] > bounds[4]) bounds[4] = pos[1]; 
+      if (pos[2] < bounds[2]) bounds[2] = pos[2]; 
+      if (pos[2] > bounds[5]) bounds[5] = pos[2]; 
+    }
     hpx_gas_unpin(retval.packed);
   }
+
+  for (size_t i = 0; i < 6; ++i) 
+    retval.bounds[i] = bounds[i]; 
 
   hpx_gas_unpin(meta->data);
   hpx_gas_unpin(user_data);
@@ -191,76 +209,6 @@ int pack_targets_handler(hpx_addr_t user_data, int pos_offset) {
 HPX_ACTION(HPX_DEFAULT, 0,
            pack_targets_action, pack_targets_handler,
            HPX_ADDR, HPX_INT);
-
-
-/// Action to find the bounding domain for the source points
-///
-/// This action continues the bounds as six doubles.
-///
-/// \param packed - an LCO containing the packed source data's address
-int find_source_domain_handler(hpx_addr_t packed) {
-  //NOTE: SMP assumptions
-  PackDataResult packed_data;
-  hpx_lco_get(packed, sizeof(packed_data), &packed_data);
-  //now pin the sources
-  Source *sources{nullptr};
-  assert(hpx_gas_try_pin(packed_data.packed, (void **)&sources));
-
-  //These are the three low bounds, followed by the three high bounds
-  double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
-
-  for (int i = 0; i < packed_data.count; ++i) {
-    Point p = sources[i].position;
-    if (p.x() < bounds[0]) bounds[0] = p.x();
-    if (p.x() > bounds[3]) bounds[3] = p.x();
-    if (p.y() < bounds[1]) bounds[1] = p.y();
-    if (p.y() > bounds[4]) bounds[4] = p.y();
-    if (p.z() < bounds[2]) bounds[2] = p.z();
-    if (p.z() > bounds[5]) bounds[5] = p.z();
-  }
-
-  hpx_gas_unpin(packed_data.packed);
-
-  return hpx_thread_continue(bounds, sizeof(double) * 6);
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           find_source_domain_action, find_source_domain_handler,
-           HPX_ADDR);
-
-
-/// Action to find the bounding domain for the target points
-///
-/// This action continues the bounds as six doubles.
-///
-/// \param packed - an LCO containing the packed target data's address
-int find_target_domain_handler(hpx_addr_t packed) {
-  //NOTE: SMP assumptions
-  PackDataResult packed_data;
-  hpx_lco_get(packed, sizeof(packed_data), &packed_data);
-  //now pin the sources
-  Target *targets{nullptr};
-  assert(hpx_gas_try_pin(packed_data.packed, (void **)&targets));
-
-  //These are the three low bounds, followed by the three high bounds
-  double bounds[6]{1.0e34, 1.0e34, 1.0e34, -1.0e34, -1.0e34, -1.0e34};
-
-  for (int i = 0; i < packed_data.count; ++i) {
-    Point p = targets[i].position;
-    if (p.x() < bounds[0]) bounds[0] = p.x();
-    if (p.x() > bounds[3]) bounds[3] = p.x();
-    if (p.y() < bounds[1]) bounds[1] = p.y();
-    if (p.y() > bounds[4]) bounds[4] = p.y();
-    if (p.z() < bounds[2]) bounds[2] = p.z();
-    if (p.z() > bounds[5]) bounds[5] = p.z();
-  }
-
-  hpx_gas_unpin(packed_data.packed);
-
-  return hpx_thread_continue(bounds, sizeof(double) * 6);
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           find_target_domain_action, find_target_domain_handler,
-           HPX_ADDR);
 
 
 struct EvaluateParams {
@@ -287,25 +235,14 @@ struct EvaluateParams {
 /// \param total_size - the size of the parameters in bytes
 int evaluate_handler(EvaluateParams *parms, size_t total_size) {
   //copy user data into internal data
-  hpx_addr_t source_packed = hpx_lco_future_new(sizeof(PackDataResult));
-  assert(source_packed != HPX_NULL);
-  hpx_addr_t target_packed = hpx_lco_future_new(sizeof(PackDataResult));
-  assert(target_packed != HPX_NULL);
+  hpx_addr_t source_packed = hpx_lco_future_new(sizeof(PackDataResult)); 
+  hpx_addr_t target_packed = hpx_lco_future_new(sizeof(PackDataResult)); 
+  assert(source_packed != HPX_NULL && target_packed != HPX_NULL); 
 
-  hpx_call(parms->sources, pack_sources_action, source_packed,
-           &parms->sources, &parms->spos_offset, &parms->q_offset);
-  hpx_call(parms->targets, pack_targets_action, target_packed,
-           &parms->targets, &parms->tpos_offset);
-
-  hpx_addr_t source_bounds = hpx_lco_future_new(sizeof(double) * 6);
-  assert(source_bounds != HPX_NULL);
-  hpx_addr_t target_bounds = hpx_lco_future_new(sizeof(double) * 6);
-  assert(target_bounds != HPX_NULL);
-
-  hpx_call_when(source_packed, parms->sources, find_source_domain_action,
-                source_bounds, &source_packed);
-  hpx_call_when(target_packed, parms->targets, find_target_domain_action,
-                target_bounds, &target_packed);
+  hpx_call(parms->sources, pack_sources_action, source_packed, 
+           &parms->sources, &parms->spos_offset, &parms->q_offset); 
+  hpx_call(parms->targets, pack_targets_action, target_packed, 
+           &parms->targets, &parms->tpos_offset); 
 
   //create our method and expansion from the parameters
   MethodSerial *method_serial = reinterpret_cast<MethodSerial *>(parms->data);
@@ -324,29 +261,28 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     globalize_expansion(std::move(local_expansion), HPX_HERE);
   expansion.finalize();
 
-  //collect results of actions
-  PackDataResult res{};
-  hpx_lco_get(source_packed, sizeof(res), &res);
-  SourceRef sources{res.packed, res.count, res.count};
+  // Collect result of actions
+  PackDataResult s_res{}, t_res{}; 
 
-  hpx_lco_get(target_packed, sizeof(res), &res);
-  hpx_addr_t target_data = res.packed;
-  int target_count = res.count;
+  hpx_lco_get(source_packed, sizeof(s_res), &s_res); 
+  hpx_lco_delete_sync(source_packed); 
+  SourceRef sources{s_res.packed, s_res.count, s_res.count}; 
 
-  DomainGeometry root_vol = cubify_domain(source_bounds, target_bounds);
-  hpx_lco_delete_sync(source_packed);
-  hpx_lco_delete_sync(target_packed);
-  hpx_lco_delete_sync(source_bounds);
-  hpx_lco_delete_sync(target_bounds);
+  hpx_lco_get(target_packed, sizeof(t_res), &t_res); 
+  hpx_addr_t target_data = t_res.packed; 
+  int target_count = t_res.count; 
+  hpx_lco_delete_sync(target_packed); 
+
+  DomainGeometry root_vol = cubify_domain(s_res.bounds, t_res.bounds);
 
   //build trees/do work - NOTE the awkwardness with source reference... This
   // really ought to be improved.
   SourceNode source_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   hpx_addr_t partitiondone =
-      source_root.partition(sources, parms->refinement_limit,
-                            expansion.type(), expansion.data(),
-                            expansion.accuracy());
-
+    source_root.partition(sources, parms->refinement_limit,
+                          expansion.type(), expansion.data(),
+                          expansion.accuracy());
+  
   TargetNode target_root{root_vol, Index{0, 0, 0, 0}, method.data(), nullptr};
   hpx_lco_wait(partitiondone);
   hpx_lco_delete_sync(partitiondone);

@@ -85,9 +85,9 @@ class LaplaceCOM : public Expansion {
   }
   dcomplex_t term(size_t i) const override;
 
+  void S_to_M(Point center, Source *first, Source *last, 
+              double scale) const override; 
 
-  std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
-                                    Source *last, double scale) const override;
   std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
                                     Source *last, double scale) const override {
     return std::unique_ptr<Expansion>{new LaplaceCOM{nullptr, 0}};
@@ -146,19 +146,19 @@ class LaplaceCOM : public Expansion {
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_mtot(Source *first, Source *last);
+  void calc_mtot(Source *first, Source *last) const;
 
   /// This will compute the center of mass of a set of sources
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_xcom(Source *first, Source *last);
+  void calc_xcom(Source *first, Source *last) const;
 
   /// This will compute the quadrupole moments of a set of sources
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_Q(Source *first, Source *last);
+  void calc_Q(Source *first, Source *last) const;
 
   LaplaceCOMData *data_;
   size_t bytes_;

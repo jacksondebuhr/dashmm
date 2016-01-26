@@ -124,8 +124,9 @@ class LaplaceSPH : public Expansion {
     return data_->expansion[i];
   }
 
-  std::unique_ptr<Expansion> S_to_M(Point center, Source *first,
-                                    Source *last, double scale) const override;
+  void S_to_M(Point center, Source *first, Source *last, 
+              double scale) const override; 
+
   std::unique_ptr<Expansion> S_to_L(Point center, Source *first,
                                     Source *last, double scale) const override;
   std::unique_ptr<Expansion> M_to_M(int from_child,

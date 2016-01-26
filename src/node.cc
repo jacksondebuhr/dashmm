@@ -611,7 +611,7 @@ hpx_addr_t SourceNode::partition(SourceRef sources, int limit,
 
   size_t bytes = sizeof(SourceNodePartitionParams);
   SourceNodePartitionParams *args =
-      static_cast<SourceNodePartitionParams *>(malloc(bytes));
+    static_cast<SourceNodePartitionParams *>(malloc(bytes));
   assert(args);
   args->partdone = retval;
   args->limit = limit;
@@ -619,8 +619,7 @@ hpx_addr_t SourceNode::partition(SourceRef sources, int limit,
   args->expand = expand;
   args->n_digits = n_digits;
   args->sources = sources;
-  hpx_call(data_, source_node_partition_action, HPX_NULL,
-           args, bytes);
+  hpx_call(data_, source_node_partition_action, HPX_NULL, args, bytes);
   free(args);
 
   return retval;

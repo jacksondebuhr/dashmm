@@ -65,19 +65,12 @@ dcomplex_t LaplaceCOM::term(size_t i) const {
   }
 }
 
-
-std::unique_ptr<Expansion> LaplaceCOM::S_to_M(Point center,
-                                              Source *first,
-                                              Source *last,
-                                              double unused) const {
-  LaplaceCOM *retval{new LaplaceCOM{center}};
-  assert(retval);
-  retval->calc_mtot(first, last);
-  retval->calc_xcom(first, last);
-  retval->calc_Q(first, last);
-  return std::unique_ptr<Expansion>{retval};
+void LaplaceCOM::S_to_M(Point center, Source *first, Source *last, 
+                        double unused) const {
+  calc_mtot(first, last); 
+  calc_xcom(first, last); 
+  calc_Q(first, last); 
 }
-
 
 std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,
                                               double s_size) const {
@@ -182,7 +175,7 @@ void LaplaceCOM::add_expansion(const Expansion *temp1) {
 }
 
 
-void LaplaceCOM::calc_mtot(Source *first, Source *last) {
+void LaplaceCOM::calc_mtot(Source *first, Source *last) const {
   assert(valid());
   data_->mtot = 0.0;
   for (auto i = first; i != last; ++i) {
@@ -191,7 +184,7 @@ void LaplaceCOM::calc_mtot(Source *first, Source *last) {
 }
 
 
-void LaplaceCOM::calc_xcom(Source *first, Source *last) {
+void LaplaceCOM::calc_xcom(Source *first, Source *last) const {
   assert(valid());
   data_->xcom[0] = 0.0;
   data_->xcom[1] = 0.0;
@@ -210,7 +203,7 @@ void LaplaceCOM::calc_xcom(Source *first, Source *last) {
 }
 
 
-void LaplaceCOM::calc_Q(Source *first, Source *last) {
+void LaplaceCOM::calc_Q(Source *first, Source *last) const {
   assert(valid());
   for (int i = 0; i < 6; ++i) {
     data_->Q[i] = 0;

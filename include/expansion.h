@@ -136,11 +136,8 @@ class Expansion {
   /// \param first - address of the first source
   /// \param last - address of one past the last source
   /// \param scale - scaling factor
-  ///
-  /// \returns - The resulting multipole expansion
-  virtual std::unique_ptr<Expansion> S_to_M(Point center,
-                                            Source *first, Source *last,
-                                            double scale) const = 0;
+  virtual void S_to_M(Point center, Source *first, Source *last, 
+                      double scale) const = 0; 
 
   /// Create a local expansion for a given set of source points
   ///

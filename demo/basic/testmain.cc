@@ -292,7 +292,7 @@ void perform_evaluation_test(InputArguments args) {
   //prep sources
   dashmm::ObjectHandle source_handle;
   auto err = dashmm::allocate_array(args.source_count, sizeof(UserSourceData),
-                            &source_handle);
+                                    &source_handle);
   assert(err == dashmm::kSuccess);
   err = dashmm::array_put(source_handle, 0, args.source_count, sources);
   assert(err == dashmm::kSuccess);

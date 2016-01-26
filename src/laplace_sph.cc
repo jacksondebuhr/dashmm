@@ -58,12 +58,10 @@ LaplaceSPH::~LaplaceSPH() {
   }
 }
 
-
-std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
-                                              Source *first, Source *last,
-                                              double scale) const {
-  LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}};
-  dcomplex_t *expansion = &retval->data_->expansion[0];
+void LaplaceSPH::S_to_M(Point center, Source *first, Source *last, 
+                        double scale) const {
+  data_->center = center; 
+  dcomplex_t *expansion = &data_->expansion[0]; 
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p();
   const double *sqf = table->sqf();
@@ -110,7 +108,6 @@ std::unique_ptr<Expansion> LaplaceSPH::S_to_M(Point center,
   delete [] legendre;
   delete [] powers_r;
   delete [] powers_ephi;
-  return std::unique_ptr<Expansion>{retval};
 }
 
 
