@@ -157,6 +157,7 @@ int expansion_s_to_m_handler(Source *sources, int n_src,
 
   // SMP assumption here: source and expansion LCO are on the same locality
   hpx_gas_try_pin(expand, &temp); 
+  hpx_gas_unpin(expand); 
   ExpansionLCOHeader *data = 
     static_cast<ExpansionLCOHeader *>(hpx_lco_user_get_user_data(temp)); 
   auto local = interpret_expansion(type, data->payload, data->payload_size, 
