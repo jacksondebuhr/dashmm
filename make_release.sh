@@ -17,3 +17,5 @@ cp -r src/ $BASENAME/
 
 tar cvf $FILENAME $BASENAME/
 gzip $FILENAME
+
+rm -r $BASENAME/
