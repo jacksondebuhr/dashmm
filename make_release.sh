@@ -1,0 +1,19 @@
+VERSION=0.5
+BASENAME=dashmm-$VERSION
+FILENAME=$BASENAME.tar
+
+mkdir BASENAME
+cp AUTHORS $BASENAME/
+cp dashmm.h $BASENAME/
+cp INSTALL $BASENAME/
+cp Makefile $BASENAME/
+cp README $BASENAME/
+cp LICENSE $BASENAME/
+cp -r doc/ $BASENAME/
+cp -r demo/ $BASENAME/
+cp -r include/ $BASENAME/
+cp -r src/ $BASENAME/
+
+
+tar cvf $FILENAME $BASENAME/
+gzip $FILENAME
