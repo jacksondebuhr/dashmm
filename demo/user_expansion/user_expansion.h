@@ -126,12 +126,10 @@ class User : public dashmm::Expansion {
   // alias for std::complex<double>.
   dashmm::dcomplex_t term(size_t i) const override;
 
-  // This routine will generate the multipole expansion about the given
-  // center for the given points.
-  std::unique_ptr<dashmm::Expansion> S_to_M(dashmm::Point center,
-                                            dashmm::Source *first,
-                                            dashmm::Source *last,
-                                            double scale) const override;
+  // This routine will set this expansion to the multipole moments generated
+  // by the given sources.
+  void S_to_M(dashmm::Point center, dashmm::Source *first,
+              dashmm::Source *last, double scale) const override;
 
   // This will generate a local expansion at the given center for the
   // given points.

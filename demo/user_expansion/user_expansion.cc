@@ -133,11 +133,9 @@ dcomplex_t User::term(size_t i) const {return dcomplex_t{};}
 // }
 //
 
-std::unique_ptr<Expansion> User::S_to_M(Point center,
-                                          Source *first, Source *last,
-                                          double scale) const {
+void User::S_to_M(Point center, Source *first, Source *last,
+                  double scale) const {
   fprintf(stdout, "S->M for %ld sources\n", last - first);
-  return std::unique_ptr<Expansion>{new User{center, acc_}};
 }
 
 std::unique_ptr<Expansion> User::S_to_L(Point center,
