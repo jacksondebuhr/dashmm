@@ -317,7 +317,7 @@ int source_node_partition_handler(SourceNodeData *node,
 
     size_t argsz = sizeof(SourceNodePartitionParams);
     SourceNodePartitionParams *args =
-        static_cast<SourceNodePartitionParams *>(malloc(argsz));
+        reinterpret_cast<SourceNodePartitionParams *>(new char [argsz]);
     assert(args != nullptr);
     args->partdone = childpartdone;
     args->limit = parms->limit;
@@ -327,7 +327,7 @@ int source_node_partition_handler(SourceNodeData *node,
     args->sources = SourceRef(cparts[i], n_per_child[i],
                               parms->sources.n_tot());
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, args, argsz);
-    free(args);
+    delete [] args;
   }
 
   hpx_call_when(childpartdone, hpx_thread_current_target(),
@@ -356,8 +356,9 @@ size_t target_node_partition_params_size(int n_consider) {
 }
 
 TargetNodePartitionParams *target_node_partition_params_alloc(int n_consider) {
-  TargetNodePartitionParams *retval = static_cast<TargetNodePartitionParams *>(
-      malloc(target_node_partition_params_size(n_consider)));
+  TargetNodePartitionParams *retval =
+      reinterpret_cast<TargetNodePartitionParams *>(
+                  new char [target_node_partition_params_size(n_consider)]);
   if (retval) {
     retval->n_consider = n_consider;
   }
@@ -483,7 +484,7 @@ int target_node_partition_handler(TargetNodeData *node,
       hpx_call(kid.data(), target_node_partition_action, HPX_NULL, args,
                argssize);
     }
-    free(args);
+    delete [] args;
 
     hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done, nullptr, 0);
   }
@@ -611,7 +612,7 @@ hpx_addr_t SourceNode::partition(SourceRef sources, int limit,
 
   size_t bytes = sizeof(SourceNodePartitionParams);
   SourceNodePartitionParams *args =
-    static_cast<SourceNodePartitionParams *>(malloc(bytes));
+    reinterpret_cast<SourceNodePartitionParams *>(new char [bytes]);
   assert(args);
   args->partdone = retval;
   args->limit = limit;
@@ -620,7 +621,7 @@ hpx_addr_t SourceNode::partition(SourceRef sources, int limit,
   args->n_digits = n_digits;
   args->sources = sources;
   hpx_call(data_, source_node_partition_action, HPX_NULL, args, bytes);
-  free(args);
+  delete [] args;
 
   return retval;
 }
@@ -817,7 +818,7 @@ void TargetNode::partition(hpx_addr_t parts, int n_parts, int limit,
   }
 
   hpx_call(data_, target_node_partition_action, HPX_NULL, parms, parms_size);
-  free(parms);
+  delete [] parms;
 
   hpx_lco_wait(done);
   hpx_lco_delete_sync(done);

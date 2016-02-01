@@ -57,14 +57,14 @@ struct UserData {
 };
 
 
-// Currently, DASHMM expects that the data provided by release() was allocated
-// using malloc().
+// DASHMM expects that the data provided by release() will have been allocated
+// using new char [].
 User::User(Point center, int n_digits) {
   // If there was more complication to UserData, this next line would need to
   // be modified.
   bytes_ = sizeof(UserData);
   acc_ = n_digits;
-  data_ = static_cast<UserData *>(malloc(bytes_));
+  data_ = reinterpret_cast<UserData *>(new char [bytes_]);
   assert(valid());
   data_->type = type();
   data_->acc = acc_;
@@ -75,7 +75,7 @@ User::User(Point center, int n_digits) {
 // If the object is valid, free the data when this object is destroyed.
 User::~User() {
   if (valid()) {
-    free(data_);
+    delete [] data_;
     data_ = nullptr;
   }
 }

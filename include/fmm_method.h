@@ -35,7 +35,7 @@ namespace dashmm {
 class FMM : public Method {
  public:
   FMM() : local_{nullptr} {
-    local_ = static_cast<MethodSerial *>(malloc(sizeof(MethodSerial)));
+    local_ = reinterpret_cast<MethodSerial *>(new char [sizeof(MethodSerial)]);
     assert(local_);
     local_->type = kMethodFMM;
     local_->size = 0;
@@ -43,7 +43,7 @@ class FMM : public Method {
 
   ~FMM() {
     if (local_) {
-      free(local_);
+      delete [] local_;
       local_ = nullptr;
     }
   }

@@ -30,7 +30,7 @@ namespace dashmm {
 
 LaplaceCOM::LaplaceCOM(Point center) {
   bytes_ = sizeof(LaplaceCOMData);
-  data_ = static_cast<LaplaceCOMData *>(malloc(bytes_));
+  data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
   assert(valid());
   data_->type = type();
   data_->n_digits = -1; // unused
@@ -49,7 +49,7 @@ LaplaceCOM::LaplaceCOM(Point center) {
 
 LaplaceCOM::~LaplaceCOM() {
   if (valid()) {
-    free(data_);
+    delete [] data_;
     data_ = nullptr;
   }
 }
@@ -65,11 +65,11 @@ dcomplex_t LaplaceCOM::term(size_t i) const {
   }
 }
 
-void LaplaceCOM::S_to_M(Point center, Source *first, Source *last, 
+void LaplaceCOM::S_to_M(Point center, Source *first, Source *last,
                         double unused) const {
-  calc_mtot(first, last); 
-  calc_xcom(first, last); 
-  calc_Q(first, last); 
+  calc_mtot(first, last);
+  calc_xcom(first, last);
+  calc_Q(first, last);
 }
 
 std::unique_ptr<Expansion> LaplaceCOM::M_to_M(int from_child,

@@ -32,7 +32,7 @@ LaplaceSPH::LaplaceSPH(Point center, int n_digits) : n_digits_{n_digits} {
   int p = table->p();
   int n_terms = (p + 1) * (p + 2) / 2;
   bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
-  data_ = static_cast<LaplaceSPHData *>(malloc(bytes_));
+  data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
   assert(valid());
   data_->type = type();
   data_->n_digits = n_digits;
@@ -53,15 +53,15 @@ LaplaceSPH::LaplaceSPH(LaplaceSPHData *ptr, size_t bytes, int n_digits)
 
 LaplaceSPH::~LaplaceSPH() {
   if (valid()) {
-    free(data_);
+    delete [] data_;
     data_ = nullptr;
   }
 }
 
-void LaplaceSPH::S_to_M(Point center, Source *first, Source *last, 
+void LaplaceSPH::S_to_M(Point center, Source *first, Source *last,
                         double scale) const {
-  data_->center = center; 
-  dcomplex_t *expansion = &data_->expansion[0]; 
+  data_->center = center;
+  dcomplex_t *expansion = &data_->expansion[0];
   uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
   int p = table->p();
   const double *sqf = table->sqf();

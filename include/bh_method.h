@@ -37,8 +37,8 @@ namespace dashmm {
 class BH : public Method {
  public:
   BH(double theta) : local_{nullptr} {
-    local_ = static_cast<MethodSerial *>(
-            malloc(sizeof(MethodSerial) + sizeof(double)));
+    local_ = reinterpret_cast<MethodSerial *>(
+            new char [sizeof(MethodSerial) + sizeof(double)]);
     assert(local_);
     local_->type = kMethodBH;
     local_->size = sizeof(double);
@@ -47,7 +47,7 @@ class BH : public Method {
 
   ~BH() {
     if (local_) {
-      free(local_);
+      delete [] local_;
       local_ = nullptr;
     }
   }

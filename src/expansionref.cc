@@ -102,7 +102,7 @@ void expansion_lco_operation_handler(ExpansionLCOHeader *lhs, void *rhs,
     }
 
     if (bytes <= sizeof(int))
-      return; 
+      return;
 
     //create an expansion from the rhs
     char *input = static_cast<char *>(rhs);
@@ -153,20 +153,20 @@ HPX_ACTION(HPX_FUNCTION, 0,
 int expansion_s_to_m_handler(Source *sources, int n_src,
                              double cx, double cy, double cz, double scale,
                              hpx_addr_t expand, int type, int n_digits) {
-  void *temp{nullptr}; 
+  void *temp{nullptr};
 
   // SMP assumption here: source and expansion LCO are on the same locality
-  hpx_gas_try_pin(expand, &temp); 
-  hpx_gas_unpin(expand); 
-  ExpansionLCOHeader *data = 
-    static_cast<ExpansionLCOHeader *>(hpx_lco_user_get_user_data(temp)); 
-  auto local = interpret_expansion(type, data->payload, data->payload_size, 
-                                   n_digits); 
-  local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale); 
-  local->release(); 
+  hpx_gas_try_pin(expand, &temp);
+  hpx_gas_unpin(expand);
+  ExpansionLCOHeader *data =
+    static_cast<ExpansionLCOHeader *>(hpx_lco_user_get_user_data(temp));
+  auto local = interpret_expansion(type, data->payload, data->payload_size,
+                                   n_digits);
+  local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
+  local->release();
 
-  int code = kContribute; 
-  hpx_lco_set_lsync(expand, sizeof(code), &code, HPX_NULL); 
+  int code = kContribute;
+  hpx_lco_set_lsync(expand, sizeof(code), &code, HPX_NULL);
 
   return HPX_SUCCESS;
 }
@@ -186,7 +186,7 @@ int expansion_s_to_l_handler(Source *sources, int n_src,
 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, serial);
-  free(serial);
+  delete [] serial;
 
   return HPX_SUCCESS;
 }
@@ -210,12 +210,12 @@ int expansion_m_to_m_handler(int type, hpx_addr_t expand, int n_digits,
   hpx_lco_release(target, ldata);
 
   size_t bytes = translated->bytes();
-  void *transexpand = translated->release();
+  char *transexpand = reinterpret_cast<char *>(translated->release());
 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
-  free(transexpand);
+  delete [] transexpand;
 
   return HPX_SUCCESS;
 }
@@ -246,11 +246,11 @@ int expansion_m_to_l_handler(ExpansionMtoLParams *parms, size_t UNUSED) {
   hpx_lco_release(target, ldata);
 
   size_t bytes = translated->bytes();
-  void *transexpand = translated->release();
+  char *transexpand = reinterpret_cast<char *>(translated->release());
 
   parms->total.contribute(bytes, static_cast<char *>(transexpand));
 
-  free(transexpand);
+  delete [] transexpand;
 
   return HPX_SUCCESS;
 }
@@ -273,12 +273,12 @@ int expansion_l_to_l_handler(int type, hpx_addr_t expand, int n_digits,
   hpx_lco_release(target, ldata);
 
   size_t bytes = translated->bytes();
-  void *transexpand = translated->release();
+  char *transexpand = reinterpret_cast<char *>(translated->release());
 
   ExpansionRef total{type, expand, n_digits};
   total.contribute(bytes, static_cast<char *>(transexpand));
 
-  free(transexpand);
+  delete [] transexpand;
 
   return HPX_SUCCESS;
 }
@@ -505,12 +505,12 @@ ExpansionRef globalize_expansion(std::unique_ptr<Expansion> exp,
   size_t bytes = exp->bytes();
   int type = exp->type();
   int n_digits = exp->accuracy();
-  void *ldata = exp->release();
+  char *ldata = reinterpret_cast<char *>(exp->release());
 
   hpx_addr_t retval{HPX_NULL};
   hpx_call_sync(where, globalize_expansion_action, &retval, sizeof(retval),
                 ldata, bytes);
-  free(ldata);
+  delete [] ldata;
 
   return ExpansionRef{type, retval, n_digits};
 }

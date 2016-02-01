@@ -171,7 +171,7 @@ void SourceRef::destroy() {
 TargetRef::TargetRef(Target *targets, int n) {
   size_t init_size = sizeof(TargetRefLCOInitData) + sizeof(Target) * n;
   TargetRefLCOInitData *init =
-      static_cast<TargetRefLCOInitData *>(malloc(init_size));
+      reinterpret_cast<TargetRefLCOInitData *>(new char [init_size]);
   assert(init);
   init->count = n;
   memcpy(init->targets, targets, sizeof(Target) * n);
@@ -182,7 +182,7 @@ TargetRef::TargetRef(Target *targets, int n) {
                            targetref_lco_operation, targetref_lco_predicate,
                            init, init_size);
   assert(data_ != HPX_NULL);
-  free(init);
+  delete [] init;
   n_ = n;
 }
 
@@ -219,7 +219,7 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
   size_t inputsize = sizeof(TargetRefLCOSetStoTData)
                      + sizeof(Source) * n;
   TargetRefLCOSetStoTData *input =
-      static_cast<TargetRefLCOSetStoTData *>(malloc(inputsize));
+      reinterpret_cast<TargetRefLCOSetStoTData *>(new char [inputsize]);
   assert(input);
   input->code = kStoT;
   input->type = type;
@@ -229,7 +229,7 @@ void TargetRef::contribute_S_to_T(int type, int n, Source *sources) const {
   //call set with appropriate data
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
 
-  free(input);
+  delete [] input;
 }
 
 
@@ -237,7 +237,7 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
                                   int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetMtoTData) + bytes;
   TargetRefLCOSetMtoTData *input =
-      static_cast<TargetRefLCOSetMtoTData *>(malloc(inputsize));
+      reinterpret_cast<TargetRefLCOSetMtoTData *>(new char [inputsize]);
   assert(input);
   input->code = kMtoT;
   input->type = type;
@@ -246,7 +246,7 @@ void TargetRef::contribute_M_to_T(int type, size_t bytes, void *data,
   input->bytes = bytes;
   memcpy(input->data, data, bytes);
   hpx_lco_set_lsync(data_, inputsize, input, HPX_NULL);
-  free(input);
+  delete [] input;
 }
 
 
@@ -254,7 +254,7 @@ void TargetRef::contribute_L_to_T(int type, size_t bytes, void *data,
                                   int n_digits, double scale) const {
   size_t inputsize = sizeof(TargetRefLCOSetLtoTData) + bytes;
   TargetRefLCOSetLtoTData *input =
-      static_cast<TargetRefLCOSetLtoTData *>(malloc(inputsize));
+      reinterpret_cast<TargetRefLCOSetLtoTData *>(new char [inputsize]);
   assert(input);
   input->code = kLtoT;
   input->type = type;

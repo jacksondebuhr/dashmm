@@ -281,10 +281,10 @@ void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
   //create some arrays
-  UserSourceData *sources = static_cast<UserSourceData *>(
-        malloc(sizeof(UserSourceData) * args.source_count));
-  UserTargetData *targets = static_cast<UserTargetData *>(
-        malloc(sizeof(UserTargetData) * args.target_count));
+  UserSourceData *sources = reinterpret_cast<UserSourceData *>(
+        new char [sizeof(UserSourceData) * args.source_count]);
+  UserTargetData *targets = reinterpret_cast<UserTargetData *>(
+        new char [sizeof(UserTargetData) * args.target_count]);
 
   set_sources(sources, args.source_count, args.source_type, args.test_case);
   set_targets(targets, args.target_count, args.target_type);
@@ -336,8 +336,8 @@ void perform_evaluation_test(InputArguments args) {
     if (test_count > args.target_count) {
       test_count = args.target_count;
     }
-    UserTargetData *test_targets = static_cast<UserTargetData *>(
-          malloc(sizeof(UserTargetData) * test_count));
+    UserTargetData *test_targets = reinterpret_cast<UserTargetData *>(
+          new char [sizeof(UserTargetData) * test_count]);
 
     //Save a few targets for direct comparison
     for (int i = 0; i < test_count; ++i) {
@@ -387,7 +387,7 @@ void perform_evaluation_test(InputArguments args) {
     fprintf(stdout, "Error for %d test points: %lg (max %lg)\n",
                     test_count, sqrt(numerator / denominator), maxrel);
 
-    free(test_targets);
+    delete [] test_targets;
   }
 
   //free up resources
@@ -396,8 +396,8 @@ void perform_evaluation_test(InputArguments args) {
   err = dashmm::deallocate_array(target_handle);
   assert(err == dashmm::kSuccess);
 
-  free(sources);
-  free(targets);
+  delete [] sources;
+  delete [] targets;
 }
 
 

@@ -80,8 +80,9 @@ class Expansion {
   /// type of this expansion, which should be given a value by the user.
   ///
   /// The caller of this function assumes ownership of the released data,
-  /// and it is the caller's responsibility to free() that data. Note,
-  /// this means the data should be allocated with malloc().
+  /// and it is the caller's responsibility to release the data. This should be
+  /// done with delete [], as the memory will have been allocated with
+  /// new char [some_size].
   virtual void *release() = 0;
 
   /// The size in bytes of the serialized expansion data
@@ -136,8 +137,8 @@ class Expansion {
   /// \param first - address of the first source
   /// \param last - address of one past the last source
   /// \param scale - scaling factor
-  virtual void S_to_M(Point center, Source *first, Source *last, 
-                      double scale) const = 0; 
+  virtual void S_to_M(Point center, Source *first, Source *last,
+                      double scale) const = 0;
 
   /// Create a local expansion for a given set of source points
   ///

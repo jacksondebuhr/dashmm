@@ -32,7 +32,7 @@ namespace dashmm {
 class Direct : public Method {
  public:
   Direct() : local_{nullptr} {
-    local_ = static_cast<MethodSerial *>(malloc(sizeof(MethodSerial)));
+    local_ = reinterpret_cast<MethodSerial *>(new char [sizeof(MethodSerial)]);
     assert(local_);
     local_->type = kMethodDirect;
     local_->size = 0;
@@ -40,7 +40,7 @@ class Direct : public Method {
 
   ~Direct() {
     if (local_) {
-      free(local_);
+      delete [] local_;
       local_ = nullptr;
     }
   }

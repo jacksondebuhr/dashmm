@@ -119,7 +119,7 @@ MethodRef globalize_method(Method *met, hpx_addr_t where) {
   // registered memory. However, this will not happen often, so this is perhaps
   // okay.
   hpx_gas_memput_rsync(data, serial, size);
-  free(serial);
+  delete [] serial;
   return MethodRef{data};
 }
 

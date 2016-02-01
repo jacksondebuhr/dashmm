@@ -161,10 +161,10 @@ void perform_evaluation_test(InputArguments args) {
   register_user_with_dashmm();
 
   //create some arrays
-  UserSourceData *sources = static_cast<UserSourceData *>(
-        malloc(sizeof(UserSourceData) * args.source_count));
-  UserTargetData *targets = static_cast<UserTargetData *>(
-        malloc(sizeof(UserTargetData) * args.target_count));
+  UserSourceData *sources = reinterpret_cast<UserSourceData *>(
+        new char [sizeof(UserSourceData) * args.source_count]);
+  UserTargetData *targets = reinterpret_cast<UserTargetData *>(
+        new char [sizeof(UserTargetData) * args.target_count]);
 
   set_sources(sources, args.source_count);
   set_targets(targets, args.target_count);
@@ -215,8 +215,8 @@ void perform_evaluation_test(InputArguments args) {
   err = dashmm::deallocate_array(target_handle);
   assert(err == dashmm::kSuccess);
 
-  free(sources);
-  free(targets);
+  delete [] sources;
+  delete [] targets;
 }
 
 
