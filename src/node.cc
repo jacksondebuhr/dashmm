@@ -207,7 +207,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
 
 struct SourceNodePartitionParams {
   hpx_addr_t partdone;
-  int limit;
+  size_t limit;
   int type;
   hpx_addr_t expand;
   int n_digits;
@@ -283,28 +283,25 @@ int source_node_partition_handler(SourceNodeData *node,
   hpx_gas_unpin(parms->sources.data());
 
   //Find some counts
-  hpx_addr_t cparts[8]{};
-  int n_per_child[8]{0, 0, 0, 0, 0, 0, 0, 0};
+  SourceRef cparts[8]{};
   int n_children{0};
-  int n_offset{0};
-  for (int i = 0; i < 8; ++i) {
-    n_per_child[i] = splits[i + 1] - splits[i];
-    if (n_per_child[i]) {
-      ++n_children;
-      cparts[i] = hpx_addr_add(parms->sources.data(),
-                               sizeof(Source) * n_offset,
-                               sizeof(Source) * parms->sources.n_tot());
-    } else {
-      cparts[i] = HPX_NULL;
+  {
+    int n_offset{0};
+    for (int i = 0; i < 8; ++i) {
+      int n_per_child = splits[i + 1] - splits[i];
+      if (n_per_child) {
+        ++n_children;
+        cparts[i] = parms->sources.slice(n_offset, n_per_child);
+      }
+      n_offset += n_per_child;
     }
-    n_offset += n_per_child[i];
   }
 
   hpx_addr_t childpartdone = hpx_lco_and_new(n_children);
   assert(childpartdone != HPX_NULL);
 
   for (int i = 0; i < 8; ++i) {
-    if (n_per_child[i] == 0) {
+    if (!cparts[i].valid()) {
       node->child[i] = HPX_NULL;
       continue;
     }
@@ -324,8 +321,7 @@ int source_node_partition_handler(SourceNodeData *node,
     args->type = parms->type;
     args->expand = parms->expand;
     args->n_digits = parms->n_digits;
-    args->sources = SourceRef(cparts[i], n_per_child[i],
-                              parms->sources.n_tot());
+    args->sources = cparts[i];
     hpx_call(kid.data(), source_node_partition_action, HPX_NULL, args, argsz);
     delete [] args;
   }

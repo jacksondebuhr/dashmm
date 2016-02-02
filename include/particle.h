@@ -49,19 +49,15 @@ struct Source {
 class SourceRef {
  public:
   /// Default constructor.
-  SourceRef() : data_{HPX_NULL}, n_{0} { }
-
-  /// Construct a reference from Source data.
-  ///
-  /// This will allocate GAS memory and copy the input sources into the
-  /// GAS allocation, before setting this object up as a reference to that
-  /// GAS memory.
-  SourceRef(Source *sources, int n);
+  SourceRef()
+      : data_{HPX_NULL}, n_{0}, n_tot_{0},
+        record_size_{0}, pos_offset_{0}, q_offset_{0} { }
 
   /// Construct from a specific address and count.
-  SourceRef(hpx_addr_t data, int n, int n_tot)
-      : data_{data}, n_{n}, n_tot_{n_tot} { }
-
+  SourceRef(hpx_addr_t data, size_t n, size_t n_tot, size_t recsz,
+            size_t posoff, size_t qoff)
+      : data_{data}, n_{n}, n_tot_{n_tot},
+        record_size_{recsz}, pos_offset_{posoff}, q_offset_{qoff} { }
 
   /// Destroy the particle data in GAS.
   ///
@@ -69,19 +65,47 @@ class SourceRef {
   /// this oject only destroys the reference.
   void destroy();
 
+  /// Returns if the reference is valid
+  bool valid() const {return data_ != HPX_NULL;}
+
+  /// Get a reference to a slide of the current reference
+  ///
+  /// This will return a SourceRef to a consecutive chunk of the records that
+  /// begin at an offset from the start of this reference and that will contain
+  /// n entries. If the input arguments to this method are invalid, then an
+  /// invalid reference will be returned.
+  ///
+  /// \param offset - the offset from the start of this reference
+  /// \param n - the number of entries in the slice
+  ///
+  /// \returns - the resulting SourceRef; may be invalid.
+  SourceRef slice(size_t offset, size_t n) const;
+
   /// Returns the number of Source records referred to.
-  int n() const {return n_;}
+  size_t n() const {return n_;}
 
   /// Returns the total number of Source records.
-  int n_tot() const {return n_tot_;}
+  size_t n_tot() const {return n_tot_;}
 
   /// Returns the global address of the referred to data.
   hpx_addr_t data() const {return data_;}
 
+  /// Returns the size of the referenced records
+  size_t record_size() const {return record_size_;}
+
+  /// Returns the offset to the poisition in the referenced records
+  size_t pos_offset() const {return pos_offset_;}
+
+  /// Returns the offset to the charge in the referenced records
+  size_t q_offset() const {return q_offset_;}
+
  private:
   hpx_addr_t data_;
-  int n_;
-  int n_tot_;
+  size_t n_;
+  size_t n_tot_;
+  size_t record_size_;
+  size_t pos_offset_;
+  size_t q_offset_;
 };
 
 

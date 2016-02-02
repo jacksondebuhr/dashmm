@@ -147,24 +147,25 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-SourceRef::SourceRef(Source *sources, int n) {
-  data_ = hpx_gas_alloc_local(1, sizeof(Source) * n, 0);
-  assert(data_ != HPX_NULL);
-  n_ = n;
-  n_tot_ = n;
-  Source *local{nullptr};
-  assert(hpx_gas_try_pin(data_, (void **)&local));
-  memcpy(local, sources, sizeof(Source) * n);
-  hpx_gas_unpin(data_);
-}
-
-
 void SourceRef::destroy() {
   if (data_ != HPX_NULL) {
     hpx_gas_free_sync(data_);
     data_ = HPX_NULL;
     n_ = 0;
   }
+}
+
+
+SourceRef SourceRef::slice(size_t offset, size_t n) const {
+  if (offset > n_) {
+    return SourceRef{HPX_NULL, 0, 0, 0, 0, 0};
+  }
+  if (offset + n > n_) {
+    return SourceRef{HPX_NULL, 0, 0, 0, 0, 0};
+  }
+  hpx_addr_t addr = hpx_addr_add(data_, sizeof(Source) * offset,
+                                 sizeof(Source) * n_tot_);
+  return SourceRef{addr, n, n_tot_, record_size_, pos_offset_, q_offset_};
 }
 
 

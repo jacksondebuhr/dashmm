@@ -213,11 +213,11 @@ HPX_ACTION(HPX_DEFAULT, 0,
 
 struct EvaluateParams {
   hpx_addr_t sources;
-  int spos_offset;
-  int q_offset;
+  size_t spos_offset;
+  size_t q_offset;
   hpx_addr_t targets;
-  int tpos_offset;
-  int phi_offset;
+  size_t tpos_offset;
+  size_t phi_offset;
   int refinement_limit;
   size_t method_size;
   size_t expansion_size;
@@ -266,7 +266,13 @@ int evaluate_handler(EvaluateParams *parms, size_t total_size) {
 
   hpx_lco_get(source_packed, sizeof(s_res), &s_res);
   hpx_lco_delete_sync(source_packed);
-  SourceRef sources{s_res.packed, s_res.count, s_res.count};
+  //TODO
+  //TODO: update this once packing is removed
+  //TODO
+  ArrayMetaData *arr{nullptr};
+  assert(hpx_gas_try_pin(parms->sources, (void **)&arr)); //NOTE: SMP assumption
+  SourceRef sources{s_res.packed, arr->count, arr->count,
+                    arr->size, parms->spos_offset, parms->q_offset};
 
   hpx_lco_get(target_packed, sizeof(t_res), &t_res);
   hpx_addr_t target_data = t_res.packed;
@@ -316,8 +322,8 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
 /////////////////////////////////////////////////////////////////////
 
 
-ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
-                    ObjectHandle targets, int tpos_offset, int phi_offset,
+ReturnCode evaluate(ObjectHandle sources, size_t spos_offset, size_t q_offset,
+                    ObjectHandle targets, size_t tpos_offset, size_t phi_offset,
                     int refinement_limit,
                     std::unique_ptr<Method> method,
                     std::unique_ptr<Expansion> expansion) {

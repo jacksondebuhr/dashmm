@@ -106,8 +106,8 @@ ReturnCode finalize();
 /// \returns - kSuccess on successful evaluation; kIncompatible if the given
 ///            method and expansion are incompatible; kRuntimeError if there
 ///            is an error from the runtime.
-ReturnCode evaluate(ObjectHandle sources, int spos_offset, int q_offset,
-                    ObjectHandle targets, int tpos_offset, int phi_offset,
+ReturnCode evaluate(ObjectHandle sources, size_t spos_offset, size_t q_offset,
+                    ObjectHandle targets, size_t tpos_offset, size_t phi_offset,
                     int refinement_limit,
                     std::unique_ptr<Method> method,
                     std::unique_ptr<Expansion> expansion);
