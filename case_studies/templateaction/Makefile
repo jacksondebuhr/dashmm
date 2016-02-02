@@ -1,4 +1,4 @@
-CXX = icpc
+CXX = g++
 CXXFLAGS = -std=c++11 -Wall -O0 -g
 INCLUDE = $(shell pkg-config --cflags hpx)
 LIBS = $(shell pkg-config --libs hpx)
