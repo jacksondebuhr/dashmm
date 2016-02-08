@@ -1,11 +1,47 @@
-* First release TODO
-  - create a build system for making DASHMM into a library
-  - enlist Matt as an end-user for testing the ease of the build system
-  - Update the Basic user guide
-  - Start to work on the Advanced User Guide (we have a few of the advanced
-    features implemented.) Also, having a guide for implementing new internal
-    methods and expansions it would be helpful, as it would be easy to miss
-    something.
+NOTES for making this into a templatized thing:
+
+Some things will not need any change:
+ - index.h is fine
+ - point.h/.cc is fine
+ - types.h is fine
+ - reductionops.h/.cc is also fine
+ - domaingeometry.h/.cc is fine
+
+Some things are no longer needed:
+ - ids.h is now not needed
+
+Unknown:
+ (Array stuff for Users)
+ - array.h/.cc
+
+ (Method related)
+ - method.h/.cc
+ - methodref.h/.cc
+ - bh_method.h/.cc
+ - direct_method.h/.cc
+ - fmm_method.h/.cc
+
+ (Expansion related)
+ - expansion.h/.cc
+ - expansionref.h/.cc
+ - laplace_com.h/.cc
+ - laplace_sph.h/.cc
+
+ (Built in methods and expansions)
+ - builtins.h/.cc
+
+ (Evaluation)
+ - evalutate.cc
+ - node.h/.cc
+ - particle.h/.cc
+
+ (Setup and teardown of DASHMM)
+ - initfini.cc
+
+ (Interface to Users)
+ - dashmm.h
+ - basic.h
+
 
 
 Some notes about issues or future features
