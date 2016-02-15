@@ -20,6 +20,8 @@
 /// \brief Basic type definitions used throughout DASHMM
 
 
+#include <complex>
+
 #include <hpx/hpx.h>
 
 

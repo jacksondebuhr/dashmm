@@ -65,6 +65,8 @@ template <typename Source, typename Target>
 class LaplaceCOM {
  public:
   using contents_t = LaplaceCOMData;
+  using source_t = Source;
+  using target_t = Target;
 
   LaplaceCOM(Point center, int n_digits) {
     bytes_ = sizeof(LaplaceCOMData);

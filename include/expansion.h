@@ -34,6 +34,10 @@ class Expansion {
   /// correct type as soon as possible.
   using contents_t = ExpansionData;
 
+  //TODO: decide if this is actually useful
+  using source_t = Source;
+  using target_t = Target;
+
   /// Expansions must provide two constructors
   ///
   /// The first creates the object with the given center and the given

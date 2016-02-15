@@ -168,6 +168,9 @@ Unknown:
       For this, we will want to specify the requirements on the fields in
       Source and Target types. This will be more of a documentation thing.
 
+      Well, the SourceRef appears to be done. There is nothing much here in
+      SMP.
+
  (Setup and teardown of DASHMM)
  - initfini.cc
       This becomes very simple. Just wrappers around hpx_init and hpx_finalize

@@ -25,45 +25,51 @@
 #include <hpx/hpx.h>
 
 #include "include/point.h"
+#include "include/types.h"
 
 
 namespace dashmm {
 
 
-using dcomplex_t = std::complex<double>;
+/// Source concept in DASHMM
+///
+/// To qualify as a Source for DASHMM, a type should be trivially copyable,
+/// and should provide at least two members accessible by name:
+///
+/// Point position;
+/// double charge;
 
-
-/// The data needed for source particles.
-struct Source {
-  double charge;
-  Point position;
-};
 
 
 /// Reference to a set of sources
 ///
 /// This is a reference object, meaning that it refers to the Source data in
 /// the GAS, but does not contain those data. As such, one can pass this
-/// class by value without worry. The data referred to will be a single block
-/// of GAS which contains a number of source records.
+/// class by value without worry.
+template <typename Source>
 class SourceRef {
  public:
+  using source_t = Source;
+
   /// Default constructor.
   SourceRef()
-      : data_{HPX_NULL}, n_{0}, n_tot_{0},
-        record_size_{0}, pos_offset_{0}, q_offset_{0} { }
+      : data_{HPX_NULL}, n_{0}, n_tot_{0} { }
 
   /// Construct from a specific address and count.
-  SourceRef(hpx_addr_t data, size_t n, size_t n_tot, size_t recsz,
-            size_t posoff, size_t qoff)
-      : data_{data}, n_{n}, n_tot_{n_tot},
-        record_size_{recsz}, pos_offset_{posoff}, q_offset_{qoff} { }
+  SourceRef(hpx_addr_t data, size_t n, size_t n_tot)
+      : data_{data}, n_{n}, n_tot_{n_tot} { }
 
   /// Destroy the particle data in GAS.
   ///
   /// This is needed because this object is a reference, and the destruction of
   /// this oject only destroys the reference.
-  void destroy();
+  void destroy() {
+    if (data_ != HPX_NULL) {
+      hpx_gas_free_sync(data_);
+      data_ = HPX_NULL;
+      n_ = 0;
+    }
+  }
 
   /// Returns if the reference is valid
   bool valid() const {return data_ != HPX_NULL;}
@@ -79,7 +85,17 @@ class SourceRef {
   /// \param n - the number of entries in the slice
   ///
   /// \returns - the resulting SourceRef; may be invalid.
-  SourceRef slice(size_t offset, size_t n) const;
+  SourceRef slice(size_t offset, size_t n) const {
+    if (offset > n_) {
+      return SourceRef{HPX_NULL, 0, 0};
+    }
+    if (offset + n > n_) {
+      return SourceRef{HPX_NULL, 0, 0};
+    }
+    hpx_addr_t addr = hpx_addr_add(data_, sizeof(Source) * offset,
+                                   sizeof(Source) * n_tot_);
+    return SourceRef{addr, n, n_tot_};
+  }
 
   /// Returns the number of Source records referred to.
   size_t n() const {return n_;}
@@ -90,22 +106,10 @@ class SourceRef {
   /// Returns the global address of the referred to data.
   hpx_addr_t data() const {return data_;}
 
-  /// Returns the size of the referenced records
-  size_t record_size() const {return record_size_;}
-
-  /// Returns the offset to the poisition in the referenced records
-  size_t pos_offset() const {return pos_offset_;}
-
-  /// Returns the offset to the charge in the referenced records
-  size_t q_offset() const {return q_offset_;}
-
  private:
   hpx_addr_t data_;
   size_t n_;
   size_t n_tot_;
-  size_t record_size_;
-  size_t pos_offset_;
-  size_t q_offset_;
 };
 
 
@@ -186,7 +190,7 @@ class TargetRef {
 };
 
 
-} //namespace dashmm
+} // namespace dashmm
 
 
 #endif // __DASHMM_PARTICLE_H__

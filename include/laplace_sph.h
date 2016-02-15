@@ -47,6 +47,8 @@ template <typename Source, typename Target>
 class LaplaceSPH {
  public:
   using contents_t = LaplaceSPHData;
+  using source_t = Source;
+  using target_t = Target;
 
   LaplaceSPH(Point center, int n_digits) {
     LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);

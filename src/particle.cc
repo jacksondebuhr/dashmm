@@ -147,28 +147,6 @@ HPX_ACTION(HPX_FUNCTION, 0,
 /////////////////////////////////////////////////////////////////////
 
 
-void SourceRef::destroy() {
-  if (data_ != HPX_NULL) {
-    hpx_gas_free_sync(data_);
-    data_ = HPX_NULL;
-    n_ = 0;
-  }
-}
-
-
-SourceRef SourceRef::slice(size_t offset, size_t n) const {
-  if (offset > n_) {
-    return SourceRef{HPX_NULL, 0, 0, 0, 0, 0};
-  }
-  if (offset + n > n_) {
-    return SourceRef{HPX_NULL, 0, 0, 0, 0, 0};
-  }
-  hpx_addr_t addr = hpx_addr_add(data_, sizeof(Source) * offset,
-                                 sizeof(Source) * n_tot_);
-  return SourceRef{addr, n, n_tot_, record_size_, pos_offset_, q_offset_};
-}
-
-
 TargetRef::TargetRef(Target *targets, int n) {
   size_t init_size = sizeof(TargetRefLCOInitData) + sizeof(Target) * n;
   TargetRefLCOInitData *init =
