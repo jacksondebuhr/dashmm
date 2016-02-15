@@ -31,6 +31,19 @@ Unknown:
       contain the user interface for everything. The question is, how to we
       keep it from becoming this huge damn file.
 
+      Well, not quite. We shall have a dashmm namespace still. And there will
+      be an evaluator type for that. I have worked out in anothertemplate under
+      case_studies how to split things up and make them separable into multiple
+      files. So we are going to go that route. That being said, there is
+      still the possibility of a very large file (for the evaluator for
+      instance). Perhaps we shall take some of the internal code out and put
+      it into .inc files. But perhaps not. Anyway, it will get out of hand
+      pretty easily.
+
+      We shall want some good documentation anyway, so perhaps we just leave all
+      the gore in and if the user really goes poking around, they will be in
+      for a shock.
+
  (Method related)
       The complication with this is that the specific methods need to use the
       ExpansionReferences as well as the Source and Target Nodes. So creating
