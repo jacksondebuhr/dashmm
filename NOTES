@@ -13,13 +13,99 @@ Some things are no longer needed:
 Unknown:
  (Array stuff for Users)
  - array.h/.cc
+      I think this becomes templatized, but the actions do not need to be
+      changed really. Perhaps these even become objects. So the user gets
+      an array<Source> instead of calling allocate_array and getting an
+      object handle. The resulting type is the handle.  The question is if there
+      is some benefit for the actions to know the underlying type.
+
+      Perhaps what is happening is that we really do have one large dashmm
+      object. And it also defines the array types for us.  Then, init can
+      happen at the end of the constructor, and fini can happen at the
+      destruction of the object. Of course, multiple dashmm instances would
+      then compete to be the initializer and finalizer. So these might need to
+      be instead user controlled things. That way multiple instances can be
+      created and there is no hpx_init problem.
+
+      I think this will be the model. One large object called dashmm. That will
+      contain the user interface for everything. The question is, how to we
+      keep it from becoming this huge damn file.
 
  (Method related)
+      The complication with this is that the specific methods need to use the
+      ExpansionReferences as well as the Source and Target Nodes. So creating
+      a Method means creating a template class that uses these things? This
+      will take a bit of thinking. Basically Method will be templatized over
+      the Expansion, the Source, and the Target types. But since there are not
+      any actions required, it should just be fine to make it a typical sort
+      of template.
+
+      It also will use SourceRef and TargetRef. But those again have the
+      Source, Target, Expansion as their parameters.
+
+      Next question, how do we make the definitions available to the Method?
+      This one is hard, I think.
+
+      So the issue is that the dashmm object will be parameterized by the
+      method, and the method needs something from the dashmm type to work.
+      So do we somehow create multiple objects, and the dashmm object takes
+      charge of creating one so that the stuff gets registered? Can I do an
+      example of this to see how to make it work? A class that has two
+      type arguments, one of which needs the other in the implementation?
+
+      This is maybe okay. The dashmm object takes the four parameters, and
+      defines some auxiliary classes from those. And the Method is defined by
+      the user, also taking some parameters, and it needs the SourceRef and
+      TargetRef, but these can also be passed as a template template parameter.
+      Another option is to use the thing directly, but that is probably
+      inelegant. So the user will need to be a bit clever about stuff, but that
+      is okay. So Method will take Source Target Expansion and two template
+      template parameters
+
+      So there are a couple implementations of something like this in the case
+      studies.
+
  - method.h/.cc
+      So the overall interface for the Method is not really going to change, but
+      we do not need to explicitly define it anywhere. I guess we need one that
+      shows the basic structure, but it will not be included by anything. It
+      will just specify the overall requirements on the Method concept.
+
+      Registration of Methods is not longer sensible. So those can be removed
+      along with the table init and fini stiff. Also, the creation function
+      type as well as the create method thing can go away as the specific type
+      will be known, and we can thus, just use it.
+
+      So basically, this whole thing goes away and is replaced by a specification
+      in the documentation about what will make a method conform to the Method
+      concept.
+
+      You know, I think we can rid ourselves of the release() requirement on the
+      Method concept. I think we can just go ahead and use some POD in the type
+      and not provide copy move operators, and leave the destructor simple.
+
+      The question to answer, does this make for a strange imbalance with the
+      Expansion concept? Probably not. They are already different, and will have
+      different requirements. So why not go for it?
  - methodref.h/.cc
+      Given that we are likely just going to copy the method type around, then
+      there is no longer any reason for the method reference object, right? If
+      we know the type, we can just copy it as needed. At worst, this will be
+      a few numbers. Now, since this is a user type, HPX-5 will need to always
+      use a marshalled action if this is being sent in a so on. But whatever.
+
+      For BH, we are going to have a double to send around. For FMM, there is
+      nothing, so it will be 1 byte (or a larger aligned thing). For fancier
+      methods, this could be a problem, but the current implementation is
+      always pulling copies anyway. So this is perhaps not a big deal.
+
+      So this seems to be disappearing as well.
  - bh_method.h/.cc
+      Hopefully very little change here. If anything, a simplification.
  - direct_method.h/.cc
+      Hopefully very little change here. If anything, a simplification.
  - fmm_method.h/.cc
+      Hopefully very little change here. If anything, a simplification.
 
  (Expansion related)
  - expansion.h/.cc
@@ -29,6 +115,11 @@ Unknown:
 
  (Built in methods and expansions)
  - builtins.h/.cc
+      The evaluator will not need a specific object for the definition portion
+      but we shall still need particular objects for the evaluation step.
+      So this may not change much.
+
+      We will be able to get rid of the registration portions of this stuff.
 
  (Evaluation)
  - evalutate.cc
@@ -37,10 +128,15 @@ Unknown:
 
  (Setup and teardown of DASHMM)
  - initfini.cc
+      This becomes very simple. Just wrappers around hpx_init and hpx_finalize
 
  (Interface to Users)
  - dashmm.h
  - basic.h
+
+
+So the basic parameters are the source type, the target type, the expansion
+type and the method type.
 
 
 

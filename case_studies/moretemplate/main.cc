@@ -1,6 +1,6 @@
 #include <iostream>
 
-//#include <hpx/hpx.h>
+// #include <hpx/hpx.h>
 
 
 template <template <typename> class B>
@@ -38,7 +38,7 @@ class SecondClass {
 
 
 
-//Now for a second approach
+// Now for a second approach
 template <typename Source, template <typename, typename> class Method>
 class dashmm {
  public:
