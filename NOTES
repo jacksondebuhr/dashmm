@@ -1,49 +1,63 @@
 NOTES for making this into a templatized thing:
 
+Perhaps what is happening is that we really do have one large dashmm
+object. And it also defines the array types for us.  Then, init can
+happen at the end of the constructor, and fini can happen at the
+destruction of the object. Of course, multiple dashmm instances would
+then compete to be the initializer and finalizer. So these might need to
+be instead user controlled things. That way multiple instances can be
+created and there is no hpx_init problem.
+
+I think this will be the model. One large object called dashmm. That will
+contain the user interface for everything. The question is, how to we
+keep it from becoming this huge damn file.
+
+Well, not quite. We shall have a dashmm namespace still. And there will
+be an evaluator type for that. I have worked out in anothertemplate under
+case_studies how to split things up and make them separable into multiple
+files. So we are going to go that route. That being said, there is
+still the possibility of a very large file (for the evaluator for
+instance). Perhaps we shall take some of the internal code out and put
+it into .inc files. But perhaps not. Anyway, it will get out of hand
+pretty easily.
+
+We shall want some good documentation anyway, so perhaps we just leave all
+the gore in and if the user really goes poking around, they will be in
+for a shock.
+
+
 Some things will not need any change:
- - index.h is fine
- - point.h/.cc is fine
- - types.h is fine
- - reductionops.h/.cc is also fine
- - domaingeometry.h/.cc is fine
+ - DONE index.h is fine
+ - DONE point.h/.cc is fine
+ - DONE types.h is fine
+ - DONE reductionops.h/.cc is also fine
+ - DONE domaingeometry.h/.cc is fine
 
 Some things are no longer needed:
- - ids.h is now not needed
+ - DONE ids.h is now not needed
+
+Done things in the upgrade
+ - DONE array.h/.cc
+     I think this becomes templatized, but the actions do not need to be
+     changed really. Perhaps these even become objects. So the user gets
+     an array<Source> instead of calling allocate_array and getting an
+     object handle. The resulting type is the handle.  The question is if there
+     is some benefit for the actions to know the underlying type. Actually,
+     there is benefit for the action to be type oblivious. That way we do
+     not have to have all possible array types register with the runtime.
+
+     The result here is that there is now a template class that deals with
+     arrays for the user. The object handle is now obsolete. It is removed.
+
+     The actions for this are unchanged from the 0.5 version.
+
+     There will need to be some potential additions to the class as the use
+     cases are extended.
+
+     There is also the need to look into an iterator for the class. Not sure
+     if that will be useful.
 
 Unknown:
- (Array stuff for Users)
- - array.h/.cc
-      I think this becomes templatized, but the actions do not need to be
-      changed really. Perhaps these even become objects. So the user gets
-      an array<Source> instead of calling allocate_array and getting an
-      object handle. The resulting type is the handle.  The question is if there
-      is some benefit for the actions to know the underlying type.
-
-      Perhaps what is happening is that we really do have one large dashmm
-      object. And it also defines the array types for us.  Then, init can
-      happen at the end of the constructor, and fini can happen at the
-      destruction of the object. Of course, multiple dashmm instances would
-      then compete to be the initializer and finalizer. So these might need to
-      be instead user controlled things. That way multiple instances can be
-      created and there is no hpx_init problem.
-
-      I think this will be the model. One large object called dashmm. That will
-      contain the user interface for everything. The question is, how to we
-      keep it from becoming this huge damn file.
-
-      Well, not quite. We shall have a dashmm namespace still. And there will
-      be an evaluator type for that. I have worked out in anothertemplate under
-      case_studies how to split things up and make them separable into multiple
-      files. So we are going to go that route. That being said, there is
-      still the possibility of a very large file (for the evaluator for
-      instance). Perhaps we shall take some of the internal code out and put
-      it into .inc files. But perhaps not. Anyway, it will get out of hand
-      pretty easily.
-
-      We shall want some good documentation anyway, so perhaps we just leave all
-      the gore in and if the user really goes poking around, they will be in
-      for a shock.
-
  (Method related)
       The complication with this is that the specific methods need to use the
       ExpansionReferences as well as the Source and Target Nodes. So creating
@@ -121,10 +135,22 @@ Unknown:
       Hopefully very little change here. If anything, a simplification.
 
  (Expansion related)
- - expansion.h/.cc
+ - DONE expansion.h/.cc - These are basically going to be removed. The .cc is no
+      longer needed at all. The .h will be converted into documentation for
+      the concept of expansions for DASHMM.
+ - DONE laplace_com.h/.cc - This was dead simple. Just had to make it a
+ - DONE laplace_sph.h/.cc - This was also pretty simple. We changed things so
+     that the user will have to call laplace_sph_precompute() with their
+     accuracy before the expansion is initially created for a given accuracy.
+     Otherwise it should be pretty simple.
+
+     Also, I split the table stuff into a separate file. So that has increased
+     the file count, but the stuff that is not interesting to the user is now
+     taken out of the file. If a user wants to see it, they can go ahead and
+     look into it.
+
  - expansionref.h/.cc
- - laplace_com.h/.cc
- - laplace_sph.h/.cc
+
 
  (Built in methods and expansions)
  - builtins.h/.cc
@@ -133,11 +159,14 @@ Unknown:
       So this may not change much.
 
       We will be able to get rid of the registration portions of this stuff.
+      Actually, this file will disappear once the Method stuff is complete.
 
  (Evaluation)
  - evalutate.cc
  - node.h/.cc
  - particle.h/.cc
+      For this, we will want to specify the requirements on the fields in
+      Source and Target types. This will be more of a documentation thing.
 
  (Setup and teardown of DASHMM)
  - initfini.cc

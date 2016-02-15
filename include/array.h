@@ -44,6 +44,63 @@ struct ArrayMetaData {
 };
 
 
+extern hpx_action_t allocate_array_action;
+extern hpx_action_t deallocate_array_action;
+extern hpx_action_t array_put_action;
+extern hpx_action_t array_get_action;
+
+
+
+template <typename T>
+class Array {
+ public:
+  Array(size_t record_count) {
+    // TODO: Make work also from HPX thread.
+    int runcode;
+    int *arg = &runcode;
+    size_t size = sizeof(T);
+    hpx_run(&allocate_array_action, &record_count, &size, &data_, &arg);
+  }
+
+  Array(hpx_addt_t data) : data_{data} { }
+
+  bool valid() const {return data != HPX_NULL;}
+
+  // TODO: Do we want queries on the number of records?
+
+  ReturnCode destroy() {
+    // TODO: Make work also from HPX thread.
+    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
+      return kSuccess;
+    } else {
+      return kRuntimeError;
+    }
+  };
+
+  ReturnCode get(size_t first, size_t last, T *out_data) {
+    // TODO: Make work also from HPX thread.
+    int runcode;
+    int *arg = &runcode;
+    hpx_run(&array_get_action, &data_, &first, &last, &arg, &out_data);
+    return static_cast<ReturnCode>(runcode);
+  }
+
+  ReturnCode put(size_t first, size_t last, T *in_data) {
+    // TODO: Make work also from HPX thread.
+    int runcode;
+    int *arg = &runcode;
+    hpx_run(&array_put_action, &data_, &first, &last, &arg, &in_data);
+    return static_cast<ReturnCode>(runcode);
+  }
+
+  // TODO: do we define an iterator for this? What does that even mean in the
+  // context of GAS?
+ private:
+  hpx_addr_t data_;
+};
+
+
+
 } // namespace dashmm
 
 

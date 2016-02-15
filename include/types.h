@@ -42,13 +42,7 @@ enum ReturnCode {
 };
 
 
-/// \class ObjectHandle
-/// \brief An opaque handle to global objects in DASHMM
-///
-/// References to objects created by DASHMM that are returned to the user
-/// will all be of class ObjectHandle. These references are opaque, and there
-/// are no methods exposed to the user.
-using ObjectHandle = hpx_addr_t;
+using dcomplex_t = std::complex<double>;
 
 
 } // namespace dashmm

@@ -48,7 +48,7 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
                            int *err) {
   *err = kSuccess;
 
-  //create the metadata object
+  // create the metadata object
   hpx_addr_t retval = hpx_gas_alloc_local_at_sync(1, sizeof(ArrayMetaData), 0,
                                                   HPX_HERE);
   *obj = retval;
@@ -57,17 +57,25 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
     hpx_exit(HPX_ERROR);
   }
 
-  //pin it
+  // NOTE: this should always work as the array meta data is allocated here.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(retval, (void **)&meta)) {
     *err = kRuntimeError;
+    hpx_gas_free_sync(retval);
+    *obj = HPX_NULL;
     hpx_exit(HPX_ERROR);
   }
   meta->count = count;
   meta->size = size;
 
   meta->data = hpx_gas_alloc_local_at_sync(1, count * size, 0, HPX_HERE);
-  assert(meta->data != HPX_NULL);
+  if (meta->data == HPX_NULL) {
+    *err = kAllocationError;
+    hpx_gas_unpin(retval);
+    hpx_gas_free_sync(retval);
+    *obj = HPX_NULL;
+    hpx_exit(HPX_ERROR);
+  }
 
   hpx_gas_unpin(retval);
   hpx_exit(HPX_SUCCESS);
@@ -84,6 +92,7 @@ HPX_ACTION(HPX_DEFAULT, 0, allocate_array_action, allocate_array_handler,
 ///
 /// \returns - HPX_SUCCESS
 int deallocate_array_handler(hpx_addr_t obj) {
+  // NOTE: This should always work as this is called on the meta data
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     hpx_exit(HPX_ERROR);
@@ -116,12 +125,14 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
                       void *in_data) {
   *err = kSuccess;
 
+  //NOTE: This should always work as this is called on the meta data.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     *err = kRuntimeError;
     hpx_exit(HPX_ERROR);
   }
 
+  //TODO: SMP assumption here. This must be improved.
   char *local;
   if (!hpx_gas_try_pin(meta->data, (void **)&local)) {
     hpx_gas_unpin(obj);
@@ -129,7 +140,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
     hpx_exit(HPX_ERROR);
   }
 
-  //Do some simple bounds checking
+  // Do some simple bounds checking
   if (last > meta->count || last < first) {
     *err = kDomainError;
     hpx_gas_unpin(meta->data);
@@ -165,12 +176,14 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
                       void *out_data) {
   *err = kSuccess;
 
+  // NOTE: This will always work as the action is called on the meta data
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     *err = kRuntimeError;
     hpx_exit(HPX_ERROR);
   }
 
+  // TODO: SMP assumption here. This must be improved.
   char *local{nullptr};
   if (!hpx_gas_try_pin(meta->data, (void **)&local)) {
     *err = kRuntimeError;
@@ -178,7 +191,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
     hpx_exit(HPX_ERROR);
   }
 
-  //Do some simple bounds checking
+  // Do some simple bounds checking
   if (last > meta->count || last < first) {
     *err = kDomainError;
     hpx_gas_unpin(meta->data);
@@ -196,46 +209,6 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
-
-
-/////////////////////////////////////////////////////////////////////
-// Interface
-/////////////////////////////////////////////////////////////////////
-
-
-ReturnCode allocate_array(size_t records, size_t size, ObjectHandle *obj) {
-  int runcode;
-  int *arg = &runcode;
-  hpx_run(&allocate_array_action, &records, &size, &obj, &arg);
-  return static_cast<ReturnCode>(runcode);
-}
-
-
-ReturnCode deallocate_array(ObjectHandle obj) {
-  if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &obj)) {
-    return kSuccess;
-  } else {
-    return kRuntimeError;
-  }
-}
-
-
-ReturnCode array_put(ObjectHandle obj, size_t first, size_t last,
-                     void *in_data) {
-  int runcode;
-  int *arg = &runcode;
-  hpx_run(&array_put_action, &obj, &first, &last, &arg, &in_data);
-  return static_cast<ReturnCode>(runcode);
-}
-
-
-ReturnCode array_get(ObjectHandle obj, size_t first, size_t last,
-                     void *out_data) {
-  int runcode;
-  int *arg = &runcode;
-  hpx_run(&array_get_action, &obj, &first, &last, &arg, &out_data);
-  return static_cast<ReturnCode>(runcode);
-}
 
 
 } // namespace dashmm
