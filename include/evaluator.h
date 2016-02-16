@@ -30,7 +30,8 @@ class Evaluator {
   using method_t = Method<Source, Target, expansion_t>;
 
   // Related type aliases to avoid clutter
-  using targetlco_t = TargetLCO<source_t, target_t, expansion_t, method_t>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
 
   Evaluator() {
     // TODO: register all actions in the system
@@ -46,6 +47,61 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
                         targetlco_t::predicate_,
                         targetlco_t::predicate_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+
+    // ExpansionLCO related
+    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+                        targetlco_t::init_, targetlco_t::init_handler,
+                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+                        expansionlco_t::operation_,
+                        expansionlco_t::operation_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+                        expansionlco_t::predicate_,
+                        expansionlco_t::predicate_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
+                        expansionlco_t::s_to_m_,
+                        expansionlco_t::s_to_m_handler,
+                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
+                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
+                        expansionlco_t::s_to_l_,
+                        expansionlco_t::_s_to_l_handler,
+                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
+                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        expansionlco_t::m_to_m_,
+                        expansionlco_t::m_to_m_handler,
+                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        expansionlco_t::m_to_l_,
+                        expansionlco_t::m_to_l_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        expansionlco_t::l_to_l_,
+                        expansionlco_t::l_to_l_handler,
+                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        expansionlco_t::m_to_t_,
+                        expansionlco_t::m_to_t_handler,
+                        HPX_INT, HPX_DOUBLE, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        expansionlco_t::l_to_t_,
+                        expansionlco_t::l_to_t_handler,
+                        HPX_INT, HPX_DOUBLE, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
+                        expansionlco_t::s_to_t_,
+                        expansionlco_t::s_to_t_handler,
+                        HPX_POINTER, HPX_INT, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        expansionlco_t::add_,
+                        expansionlco_t::add_handler,
+                        HPX_ADDR, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        expansionlco_t::create_from_expansion_,
+                        expansionlco_t::create_from_expansion_handler,
                         HPX_POINTER, HPX_SIZE_T);
   }
  private:

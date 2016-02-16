@@ -224,18 +224,20 @@ class TargetRef {
 /// at the same locality as the data referred to by the TargetRef, so they
 /// should always be co-located. Generally speaking, the user does not
 /// interact with the object very often. Mostly they will pass objects of this
-/// type to ExpansionRef objects.
+/// type to ExpansionLCO objects.
 ///
 /// NOTE: We need all four here because otherwise, we would possibly have two
 /// methods for the same Source, Target, Expansion triple try to register the
 /// same functions. So that is no good. So we have to have all four.
-template <typename Source, typename Target, typename Expansion, typename Method>
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename, typename> class Method>
 class TargetLCO {
  public:
   using source_t = Source;
   using target_t = Target;
-  using expansion_t = Expansion;
-  using method_t = Method;
+  using expansion_t = Expansion<Source, Target>;
+  using method_t = Method<Source, Target, expansion_t>;
 
   using targetref_t = TargetRef<Target>;
 
@@ -243,10 +245,10 @@ class TargetLCO {
   TargetLCO() : lco_{HPX_NULL} { }
 
   /// Construct from an existing LCO
-  TargetLCO(hpx_addr_t data) : lco_{data} { }
+  explicit TargetLCO(hpx_addr_t data) : lco_{data} { }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
-  TargetRef(targetref_t targets) {
+  explicit TargetRef(targetref_t targets) {
     Init init{targets};
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
@@ -307,7 +309,7 @@ class TargetLCO {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_M_to_T(size_t bytes, Expansion::contents_t *data,
+  void contribute_M_to_T(size_t bytes, expansion_t::contents_t *data,
                          int n_digits, double scale) const {
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
@@ -327,7 +329,7 @@ class TargetLCO {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_L_to_T(size_t bytes, Expansion::contents_t *data,
+  void contribute_L_to_T(size_t bytes, expansion_t::contents_t *data,
                          int n_digits, double scale) const {
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
@@ -475,13 +477,19 @@ class TargetLCO {
 };
 
 
-template <typename S, typename T, typename E, typename M>
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename, typename> class M>
 hpx_action_t TargetLCO<S, T, E, M>::init_ = HPX_ACTION_NULL;
 
-template <typename S, typename T, typename E, typename M>
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename, typename> class M>
 hpx_action_t TargetLCO<S, T, E, M>::operation_ = HPX_ACTION_NULL;
 
-template <typename S, typename T, typename E, typename M>
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename, typename> class M>
 hpx_action_t TargetLCO<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
 
 
