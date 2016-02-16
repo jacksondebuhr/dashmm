@@ -49,7 +49,6 @@ class Expansion {
   /// The second creates the expansion from previously existing data. The
   /// bytes argument allows for variable length expansions in DASHMM.
   ///
-  /// TODO: is the following needed still?
   /// Further, this constructor needs to be able to operate in a 'shallow'
   /// mode, where ptr = nullptr. This allows for situations where Expansion
   /// is needed, but the speicif data for the expansion is not. The exemplar of

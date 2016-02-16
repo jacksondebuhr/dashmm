@@ -399,6 +399,8 @@ int target_node_partition_handler(TargetNodeData *node,
 
   if (refine) {
     //partition
+    //TODO: Be aware that this might be the same data as the sources, which
+    // are already partitioned. So make something else happen in that case.
     Target *T{nullptr};
     assert(hpx_gas_try_pin(parms->parts, (void **)&T));
     Target *splits[9]{};

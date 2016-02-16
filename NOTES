@@ -57,6 +57,27 @@ Done things in the upgrade
      There is also the need to look into an iterator for the class. Not sure
      if that will be useful.
 
+- DONE particle.h/.cc
+     For this, we will want to specify the requirements on the fields in
+     Source and Target types. This will be more of a documentation thing.
+     Actually, should these be specified by the Expansion instead? After all,
+     it is the expansion that will be using these.
+
+     Well, the SourceRef appears to be done. There is nothing much here in
+     SMP.
+
+     TargetRef is a little more involved. It has to be templatized, and will
+     also have to be modified to work for the no-copy version we are moving to.
+
+     This is done. TargetRef was split into two things. The first, TargetRef,
+     is just like SourceRef but for the targets instead. Then, the LCO part is
+     now in TargetLCO, which stores a TargetRef in its data. So we are doing
+     something potentially dangerous: the LCO will operate on data it does
+     not own. But it should be mostly okay. This is how it has to be to avoid
+     the pack/unpack for the targets.
+
+     Also, the .cc file ended up empty, so it is removed.
+
 Unknown:
  (Method related)
       The complication with this is that the specific methods need to use the
@@ -164,12 +185,6 @@ Unknown:
  (Evaluation)
  - evalutate.cc
  - node.h/.cc
- - particle.h/.cc
-      For this, we will want to specify the requirements on the fields in
-      Source and Target types. This will be more of a documentation thing.
-
-      Well, the SourceRef appears to be done. There is nothing much here in
-      SMP.
 
  (Setup and teardown of DASHMM)
  - initfini.cc
