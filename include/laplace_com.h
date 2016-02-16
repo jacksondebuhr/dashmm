@@ -37,7 +37,7 @@ namespace dashmm {
 
 struct LaplaceCOMData {
   int reserved;
-  //int type;
+  // int type;
   int n_digits; // unused
   double mtot;
   double xcom[3];
@@ -67,6 +67,7 @@ class LaplaceCOM {
   using contents_t = LaplaceCOMData;
   using source_t = Source;
   using target_t = Target;
+  using expansion_t = LaplaceCOM<Source, Target>;
 
   LaplaceCOM(Point center, int n_digits) {
     bytes_ = sizeof(LaplaceCOMData);
@@ -87,7 +88,7 @@ class LaplaceCOM {
   }
 
   LaplaceCOM(contents_t *ptr, size_t bytes, int n_digits)
-    : data_{ptr}, bytes_{sizeof(LaplaceCOMData)} { }
+      : data_{ptr}, bytes_{sizeof(LaplaceCOMData)} { }
 
   ~LaplaceCOM() {
     if (valid()) {
@@ -132,15 +133,25 @@ class LaplaceCOM {
     calc_Q(first, last);
   }
 
-  std::unique_ptr<LaplaceCOM> M_to_M(int from_child,
-                                     double s_size) const {
+  std::unique_ptr<expansion_t> S_to_L(Point center,
+                                      Source *first, Source *last,
+                                      double scale) const { }
+
+  std::unique_ptr<expansion_t> M_to_M(int from_child,
+                                      double s_size) const {
     assert(valid());
-    LaplaceCOM *temp = new LaplaceCOM(Point{0.0, 0.0, 0.0});
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0});
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
     temp->set_Q(data_->Q);
-    return std::unique_ptr<LaplaceCOM>{temp};
+    return std::unique_ptr<expansion_t>{temp};
   }
+
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
+                                      Index t_index) const { }
+
+  std::unique_ptr<expansion_t> L_to_L(int to_child,
+                                      double t_size) const { }
 
   void M_to_T(Target *first, Target *last, double scale) const {
     assert(valid());
@@ -168,6 +179,8 @@ class LaplaceCOM {
     }
   }
 
+  void L_to_T(Target *first, Target *last, double scale) const { }
+
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {
     for (auto targ = t_first; targ != t_last; ++targ) {
@@ -186,7 +199,7 @@ class LaplaceCOM {
     }
   }
 
-  void add_expansion(const LaplaceCOM *temp1) {
+  void add_expansion(const expansion_t *temp1) {
     double M2 = temp1->term(0).real();
     double D2[3] = {temp1->term(1).real(), temp1->term(2).real(),
                     temp1->term(3).real()};

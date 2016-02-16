@@ -36,7 +36,7 @@ namespace dashmm {
 
 struct LaplaceSPHData {
   int reserved;
-  //int type;
+  // int type;
   int n_digits;
   Point center;
   dcomplex_t expansion[];
@@ -49,6 +49,7 @@ class LaplaceSPH {
   using contents_t = LaplaceSPHData;
   using source_t = Source;
   using target_t = Target;
+  using expansion_t = LaplaceSPH<Source, Target>;
 
   LaplaceSPH(Point center, int n_digits) {
     LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
@@ -161,9 +162,9 @@ class LaplaceSPH {
     delete [] powers_ephi;
   }
 
-  std::unique_ptr<LaplaceSPH> S_to_L(Point center, Source *first,
-                                    Source *last, double scale) const {
-    LaplaceSPH *retval{new LaplaceSPH{center, n_digits_}};
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
+                                      Source *last, double scale) const {
+    expansion_t *retval{new expansion_t{center, n_digits_}};
     dcomplex_t *expansion = &retval->data_->expansion[0];
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -214,11 +215,11 @@ class LaplaceSPH {
     delete [] powers_r;
     delete [] powers_ephi;
 
-    return std::unique_ptr<LaplaceSPH>{retval};
+    return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<LaplaceSPH> M_to_M(int from_child,
-                                    double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child,
+                                      double s_size) const {
     // The function is called on th expansion of the child box and
     // s_size is the child box's size.
     double h = s_size / 2;
@@ -226,7 +227,7 @@ class LaplaceSPH {
     double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = data_->center.z() + (from_child < 4 ? h : -h);
 
-    LaplaceSPH *retval{new LaplaceSPH{Point{px, py, pz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits_}};
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -297,11 +298,11 @@ class LaplaceSPH {
 
     delete [] W2;
     delete [] powers_rho;
-    return std::unique_ptr<LaplaceSPH>{retval};
+    return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<LaplaceSPH> M_to_L(Index s_index, double s_size,
-                                    Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
+                                      Index t_index) const {
     int t2s_x = s_index.x() - t_index.x();
     int t2s_y = s_index.y() - t_index.y();
     int t2s_z = s_index.z() - t_index.z();
@@ -309,7 +310,7 @@ class LaplaceSPH {
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
 
-    LaplaceSPH *retval{new LaplaceSPH{Point{tx, ty, tz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits_}};
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
 
@@ -362,17 +363,17 @@ class LaplaceSPH {
 
     delete [] W2;
     delete [] powers_rho;
-    return std::unique_ptr<LaplaceSPH>{retval};
+    return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<LaplaceSPH> L_to_L(int to_child, double t_size) const {
+  std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
     // The function is called on the parent box and t_size is its child size
     double h = t_size / 2;
     double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
 
-    LaplaceSPH *retval{new LaplaceSPH{Point{cx, cy, cz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, n_digits_}};
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -444,7 +445,7 @@ class LaplaceSPH {
 
     delete [] W2;
     delete [] powers_rho;
-    return std::unique_ptr<LaplaceSPH>{retval};
+    return std::unique_ptr<expansion_t>{retval};
   }
 
   void M_to_T(Target *first, Target *last, double scale) const {
@@ -580,7 +581,7 @@ class LaplaceSPH {
     }
   }
 
-  void add_expansion(const LaplaceSPH *temp1) {
+  void add_expansion(const expansion_t *temp1) {
     dcomplex_t *expansion = &data_->expansion[0];
     for (size_t i = 0; i < temp1->size(); ++i)
       expansion[i] += temp1->term(i);

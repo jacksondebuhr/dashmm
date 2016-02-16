@@ -33,10 +33,9 @@ class Expansion {
   /// 'contents_t' so that internally DASHMM can cast message buffers into the
   /// correct type as soon as possible.
   using contents_t = ExpansionData;
-
-  //TODO: decide if this is actually useful
   using source_t = Source;
   using target_t = Target;
+  using expansion_t = Expansion<Source, Target>;
 
   /// Expansions must provide two constructors
   ///
@@ -157,9 +156,9 @@ class Expansion {
   /// \param scale - scaling factor
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<Expansion> S_to_L(Point center,
-                                    Source *first, Source *last,
-                                    double scale) const;
+  std::unique_ptr<expansion_t> S_to_L(Point center,
+                                      Source *first, Source *last,
+                                      double scale) const;
 
   /// Change center of a multipole expansion
   ///
@@ -172,8 +171,8 @@ class Expansion {
   /// \param s_size - the size of the child node
   ///
   /// \returns - The resulting multipole expansion
-  std::unique_ptr<Expansion> M_to_M(int from_child,
-                                    double s_size) const;
+  std::unique_ptr<expansion_t> M_to_M(int from_child,
+                                      double s_size) const;
 
   /// Convert a multipole to a local expansion
   ///
@@ -185,8 +184,8 @@ class Expansion {
   /// \param t_index - the index specifying the target node
   ///
   /// \returns - The resulting local expansion.
-  std::unique_ptr<Expansion> M_to_L(Index s_index, double s_size,
-                                    Index t_index) const;
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
+                                      Index t_index) const;
 
   /// Convert a local expansion to a local expansion for a child
   ///
@@ -198,8 +197,8 @@ class Expansion {
   /// \param t_size - the size of the child node.
   ///
   /// \returns - The resulting local expansion.
-  std::unique_ptr<Expansion> L_to_L(int to_child,
-                                    double t_size) const;
+  std::unique_ptr<expansion_t> L_to_L(int to_child,
+                                      double t_size) const;
 
   /// Apply a multipole expansion to a set of targets
   ///
@@ -229,5 +228,5 @@ class Expansion {
   /// Given another expansion (assumed to be of the same type), add the
   /// expansions together.
   ///
-  void add_expansion(const Expansion *temp1);
+  void add_expansion(const expansion_t *temp1);
 };

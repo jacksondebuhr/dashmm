@@ -34,14 +34,14 @@
 namespace dashmm {
 
 
-/// Reference to an Expansion
+/// Expansion LCO
 ///
-/// This object is a reference to data in GAS. As such, it can be passed by
-/// value without worry. The point of the object is to provide an interface
-/// to the GAS data without having to worry about the HPX-5 side of things,
-/// unless one is interested.
+/// This object is a thin wrapper around the address of a user-defined LCO
+/// whose data is the serialized form of an expansion. The main purpose of
+/// this object is to hide HPX-5 from end-users that are not interested in the
+/// details of HPX-5.
 ///
-/// As a reference, it attempts to have as many of the same methods as the
+/// This object attempts to have as many of the same methods as the
 /// underlying Expansion object. However, some of the function signatures are
 /// different, and some are missing.
 ///
@@ -268,6 +268,7 @@ class ExpansionLCO {
   /// Create a new expansion of the same type referred to by this object.
   ///
   /// \param center - the center point for the next expansion.
+  /// \param n_digits - the accuracy parameter for the expansion
   ///
   /// \returns - the resulting expansion.
   std::unique_ptr<expansion_t> get_new_expansion(Point center,
@@ -694,23 +695,6 @@ template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename, typename> class M>
 hpx_action_t ExpansionRef<S, T, E, M>::create_from_expansion_ = HPX_ACTION_NULL;
-
-
-/// Create a global version of a given expansion
-///
-/// This will export the local data represented by the given expansion into
-/// the global address space, and return an ExpansionLCO to that data. This
-/// mechanism relies on the release() method of the particular expansion to
-/// provide a packed representation of the relevant data for the expansion.
-/// For more details, see the DASHMM Advanced User Guide.
-///
-/// \param exp - the expansion to globalize
-/// \param where - an HPX address indicating an address which should be local
-///                to the globalized expansion
-///
-/// \returns - a reference to the resulting expansion
-ExpansionLCO globalize_expansion(std::unique_ptr<Expansion> exp,
-                                 hpx_addr_t where);
 
 
 } // namespace dashmm

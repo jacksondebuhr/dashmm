@@ -56,7 +56,6 @@ Done things in the upgrade
 
      There is also the need to look into an iterator for the class. Not sure
      if that will be useful.
-
 - DONE particle.h/.cc
      For this, we will want to specify the requirements on the fields in
      Source and Target types. This will be more of a documentation thing.
@@ -77,6 +76,22 @@ Done things in the upgrade
      the pack/unpack for the targets.
 
      Also, the .cc file ended up empty, so it is removed.
+- DONE expansion.h/.cc - These are basically going to be removed. The .cc is no
+     longer needed at all. The .h will be converted into documentation for
+     the concept of expansions for DASHMM.
+- DONE laplace_com.h/.cc - This was dead simple. Just had to make it a
+- DONE laplace_sph.h/.cc - This was also pretty simple. We changed things so
+    that the user will have to call laplace_sph_precompute() with their
+    accuracy before the expansion is initially created for a given accuracy.
+    Otherwise it should be pretty simple.
+
+    Also, I split the table stuff into a separate file. So that has increased
+    the file count, but the stuff that is not interesting to the user is now
+    taken out of the file. If a user wants to see it, they can go ahead and
+    look into it.
+- expansionref.h/.cc
+     This should be done. The .cc again disappeared. Some things are simplified
+     in the change. But then again, some things are worse to look at.
 
 Unknown:
  (Method related)
@@ -154,24 +169,6 @@ Unknown:
       Hopefully very little change here. If anything, a simplification.
  - fmm_method.h/.cc
       Hopefully very little change here. If anything, a simplification.
-
- (Expansion related)
- - DONE expansion.h/.cc - These are basically going to be removed. The .cc is no
-      longer needed at all. The .h will be converted into documentation for
-      the concept of expansions for DASHMM.
- - DONE laplace_com.h/.cc - This was dead simple. Just had to make it a
- - DONE laplace_sph.h/.cc - This was also pretty simple. We changed things so
-     that the user will have to call laplace_sph_precompute() with their
-     accuracy before the expansion is initially created for a given accuracy.
-     Otherwise it should be pretty simple.
-
-     Also, I split the table stuff into a separate file. So that has increased
-     the file count, but the stuff that is not interesting to the user is now
-     taken out of the file. If a user wants to see it, they can go ahead and
-     look into it.
-
- - expansionref.h/.cc
-
 
  (Built in methods and expansions)
  - builtins.h/.cc
