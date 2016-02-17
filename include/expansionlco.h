@@ -16,8 +16,8 @@
 #define __DASHMM_EXPANSION_REF_H__
 
 
-/// \file include/expansionref.h
-/// \brief Interface to Expansion reference object
+/// \file include/expansionlco.h
+/// \brief Interface to Expansion LCO
 
 
 #include <memory>

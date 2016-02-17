@@ -1,17 +1,5 @@
 NOTES for making this into a templatized thing:
 
-Perhaps what is happening is that we really do have one large dashmm
-object. And it also defines the array types for us.  Then, init can
-happen at the end of the constructor, and fini can happen at the
-destruction of the object. Of course, multiple dashmm instances would
-then compete to be the initializer and finalizer. So these might need to
-be instead user controlled things. That way multiple instances can be
-created and there is no hpx_init problem.
-
-I think this will be the model. One large object called dashmm. That will
-contain the user interface for everything. The question is, how to we
-keep it from becoming this huge damn file.
-
 Well, not quite. We shall have a dashmm namespace still. And there will
 be an evaluator type for that. I have worked out in anothertemplate under
 case_studies how to split things up and make them separable into multiple
@@ -150,7 +138,7 @@ Unknown:
       The question to answer, does this make for a strange imbalance with the
       Expansion concept? Probably not. They are already different, and will have
       different requirements. So why not go for it?
- - methodref.h/.cc
+ - DONE methodref.h/.cc
       Given that we are likely just going to copy the method type around, then
       there is no longer any reason for the method reference object, right? If
       we know the type, we can just copy it as needed. At worst, this will be
@@ -162,7 +150,7 @@ Unknown:
       methods, this could be a problem, but the current implementation is
       always pulling copies anyway. So this is perhaps not a big deal.
 
-      So this seems to be disappearing as well.
+      So this seems to be disappearing as well. Yeah. This is gone.
  - bh_method.h/.cc
       Hopefully very little change here. If anything, a simplification.
  - direct_method.h/.cc
@@ -178,6 +166,9 @@ Unknown:
 
       We will be able to get rid of the registration portions of this stuff.
       Actually, this file will disappear once the Method stuff is complete.
+
+      The .cc is definitely gone. Would it be useful to have the builtins.h
+      be a shortcut for inclusion of all built-in Expansion and Method types?
 
  (Evaluation)
  - evalutate.cc

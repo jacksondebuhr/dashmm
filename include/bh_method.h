@@ -20,8 +20,7 @@
 /// \brief Declaration of BHMethod
 
 
-#include "include/ids.h"
-#include "include/expansionref.h"
+#include "include/expansionlco.h"
 #include "include/method.h"
 #include "include/node.h"
 

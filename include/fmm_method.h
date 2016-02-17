@@ -20,8 +20,7 @@
 /// \brief Declaration of FMM Method
 
 
-#include "include/expansionref.h"
-#include "include/ids.h"
+#include "include/expansionlco.h"
 #include "include/index.h"
 #include "include/method.h"
 #include "include/node.h"
