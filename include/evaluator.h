@@ -118,7 +118,7 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         sourcenode_t::child_done_,
                         sourcenode_t::child_done_handler,
-                        HPX_POINTER, HPX_ADDR, HPX_ADDR, HPX_INT);
+                        HPX_POINTER, HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
                         sourcenode_t::partition_,
                         sourcenode_t::partition_handler,

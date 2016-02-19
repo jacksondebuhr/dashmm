@@ -145,7 +145,7 @@ class TargetNode {
   ///                 and targets are the same?
   /// \param consider - the list of source nodes in the consider list
   void partition(targetref_t targets, int limit,
-                 expansionlco_t expand, int which_child,
+                 int n_digits, int which_child,
                  bool same_sources_and_targets,
                  std::vector<sourcenode_t> consider) {
     hpx_addr_t done = hpx_lco_future_new(0);
@@ -157,7 +157,7 @@ class TargetNode {
     parms->same_sources_and_targets = same_sources_and_targets;
     parms->targets = targets;
     parms->limit = limit;
-    parms->expansion = expand;
+    parms->n_digits = n_digits;
     parms->which_child = which_child;
     parms->n_consider = consider.size();
     for (size_t i = 0; i < consider.size(); ++i) {
@@ -332,7 +332,7 @@ class TargetNode {
     bool same_sources_and_targets;
     targetref_t targets;
     int limit;
-    expansionlco_t expansion;
+    int n_digits;
     int which_child;
     int n_consider;
     hpx_addr_t consider[];
@@ -435,7 +435,7 @@ class TargetNode {
                     HPX_NULL, nullptr, 0);
     }
 
-    node->method.inherit(curr, parms->expansion, parms->which_child);
+    node->method.inherit(curr, parms->n_digits, parms->which_child);
     node->method.process(curr, consider, !refine);
 
     if (refine) {
@@ -511,7 +511,7 @@ class TargetNode {
       args->done = cdone;
       args->same_sources_and_targets = parms->same_sources_and_targets;
       args->limit = parms->limit;
-      args->expansion = parms->expansion;
+      args->expansion = parms->n_digits;
       args->n_consider = consider.size();
       for (size_t i = 0; i < consider.size(); ++i) {
         args->consider[i] = consider[i].data();;

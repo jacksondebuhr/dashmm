@@ -141,14 +141,14 @@ class SourceNode {
   /// \param type - the type of the expansion
   /// \param expand - global address to the prototype expansion data
   /// \param n_digits - accuracy of the expansion
-  hpx_addr_t partition(sourceref_t sources, int limit, expansionlco_t expand) {
+  hpx_addr_t partition(sourceref_t sources, int limit, int n_digits) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
 
     PartitionParams args{};
     args.partdone = retval;
     args.limit = limit;
-    args.expand = expand;
+    args.n_digits = n_digits;
     args.sources = sources;
     hpx_call(data_, partition_, HPX_NULL, &args, sizeof(args));
 
@@ -309,7 +309,7 @@ class SourceNode {
   struct PartitionParams {
     hpx_addr_t partdone;
     size_t limit;
-    expansionlco_t expand;
+    int n_digits;
     sourceref_t sources;
   };
 
@@ -377,11 +377,10 @@ class SourceNode {
   }
 
   static int child_done_handler(Data *node, hpx_addr_t partdone,
-                                hpx_addr_t expand, int n_digits) {
-    expansionlco_t expref{expand, n_digits};
+                                int n_digits) {
     sourcenode_t snode{hpx_thread_current_target()};
 
-    node->method.aggregate(snode, expref);
+    node->method.aggregate(snode, n_digits);
     node->expansion.finalize();
 
     hpx_lco_delete_sync(partdone);
@@ -401,7 +400,7 @@ class SourceNode {
       // and then set as the expansion for this node. It will be created with
       // initial data, and so there is no need to schedule any contributions to
       // the expansion.
-      node->method.generate(curr, parms->expand);
+      node->method.generate(curr, parms->n_digits);
 
       // We are done scheduling contributions to the expansion for this node.
       node->expansion.finalize();
@@ -468,7 +467,7 @@ class SourceNode {
     PartitionParams args{ };
     args.partdone = childpartdone;
     args.limit = parms->limit;
-    args.expand = parms->expand;
+    args.n_digits = parms->n_digits;
     for (int i = 0; i < 8; ++i) {
       if (!cparts[i].valid()) {
         node->child[i] = HPX_NULL;
