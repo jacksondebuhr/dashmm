@@ -80,6 +80,16 @@ Done things in the upgrade
 - expansionref.h/.cc
      This should be done. The .cc again disappeared. Some things are simplified
      in the change. But then again, some things are worse to look at.
+- DONE initfini.cc
+     This becomes very simple. Just wrappers around hpx_init and hpx_finalize.
+     Nothing to it.
+- DONE node.h/.cc
+     These will be templates over the STEM types. I think these may not be too
+     tough at the moment. I am not making it fully distributable, so some
+     issues can be ignored at the moment.
+
+     Nothing really here. The collect results thing for the TargetNode has
+     disappeared. Not a big deal.
 
 Unknown:
  (Method related)
@@ -151,6 +161,12 @@ Unknown:
       always pulling copies anyway. So this is perhaps not a big deal.
 
       So this seems to be disappearing as well. Yeah. This is gone.
+
+      Another thought. If we are ever in a situation where the Method is a large
+      object, perhaps it is just better to broadcast a copy to each locality
+      involved. Then, it is just a matter of providing a known access point to
+      that method during an evaluation. Though, this might complicate the
+      ability to run two methods simultaneously. If that is ever needed.
  - bh_method.h/.cc
       Hopefully very little change here. If anything, a simplification.
  - direct_method.h/.cc
@@ -172,15 +188,26 @@ Unknown:
 
  (Evaluation)
  - evalutate.cc
- - node.h/.cc
-
- (Setup and teardown of DASHMM)
- - initfini.cc
-      This becomes very simple. Just wrappers around hpx_init and hpx_finalize
 
  (Interface to Users)
  - dashmm.h
  - basic.h
+
+ (Recheck documentation)
+ - This will need to happen. The documentation and the code has started to
+   diverge somewhat. This means both the in-source stuff as well as the user
+   guides.
+
+ (Reorganize the directory)
+    Should we take the hint from HPX and reorganize things so that the includes
+    are obviously from DASHMM. So instead of include/file.h it would be
+    dashmm/file.h? Probably.
+
+    We would just rename include to dashmm?
+    We could then have a lib folder with the built library
+    We could leave src alone
+
+ (Do we do a minor release on the template stuff?)
 
 
 So the basic parameters are the source type, the target type, the expansion

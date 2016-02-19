@@ -61,8 +61,6 @@ class ExpansionLCO {
   using targetref_t = TargetRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
 
-  // TODO: This is a stupid name for the alias - perhaps something a little
-  // more obvious. this_type or whatever.
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
 
   /// Construct the expansion from a given global address.
@@ -317,8 +315,6 @@ class ExpansionLCO {
     *code = kContribute;
     hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
   }
-
-
 
 
  private:

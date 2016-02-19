@@ -31,6 +31,25 @@
 namespace dashmm {
 
 
+// TODO Consider to what extent we actually need to send the prototype
+// expansions around. It could be that we just need to send the n_digits
+// because now the type of the expansion is known.
+//
+// Likely we can do away with alot of that.
+//
+// Yeah it is a big goofy, especially now that I have changed the name to
+// ExpansionLCO. It makes it seem really silly. All that is needed is the
+// type and the n_digits. And the type is in the template, so we just need
+// n_digits.
+//
+// Let's get it working first and then come back to this?
+
+// TODO We should also work out a better way to deal with the consider list.
+// This packing and upacking into vectors is annoying. Sure the vector allows
+// for a much better means to handle additions, but it sucks.
+
+
+
 /// Abstract interface for Methods used in DASHMM
 ///
 /// This interface specifies the requirements for methods that a user
@@ -45,10 +64,10 @@ class Method {
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-
   using method_t = Method<Source, Target, Expansion>;
-
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
 
   /// Generate the expansion at the leaf of the source tree
   ///
@@ -67,7 +86,7 @@ class Method {
   /// \param curr - the current node of the source tree (will be a leaf)
   /// \param expand - a reference to a prototype expansion that can be used
   ///                 to generate the expansion for the given node.
-  void generate(SourceNode &curr, const expansionlco_t expand) const;
+  void generate(sourcenode_t &curr, const expansionlco_t expand) const;
 
   /// Combine expansions from children of an internal source node
   ///
@@ -81,7 +100,7 @@ class Method {
   /// \param curr - the current node of the source tree (will be internal)
   /// \param expand - a reference to a prototype expansion that can be used
   ///                 to aggregate the expansions of the given node's children.
-  void aggregate(SourceNode &curr, const expansionlco_t expand) const;
+  void aggregate(sourcenode_t &curr, const expansionlco_t expand) const;
 
   /// Inherit an expansion from a target node's parent
   ///
@@ -91,7 +110,7 @@ class Method {
   /// \param curr - the current node of the target tree
   /// \param expand - a reference to a prototype expansion that might be used
   /// \which_child - which child @p curr is of its parent
-  void inherit(TargetNode &curr, const expansionlco_t expand,
+  void inherit(targetnode_t &curr, const expansionlco_t expand,
                size_t which_child) const;
 
   /// Process the list of source nodes for a given target node
@@ -104,7 +123,7 @@ class Method {
   /// \param curr - the target node in question
   /// \param consider - a vector of the source nodes under consideration
   /// \param curr_is_leaf - indicates if @p curr is a leaf node
-  void process(TargetNode &curr, std::vector<SourceNode> &consider,
+  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
                bool curr_is_leaf) const;
 
   /// Decide if the node in the target tree should be refined
@@ -120,8 +139,8 @@ class Method {
   ///
   /// \returns - true if the refinement should proceed; false otherwise
   bool refine_test(bool same_sources_and_targets,
-                   const TargetNode &curr,
-                   const std::vector<SourceNode> &consider) const;
+                   const targetnode_t &curr,
+                   const std::vector<sourcenode_t> &consider) const;
 
  private:
   // Any data should be trivially copyable

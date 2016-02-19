@@ -57,6 +57,7 @@ template <typename Source>
 class SourceRef {
  public:
   using source_t = Source;
+  using sourceref_t = SourceRef<Source>;
 
   /// Default constructor.
   SourceRef()
@@ -95,16 +96,16 @@ class SourceRef {
   /// \param n - the number of entries in the slice
   ///
   /// \returns - the resulting SourceRef; may be invalid.
-  SourceRef slice(size_t offset, size_t n) const {
+  sourceref_t slice(size_t offset, size_t n) const {
     if (offset > n_) {
-      return SourceRef{HPX_NULL, 0, 0};
+      return sourceref_t{HPX_NULL, 0, 0};
     }
     if (offset + n > n_) {
-      return SourceRef{HPX_NULL, 0, 0};
+      return sourceref_t{HPX_NULL, 0, 0};
     }
     hpx_addr_t addr = hpx_addr_add(data_, sizeof(Source) * offset,
                                    sizeof(Source) * n_tot_);
-    return SourceRef{addr, n, n_tot_};
+    return sourceref_t{addr, n, n_tot_};
   }
 
   /// Returns the number of Source records referred to.
@@ -145,6 +146,7 @@ template <typename Target>
 class TargetRef {
  public:
   using target_t = Target;
+  using targetref_t = TargetRef<Target>;
 
   /// Default constructor.
   TargetRef()
@@ -183,16 +185,16 @@ class TargetRef {
   /// \param n - the number of entries in the slice
   ///
   /// \returns - the resulting TargetRef; may be invalid.
-  TargetRef slice(size_t offset, size_t n) const {
+  targetref_t slice(size_t offset, size_t n) const {
     if (offset > n_) {
-      return TargetRef{HPX_NULL, 0, 0};
+      return targetref_t{HPX_NULL, 0, 0};
     }
     if (offset + n > n_) {
-      return TargetRef{HPX_NULL, 0, 0};
+      return targetref_t{HPX_NULL, 0, 0};
     }
     hpx_addr_t addr = hpx_addr_add(data_, sizeof(Target) * offset,
                                    sizeof(Target) * n_tot_);
-    return TargetRef{addr, n, n_tot_};
+    return targetref_t{addr, n, n_tot_};
   }
 
   /// Returns the number of Source records referred to.
@@ -242,10 +244,10 @@ class TargetLCO {
   using targetref_t = TargetRef<Target>;
 
   /// Construct a default object
-  TargetLCO() : lco_{HPX_NULL} { }
+  TargetLCO() : lco_{HPX_NULL}, n_parts_{0} { }
 
   /// Construct from an existing LCO
-  explicit TargetLCO(hpx_addr_t data) : lco_{data} { }
+  TargetLCO(hpx_addr_t data, int n_parts) : lco_{data}, n_parts_{n_parts} { }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
   explicit TargetRef(targetref_t targets) {
@@ -253,6 +255,7 @@ class TargetLCO {
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
     assert(lco_ != HPX_NULL);
+    n_parts_ = targets.n();
   }
 
   /// Destroy the LCO. Use carefully!
@@ -265,6 +268,8 @@ class TargetLCO {
 
   /// The global address of the referred to object
   hpx_addr_t lco() const {return lco_;}
+
+  int n() const {return n_parts_;}
 
   /// Indicate to the underlying LCO that all operations have been scheduled
   void finalize() const {
@@ -469,6 +474,7 @@ class TargetLCO {
 
   // The actual data for the object
   hpx_addr_t lco_;
+  int n_parts_;
 
   // the function identifiers
   static hpx_action_t init_;

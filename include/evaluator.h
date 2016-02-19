@@ -32,6 +32,8 @@ class Evaluator {
   // Related type aliases to avoid clutter
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
 
   Evaluator() {
     // TODO: register all actions in the system
@@ -103,6 +105,38 @@ class Evaluator {
                         expansionlco_t::create_from_expansion_,
                         expansionlco_t::create_from_expansion_handler,
                         HPX_POINTER, HPX_SIZE_T);
+
+    // Source Node related
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        sourcenode_t::self_delete_,
+                        sourcenode_t::self_delete_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        sourcenode_t::node_delete_,
+                        sourcenode_t::node_delete_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
+                        sourcenode_t::child_done_,
+                        sourcenode_t::child_done_handler,
+                        HPX_POINTER, HPX_ADDR, HPX_ADDR, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
+                        sourcenode_t::partition_,
+                        sourcenode_t::partition_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+
+    // Target Node related
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        targetnode_t::self_delete_,
+                        targetnode_t::self_delete_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
+                        targetnode_t::node_delete_,
+                        targetnode_t::node_delete_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
+                        targetnode_t::partition_,
+                        targetnode_t::partition_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
   }
  private:
 };
