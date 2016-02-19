@@ -31,19 +31,6 @@
 namespace dashmm {
 
 
-// TODO Consider to what extent we actually need to send the prototype
-// expansions around. It could be that we just need to send the n_digits
-// because now the type of the expansion is known.
-//
-// Likely we can do away with alot of that.
-//
-// Yeah it is a big goofy, especially now that I have changed the name to
-// ExpansionLCO. It makes it seem really silly. All that is needed is the
-// type and the n_digits. And the type is in the template, so we just need
-// n_digits.
-//
-// Let's get it working first and then come back to this?
-
 // TODO We should also work out a better way to deal with the consider list.
 // This packing and upacking into vectors is annoying. Sure the vector allows
 // for a much better means to handle additions, but it sucks.
@@ -86,7 +73,7 @@ class Method {
   /// \param curr - the current node of the source tree (will be a leaf)
   /// \param expand - a reference to a prototype expansion that can be used
   ///                 to generate the expansion for the given node.
-  void generate(sourcenode_t &curr, const expansionlco_t expand) const;
+  void generate(sourcenode_t &curr, int n_digits) const;
 
   /// Combine expansions from children of an internal source node
   ///
@@ -100,7 +87,7 @@ class Method {
   /// \param curr - the current node of the source tree (will be internal)
   /// \param expand - a reference to a prototype expansion that can be used
   ///                 to aggregate the expansions of the given node's children.
-  void aggregate(sourcenode_t &curr, const expansionlco_t expand) const;
+  void aggregate(sourcenode_t &curr, int n_digits) const;
 
   /// Inherit an expansion from a target node's parent
   ///
@@ -110,8 +97,7 @@ class Method {
   /// \param curr - the current node of the target tree
   /// \param expand - a reference to a prototype expansion that might be used
   /// \which_child - which child @p curr is of its parent
-  void inherit(targetnode_t &curr, const expansionlco_t expand,
-               size_t which_child) const;
+  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const;
 
   /// Process the list of source nodes for a given target node
   ///

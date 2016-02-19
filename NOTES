@@ -90,6 +90,34 @@ Done things in the upgrade
 
      Nothing really here. The collect results thing for the TargetNode has
      disappeared. Not a big deal.
+- DONE methodref.h/.cc
+     Given that we are likely just going to copy the method type around, then
+     there is no longer any reason for the method reference object, right? If
+     we know the type, we can just copy it as needed. At worst, this will be
+     a few numbers. Now, since this is a user type, HPX-5 will need to always
+     use a marshalled action if this is being sent in a so on. But whatever.
+
+     For BH, we are going to have a double to send around. For FMM, there is
+     nothing, so it will be 1 byte (or a larger aligned thing). For fancier
+     methods, this could be a problem, but the current implementation is
+     always pulling copies anyway. So this is perhaps not a big deal.
+
+     So this seems to be disappearing as well. Yeah. This is gone.
+
+     Another thought. If we are ever in a situation where the Method is a large
+     object, perhaps it is just better to broadcast a copy to each locality
+     involved. Then, it is just a matter of providing a known access point to
+     that method during an evaluation. Though, this might complicate the
+     ability to run two methods simultaneously. If that is ever needed.
+- DONE bh_method.h/.cc
+     Hopefully very little change here. If anything, a simplification.
+     Once again, dead simple.
+- DONE direct_method.h/.cc
+     Hopefully very little change here. If anything, a simplification.
+     This was stupid easy.
+- DONE fmm_method.h/.cc
+     Hopefully very little change here. If anything, a simplification.
+     This also was easy, but it is worth Bo taking a look over it.
 
 Unknown:
  (Method related)
@@ -148,31 +176,7 @@ Unknown:
       The question to answer, does this make for a strange imbalance with the
       Expansion concept? Probably not. They are already different, and will have
       different requirements. So why not go for it?
- - DONE methodref.h/.cc
-      Given that we are likely just going to copy the method type around, then
-      there is no longer any reason for the method reference object, right? If
-      we know the type, we can just copy it as needed. At worst, this will be
-      a few numbers. Now, since this is a user type, HPX-5 will need to always
-      use a marshalled action if this is being sent in a so on. But whatever.
 
-      For BH, we are going to have a double to send around. For FMM, there is
-      nothing, so it will be 1 byte (or a larger aligned thing). For fancier
-      methods, this could be a problem, but the current implementation is
-      always pulling copies anyway. So this is perhaps not a big deal.
-
-      So this seems to be disappearing as well. Yeah. This is gone.
-
-      Another thought. If we are ever in a situation where the Method is a large
-      object, perhaps it is just better to broadcast a copy to each locality
-      involved. Then, it is just a matter of providing a known access point to
-      that method during an evaluation. Though, this might complicate the
-      ability to run two methods simultaneously. If that is ever needed.
- - bh_method.h/.cc
-      Hopefully very little change here. If anything, a simplification.
- - direct_method.h/.cc
-      Hopefully very little change here. If anything, a simplification.
- - fmm_method.h/.cc
-      Hopefully very little change here. If anything, a simplification.
 
  (Built in methods and expansions)
  - builtins.h/.cc
@@ -197,6 +201,9 @@ Unknown:
  - This will need to happen. The documentation and the code has started to
    diverge somewhat. This means both the in-source stuff as well as the user
    guides.
+
+ (Go back through and address the includes. I likely have not done this as I
+  went through this.)
 
  (Reorganize the directory)
     Should we take the hint from HPX and reorganize things so that the includes

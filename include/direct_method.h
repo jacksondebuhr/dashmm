@@ -28,55 +28,70 @@
 namespace dashmm {
 
 
-class Direct : public Method {
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion>
+class Direct {
  public:
-  Direct() : local_{nullptr} {
-    local_ = reinterpret_cast<MethodSerial *>(new char [sizeof(MethodSerial)]);
-    assert(local_);
-    local_->type = kMethodDirect;
-    local_->size = 0;
+  using source_t = Source;
+  using target_t = Target;
+  using expansion_t = Expansion<Source, Target>;
+  using method_t = Direct<Source, Target, Expansion>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, Direct>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, Direct>;
+
+  void generate(sourcenode_t &curr, int n_digits) const {
+    curr.set_expansion(std::unique_ptr<expansion_t>{
+        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
+      });
   }
 
-  ~Direct() {
-    if (local_) {
-      delete [] local_;
-      local_ = nullptr;
-    }
+  void aggregate(sourcenode_t &curr, int n_digits) const { }
+
+  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {
+    curr.set_expansion(std::unique_ptr<expansion_t>{
+        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
+      });
   }
 
-  MethodSerial *release() override {
-    MethodSerial *retval = local_;
-    local_ = nullptr;
-    return retval;
+  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
+               bool curr_is_leaf) const {
+    std::vector<sourcenode_t> newcons{ };
+    do {
+      for (auto i = consider.begin(); i != consider.end(); ++i) {
+        if (i->is_leaf()) {
+          if (curr_is_leaf) {
+            expansionlco_t expand = i->expansion();
+            targetlco_t targets = curr.parts();
+            sourceref_t sources = i->parts();
+            expand.S_to_T(sources, targets);
+          } else {
+            newcons.push_back(*i);
+          }
+        } else {
+          for (size_t j = 0; j < 8; ++j) {
+            sourcenode_t kid = i->child(j);
+            if (kid.is_valid()) {
+              newcons.push_back(kid);
+            }
+          }
+        }
+      }
+
+      consider = std::move(newcons);
+      newcons.clear();
+    } while (curr_is_leaf && !consider.empty());
   }
 
-  size_t bytes() const override {
-    return sizeof(MethodSerial);
-  }
-
-  int type() const override {return kMethodDirect;}
-
-  bool compatible_with(const Expansion *expand) const override {return true;}
-
-  void generate(SourceNode &curr, const ExpansionRef expand) const override;
-  void aggregate(SourceNode &curr, const ExpansionRef expand) const override;
-  void inherit(TargetNode &curr, const ExpansionRef expand,
-               size_t which_child) const override;
-  void process(TargetNode &curr, std::vector<SourceNode> &consider,
-               bool curr_is_leaf) const override;
-
-  //One option would be to cause this test to always return false, meaning the
+  // One option would be to cause this test to always return false, meaning the
   // trees would not refine at all, and thus create two huge nodes, and then
   // run S->T for the given expansion. However, we can get some parallelism if
   // we go ahead and refine where we can. Just because we are using a dumb
   // method, does not mean we have to do that dumb thing in serial.
-  bool refine_test(bool same_sources_and_targets, const TargetNode &curr,
-                   const std::vector<SourceNode> &consider) const override {
+  bool refine_test(bool same_sources_and_targets, const targetnode_t &curr,
+                   const std::vector<sourcenode_t> &consider) const {
     return true;
   }
-
- private:
-  MethodSerial *local_;
 };
 
 
