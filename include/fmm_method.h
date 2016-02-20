@@ -22,8 +22,10 @@
 
 #include "include/expansionlco.h"
 #include "include/index.h"
-#include "include/method.h"
-#include "include/node.h"
+#include "include/sourcenode.h"
+#include "include/sourceref.h"
+#include "include/targetlco.h"
+#include "include/targetnode.h"
 
 
 namespace dashmm {
@@ -40,8 +42,10 @@ class FMM {
   using expansion_t = Expansion<Source, Target>;
   using method_t = FMM<Source, Target, Expansion>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM>;
+  using sourceref_t = SourceRef<Source>;
   using sourcenode_t = SourceNode<Source, Target, Expansion, FMM>;
   using targetnode_t = TargetNode<Source, Target, Expansion, FMM>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM>;
 
   void generate(sourcenode_t &curr, int n_digits) const {
     curr.set_expansion(std::unique_ptr<expansion_t>{

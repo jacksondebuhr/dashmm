@@ -26,8 +26,10 @@
 #include <hpx/hpx.h>
 
 #include "include/index.h"
-#include "include/particle.h"
 #include "include/point.h"
+#include "include/sourceref.h"
+#include "include/targetlco.h"
+#include "include/targetref.h"
 #include "include/types.h"
 
 
@@ -301,7 +303,6 @@ class ExpansionLCO {
   }
 
 
-  // TODO: Can we change this so that the user can just pass in the expansion?
   /// Contribute to the referred expansion
   ///
   /// This will setup the given @p payload with the correct internal code
@@ -463,8 +464,6 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  // TODO: Why is the different than above? We do in place work in S->M but
-  // not here.
   static int s_to_l_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {

@@ -71,12 +71,20 @@ class Point {
     return sqrt(pos_[0] * pos_[0] + pos_[1] * pos_[1] + pos_[2] * pos_[2]);
   }
 
+  /// Compute lower bound
+  ///
+  /// This computes the lower bound of this point and the argument, and
+  /// sets this object to be the lower bound.
   void lower_bound(const Point &other) {
     if (other.x() < pos_[0]) pos_[0] = other.x();
     if (other.y() < pos_[1]) pos_[1] = other.y();
     if (other.z() < pos_[2]) pos_[2] = other.z();
   }
 
+  /// Compute upper bound
+  ///
+  /// This computes the upper bound of this point and the argument, and
+  /// sets this object to be the upper bound.
   void upper_bound(const Point &other) {
     if (other.x() > pos_[0]) pos_[0] = other.x();
     if (other.y() > pos_[1]) pos_[1] = other.y();

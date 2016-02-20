@@ -22,8 +22,6 @@
 
 #include <complex>
 
-#include <hpx/hpx.h>
-
 
 namespace dashmm {
 

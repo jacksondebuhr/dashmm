@@ -82,7 +82,7 @@ class LaplaceSPH {
     }
   }
 
-  void *release() {
+  contents_t *release() {
     LaplaceSPHData *retval = data_;
     data_ = nullptr;
     return retval;

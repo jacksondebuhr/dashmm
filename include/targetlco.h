@@ -12,205 +12,15 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_PARTICLE_H__
-#define __DASHMM_PARTICLE_H__
+#ifndef __DASHMM_TARGET_LCO_H__
+#define __DASHMM_TARGET_LCO_H__
 
 
-/// \file include/particle.h
-/// \brief Source and Target particle types.
-
-#include <cassert>
-#include <cstring>
-
-#include <complex>
-
-#include <hpx/hpx.h>
-
-#include "include/point.h"
-#include "include/types.h"
+/// \file include/targetlco.h
+/// \brief TargetLCO object definition
 
 
 namespace dashmm {
-
-
-/// Source concept in DASHMM
-///
-/// To qualify as a Source for DASHMM, a type should be trivially copyable,
-/// and should provide at least two members accessible by name:
-///
-/// Point position;
-/// double charge;
-///
-///
-/// NOTE: For specific cases, you can add further data to that used by the
-/// Expansions. The member will need to exist, or there will be some compilation
-/// error.
-
-
-
-/// Reference to a set of sources
-///
-/// This is a reference object, meaning that it refers to the Source data in
-/// the GAS, but does not contain those data. As such, one can pass this
-/// class by value without worry.
-template <typename Source>
-class SourceRef {
- public:
-  using source_t = Source;
-  using sourceref_t = SourceRef<Source>;
-
-  /// Default constructor.
-  SourceRef()
-      : data_{HPX_NULL}, n_{0}, n_tot_{0} { }
-
-  /// Construct from a specific address and count.
-  SourceRef(hpx_addr_t data, size_t n, size_t n_tot)
-      : data_{data}, n_{n}, n_tot_{n_tot} { }
-
-  /// Destroy the particle data in GAS.
-  ///
-  /// This is needed because this object is a reference, and the destruction of
-  /// this object only destroys the reference.
-  ///
-  /// Note that slices of another SourceRef should not be destroyed.
-  /// TODO: Add some logic to prevent that? Another member is_slice_?
-  void destroy() {
-    if (data_ != HPX_NULL) {
-      hpx_gas_free_sync(data_);
-      data_ = HPX_NULL;
-      n_ = 0;
-    }
-  }
-
-  /// Returns if the reference is valid
-  bool valid() const {return data_ != HPX_NULL;}
-
-  /// Get a reference to a slide of the current reference
-  ///
-  /// This will return a SourceRef to a consecutive chunk of the records that
-  /// begin at an offset from the start of this reference and that will contain
-  /// n entries. If the input arguments to this method are invalid, then an
-  /// invalid reference will be returned.
-  ///
-  /// \param offset - the offset from the start of this reference
-  /// \param n - the number of entries in the slice
-  ///
-  /// \returns - the resulting SourceRef; may be invalid.
-  sourceref_t slice(size_t offset, size_t n) const {
-    if (offset > n_) {
-      return sourceref_t{HPX_NULL, 0, 0};
-    }
-    if (offset + n > n_) {
-      return sourceref_t{HPX_NULL, 0, 0};
-    }
-    hpx_addr_t addr = hpx_addr_add(data_, sizeof(Source) * offset,
-                                   sizeof(Source) * n_tot_);
-    return sourceref_t{addr, n, n_tot_};
-  }
-
-  /// Returns the number of Source records referred to.
-  size_t n() const {return n_;}
-
-  /// Returns the total number of Source records.
-  size_t n_tot() const {return n_tot_;}
-
-  /// Returns the global address of the referred to data.
-  hpx_addr_t data() const {return data_;}
-
- private:
-  hpx_addr_t data_;
-  size_t n_;
-  size_t n_tot_;
-};
-
-
-
-/// Target concept in DASHMM
-///
-/// To work as a Target type in DASHMM, a type must be trivially copyable and
-/// must provide two members:
-///
-/// Point position
-/// std::complex<double> phi
-///
-/// NOTE: Specific expansions may change these requirements. Please see the
-/// documentation about the Expansion of interest.
-
-
-/// Reference to a set of targets
-///
-/// This is a reference object, meaning that it refers to the Target data in
-/// the GAS, but does not contain those data. As such, one can pass this
-/// class by value without worry.
-template <typename Target>
-class TargetRef {
- public:
-  using target_t = Target;
-  using targetref_t = TargetRef<Target>;
-
-  /// Default constructor.
-  TargetRef()
-      : data_{HPX_NULL}, n_{0}, n_tot_{0} { }
-
-  /// Construct from a specific address and count.
-  TargetRef(hpx_addr_t data, size_t n, size_t n_tot)
-      : data_{data}, n_{n}, n_tot_{n_tot} { }
-
-  /// Destroy the particle data in GAS.
-  ///
-  /// This is needed because this object is a reference, and the destruction of
-  /// this object only destroys the reference.
-  ///
-  /// Note that slices of another TargetRef should not be destroyed.
-  /// TODO: Add some logic to prevent that? Another member is_slice_?
-  void destroy() {
-    if (data_ != HPX_NULL) {
-      hpx_gas_free_sync(data_);
-      data_ = HPX_NULL;
-      n_ = 0;
-    }
-  }
-
-  /// Returns if the reference is valid
-  bool valid() const {return data_ != HPX_NULL;}
-
-  /// Get a reference to a slide of the current reference
-  ///
-  /// This will return a TargetRef to a consecutive chunk of the records that
-  /// begin at an offset from the start of this reference and that will contain
-  /// n entries. If the input arguments to this method are invalid, then an
-  /// invalid reference will be returned.
-  ///
-  /// \param offset - the offset from the start of this reference
-  /// \param n - the number of entries in the slice
-  ///
-  /// \returns - the resulting TargetRef; may be invalid.
-  targetref_t slice(size_t offset, size_t n) const {
-    if (offset > n_) {
-      return targetref_t{HPX_NULL, 0, 0};
-    }
-    if (offset + n > n_) {
-      return targetref_t{HPX_NULL, 0, 0};
-    }
-    hpx_addr_t addr = hpx_addr_add(data_, sizeof(Target) * offset,
-                                   sizeof(Target) * n_tot_);
-    return targetref_t{addr, n, n_tot_};
-  }
-
-  /// Returns the number of Source records referred to.
-  size_t n() const {return n_;}
-
-  /// Returns the total number of Source records.
-  size_t n_tot() const {return n_tot_;}
-
-  /// Returns the global address of the referred to data.
-  hpx_addr_t data() const {return data_;}
-
- private:
-  hpx_addr_t data_;
-  size_t n_;
-  size_t n_tot_;
-};
 
 
 /// Target LCO
@@ -228,9 +38,8 @@ class TargetRef {
 /// interact with the object very often. Mostly they will pass objects of this
 /// type to ExpansionLCO objects.
 ///
-/// NOTE: We need all four here because otherwise, we would possibly have two
-/// methods for the same Source, Target, Expansion triple try to register the
-/// same functions. So that is no good. So we have to have all four.
+/// This is a template class parameterized by the Source, Target, Expansion
+/// and Method types for a particular evaluation of DASHMM.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename, typename> class Method>
@@ -502,4 +311,4 @@ hpx_action_t TargetLCO<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
 } // namespace dashmm
 
 
-#endif // __DASHMM_PARTICLE_H__
+#endif // __DASHMM_TARGET_LCO_H__

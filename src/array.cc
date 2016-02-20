@@ -13,24 +13,18 @@
 
 
 /// \file src/array.cc
-/// \brief Implementation of DASHMM array object.
+/// \brief Implementation of DASHMM Array actions.
 
 
 #include <cassert>
 #include <cstring>
 
-#include "hpx/hpx.h"
+#include <hpx/hpx.h>
 
 #include "include/array.h"
-#include "include/types.h"
 
 
 namespace dashmm {
-
-
-/////////////////////////////////////////////////////////////////////
-// Actions
-/////////////////////////////////////////////////////////////////////
 
 
 /// Action to allocate an array.

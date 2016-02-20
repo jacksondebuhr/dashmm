@@ -97,7 +97,7 @@ class LaplaceCOM {
     }
   }
 
-  void *release() {
+  contents_t *release() {
     LaplaceCOMData *retval = data_;
     data_ = nullptr;
     return retval;

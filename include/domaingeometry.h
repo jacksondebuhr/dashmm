@@ -42,8 +42,13 @@ class DomainGeometry {
   /// Given the low and high corners of a rectangular region, this constructor
   /// will initialize the DomainGeometry to be the cube that shares a center
   /// with the specified rectangular region, but which contains the entire
-  /// rectangle.
-  DomainGeometry(Point low_rect, Point high_rect);
+  /// rectangle. Optionally, one can increase the size of the resulting domain
+  /// by some factor.
+  ///
+  /// \param low_rect - the low corner of the rectangular region
+  /// \param high_rect - the high corner of the rectangular region
+  /// \param factor - factor by which to enlarge the resulting cube
+  DomainGeometry(Point low_rect, Point high_rect, double factor = 1.0);
 
   /// The side length of the cube represented by this object
   double size() const {return size_;}

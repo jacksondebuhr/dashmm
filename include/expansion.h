@@ -53,8 +53,7 @@ class Expansion {
   /// is needed, but the speicif data for the expansion is not. The exemplar of
   /// this use is to perform an S->T operation.
   ///
-  /// Again, n_digits is required, but could be ignored.
-  ///
+  /// Again, n_digits is a required argument, but it can be ignored.
   Expansion(contents_t *ptr, size_t bytes, int n_digits)
 
   /// The destructor should delete the allocated memory of the object. In the
@@ -88,7 +87,7 @@ class Expansion {
   /// to memory allocated on the heap (cast from new char [size]). And then
   /// release() will just return that pointer, and set this objects member to
   /// nullptr.
-  void *release();
+  contents_t *release();
 
   /// The size in bytes of the serialized expansion data
   size_t bytes() const;
@@ -124,13 +123,6 @@ class Expansion {
   dcomplex_t term(size_t i) const;
 
 
-  /// In the following operators, it is not required that all are implemented.
-  /// Only those being used by the Method are needed. In practice, all of the
-  /// operators with an 'M' in their title are always implemented. And only for
-  /// FMM-like methods are the 'L' operations needed. Of course, S->T is always
-  /// required.
-
-
   /// Create a multipole expansion for a given set of source points
   ///
   /// This uses the given sources to create a multipole expansion centered
@@ -141,7 +133,7 @@ class Expansion {
   /// \param first - address of the first source
   /// \param last - address of one past the last source
   /// \param scale - scaling factor
-  void S_to_M(Point center, Source *first, Source *last,
+  void S_to_M(Point center, source_t *first, source_t *last,
               double scale) const;
 
   /// Create a local expansion for a given set of source points
@@ -157,7 +149,7 @@ class Expansion {
   ///
   /// \returns - The resulting local expansion
   std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      Source *first, Source *last,
+                                      source_t *first, source_t *last,
                                       double scale) const;
 
   /// Change center of a multipole expansion
@@ -205,14 +197,14 @@ class Expansion {
   /// \param first - the first target point
   /// \param last - one past the last target point
   /// \param scale - scaling factor
-  void M_to_T(Target *first, Target *last, double scale) const;
+  void M_to_T(target_t *first, target_t *last, double scale) const;
 
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
   /// \param scale - scaling factor
-  void L_to_T(Target *first, Target *last, double scale) const;
+  void L_to_T(target_t *first, target_t *last, double scale) const;
 
   /// Compute the direct interaction between sources and targets
   ///
@@ -220,8 +212,8 @@ class Expansion {
   /// \param s_last - one past the last source point
   /// \param t_first - the first target point
   /// \param t_last - one past the last target point
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const;
+  void S_to_T(source_t *s_first, source_t *s_last,
+              target_t *t_first, target_t *t_last) const;
 
   /// Add an expansion to this expansion
   ///

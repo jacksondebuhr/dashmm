@@ -17,12 +17,19 @@
 
 
 /// \file include/bh_method.h
-/// \brief Declaration of BHMethod
+/// \brief Declaration of BH method
 
+
+#include <cstdlib>
+
+#include <vector>
 
 #include "include/expansionlco.h"
-#include "include/method.h"
-#include "include/node.h"
+#include "include/point.h"
+#include "include/sourcenode.h"
+#include "include/sourceref.h"
+#include "include/targetlco.h"
+#include "include/targetnode.h"
 
 
 namespace dashmm {
@@ -31,8 +38,11 @@ namespace dashmm {
 /// A Method to implement classic Barnes-Hut
 ///
 /// It uses the simple critical angle criterion to decide if a given expansion
-/// is usable. There is little that needs explanation in this class, as the
-/// methods are essentially just those of the abstract base class Method.
+/// is usable. If the point of interest is a distance D from the multipole
+/// moment center, and the size of the node for which that multipole moment
+/// applies is L, then the moments are usable if L / D < theta_c, where
+/// theta_c is the critical angle supplied when an instance of this method
+/// is constructed.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion>
 class BH {
@@ -42,13 +52,18 @@ class BH {
   using expansion_t = Expansion<Source, Target>;
   using method_t = BH<Source, Target, Expansion>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, BH>;
   using sourcenode_t = SourceNode<Source, Target, Expansion, BH>;
   using targetnode_t = TargetNode<Source, Target, Expansion, BH>;
+  using sourceref_t = SourceRef<Source>;
 
+  /// The BH Method requires a critical angle
   BH(double theta) : theta_{theta} {  }
 
+  /// Return the critical angle
   double theta() const {return theta_;}
 
+  /// In generate, BH will call S->M on the sources in a leaf node.
   void generate(sourcenode_t &curr, int n_digits) const {
     double scale = 0.0;
     curr.set_expansion(std::unique_ptr<expansion_t>{
@@ -59,6 +74,8 @@ class BH {
     currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, scale);
   }
 
+  /// In aggregate, BH will call M->M to combine moments from the children
+  /// of the current node.
   void aggregate(sourcenode_t &curr, int n_digits) const {
     curr.set_expansion(std::unique_ptr<expansion_t>{
         new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
@@ -73,12 +90,14 @@ class BH {
     }
   }
 
+  /// In inherit, BH does nothing.
   void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {
     curr.set_expansion(std::unique_ptr<expansion_t>{
         new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
       });
   }
 
+  /// In process, BH tests and uses multipole expansions.
   void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
                bool curr_is_leaf) const {
     std::vector<sourcenode_t> newcons{ };
@@ -172,6 +191,7 @@ class BH {
   }
 
  private:
+  /// The critical angle for this instance of the BH method.
   double theta_;
 };
 

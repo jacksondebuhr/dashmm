@@ -1,164 +1,31 @@
-NOTES for making this into a templatized thing:
+OPEN QUESTIONS and TODO
+TODO: Make the Array type work from inside HPX-5 threads also
+TODO: Merge SourceRef and TargetRef. They are really just the same thing
+      with different names. Call is ArrayRef?
+TODO: Can we make the various expansion types define their input and output
+      types, so that the users can just get it right? So LaplaceCOM might
+      using input_t = double, output_t = std::complex<double>?
+      NOTE: this does not clear up the issue of naming it correctly. So
+      perhaps this is nothing too great. Also, it is not clear how this would
+      work when the Expansion will depend on the Source/Target type, which
+      depends on the Expansion type through this information.
 
-Well, not quite. We shall have a dashmm namespace still. And there will
-be an evaluator type for that. I have worked out in anothertemplate under
-case_studies how to split things up and make them separable into multiple
-files. So we are going to go that route. That being said, there is
-still the possibility of a very large file (for the evaluator for
-instance). Perhaps we shall take some of the internal code out and put
-it into .inc files. But perhaps not. Anyway, it will get out of hand
-pretty easily.
-
-We shall want some good documentation anyway, so perhaps we just leave all
-the gore in and if the user really goes poking around, they will be in
-for a shock.
-
-
-Some things will not need any change:
- - DONE index.h is fine
- - DONE point.h/.cc is fine
- - DONE types.h is fine
- - DONE reductionops.h/.cc is also fine
- - DONE domaingeometry.h/.cc is fine
-
-Some things are no longer needed:
- - DONE ids.h is now not needed
-
-Done things in the upgrade
- - DONE array.h/.cc
-     I think this becomes templatized, but the actions do not need to be
-     changed really. Perhaps these even become objects. So the user gets
-     an array<Source> instead of calling allocate_array and getting an
-     object handle. The resulting type is the handle.  The question is if there
-     is some benefit for the actions to know the underlying type. Actually,
-     there is benefit for the action to be type oblivious. That way we do
-     not have to have all possible array types register with the runtime.
-
-     The result here is that there is now a template class that deals with
-     arrays for the user. The object handle is now obsolete. It is removed.
-
-     The actions for this are unchanged from the 0.5 version.
-
-     There will need to be some potential additions to the class as the use
-     cases are extended.
-
-     There is also the need to look into an iterator for the class. Not sure
-     if that will be useful.
-- DONE particle.h/.cc
-     For this, we will want to specify the requirements on the fields in
-     Source and Target types. This will be more of a documentation thing.
-     Actually, should these be specified by the Expansion instead? After all,
-     it is the expansion that will be using these.
-
-     Well, the SourceRef appears to be done. There is nothing much here in
-     SMP.
-
-     TargetRef is a little more involved. It has to be templatized, and will
-     also have to be modified to work for the no-copy version we are moving to.
-
-     This is done. TargetRef was split into two things. The first, TargetRef,
-     is just like SourceRef but for the targets instead. Then, the LCO part is
-     now in TargetLCO, which stores a TargetRef in its data. So we are doing
-     something potentially dangerous: the LCO will operate on data it does
-     not own. But it should be mostly okay. This is how it has to be to avoid
-     the pack/unpack for the targets.
-
-     Also, the .cc file ended up empty, so it is removed.
-- DONE expansion.h/.cc - These are basically going to be removed. The .cc is no
-     longer needed at all. The .h will be converted into documentation for
-     the concept of expansions for DASHMM.
-- DONE laplace_com.h/.cc - This was dead simple. Just had to make it a
-- DONE laplace_sph.h/.cc - This was also pretty simple. We changed things so
-    that the user will have to call laplace_sph_precompute() with their
-    accuracy before the expansion is initially created for a given accuracy.
-    Otherwise it should be pretty simple.
-
-    Also, I split the table stuff into a separate file. So that has increased
-    the file count, but the stuff that is not interesting to the user is now
-    taken out of the file. If a user wants to see it, they can go ahead and
-    look into it.
-- expansionref.h/.cc
-     This should be done. The .cc again disappeared. Some things are simplified
-     in the change. But then again, some things are worse to look at.
-- DONE initfini.cc
-     This becomes very simple. Just wrappers around hpx_init and hpx_finalize.
-     Nothing to it.
-- DONE node.h/.cc
-     These will be templates over the STEM types. I think these may not be too
-     tough at the moment. I am not making it fully distributable, so some
-     issues can be ignored at the moment.
-
-     Nothing really here. The collect results thing for the TargetNode has
-     disappeared. Not a big deal.
-- DONE methodref.h/.cc
-     Given that we are likely just going to copy the method type around, then
-     there is no longer any reason for the method reference object, right? If
-     we know the type, we can just copy it as needed. At worst, this will be
-     a few numbers. Now, since this is a user type, HPX-5 will need to always
-     use a marshalled action if this is being sent in a so on. But whatever.
-
-     For BH, we are going to have a double to send around. For FMM, there is
-     nothing, so it will be 1 byte (or a larger aligned thing). For fancier
-     methods, this could be a problem, but the current implementation is
-     always pulling copies anyway. So this is perhaps not a big deal.
-
-     So this seems to be disappearing as well. Yeah. This is gone.
-
-     Another thought. If we are ever in a situation where the Method is a large
-     object, perhaps it is just better to broadcast a copy to each locality
-     involved. Then, it is just a matter of providing a known access point to
-     that method during an evaluation. Though, this might complicate the
-     ability to run two methods simultaneously. If that is ever needed.
-- DONE bh_method.h/.cc
-     Hopefully very little change here. If anything, a simplification.
-     Once again, dead simple.
-- DONE direct_method.h/.cc
-     Hopefully very little change here. If anything, a simplification.
-     This was stupid easy.
-- DONE fmm_method.h/.cc
-     Hopefully very little change here. If anything, a simplification.
-     This also was easy, but it is worth Bo taking a look over it.
-- DONE method.h/.cc
-     So the overall interface for the Method is not really going to change, but
-     we do not need to explicitly define it anywhere. I guess we need one that
-     shows the basic structure, but it will not be included by anything. It
-     will just specify the overall requirements on the Method concept.
-
-     Registration of Methods is not longer sensible. So those can be removed
-     along with the table init and fini stiff. Also, the creation function
-     type as well as the create method thing can go away as the specific type
-     will be known, and we can thus, just use it.
-
-     So basically, this whole thing goes away and is replaced by a specification
-     in the documentation about what will make a method conform to the Method
-     concept.
-
-     You know, I think we can rid ourselves of the release() requirement on the
-     Method concept. I think we can just go ahead and use some POD in the type
-     and not provide copy move operators, and leave the destructor simple.
-
-     The question to answer, does this make for a strange imbalance with the
-     Expansion concept? Probably not. They are already different, and will have
-     different requirements. So why not go for it?
-- DONE builtins.h/.cc
-     The evaluator will not need a specific object for the definition portion
-     but we shall still need particular objects for the evaluation step.
-     So this may not change much.
-
-     We will be able to get rid of the registration portions of this stuff.
-     Actually, this file will disappear once the Method stuff is complete.
-
-     The .cc is definitely gone. Would it be useful to have the builtins.h
-     be a shortcut for inclusion of all built-in Expansion and Method types?
-
-     Let's not. The user will just have to know what to include.
-- DONE evalutate.cc - this has become the evaluator class. This class
-     registers everything with HPX and make sure all the types are all set.
+      A MACRO for the Expansion? Not super useful.
+TODO: Should we explicitly enforce the singleton nature of Evaluator?
+TODO: currently it is impossible to use the same tree for different Evaluators.
+      Do we want to decouple the tree?
+TODO: Perhaps we want to parameterize the nodes with some user data? So
+      the user can use the tree for other things as well.
+TODO: Should we just make the evaluator into a functor? Instead of evaluate,
+      we just overload ()?
+TODO: Factor the bit in evaluate_handler() that gets the domain
+TODO: In contribute for ExpansionLCO, can we change it so the user can just
+      pass in the expansion?
+TODO: Why is s_to_l_handler different than s_to_m_handler?
 
 Unknown:
  (Interface to Users)
- - dashmm.h
- - basic.h
+ - dashmm.h - will just include all the user interface stuff
 
  (Recheck documentation)
  - This will need to happen. The documentation and the code has started to

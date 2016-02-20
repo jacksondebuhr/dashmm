@@ -24,15 +24,13 @@
 namespace dashmm {
 
 
-DomainGeometry::DomainGeometry(Point low_rect, Point high_rect)
+DomainGeometry::DomainGeometry(Point low_rect, Point high_rect, double factor)
     : low_{0.0, 0.0, 0.0}, size_{0.0} {
-  Point center{low_rect.x() * 0.5 + high_rect.x() * 0.5,
-               low_rect.y() * 0.5 + high_rect.y() * 0.5,
-               low_rect.z() * 0.5 + high_rect.z() * 0.5};
-  Point diff{high_rect.x() - low_rect.x(), high_rect.y() - low_rect.y(),
-             high_rect.z() - low_rect.z()};
-  double max_size = diff.x() > diff.y() ? diff.x() : diff.y();
-  max_size = max_size > diff.z() ? max_size : diff.z();
+  Point center = point_add(low_rect.scale(0.5), high_rect.scale(0.5));
+  Point sizes = point_sub(high, low);
+  double max_size = sizes.x() > sizes.y() ? sizes.x() : sizes.y();
+  max_size = max_size > sizes.z() ? max_size : sizes.z();
+  max_size *= factor;
   size_ = max_size;
   max_size *= 0.5;
   low_ = Point{center.x() - max_size, center.y() - max_size,
