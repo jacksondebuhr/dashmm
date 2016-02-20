@@ -26,17 +26,26 @@
 #include <cstring>
 
 #include <algorithm>
+#include <memory>
 
 #include <hpx/hpx.h>
 
 #include "include/domaingeometry.h"
 #include "include/expansionlco.h"
 #include "include/index.h"
-#include "include/particle.h"
+#include "include/point.h"
+#include "include/sourceref.h"
 #include "include/types.h"
 
 
 namespace dashmm {
+
+
+/// Forward declaration of Evaluator so that we can become friends
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename, typename> class Method>
+class Evaluator<Source, Target, Expansion, Method>;
 
 
 /// A node of the source tree.
@@ -135,17 +144,17 @@ class SourceNode {
   /// This will return the address of an LCO that represents completion of the
   /// partitioning of this node.
   ///
-  /// \param parts - the source points
-  /// \param n_parts - the number of sources
+  /// In practice, this is only called once in Evaluator::evaluate(). The
+  /// internal calls to partition are handled directly.
+  ///
+  /// \param sources - the source points
   /// \param limit - the refinement limit for the partitioning
-  /// \param type - the type of the expansion
-  /// \param expand - global address to the prototype expansion data
   /// \param n_digits - accuracy of the expansion
   hpx_addr_t partition(sourceref_t sources, int limit, int n_digits) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
 
-    PartitionParams args{};
+    PartitionParams args{ };
     args.partdone = retval;
     args.limit = limit;
     args.n_digits = n_digits;
@@ -503,6 +512,7 @@ class SourceNode {
   static hpx_action_t child_done_;
   static hpx_action_t partition_;
 };
+
 
 template <typename S, typename T,
           template <typename, typename> class E,

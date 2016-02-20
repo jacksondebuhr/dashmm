@@ -36,6 +36,13 @@
 namespace dashmm {
 
 
+/// Forward declaration of Evaluator so that we can become friends
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename, typename> class Method>
+class Evaluator<Source, Target, Expansion, Method>;
+
+
 /// Expansion LCO
 ///
 /// This object is a thin wrapper around the address of a user-defined LCO

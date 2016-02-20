@@ -23,6 +23,7 @@
 #include <cmath>
 #include <complex>
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "include/index.h"
@@ -43,6 +44,23 @@ struct LaplaceSPHData {
 };
 
 
+/// Laplace kernel Spherical Harmonic expansion
+///
+/// This expansion is of the Laplace Kernel about the center of the node
+/// containing the represented sources. The kernel does not include any
+/// scaling for physical constants, and so the user will need to multiply
+/// results of this expansion by the relevant factors (including a minus sign
+/// if needed).
+///
+/// This expansion is most relevant for interactions that have both signs
+/// of the charge.
+///
+/// This class is a template with parameters for the source and target
+/// types.
+///
+/// Source must define a double valued 'charge' member to be used with
+/// LaplaceCOM. Target must define a std::complex<double> valued 'phi' member
+/// to be used with LaplaceCOM.
 template <typename Source, typename Target>
 class LaplaceSPH {
  public:
@@ -684,6 +702,12 @@ class LaplaceSPH {
 };
 
 
+/// Precompute some required data for using the LaplaceSPH expansion
+///
+/// This routine must be called before an object of type LaplaceSPH is
+/// constucted with the given accuracy.
+///
+/// \param n_digits - the accuracy parameter for which to pregenerate values
 void laplace_sph_precompute(int n_digits);
 
 

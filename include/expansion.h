@@ -12,7 +12,6 @@
 // =============================================================================
 
 
-
 /// To qualify for the Expansion concept in DASHMM, a class must satisfy the
 /// following criteria. This file is not included anywhere in DASHMM, but it
 /// is in the source distribution as an example, and to explain the
@@ -25,7 +24,6 @@
 ///
 /// When creating a user-defined Expansion, the name Expansion in the following
 /// should be replaced by the name of the new Expansion type.
-
 template <typename Source, typename Target>
 class Expansion {
  public:

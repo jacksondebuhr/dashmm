@@ -96,7 +96,7 @@ inline double pow_m1(const int m) {
 }
 
 
-}
+} // namespace dashmm
 
 
 #endif // __DASHMM_LAPLACE_SPH_TABLE_H__

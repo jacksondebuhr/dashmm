@@ -22,6 +22,8 @@ TODO: Factor the bit in evaluate_handler() that gets the domain
 TODO: In contribute for ExpansionLCO, can we change it so the user can just
       pass in the expansion?
 TODO: Why is s_to_l_handler different than s_to_m_handler?
+TODO: See if we can work out a better way to work with the consider list.
+      All this to and from vectors is annoying.
 
 Unknown:
  (Interface to Users)
@@ -40,7 +42,8 @@ Unknown:
     are obviously from DASHMM. So instead of include/file.h it would be
     dashmm/file.h? Probably.
 
-    We would just rename include to dashmm?
+    We would just rename include to dashmm - no include would have a dashmm
+      subdirectory, as well as a libdashmm
     We could then have a lib folder with the built library
     We could leave src alone
 

@@ -19,12 +19,14 @@
 /// \file include/targetnode.h
 /// \brief Target tree
 
+
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 
 #include <algorithm>
+#include <vector>
 
 #include <hpx/hpx.h>
 
@@ -32,10 +34,21 @@
 #include "include/expansionlco.h"
 #include "include/index.h"
 #include "include/particle.h"
+#include "include/point.h"
+#include "include/targetlco.h"
+#include "include/targetref.h"
 #include "include/types.h"
 
 
 namespace dashmm {
+
+
+
+/// Forward declaration of Evaluator so that we can become friends
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename, typename> class Method>
+class Evaluator<Source, Target, Expansion, Method>;
 
 
 /// A node of the target tree.
@@ -135,11 +148,9 @@ class TargetNode {
   /// Note that for internal reasons, the target points are passed to this
   /// routine as a global address, rather than as the data itself.
   ///
-  /// \param parts - global address of the target data
-  /// \param n_parts - the number of target locations
+  /// \param targets - a reference to the targets that are in this node
   /// \param limit - the refinement limit for the partition
-  /// \param expand - the expansion to use as prototype for the nodes created
-  ///                 during the partition
+  /// \param n_digits - the accuracy of the expansion
   /// \param which_child - which child of this node's parent was this node
   /// \param same_sources_and_targets - are we in the case where the sources
   ///                 and targets are the same?
@@ -560,6 +571,7 @@ class TargetNode {
   static hpx_action_t self_delete_;
   static hpx_action_t partition_;
 };
+
 
 template <typename S, typename T,
           template <typename, typename> class E,

@@ -12,42 +12,24 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_METHOD_H__
-#define __DASHMM_METHOD_H__
+/// To qualify for the Method concept in DASHMM, a class must satisfy the
+/// following criteria. This file is not included anywhere in DASHMM, but it
+/// is in the source distribution as an example, and to explain the
+/// Method concept.
 
 
-/// \file include/method.h
-/// \brief Abstract interface for Method objects
-
-
-#include <vector>
-
-
-#include "include/expansionlco.h"
-#include "include/node.h"
-#include "include/types.h"
-
-
-namespace dashmm {
-
-
-// TODO We should also work out a better way to deal with the consider list.
-// This packing and upacking into vectors is annoying. Sure the vector allows
-// for a much better means to handle additions, but it sucks.
-
-
-
-/// Abstract interface for Methods used in DASHMM
+/// Methods in DASHMM are template classes parameterized over the types of
+/// sources and tagets as well as the Expansion. A full description of the
+/// requirements of the Source, Target and Expansion can be found elsewhere.
 ///
-/// This interface specifies the requirements for methods that a user
-/// may add to DASHMM. In general, the user will need to implement the method
-/// and then somewhere in their program call register_user_method() providing
-/// the creation functions that the user also implements. For details, see the
-/// DASHMM Advanced User Guide.
+/// When creating a user-defined Method, the name Method in the following
+/// should be replaced by the name of the new Method type.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion>
 class Method {
  public:
+  /// These are all useful aliases to define, given the heavily templated
+  /// nature of DASHMM.
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
@@ -71,8 +53,7 @@ class Method {
   /// that expansion.
   ///
   /// \param curr - the current node of the source tree (will be a leaf)
-  /// \param expand - a reference to a prototype expansion that can be used
-  ///                 to generate the expansion for the given node.
+  /// \param n_digits - the accuracy parameter for the expansion in question.
   void generate(sourcenode_t &curr, int n_digits) const;
 
   /// Combine expansions from children of an internal source node
@@ -85,8 +66,7 @@ class Method {
   /// contributions to that expansion.
   ///
   /// \param curr - the current node of the source tree (will be internal)
-  /// \param expand - a reference to a prototype expansion that can be used
-  ///                 to aggregate the expansions of the given node's children.
+  /// \param n_digits - the accuracy parameter for the expansion in question.
   void aggregate(sourcenode_t &curr, int n_digits) const;
 
   /// Inherit an expansion from a target node's parent
@@ -95,7 +75,7 @@ class Method {
   /// effect of the expansion collected at the parent of the given node.
   ///
   /// \param curr - the current node of the target tree
-  /// \param expand - a reference to a prototype expansion that might be used
+  /// \param n_digits - the accuracy parameter for the expansion in question.
   /// \which_child - which child @p curr is of its parent
   void inherit(targetnode_t &curr, int n_digits, size_t which_child) const;
 
@@ -131,9 +111,3 @@ class Method {
  private:
   // Any data should be trivially copyable
 };
-
-
-} // namespace dashmm
-
-
-#endif // __DASHMM_METHOD_H__

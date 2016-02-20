@@ -20,7 +20,22 @@
 /// \brief TargetLCO object definition
 
 
+#include <cstring>
+
+#include <hpx/hpx.h>
+
+#include "include/targetref.h"
+
+
 namespace dashmm {
+
+
+/// Forward declaration of Evaluator so that we can become friends
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename, typename> class Method>
+class Evaluator<Source, Target, Expansion, Method>;
+
 
 
 /// Target LCO
@@ -53,10 +68,10 @@ class TargetLCO {
   using targetref_t = TargetRef<Target>;
 
   /// Construct a default object
-  TargetLCO() : lco_{HPX_NULL}, n_parts_{0} { }
+  TargetLCO() : lco_{HPX_NULL}, n_targs_{0} { }
 
   /// Construct from an existing LCO
-  TargetLCO(hpx_addr_t data, int n_parts) : lco_{data}, n_parts_{n_parts} { }
+  TargetLCO(hpx_addr_t data, int n_targs) : lco_{data}, n_targs_{n_targs} { }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
   explicit TargetRef(targetref_t targets) {
@@ -64,7 +79,7 @@ class TargetLCO {
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
     assert(lco_ != HPX_NULL);
-    n_parts_ = targets.n();
+    n_targs_ = targets.n();
   }
 
   /// Destroy the LCO. Use carefully!
@@ -78,7 +93,7 @@ class TargetLCO {
   /// The global address of the referred to object
   hpx_addr_t lco() const {return lco_;}
 
-  int n() const {return n_parts_;}
+  int n() const {return n_targs_;}
 
   /// Indicate to the underlying LCO that all operations have been scheduled
   void finalize() const {
@@ -103,14 +118,14 @@ class TargetLCO {
   ///
   /// \param n - the number of sources
   /// \param sources - the sources themselves
-  void contribute_S_to_T(int n, Source *sources) const {
+  void contribute_S_to_T(int n, source_t *sources) const {
     // NOTE: we assume this is called local to the sources
-    size_t inputsize = sizeof(StoT) + sizeof(Source) * n;
+    size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);
     input->code = kStoT;
     input->count = n;
-    memcpy(input->sources, source, sizeof(Source) * n);
+    memcpy(input->sources, source, sizeof(source_t) * n);
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
 
@@ -157,10 +172,10 @@ class TargetLCO {
   }
 
  private:
-  // Make Evaluator a friend -- it handles action registration
+  /// Make Evaluator a friend -- it handles action registration
   friend class Evaluator<Source, Target, Expansion, Method>;
 
-  // some types used by the implementation
+  /// LCO data type
   struct Data {
     int arrived;
     int scheduled;
@@ -168,16 +183,19 @@ class TargetLCO {
     targetref_t targets;
   };
 
+  /// LCO initialization type
   struct Init {
     targetref_t targets;
   };
 
+  /// S->T parameters type
   struct StoT {
     int code;
     int count;
-    Source sources[];
+    source_t sources[];
   };
 
+  /// M->T parameters type
   struct MtoT {
     int code;
     int n_digits;
@@ -186,6 +204,7 @@ class TargetLCO {
     char data[];
   };
 
+  /// L->T parameters type
   struct LtoT {
     int code;
     int n_digits;
@@ -194,6 +213,7 @@ class TargetLCO {
     char data[];
   };
 
+  /// Codes to define what the LCO set is doing.
   enum SetCodes {
     kSetOnly = 1,
     kStoT = 2,
@@ -202,7 +222,7 @@ class TargetLCO {
     kFinish = 5
   };
 
-  // The functions implementing the LCO
+  /// Initialize the LCO
   static void init_handler(Data *i, size_t bytes,
                            Init *init, size_t init_bytes) {
     i->arrived = 0;
@@ -211,6 +231,9 @@ class TargetLCO {
     i->targets = init->targets;
   }
 
+  /// The 'set' operation on the LCO
+  ///
+  /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
     int *code = static_cast<int *>(rhs);
     if (*code == kSetOnly) {    // this is a pair of ints, a code and a count
@@ -277,17 +300,22 @@ class TargetLCO {
     }
   }
 
-  static bool predicate_handler(TargetRefLCOData *i, size_t bytes) {
+  /// The LCO is set if it has been finalized, and all scheduled operations
+  /// have taken place.
+  static bool predicate_handler(Data *i, size_t bytes) {
     return i->finished && (i->arrived == i->scheduled);
   }
 
-  // The actual data for the object
+  /// The global address of the LCO
   hpx_addr_t lco_;
-  int n_parts_;
+  /// The number of targets represented by the LCO.
+  int n_targs_;
 
-  // the function identifiers
+  /// HPX function for LCO initialization
   static hpx_action_t init_;
+  /// HPX function for LCO set
   static hpx_action_t operation_;
+  /// HPX function for LCO predicate
   static hpx_action_t predicate_;
 };
 

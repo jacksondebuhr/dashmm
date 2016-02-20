@@ -61,6 +61,10 @@ struct LaplaceCOMData {
 ///
 /// This class is a template with parameters for the source and target
 /// types.
+///
+/// Source must define a double valued 'charge' member to be used with
+/// LaplaceCOM. Target must define a std::complex<double> valued 'phi' member
+/// to be used with LaplaceCOM.
 template <typename Source, typename Target>
 class LaplaceCOM {
  public:

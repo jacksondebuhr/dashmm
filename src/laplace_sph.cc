@@ -19,9 +19,9 @@
 #include "include/laplace_sph.h"
 
 
-// NOTE: This new function does the precomputation. It is just a feature of
-// using the LaplaceSPH expansion that the user must call this before using
-// the expansion for a given number of digits.
+namespace dashmm {
+
+
 void laplace_sph_precompute(int n_digits) {
   // If we are not running on SMP, the following needs to be wrapped and
   // broadcasted inside an hpx_run
@@ -31,3 +31,6 @@ void laplace_sph_precompute(int n_digits) {
       std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}};
   }
 }
+
+
+} // namespace dashmm
