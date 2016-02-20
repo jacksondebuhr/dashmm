@@ -71,6 +71,18 @@ class Point {
     return sqrt(pos_[0] * pos_[0] + pos_[1] * pos_[1] + pos_[2] * pos_[2]);
   }
 
+  void lower_bound(const Point &other) {
+    if (other.x() < pos_[0]) pos_[0] = other.x();
+    if (other.y() < pos_[1]) pos_[1] = other.y();
+    if (other.z() < pos_[2]) pos_[2] = other.z();
+  }
+
+  void upper_bound(const Point &other) {
+    if (other.x() > pos_[0]) pos_[0] = other.x();
+    if (other.y() > pos_[1]) pos_[1] = other.y();
+    if (other.z() > pos_[2]) pos_[2] = other.z();
+  }
+
  private:
   double pos_[3];
 };
@@ -106,7 +118,6 @@ Point point_add(const Point &left, const Point &right);
 ///
 /// \returns - A Point that is \param left - \param right
 Point point_sub(const Point &left, const Point &right);
-
 
 } //namespace dashmm
 

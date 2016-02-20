@@ -66,6 +66,8 @@ class Array {
 
   bool valid() const {return data != HPX_NULL;}
 
+  hpx_addr_t data() const {return data_;}
+
   // TODO: Do we want queries on the number of records?
 
   ReturnCode destroy() {

@@ -152,11 +152,10 @@ Done things in the upgrade
      be a shortcut for inclusion of all built-in Expansion and Method types?
 
      Let's not. The user will just have to know what to include.
+- DONE evalutate.cc - this has become the evaluator class. This class
+     registers everything with HPX and make sure all the types are all set.
 
 Unknown:
- (Evaluation)
- - evalutate.cc
-
  (Interface to Users)
  - dashmm.h
  - basic.h
