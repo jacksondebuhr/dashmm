@@ -217,7 +217,7 @@ class Evaluator {
   ///
   /// In addition to sorting the data, the records in the targets Array will
   /// be given the results of the evaluation. Other than these two changes,
-  /// the arrays will be unchanged. NOTE: the sources and targets are passes
+  /// the arrays will be unchanged. NOTE: the sources and targets are passed
   /// as const even though the data they represent will be modified. Array
   /// objects are references to data in the global address space. It is the
   /// global data that will be modified, not where that data can be found. For

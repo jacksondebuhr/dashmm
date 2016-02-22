@@ -17,13 +17,19 @@
 
 
 // The basic interface
-#include "include/basic.h"
+#include "include/array.h"
+#include "include/evaluator.h"
+#include "include/initfini.h"
+#include "include/types.h"
 
-// The built in kernels and methods
-#include "include/builtins.h"
+// The built in methods
+#include "include/bh_method.h"
+#include "include/direct_method.h"
+#include "include/fmm_method.h"
 
-// Some other stuff
-#include "include/ids.h"
+// The built in expansions
+#include "include/laplace_com.h"
+#include "include/laplace_sph.h"
 
 
 #endif // __DASHMM_USER_INTERFACE_H__

@@ -22,6 +22,10 @@
 
 #include <complex>
 
+#include "include/domaingeometry.h"
+#include "include/index.h"
+#include "include/point.h"
+
 
 namespace dashmm {
 

@@ -43,9 +43,11 @@ Unknown:
     dashmm/file.h? Probably.
 
     We would just rename include to dashmm - no include would have a dashmm
-      subdirectory, as well as a libdashmm
+      subdirectory, as well as a builtin/ directory for the built in stuff
     We could then have a lib folder with the built library
     We could leave src alone
+
+    DO THIS AFTER IT IS WORKING
 
  (Do we do a minor release on the template stuff?)
 
