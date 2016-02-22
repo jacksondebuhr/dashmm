@@ -37,7 +37,6 @@ namespace dashmm {
 
 struct LaplaceCOMData {
   int reserved;
-  // int type;
   int n_digits; // unused
   double mtot;
   double xcom[3];

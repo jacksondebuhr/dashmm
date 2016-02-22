@@ -3,7 +3,7 @@ CXXFLAGS = -std=c++11 -Wall -O3 -g
 INCLUDE = -I../../. $(shell pkg-config --cflags hpx)
 LIBS = -L../../. -ldashmm $(shell pkg-config --libs hpx)
 
-SRC = usermain.cc user_expansion.cc
+SRC = usermain.cc
 OBJ = $(SRC:.cc=.o)
 
 EXEC = userdemo

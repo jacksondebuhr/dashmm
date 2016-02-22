@@ -27,9 +27,6 @@ TODO: See if we can work out a better way to work with the consider list.
 TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
       member of TargerLCO to data();
 
-Unknown:
- (Interface to Users)
- - dashmm.h - will just include all the user interface stuff
 
  (Recheck documentation)
  - This will need to happen. The documentation and the code has started to
@@ -54,17 +51,8 @@ Unknown:
  (Do we do a minor release on the template stuff?)
 
 
-So the basic parameters are the source type, the target type, the expansion
-type and the method type.
-
-
 
 Some notes about issues or future features
-
-* In the future, we may want to have the ObjectHandle be something a little
-more specific. Perhaps a dashmm::Array object. Of course, like everything else
-it is backed by data in the GAS, but it would at least add some meaning to the
-symbols in the code.
 
 * We will need to improve the error handling in this thing quite a bit.
 Basically any way that the user-facing methods can go wrong should return
@@ -76,42 +64,12 @@ exposed in header files separate from the users.
 
 Interface Ideas
 
- * For the array get and put, should we perhaps have a template function that
-   accepts iterators here? This would make it work nicely with the STL
-
- * Do we want to define instead SourceSpec and TargetSpec to combine the
-   relevant arguments for evaluate()?
-
- * Is there a sensible way to templatize allocate_array?
 
  * Eventually the expansion should have a method indicating the number of
    charges. And the number of outputs (phi, ax, ay, az, whatever)
-
- * We should add a routine to check compatibility without having to call
-   evaluate to check method,expansion compatibility.
 
  * Provide C bindings before too long
 
  * We should also in the near term get a base nearest neighbor search. This will
  be essential for SPH and Phil's MFV methods.
   This would be useful in much wider contexts, however.
-
-
-
-HOW TO ADD A NEW BUILT-IN METHOD
-
-1. Pick a name for it and create files include/****.h and src/****.cc
-
-2. Create the ID symbol in include/ids.h and choose a unique value for that id
-
-3. Implement the new method (.h .cc)
-
-4. Add factory method in include/builtins.h and implement the factory in
-   src/builtins.cc
-
-5. Implement the creation action for that method in src/builtins.cc
-
-6. Add a line to register_built_in_methods() registering the method with
-   DASHMM
-
-7. Test the new method until you are satisfied it works.

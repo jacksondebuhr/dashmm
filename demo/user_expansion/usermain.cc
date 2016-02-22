@@ -27,23 +27,35 @@
 #include "user_expansion.h"
 
 
-struct UserSourceData {
-  double pos[3];
+// Officially speaking, the User expansion type does not place any requirements
+// on Source types or Target types (see user_expansion.h). However, we generate
+// positions and masses for the data anyway.
+
+struct SourceData {
+  dashmm::Point position;
   double mass;
 };
 
-struct UserTargetData {
-  double pos[3];
-  double phi[2];    //real, imag
+struct TargetData {
+  dashmm::Point position;    //real, imag
+  dashmm::dcomplex_t phi;
 };
 
 
+// These are the input arguments to the program that are configurable on the
+// command line.
 struct InputArguments {
   int source_count;
   int target_count;
   int refinement_limit;
   int accuracy;
 };
+
+
+// To use an instance of DASHMM for a set of types, one must create one (and
+// only one) instance of the assicated Evaluator type. This object must be
+// created prior to dashmm::init() being called.
+dashmm::Evaluator<SourceData, TargetData, User, dashmm::FMM> usereval{};
 
 
 void print_usage(char *progname) {
@@ -120,10 +132,12 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
 }
 
 
-void pick_cube_position(double *pos) {
+dashmm::Point pick_cube_position() {
+  double pos[3];
   pos[0] = (double)rand() / RAND_MAX;
   pos[1] = (double)rand() / RAND_MAX;
   pos[2] = (double)rand() / RAND_MAX;
+  return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
 double pick_mass(bool use_negative) {
@@ -135,19 +149,18 @@ double pick_mass(bool use_negative) {
 }
 
 
-void set_sources(UserSourceData *sources, int source_count) {
+void set_sources(SourceData *sources, int source_count) {
   for (int i = 0; i < source_count; ++i) {
-    pick_cube_position(sources[i].pos);
+    sources[i].position = pick_cube_position();
     sources[i].mass = pick_mass(true);
   }
 }
 
 
-void set_targets(UserTargetData *targets, int target_count) {
+void set_targets(TargetData *targets, int target_count) {
   for (int i = 0; i < target_count; ++i) {
-    pick_cube_position(targets[i].pos);
-    targets[i].phi[0] = 0.0;
-    targets[i].phi[1] = 0.0;
+    targets[i].position = pick_cube_position();
+    targets[i].phi = 0.0;
   }
 }
 
@@ -155,64 +168,49 @@ void set_targets(UserTargetData *targets, int target_count) {
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
-  // To use a user-defined expansion in DASHMM one must register that expansion
-  // with the library. For simplicity, we have implemented a small utility
-  // routine to perform the necessary library call.
-  register_user_with_dashmm();
-
   //create some arrays
-  UserSourceData *sources = reinterpret_cast<UserSourceData *>(
-        new char [sizeof(UserSourceData) * args.source_count]);
-  UserTargetData *targets = reinterpret_cast<UserTargetData *>(
-        new char [sizeof(UserTargetData) * args.target_count]);
+  SourceData *sources = reinterpret_cast<SourceData *>(
+        new char [sizeof(SourceData) * args.source_count]);
+  TargetData *targets = reinterpret_cast<TargetData *>(
+        new char [sizeof(TargetData) * args.target_count]);
 
   set_sources(sources, args.source_count);
   set_targets(targets, args.target_count);
 
   //prep sources
-  dashmm::ObjectHandle source_handle;
-  auto err = dashmm::allocate_array(args.source_count, sizeof(UserSourceData),
-                            &source_handle);
+  dashmm::Array<SourceData> source_handle{};
+  int err = source_handle.allocate(args.source_count);
   assert(err == dashmm::kSuccess);
-  err = dashmm::array_put(source_handle, 0, args.source_count, sources);
+  err = source_handle.put(0, args.source_count, sources);
   assert(err == dashmm::kSuccess);
 
   //prep targets
-  dashmm::ObjectHandle target_handle;
-  err = dashmm::allocate_array(args.target_count, sizeof(UserTargetData),
-                               &target_handle);
+  dashmm::Array<TargetData> target_handle{};
+  err = target_handle.allocate(args.target_count);
   assert(err == dashmm::kSuccess);
-  err = dashmm::array_put(target_handle, 0, args.target_count, targets);
+  err = target_handle.put(0, args.target_count, targets);
   assert(err == dashmm::kSuccess);
 
-  //get method and expansion
-  auto method = dashmm::fmm_method();
+  // Create method - for this example we use FMM to showcase more operations.
+  // Methods are explicitly passed into evaluate() so that any parameters of
+  // the method might propagate through the evaluation.
+  dashmm::FMM<SourceData, TargetData, User> method{};
 
-  // Once the user-defined type is registered with DASHMM, it can be used
-  // like any of the built-in expansions. We did not write a factory method
-  // to produce a User expansion, so we create it directly. The library
-  // provides a factory for all built-in expansion types.
-  dashmm::Expansion *test_expansion{
-    new User{dashmm::Point{0.0, 0.0, 0.0}, args.accuracy}
+  // We create a specific expansion that will be passed into evaluate so that
+  // the requested number of digits can be propagated through the evaluation.
+  User<SourceData, TargetData> expansion{
+    dashmm::Point{0.0, 0.0, 0.0}, args.accuracy
   };
 
-  assert(method && test_expansion);
 
+  // All that is left is to call evaluate from the Evaluator object.
+  err = usereval.evaluate(source_handle, target_handle, args.refinement_limit,
+                          method, expansion);
 
-  // The newly created expansion object is passed into evaluate(). Having been
-  // registered, the expansion can be understood and used by DASHMM.
-  err = dashmm::evaluate(source_handle, offsetof(UserSourceData, pos),
-                         offsetof(UserSourceData, mass),
-                         target_handle, offsetof(UserTargetData, pos),
-                         offsetof(UserTargetData, phi),
-                         args.refinement_limit,
-                         std::unique_ptr<dashmm::Method>{method},
-                         std::unique_ptr<dashmm::Expansion>{test_expansion});
-
-  //free up resources
-  err = dashmm::deallocate_array(source_handle);
+  // Clean up resources
+  err = source_handle.destroy();
   assert(err == dashmm::kSuccess);
-  err = dashmm::deallocate_array(target_handle);
+  err = target_handle.destroy();
   assert(err == dashmm::kSuccess);
 
   delete [] sources;
@@ -224,15 +222,12 @@ int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);
 
-
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
-
 
   if (!usage_error) {
     perform_evaluation_test(inputargs);
   }
-
 
   err = dashmm::finalize();
   assert(err == dashmm::kSuccess);

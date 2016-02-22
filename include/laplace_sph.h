@@ -38,7 +38,6 @@ namespace dashmm {
 
 struct LaplaceSPHData {
   int reserved;
-  // int type;
   int n_digits;
   Point center;
   dcomplex_t expansion[];
