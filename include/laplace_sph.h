@@ -65,7 +65,6 @@ struct LaplaceSPHData {
 template <typename Source, typename Target>
 class LaplaceSPH {
  public:
-  using contents_t = LaplaceSPHData;
   using source_t = Source;
   using target_t = Target;
   using expansion_t = LaplaceSPH<Source, Target>;
@@ -81,13 +80,14 @@ class LaplaceSPH {
     assert(valid());
     data_->n_digits = n_digits;
     data_->center = center;
+    n_digits_ = n_digits;
     for (int i = 0; i < n_terms; ++i)
       data_->expansion[i] = 0;
   }
 
-  LaplaceSPH(contents_t *ptr, size_t bytes, int n_digits)
+  LaplaceSPH(void *ptr, size_t bytes, int n_digits)
       : n_digits_{n_digits} {
-    data_ = ptr;
+    data_ = static_cast<LaplaceSPHData *>(ptr);
     bytes_ = bytes;
     if (data_)
       data_->n_digits = n_digits;
@@ -100,7 +100,7 @@ class LaplaceSPH {
     }
   }
 
-  contents_t *release() {
+  void *release() {
     LaplaceSPHData *retval = data_;
     data_ = nullptr;
     return retval;

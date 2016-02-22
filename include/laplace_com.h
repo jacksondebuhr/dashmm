@@ -68,7 +68,6 @@ struct LaplaceCOMData {
 template <typename Source, typename Target>
 class LaplaceCOM {
  public:
-  using contents_t = LaplaceCOMData;
   using source_t = Source;
   using target_t = Target;
   using expansion_t = LaplaceCOM<Source, Target>;
@@ -77,7 +76,6 @@ class LaplaceCOM {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
     assert(valid());
-    data_->type = type();
     data_->n_digits = -1; // unused
     data_->mtot = 0.0;
     data_->xcom[0] = 0.0;
@@ -91,8 +89,9 @@ class LaplaceCOM {
     data_->Q[5] = 0.0;
   }
 
-  LaplaceCOM(contents_t *ptr, size_t bytes, int n_digits)
-      : data_{ptr}, bytes_{sizeof(LaplaceCOMData)} { }
+  LaplaceCOM(void *ptr, size_t bytes, int n_digits)
+      : data_{static_cast<LaplaceCOMData *>(ptr)},
+        bytes_{sizeof(LaplaceCOMData)} { }
 
   ~LaplaceCOM() {
     if (valid()) {
@@ -101,7 +100,7 @@ class LaplaceCOM {
     }
   }
 
-  contents_t *release() {
+  void *release() {
     LaplaceCOMData *retval = data_;
     data_ = nullptr;
     return retval;
@@ -139,12 +138,14 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> S_to_L(Point center,
                                       Source *first, Source *last,
-                                      double scale) const { }
+                                      double scale) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
     assert(valid());
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0});
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0);
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
     temp->set_Q(data_->Q);
@@ -152,10 +153,14 @@ class LaplaceCOM {
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const { }
+                                      Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
 
   std::unique_ptr<expansion_t> L_to_L(int to_child,
-                                      double t_size) const { }
+                                      double t_size) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
 
   void M_to_T(Target *first, Target *last, double scale) const {
     assert(valid());

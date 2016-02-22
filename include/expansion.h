@@ -27,10 +27,6 @@
 template <typename Source, typename Target>
 class Expansion {
  public:
-  /// Expansions are required to alias their serialized data type as
-  /// 'contents_t' so that internally DASHMM can cast message buffers into the
-  /// correct type as soon as possible.
-  using contents_t = ExpansionData;
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
@@ -52,7 +48,7 @@ class Expansion {
   /// this use is to perform an S->T operation.
   ///
   /// Again, n_digits is a required argument, but it can be ignored.
-  Expansion(contents_t *ptr, size_t bytes, int n_digits)
+  Expansion(void *ptr, size_t bytes, int n_digits)
 
   /// The destructor should delete the allocated memory of the object. In the
   /// simplest style of implementation, this means that only if the object
@@ -85,7 +81,7 @@ class Expansion {
   /// to memory allocated on the heap (cast from new char [size]). And then
   /// release() will just return that pointer, and set this objects member to
   /// nullptr.
-  contents_t *release();
+  void *release();
 
   /// The size in bytes of the serialized expansion data
   size_t bytes() const;

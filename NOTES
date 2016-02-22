@@ -24,6 +24,8 @@ TODO: In contribute for ExpansionLCO, can we change it so the user can just
 TODO: Why is s_to_l_handler different than s_to_m_handler?
 TODO: See if we can work out a better way to work with the consider list.
       All this to and from vectors is annoying.
+TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
+      member of TargerLCO to data();
 
 Unknown:
  (Interface to Users)

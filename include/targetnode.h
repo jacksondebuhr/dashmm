@@ -33,7 +33,6 @@
 #include "include/domaingeometry.h"
 #include "include/expansionlco.h"
 #include "include/index.h"
-#include "include/particle.h"
 #include "include/point.h"
 #include "include/targetlco.h"
 #include "include/targetref.h"
@@ -47,8 +46,9 @@ namespace dashmm {
 /// Forward declaration of Evaluator so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
-class Evaluator<Source, Target, Expansion, Method>;
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
+class Evaluator;
 
 
 /// A node of the target tree.
@@ -60,7 +60,8 @@ class Evaluator<Source, Target, Expansion, Method>;
 /// wherever it is needed.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
 class TargetNode {
  public:
   using source_t = Source;
@@ -68,7 +69,7 @@ class TargetNode {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
 
-  using targetref_t = TargetRef<Source>;
+  using targetref_t = TargetRef<Target>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
   using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
   using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
@@ -410,10 +411,10 @@ class TargetNode {
   }
 
   static size_t partition_params_size(int n_consider) {
-    return sizeof(TargetNodePartitionParams) + n_consider * sizeof(hpx_addr_t);
+    return sizeof(PartitionParams) + n_consider * sizeof(hpx_addr_t);
   }
 
-  PartitionParams *partition_params_alloc(int n_consider) {
+  static PartitionParams *partition_params_alloc(int n_consider) {
     PartitionParams *retval = reinterpret_cast<PartitionParams *>(
       new char [partition_params_size(n_consider)]);
     if (retval) {
@@ -426,23 +427,21 @@ class TargetNode {
                                size_t bytes) {
     targetnode_t curr{hpx_thread_current_target()};
     // TODO improve this somehow.
-    std::vector<SourceNode> consider{ };
+    std::vector<sourcenode_t> consider{ };
     for (int i = 0; i < parms->n_consider; ++i) {
-      consider.push_back(SourceNode{parms->consider[i]});
+      consider.push_back(sourcenode_t{parms->consider[i]});
     }
 
     bool refine = false;
-    if (parms->n_parts > parms->limit) {
+    if (parms->targets.n() > parms->limit) {
       refine = node->method.refine_test(parms->same_sources_and_targets, curr,
                                         consider);
     }
 
     if (!refine) {
-      Target *targs{nullptr};
-      assert(hpx_gas_try_pin(parms->targets.data(), (void **)&targs));
       node->targets = targetlco_t(parms->targets);
 
-      hpx_call_when(node->targets.data(), parms->done, hpx_lco_set_action,
+      hpx_call_when(node->targets.lco(), parms->done, hpx_lco_set_action,
                     HPX_NULL, nullptr, 0);
     }
 
@@ -455,7 +454,7 @@ class TargetNode {
       assert(hpx_gas_try_pin(parms->targets.data(), (void **)&T));
       Target *splits[9] { };
       splits[0] = T;
-      splits[8] = &T[parms->n_parts];
+      splits[8] = &T[parms->targets.n()];
 
       Point cen{node->root_geo.center_from_index(node->idx)};
       double z_center = cen.z();
@@ -497,8 +496,8 @@ class TargetNode {
 
       hpx_gas_unpin(parms->targets.data());
 
-      targetref_t cparts[8];
-      int n_children{0}
+      targetref_t cparts[8] {};
+      int n_children{0};
       {
         int n_offset{0};
         for (int i = 0; i < 8; ++i) {
@@ -506,10 +505,8 @@ class TargetNode {
           if (n_per_child) {
             ++n_children;
             cparts[i] = parms->targets.slice(n_offset, n_per_child);
-          } else {
-            cparts[i] = HPX_NULL;
           }
-          n_offset += n_per_child[i];
+          n_offset += n_per_child;
         }
       }
 
@@ -522,14 +519,14 @@ class TargetNode {
       args->done = cdone;
       args->same_sources_and_targets = parms->same_sources_and_targets;
       args->limit = parms->limit;
-      args->expansion = parms->n_digits;
+      args->n_digits = parms->n_digits;
       args->n_consider = consider.size();
       for (size_t i = 0; i < consider.size(); ++i) {
         args->consider[i] = consider[i].data();;
       }
 
       for (int i = 0; i < 8; ++i) {
-        if (n_per_child[i] == 0) {
+        if (!cparts[i].valid()) {
           node->child[i] = HPX_NULL;
           continue;
         }
@@ -575,17 +572,20 @@ class TargetNode {
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetNode<S, T, E, M>::node_delete_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetNode<S, T, E, M>::self_delete_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetNode<S, T, E, M>::partition_ = HPX_ACTION_NULL;
 
 

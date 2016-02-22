@@ -18,6 +18,7 @@
 #include <sys/time.h>
 
 #include <algorithm>
+#include <complex>
 #include <map>
 #include <memory>
 #include <string>
@@ -26,13 +27,13 @@
 
 
 struct SourceData {
-  double pos[3];
-  double mass;
+  dashmm::Point position;
+  double charge;
 };
 
 struct TargetData {
-  double pos[3];
-  double phi[2];    //real, imag
+  dashmm::Point position;
+  std::complex<double> phi;    //real, imag
   int index;
 };
 
@@ -41,11 +42,11 @@ struct TargetData {
 // These must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::laplace_com, dashmm::BH> bheval{};
+                  dashmm::LaplaceCOM, dashmm::BH> bheval{};
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::laplace_sph, dashmm::FMM> fmmeval{};
+                  dashmm::LaplaceSPH, dashmm::FMM> fmmeval{};
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::laplace_com, dashmm::Direct> directeval{};
+                  dashmm::LaplaceCOM, dashmm::Direct> directeval{};
 
 
 
@@ -193,21 +194,25 @@ inline double elapsed(double t1, double t0) {
 }
 
 
-void pick_cube_position(double *pos) {
+dashmm::Point pick_cube_position() {
+  double pos[3];
   pos[0] = (double)rand() / RAND_MAX;
   pos[1] = (double)rand() / RAND_MAX;
   pos[2] = (double)rand() / RAND_MAX;
+  return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
 
-void pick_sphere_position(double *pos) {
+dashmm::Point pick_sphere_position() {
   double r = 1.0;
   double ctheta = 2.0 * (double)rand() / RAND_MAX - 1.0;
   double stheta = sqrt(1.0 - ctheta * ctheta);
   double phi = 2.0 * 3.1415926535 * (double)rand() / RAND_MAX;
+  double pos[3];
   pos[0] = r * stheta * cos(phi);
   pos[1] = r * stheta * sin(phi);
   pos[2] = r * ctheta;
+  return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
 
@@ -220,16 +225,18 @@ double pick_mass(bool use_negative) {
 }
 
 
-void pick_plummer_position(double *pos) {
+dashmm::Point pick_plummer_position() {
   //NOTE: This is using a = 1
   double unif = (double)rand() / RAND_MAX;
   double r = 1.0 / sqrt(pow(unif, -2.0 / 3.0) - 1);
   double ctheta = 2.0 * (double)rand() / RAND_MAX - 1.0;
   double stheta = sqrt(1.0 - ctheta * ctheta);
   double phi = 2.0 * 3.1415926535 * (double)rand() / RAND_MAX;
+  double pos[3];
   pos[0] = r * stheta * cos(phi);
   pos[1] = r * stheta * sin(phi);
   pos[2] = r * ctheta;
+  return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
 
@@ -244,20 +251,20 @@ void set_sources(SourceData *sources, int source_count,
   bool use_negative = test_case == std::string{"fmm"};
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
-      pick_cube_position(sources[i].pos);
-      sources[i].mass = pick_mass(use_negative);
+      sources[i].position = pick_cube_position();
+      sources[i].charge = pick_mass(use_negative);
     }
   } else if (source_type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < source_count; ++i) {
-      pick_sphere_position(sources[i].pos);
-      sources[i].mass = pick_mass(use_negative);
+      sources[i].position = pick_sphere_position();
+      sources[i].charge = pick_mass(use_negative);
     }
   } else {
     //Plummer
     for (int i = 0; i < source_count; ++i) {
-      pick_plummer_position(sources[i].pos);
-      sources[i].mass = pick_plummer_mass(source_count);
+      sources[i].position = pick_plummer_position();
+      sources[i].charge = pick_plummer_mass(source_count);
     }
   }
 }
@@ -268,25 +275,22 @@ void set_targets(TargetData *targets, int target_count,
   if (target_type == std::string{"cube"}) {
     //Cube
     for (int i = 0; i < target_count; ++i) {
-      pick_cube_position(targets[i].pos);
-      targets[i].phi[0] = 0.0;
-      targets[i].phi[1] = 0.0;
+      targets[i].position = pick_cube_position();
+      targets[i].phi = 0.0;
       targets[i].index = i;
     }
   } else if (target_type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < target_count; ++i) {
-      pick_sphere_position(targets[i].pos);
-      targets[i].phi[0] = 0.0;
-      targets[i].phi[1] = 0.0;
+      targets[i].position = pick_sphere_position();
+      targets[i].phi = 0.0;
       targets[i].index = i;
     }
   } else {
     //Plummer
     for (int i = 0; i < target_count; ++i) {
-      pick_plummer_position(targets[i].pos);
-      targets[i].phi[0] = 0.0;
-      targets[i].phi[1] = 0.0;
+      targets[i].position = pick_plummer_position();
+      targets[i].phi = 0.0;
       targets[i].index = i;
     }
   }
@@ -305,19 +309,19 @@ void compare_results(TargetData *targets, int target_count,
   double numerator = 0.0;
   double denominator = 0.0;
   double maxrel = 0.0;
-  for (int i = 0; i < test_count; ++i) {
+  for (int i = 0; i < exact_count; ++i) {
     auto j = offsets.find(exacts[i].index);
     assert(j != offsets.end());
     int idx = j->second;
-    double relerr = fabs(targets[idx].phi[0] - exacts[i].phi[0]);
+    double relerr = fabs(targets[idx].phi.real() - exacts[i].phi.real());
     numerator += relerr * relerr;
-    denominator += exacts[i].phi[0] * exacts[i].phi[0];
-    if (relerr / exacts[i].phi[0] > maxrel) {
-      maxrel = relerr / exacts[i].phi[0];
+    denominator += exacts[i].phi.real() * exacts[i].phi.real();
+    if (relerr / exacts[i].phi.real() > maxrel) {
+      maxrel = relerr / exacts[i].phi.real();
     }
   }
   fprintf(stdout, "Error for %d test points: %lg (max %lg)\n",
-                  test_count, sqrt(numerator / denominator), maxrel);
+                  exact_count, sqrt(numerator / denominator), maxrel);
 }
 
 
@@ -334,14 +338,16 @@ void perform_evaluation_test(InputArguments args) {
   set_targets(targets, args.target_count, args.target_type);
 
   //prep sources
-  dashmm::Array<SourceData> source_handle{args.source_count};
-  assert(source_handle.valid());
+  dashmm::Array<SourceData> source_handle{};
+  int err = source_handle.allocate(args.source_count);
+  assert(err == dashmm::kSuccess);
   err = source_handle.put(0, args.source_count, sources);
   assert(err == dashmm::kSuccess);
 
   //prep targets
-  dashmm::Array<TargetData> target_handle{args.target_count};
-  assert(target_handle.valid());
+  dashmm::Array<TargetData> target_handle{};
+  err = target_handle.allocate(args.target_count);
+  assert(err == dashmm::kSuccess);
   err = target_handle.put(0, args.target_count, targets);
   assert(err == dashmm::kSuccess);
 
@@ -362,9 +368,9 @@ void perform_evaluation_test(InputArguments args) {
   double t0{};
   double tf{};
   if (args.test_case == std::string{"bh"}) {
-    dashmm::laplace_com<SourceData, TargetData> expansion{
-        Point{0.0, 0.0, 0.0}, 0};
-    dashmm::BH<SourceData, TargetData, dashmm::laplace_com> method{0.6};
+    dashmm::LaplaceCOM<SourceData, TargetData> expansion{
+        dashmm::Point{0.0, 0.0, 0.0}, 0};
+    dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
     t0 = getticks();
     err = bheval.evaluate(source_handle, target_handle, args.refinement_limit,
@@ -372,9 +378,10 @@ void perform_evaluation_test(InputArguments args) {
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm"}) {
-    dashmm::laplace_sph<SourceData, TargetData> expansion{
-          Point{0.0, 0.0, 0.0}, args->accuracy}:
-    dashmm::FMM<SourceData, TargetData, dashmm::laplace_sph> method{};
+    dashmm::laplace_sph_precompute(args.accuracy);
+    dashmm::LaplaceSPH<SourceData, TargetData> expansion{
+          dashmm::Point{0.0, 0.0, 0.0}, args.accuracy};
+    dashmm::FMM<SourceData, TargetData, dashmm::LaplaceSPH> method{};
 
     t0 = getticks();
     err = fmmeval.evaluate(source_handle, target_handle, args.refinement_limit,
@@ -387,14 +394,16 @@ void perform_evaluation_test(InputArguments args) {
 
   if (args.verify) {
     // Create array for test targets
-    dashmm::Array<TargetData> test_handle{test_count};
-    assert(test_handle.valid());
-    err = dashmm::array_put(test_handle, 0, test_count, test_targets);
+    dashmm::Array<TargetData> test_handle{};
+    err = test_handle.allocate(test_count);
+    assert(err == dashmm::kSuccess);
+    err = test_handle.put(0, test_count, test_targets);
     assert(err == dashmm::kSuccess);
 
     //do direct evaluation
-    dashmm::Direct<SourceData, TargetData, dashmm::laplace_com> direct{};
-    dashmm::laplace_com<SourceData, TargetData> direxp{Point{0.0, 0.0, 0.0}, 0};
+    dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
+    dashmm::LaplaceCOM<SourceData, TargetData> direxp{
+        dashmm::Point{0.0, 0.0, 0.0}, 0};
     err = directeval.evaluate(source_handle, test_handle, args.refinement_limit,
                               direct, direxp);
     assert(err == dashmm::kSuccess);

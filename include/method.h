@@ -38,6 +38,8 @@ class Method {
   using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
   using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
 
+  /// TODO: The method will need a default constructor.
+
   /// Generate the expansion at the leaf of the source tree
   ///
   /// This operation is invoked at the leaves of the source tree to generate

@@ -33,9 +33,9 @@ namespace dashmm {
 /// Forward declaration of Evaluator so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
-class Evaluator<Source, Target, Expansion, Method>;
-
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
+class Evaluator;
 
 
 /// Target LCO
@@ -57,13 +57,14 @@ class Evaluator<Source, Target, Expansion, Method>;
 /// and Method types for a particular evaluation of DASHMM.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
 class TargetLCO {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, expansion_t>;
+  using method_t = Method<Source, Target, Expansion>;
 
   using targetref_t = TargetRef<Target>;
 
@@ -74,7 +75,7 @@ class TargetLCO {
   TargetLCO(hpx_addr_t data, int n_targs) : lco_{data}, n_targs_{n_targs} { }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
-  explicit TargetRef(targetref_t targets) {
+  explicit TargetLCO(const targetref_t &targets) {
     Init init{targets};
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
@@ -125,7 +126,7 @@ class TargetLCO {
     assert(input);
     input->code = kStoT;
     input->count = n;
-    memcpy(input->sources, source, sizeof(source_t) * n);
+    memcpy(input->sources, sources, sizeof(source_t) * n);
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
 
@@ -138,7 +139,7 @@ class TargetLCO {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_M_to_T(size_t bytes, expansion_t::contents_t *data,
+  void contribute_M_to_T(size_t bytes, void *data,
                          int n_digits, double scale) const {
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
@@ -158,7 +159,7 @@ class TargetLCO {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   /// \param scale - scaling factor
-  void contribute_L_to_T(size_t bytes, expansion_t::contents_t *data,
+  void contribute_L_to_T(size_t bytes, void *data,
                          int n_digits, double scale) const {
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
@@ -244,15 +245,15 @@ class TargetLCO {
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
-      target_t *targets{nullptr}
+      target_t *targets{nullptr};
       // NOTE: This should succeed because we place the LCO at the same locality
       // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)targets));
+      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
       expansion_t expand{nullptr, 0, -1};
-      expand->S_to_T(input->sources, &input->sources[input->count],
+      expand.S_to_T(input->sources, &input->sources[input->count],
                      targets, &targets[lhs->targets.n()]);
-      expansion->release(); // NOTE: This is not strictly needed
+      expand.release(); // NOTE: This is not strictly needed
 
       hpx_gas_unpin(lhs->targets.data());
 
@@ -262,15 +263,14 @@ class TargetLCO {
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
-      target_t *targets{nullptr}
+      target_t *targets{nullptr};
       // NOTE: This should succeed because we place the LCO at the same locality
       // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)targets));
+      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{static_cast<expansion_t::contents_t *>(input->data),
-                         input->bytes, input->n_digits};
-      expansion->M_to_T(targets, &targets[lhs->targets.n()], input->scale);
-      expansion->release();
+      expansion_t expand{input->data, input->bytes, input->n_digits};
+      expand.M_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
 
@@ -280,15 +280,14 @@ class TargetLCO {
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
-      target_t *targets{nullptr}
+      target_t *targets{nullptr};
       // NOTE: This should succeed because we place the LCO at the same locality
       // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)targets));
+      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{static_cast<expansion_t::contents_t *>(input->data),
-                         input->bytes, input->n_digits};
-      expansion->L_to_T(lhs->targets, &lhs->targets[lhs->count], input->scale);
-      expansion->release();
+      expansion_t expand{input->data, input->bytes, input->n_digits};
+      expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
 
@@ -322,17 +321,20 @@ class TargetLCO {
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetLCO<S, T, E, M>::init_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetLCO<S, T, E, M>::operation_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t TargetLCO<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
 
 

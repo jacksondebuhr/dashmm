@@ -57,6 +57,8 @@ class BH {
   using targetnode_t = TargetNode<Source, Target, Expansion, BH>;
   using sourceref_t = SourceRef<Source>;
 
+  BH() : theta_{0.0} { }
+
   /// The BH Method requires a critical angle
   BH(double theta) : theta_{theta} {  }
 
@@ -162,7 +164,7 @@ class BH {
   bool MAC(Point exp_point, double size, Point pos) const {
     Point disp = point_sub(pos, exp_point);
     double theta = size / disp.norm();
-    return theta < local_->data[0];
+    return theta < theta_;
   }
 
   /// Finds the point nearest the given point in a given node

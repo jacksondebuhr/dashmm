@@ -51,7 +51,7 @@ class Direct {
   using sourcenode_t = SourceNode<Source, Target, Expansion, Direct>;
   using targetnode_t = TargetNode<Source, Target, Expansion, Direct>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Direct>;
-  using sourceref_t SourceRef<Source>;
+  using sourceref_t = SourceRef<Source>;
 
   /// In generate, Direct does nothing.
   void generate(sourcenode_t &curr, int n_digits) const {

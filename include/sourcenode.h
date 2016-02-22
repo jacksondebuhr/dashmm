@@ -44,8 +44,9 @@ namespace dashmm {
 /// Forward declaration of Evaluator so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
-class Evaluator<Source, Target, Expansion, Method>;
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
+class Evaluator;
 
 
 /// A node of the source tree.
@@ -57,7 +58,8 @@ class Evaluator<Source, Target, Expansion, Method>;
 /// wherever it is needed.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
 class SourceNode {
  public:
   using source_t = Source;
@@ -493,11 +495,9 @@ class SourceNode {
       hpx_call(kid.data(), partition_, HPX_NULL, &args, sizeof(args));
     }
 
-    hpx_addr_t expaddr = parms->expand.data();
-    int expdigits = parms->expand.n_digits();
+    int expdigits = parms->n_digits;
     hpx_call_when(childpartdone, hpx_thread_current_target(),
-                  child_done_, parms->partdone, &childpartdone,
-                  &expaddr, &expdigits);
+                  child_done_, parms->partdone, &childpartdone, &expdigits);
 
     return HPX_SUCCESS;
   }
@@ -516,22 +516,26 @@ class SourceNode {
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t SourceNode<S, T, E, M>::node_delete_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t SourceNode<S, T, E, M>::self_delete_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t SourceNode<S, T, E, M>::child_done_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
+          template <typename, typename,
+                    template <typename, typename> class> class M>
 hpx_action_t SourceNode<S, T, E, M>::partition_ = HPX_ACTION_NULL;
 
 

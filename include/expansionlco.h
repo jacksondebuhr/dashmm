@@ -39,8 +39,9 @@ namespace dashmm {
 /// Forward declaration of Evaluator so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
-class Evaluator<Source, Target, Expansion, Method>;
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
+class Evaluator;
 
 
 /// Expansion LCO
@@ -58,13 +59,14 @@ class Evaluator<Source, Target, Expansion, Method>;
 /// potentially concurrent contribution to the expansion.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          template <typename, typename, typename> class Method>
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
 class ExpansionLCO {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, expansion_t>;
+  using method_t = Method<Source, Target, Expansion>;
 
   using sourceref_t = SourceRef<Source>;
   using targetref_t = TargetRef<Target>;
@@ -77,9 +79,10 @@ class ExpansionLCO {
       : data_{addr}, n_digits_{n_digits} { }
 
   /// Construct from an existing expansion - this will create a new LCO
-  ExpansionLCO(std::unique_ptr<expanstion_t> exp, hpx_addr_t where) {
+  ExpansionLCO(std::unique_ptr<expansion_t> exp, hpx_addr_t where) {
     if (exp == nullptr) {
-      return ExpansionLCO{HPX_NULL, -1};
+      data_ = HPX_NULL;
+      n_digits_ = -1;
     }
 
     size_t bytes = exp->bytes();
@@ -91,7 +94,8 @@ class ExpansionLCO {
                   ldata, bytes);
     delete [] ldata;
 
-    return ExpansionLCO{retval, n_digits};
+    data_ = retval;
+    n_digits_ = n_digits;
   }
 
   /// Destroy the GAS data referred by the object.
@@ -224,8 +228,10 @@ class ExpansionLCO {
   /// \param scale - scaling factor
   void M_to_T(targetlco_t targets, double scale) const {
     targets.schedule(1);
-    hpx_addr_t tsend = targets.data();
-    hpx_call_when(data_, data_, m_to_t_, HPX_NULL, &n_digits_, &scale, &tsend);
+    hpx_addr_t tsend = targets.lco();
+    int nsend = targets.n();
+    hpx_call_when(data_, data_, m_to_t_, HPX_NULL, &n_digits_, &scale,
+                  &tsend, &nsend);
   }
 
   /// Apply the effect of a local expansion to targets
@@ -238,8 +244,10 @@ class ExpansionLCO {
   /// \param scale - scaling factor
   void L_to_T(targetlco_t targets, double scale) const {
     targets.schedule(1);
-    hpx_addr_t tsend = targets.data();
-    hpx_call_when(data_, data_, l_to_t_, HPX_NULL, &n_digits_, &scale, &tsend);
+    hpx_addr_t tsend = targets.lco();
+    int nsend = targets.n();
+    hpx_call_when(data_, data_, l_to_t_, HPX_NULL, &n_digits_, &scale,
+                  &tsend, &nsend);
   }
 
   /// Apply effect of sources to targets
@@ -253,8 +261,9 @@ class ExpansionLCO {
   void S_to_T(sourceref_t sources, targetlco_t targets) const {
     targets.schedule(1);
     int n_src = sources.n();
-    hpx_addr_t tsend = targets.data();
-    hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend);
+    hpx_addr_t tsend = targets.lco();
+    int n_trg = targets.n();
+    hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend, &n_trg);
   }
 
   /// Add the given expansion to this expansion
@@ -343,7 +352,7 @@ class ExpansionLCO {
     int arrived;
     int scheduled;
     int finished;
-    int payload_size;
+    size_t payload_size;
     char payload[];
   };
 
@@ -416,19 +425,15 @@ class ExpansionLCO {
         return;
       }
 
-      // create an expansion from the rhs
-      expansion_t::contents_t *input =
-        static_cast<expansion_t::contents_t *>(rhs);
-      // The start of contents_t must be two integers, the second being
-      // n_digits.
-      expansion_t incoming{input, bytes, code[1]};
+      // The start of rhs must be two integers, the second being n_digits.
+      expansion_t incoming{rhs, bytes, code[1]};
 
       // create the expansion from the payload
       int *n_digits = reinterpret_cast<int *>(lhs->payload + sizeof(int));
       expansion_t expand{lhs->payload, lhs->payload_size, *n_digits};
 
       // add the one to the other
-      expand.add_expansion(incoming);
+      expand.add_expansion(&incoming);
 
       // release the data, because these objects do not actually own those buffers
       expand.release();
@@ -461,8 +466,8 @@ class ExpansionLCO {
     hpx_gas_try_pin(expand, &temp);
     Header *data = static_cast<Header *>(hpx_lco_user_get_user_data(temp));
     expansion_t local{data->payload, data->payload_size, n_digits};
-    local->S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
-    local->release();
+    local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
+    local.release();
     hpx_gas_unpin(expand);
 
     int code = kContribute;
@@ -495,8 +500,8 @@ class ExpansionLCO {
     Header *ldata{nullptr};
     hpx_lco_getref(target, 1, (void **)&ldata);
     expansion_t lexp{ldata->payload, ldata->payload_size, n_digits};
-    auto translated = lexp->M_to_M(from_child, s_size);
-    lexp->release();
+    auto translated = lexp.M_to_M(from_child, s_size);
+    lexp.release();
     hpx_lco_release(target, ldata);
 
     size_t bytes = translated->bytes();
@@ -518,9 +523,9 @@ class ExpansionLCO {
     hpx_lco_getref(target, 1, (void **)&ldata);
 
     expansion_t lexp{ldata->payload, ldata->payload_size, parms->n_digits};
-    auto translated = lexp->M_to_L(parms->s_index, parms->s_size,
-                                   parms->t_index);
-    lexp->release();
+    auto translated = lexp.M_to_L(parms->s_index, parms->s_size,
+                                 parms->t_index);
+    lexp.release();
     hpx_lco_release(target, ldata);
 
     size_t bytes = translated->bytes();
@@ -541,8 +546,8 @@ class ExpansionLCO {
     Header *ldata{nullptr};
     hpx_lco_getref(target, 1, (void **)&ldata);
     expansion_t lexp{ldata->payload, ldata->payload_size, n_digits};
-    auto translated = lexp->L_to_L(to_child, t_size);
-    lexp->release();
+    auto translated = lexp.L_to_L(to_child, t_size);
+    lexp.release();
     hpx_lco_release(target, ldata);
 
     size_t bytes = translated->bytes();
@@ -556,8 +561,9 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  static int m_to_t_handler(int n_digits, double scale, hpx_addr_t targ) {
-    targetlco_t targets{targ};
+  static int m_to_t_handler(int n_digits, double scale,
+                            hpx_addr_t targ, int n_trg) {
+    targetlco_t targets{targ, n_trg};
     // HACK: This action is local to the expansion, so we getref here with
     // whatever as the size and things are okay...
     Header *ldata{nullptr};
@@ -569,8 +575,9 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  static int l_to_t_handler(int n_digits, double scale, hpx_addr_t targ) {
-    targetlco_t targets{targ};
+  static int l_to_t_handler(int n_digits, double scale,
+                            hpx_addr_t targ, int n_trg) {
+    targetlco_t targets{targ, n_trg};
     // HACK: This action is local to the expansion, so we getref here with
     // whatever as the size and things are okay...
     Header *ldata{nullptr};
@@ -583,8 +590,8 @@ class ExpansionLCO {
   }
 
   static int s_to_t_handler(Source *sources, int n_sources,
-                            hpx_addr_t target) {
-    targetlco_t targets{target};
+                            hpx_addr_t target, int n_trg) {
+    targetlco_t targets{target, n_trg};
     targets.contribute_S_to_T(n_sources, sources);
     return HPX_SUCCESS;
   }
@@ -635,68 +642,81 @@ class ExpansionLCO {
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::init_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::init_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::operation_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::operation_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::s_to_m_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::s_to_m_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::s_to_l_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::s_to_l_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::m_to_m_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::m_to_m_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::m_to_l_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::m_to_l_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::l_to_l_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::l_to_l_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::m_to_t_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::m_to_t_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::l_to_t_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::l_to_t_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::s_to_t_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::s_to_t_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::add_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::add_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
-          template <typename, typename, typename> class M>
-hpx_action_t ExpansionRef<S, T, E, M>::create_from_expansion_ = HPX_ACTION_NULL;
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t ExpansionLCO<S, T, E, M>::create_from_expansion_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

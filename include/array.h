@@ -80,7 +80,7 @@ class Array {
   /// the address of the records.
   ///
   /// \param data - the global address of the array meta data.
-  Array(hpx_addr_t data) : data_{data} { }
+  Array(hpx_addr_t data = HPX_NULL) : data_{data} { }
 
   /// Returns if the Array is valid.
   ///
@@ -94,15 +94,16 @@ class Array {
   ///
   /// \param record_count - the number of records that will be in the array.
   ReturnCode allocate(size_t record_count) {
+    hpx_addr_t *dataout = &data_; //YIKES!
     int runcode;
     int *arg = &runcode;
     size_t size = sizeof(T);
     int err = hpx_run(&allocate_array_action, &record_count,
-                      &size, &data_, &arg);
+                      &size, &dataout, &arg);
     if (HPX_SUCCESS == err) {
       return kSuccess;
     } else {
-      return kAllocationError;
+      return static_cast<ReturnCode>(runcode);
     }
   }
 
