@@ -27,7 +27,7 @@ namespace dashmm {
 DomainGeometry::DomainGeometry(Point low_rect, Point high_rect, double factor)
     : low_{0.0, 0.0, 0.0}, size_{0.0} {
   Point center = point_add(low_rect.scale(0.5), high_rect.scale(0.5));
-  Point sizes = point_sub(high, low);
+  Point sizes = point_sub(high_rect, low_rect);
   double max_size = sizes.x() > sizes.y() ? sizes.x() : sizes.y();
   max_size = max_size > sizes.z() ? max_size : sizes.z();
   max_size *= factor;

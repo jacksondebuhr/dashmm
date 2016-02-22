@@ -23,6 +23,7 @@
 #include <cmath>
 #include <complex>
 #include <map>
+#include <memory>
 #include <vector>
 
 

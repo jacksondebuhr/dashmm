@@ -74,23 +74,13 @@ extern hpx_action_t array_get_action;
 template <typename T>
 class Array {
  public:
-  /// This creates an array object
-  ///
-  /// \param record_count - the number of records that will be in the array.
-  Array(size_t record_count) {
-    int runcode;
-    int *arg = &runcode;
-    size_t size = sizeof(T);
-    hpx_run(&allocate_array_action, &record_count, &size, &data_, &arg);
-  }
-
   /// This creates the Array from the global address of an existing array
   ///
   /// Note that this address is the address of the Array meta data, and not
   /// the address of the records.
   ///
   /// \param data - the global address of the array meta data.
-  Array(hpx_addt_t data) : data_{data} { }
+  Array(hpx_addr_t data) : data_{data} { }
 
   /// Returns if the Array is valid.
   ///
@@ -99,6 +89,22 @@ class Array {
 
   /// Return the global address of the Array meta data.
   hpx_addr_t data() const {return data_;}
+
+  /// This creates an array object
+  ///
+  /// \param record_count - the number of records that will be in the array.
+  ReturnCode allocate(size_t record_count) {
+    int runcode;
+    int *arg = &runcode;
+    size_t size = sizeof(T);
+    int err = hpx_run(&allocate_array_action, &record_count,
+                      &size, &data_, &arg);
+    if (HPX_SUCCESS == err) {
+      return kSuccess;
+    } else {
+      return kAllocationError;
+    }
+  }
 
   /// Destroy the Array
   ///

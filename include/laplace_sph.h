@@ -20,6 +20,7 @@
 /// \brief Declaration of LaplaceSPH
 
 
+#include <cassert>
 #include <cmath>
 #include <complex>
 #include <map>
@@ -78,7 +79,6 @@ class LaplaceSPH {
     bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
     data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
     assert(valid());
-    data_->type = type();
     data_->n_digits = n_digits;
     data_->center = center;
     for (int i = 0; i < n_terms; ++i)
