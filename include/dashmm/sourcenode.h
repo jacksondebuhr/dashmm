@@ -30,12 +30,12 @@
 
 #include <hpx/hpx.h>
 
-#include "include/domaingeometry.h"
-#include "include/expansionlco.h"
-#include "include/index.h"
-#include "include/point.h"
-#include "include/sourceref.h"
-#include "include/types.h"
+#include "dashmm/domaingeometry.h"
+#include "dashmm/expansionlco.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
+#include "dashmm/sourceref.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {

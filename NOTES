@@ -2,15 +2,6 @@ OPEN QUESTIONS and TODO
 TODO: Make the Array type work from inside HPX-5 threads also
 TODO: Merge SourceRef and TargetRef. They are really just the same thing
       with different names. Call is ArrayRef?
-TODO: Can we make the various expansion types define their input and output
-      types, so that the users can just get it right? So LaplaceCOM might
-      using input_t = double, output_t = std::complex<double>?
-      NOTE: this does not clear up the issue of naming it correctly. So
-      perhaps this is nothing too great. Also, it is not clear how this would
-      work when the Expansion will depend on the Source/Target type, which
-      depends on the Expansion type through this information.
-
-      A MACRO for the Expansion? Not super useful.
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
 TODO: currently it is impossible to use the same tree for different Evaluators.
       Do we want to decouple the tree?
@@ -33,22 +24,8 @@ TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
    diverge somewhat. This means both the in-source stuff as well as the user
    guides.
 
- (Go back through and address the includes. I likely have not done this as I
-  went through this.)
-
- (Reorganize the directory)
-    Should we take the hint from HPX and reorganize things so that the includes
-    are obviously from DASHMM. So instead of include/file.h it would be
-    dashmm/file.h? Probably.
-
-    We would just rename include to dashmm - no include would have a dashmm
-      subdirectory, as well as a builtin/ directory for the built in stuff
-    We could then have a lib folder with the built library
-    We could leave src alone
-
-    DO THIS AFTER IT IS WORKING
-
  (Do we do a minor release on the template stuff?)
+    I lean toward yes. v0.6?
 
 
 
@@ -73,3 +50,17 @@ Interface Ideas
  * We should also in the near term get a base nearest neighbor search. This will
  be essential for SPH and Phil's MFV methods.
   This would be useful in much wider contexts, however.
+
+
+
+Some more expansions
+
+ * Do LaplaceCOM with acceleration instead (or both)
+ * So LaplaceCOM with softened force (ala GADGET)
+ * Do one for Ewald technique for periodic BCs
+ * Do one for Short range forces
+
+Some more methods
+
+ * Can we do something more like GADGET's BH method?
+ *

@@ -22,7 +22,7 @@
 #include <memory>
 #include <string>
 
-#include "dashmm.h"
+#include "dashmm/dashmm.h"
 
 #include "user_expansion.h"
 

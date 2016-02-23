@@ -25,9 +25,9 @@
 #include <memory>
 #include <vector>
 
-#include "include/index.h"
-#include "include/point.h"
-#include "include/types.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
+#include "dashmm/types.h"
 
 
 // NOTE: Built-in Methods and Expansions will be part of the dashmm namespace.

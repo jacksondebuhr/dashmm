@@ -16,7 +16,7 @@
 /// \brief Implemention of Point operations
 
 
-#include "include/point.h"
+#include "dashmm/point.h"
 
 
 namespace dashmm {

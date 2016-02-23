@@ -24,7 +24,7 @@
 
 #include <hpx/hpx.h>
 
-#include "include/types.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {

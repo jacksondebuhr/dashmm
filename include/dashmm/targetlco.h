@@ -24,7 +24,7 @@
 
 #include <hpx/hpx.h>
 
-#include "include/targetref.h"
+#include "dashmm/targetref.h"
 
 
 namespace dashmm {

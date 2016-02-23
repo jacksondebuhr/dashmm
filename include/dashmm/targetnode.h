@@ -30,13 +30,13 @@
 
 #include <hpx/hpx.h>
 
-#include "include/domaingeometry.h"
-#include "include/expansionlco.h"
-#include "include/index.h"
-#include "include/point.h"
-#include "include/targetlco.h"
-#include "include/targetref.h"
-#include "include/types.h"
+#include "dashmm/domaingeometry.h"
+#include "dashmm/expansionlco.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
+#include "dashmm/targetlco.h"
+#include "dashmm/targetref.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {
@@ -306,10 +306,6 @@ class TargetNode {
     local_->expansion = expansionlco_t{std::move(expand), HPX_HERE};
   }
 
-  // TODO likely this is no longer needed
-  /// Collect results into user's array
-  void collect_results(hpx_addr_t user_array, size_t phi_offset);
-
  private:
   friend class Evaluator<Source, Target, Expansion, Method>;
 
@@ -426,7 +422,6 @@ class TargetNode {
   static int partition_handler(Data *node, PartitionParams *parms,
                                size_t bytes) {
     targetnode_t curr{hpx_thread_current_target()};
-    // TODO improve this somehow.
     std::vector<sourcenode_t> consider{ };
     for (int i = 0; i < parms->n_consider; ++i) {
       consider.push_back(sourcenode_t{parms->consider[i]});

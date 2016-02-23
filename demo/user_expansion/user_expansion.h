@@ -27,7 +27,7 @@
 #include <memory>
 
 // All of the library interface can be accessed through dashmm.h
-#include "dashmm.h"
+#include "dashmm/dashmm.h"
 
 
 // This is the specific detail of the implementation of the data for the

@@ -20,8 +20,8 @@
 /// \brief Object to represent the top-level domain
 
 
-#include "include/index.h"
-#include "include/point.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
 
 
 namespace dashmm {

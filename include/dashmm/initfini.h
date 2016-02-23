@@ -20,7 +20,7 @@
 /// \brief The basic interface to DASHMM.
 
 
-#include "include/types.h"
+#include "dashmm/types.h"
 
 
 /// \namespace dashmm

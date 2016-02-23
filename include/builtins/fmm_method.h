@@ -20,12 +20,12 @@
 /// \brief Declaration of FMM Method
 
 
-#include "include/expansionlco.h"
-#include "include/index.h"
-#include "include/sourcenode.h"
-#include "include/sourceref.h"
-#include "include/targetlco.h"
-#include "include/targetnode.h"
+#include "dashmm/expansionlco.h"
+#include "dashmm/index.h"
+#include "dashmm/sourcenode.h"
+#include "dashmm/sourceref.h"
+#include "dashmm/targetlco.h"
+#include "dashmm/targetnode.h"
 
 
 namespace dashmm {

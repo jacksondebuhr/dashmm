@@ -16,7 +16,7 @@
 /// \brief Implementation of laplace_sph_precompute()
 
 
-#include "include/laplace_sph.h"
+#include "builtins/laplace_sph.h"
 
 
 namespace dashmm {

@@ -21,7 +21,7 @@
 
 #include <hpx/hpx.h>
 
-#include "include/array.h"
+#include "dashmm/array.h"
 
 
 namespace dashmm {
@@ -119,14 +119,13 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
                       void *in_data) {
   *err = kSuccess;
 
-  //NOTE: This should always work as this is called on the meta data.
+  // NOTE: This should always work as this is called on the meta data.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     *err = kRuntimeError;
     hpx_exit(HPX_ERROR);
   }
 
-  //TODO: SMP assumption here. This must be improved.
   char *local;
   if (!hpx_gas_try_pin(meta->data, (void **)&local)) {
     hpx_gas_unpin(obj);
@@ -177,7 +176,6 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
     hpx_exit(HPX_ERROR);
   }
 
-  // TODO: SMP assumption here. This must be improved.
   char *local{nullptr};
   if (!hpx_gas_try_pin(meta->data, (void **)&local)) {
     *err = kRuntimeError;

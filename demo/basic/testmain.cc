@@ -23,7 +23,7 @@
 #include <memory>
 #include <string>
 
-#include "dashmm.h"
+#include "dashmm/dashmm.h"
 
 
 struct SourceData {

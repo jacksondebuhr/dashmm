@@ -16,9 +16,9 @@
 /// \brief Implementation of DomainGeometry
 
 
-#include "include/domaingeometry.h"
-
 #include <cmath>
+
+#include "dashmm/domaingeometry.h"
 
 
 namespace dashmm {

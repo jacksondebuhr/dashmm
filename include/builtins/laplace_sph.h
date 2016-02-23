@@ -27,10 +27,10 @@
 #include <memory>
 #include <vector>
 
-#include "include/index.h"
-#include "include/laplace_sph_table.h"
-#include "include/point.h"
-#include "include/types.h"
+#include "dashmm/index.h"
+#include "builtins/laplace_sph_table.h"
+#include "dashmm/point.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {

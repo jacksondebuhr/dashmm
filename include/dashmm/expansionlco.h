@@ -25,12 +25,12 @@
 
 #include <hpx/hpx.h>
 
-#include "include/index.h"
-#include "include/point.h"
-#include "include/sourceref.h"
-#include "include/targetlco.h"
-#include "include/targetref.h"
-#include "include/types.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
+#include "dashmm/sourceref.h"
+#include "dashmm/targetlco.h"
+#include "dashmm/targetref.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {
