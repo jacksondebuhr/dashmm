@@ -94,6 +94,10 @@ class Array {
   ///
   /// \param record_count - the number of records that will be in the array.
   ReturnCode allocate(size_t record_count) {
+    if (data_ != HPX_NULL) {
+      // If the object already has data, do not allocate new data.
+      return kDomainError;
+    }
     hpx_addr_t *dataout = &data_; //YIKES!
     int runcode;
     int *arg = &runcode;
@@ -113,6 +117,9 @@ class Array {
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
+    if (data_ == HPX_NULL) {
+      return kSuccess;
+    }
     if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
       return kSuccess;
     } else {

@@ -17,12 +17,13 @@ TODO: See if we can work out a better way to work with the consider list.
       All this to and from vectors is annoying.
 TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
       member of TargerLCO to data();
+TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
+      constructor in some way?
+TODO: Do we want to decouple the registration from the evaluation? Two objects?
+      Some kind of template function?
 
 
  (Recheck documentation)
- - This will need to happen. The documentation and the code has started to
-   diverge somewhat. This means both the in-source stuff as well as the user
-   guides.
 
  (Do we do a minor release on the template stuff?)
     I lean toward yes. v0.6?
