@@ -33,6 +33,9 @@ class Point {
   /// Construct a point from x, y, z positions.
   Point(double x, double y, double z) : pos_{x, y, z} { }
 
+  /// Construct a point from a C-style array.
+  Point(double *arr) : pos_{arr[0], arr[1], arr[2]} { }
+
   /// Copy construct a point.
   Point(const Point &pt) : pos_{pt.x(), pt.y(), pt.z()} { }
 

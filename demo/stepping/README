@@ -1,11 +1,13 @@
------------------------
-testdashmm demo program
------------------------
+---------------------
+stepping demo program
+---------------------
 
-This demo contains a simple utility to demonstrate the basic use of
-DASHMM for both BH and FMM cases. The utility produces a random selection
-of sources and targets in three different distributions (selectable separately
-for sources and targets).
+This demo contains a simple time stepping code to demonstrate the means by
+which a user can map an action onto the elements of a DASHMM Array. The
+code creates a number of particles in the volume inside a unit sphere and lets
+them evolve forward in time under their mutual gravitational interaction.
+This example is demonstrative only, and so do not expect high quality
+time integrations.
 
 
 -----------------
@@ -28,20 +30,18 @@ of default arguments. The behavior of the demo can be controlled by a set of
 command line arguments.
 
 Options available: [possible/values] (default value)
-  --method=[fmm/bh]            method to use (fmm)
   --nsources=num               number of source points to generate (10000)
-  --sourcedata=[cube/sphere/plummer]
-                               source distribution type (cube)
-  --ntargets=num               number of target points to generate (10000)
-  --targetdata=[cube/sphere/plummer]
-                               target distribution type (cube)
   --threshold=num              source and target tree partition refinement
                                  limit (40)
-  --accuracy=num               number of digits of accuracy for fmm (3)
-  --verify=[yes/no]            perform an accuracy test comparing to direct
-                                 summation (yes)
+  --nsteps=num                 number of steps to take (100)
+  --output=file                specify file for output (disabled)
 
-After running, the code will output some summary information.
+After running, the code will output some summary information. If an output file
+is provided, the final positions, velocities and accelerations of the particles
+will be written out in the provided file. Each line of the file will contain
+10 entries separated by a space: three coordinates, three velocity components,
+three acceleration components and the original index of the particle in
+question.
 
 There is one HPX-5 command line argument that may be of use. Specifying
 --hpx-threads=num on the command line will control how many scheduler threads

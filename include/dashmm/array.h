@@ -24,26 +24,12 @@
 
 #include <hpx/hpx.h>
 
+#include "dashmm/arraymetadata.h"
+#include "dashmm/arraymapaction.h"
 #include "dashmm/types.h"
 
 
 namespace dashmm {
-
-
-/// Meta data for the array object
-///
-/// Array objects in DASHMM are two part objects in the global address space.
-/// The ObjectHandle points to the meta data which is the information below.
-/// Somewhere else in the global address space will be the data itself.
-/// Currently, as DASHMM is specialized to SMP operation, the array data will
-/// be on the same locality. In the future, this may change, and so we separate
-/// the array meta data from the array itself, as the required metadata may
-/// need to change as the data layout becomes more flexible.
-struct ArrayMetaData {
-  hpx_addr_t data;    /// global address of the array data
-  size_t count;       /// the number of records in the array
-  size_t size;        /// the size (bytes) of each record
-};
 
 
 /// Action for Array allocation
@@ -167,6 +153,23 @@ class Array {
     int *arg = &runcode;
     hpx_run(&array_put_action, &data_, &first, &last, &arg, &in_data);
     return static_cast<ReturnCode>(runcode);
+  }
+
+  /// Map an action onto each record in the Array
+  ///
+  /// This will cause the action represented by the given argument, to be
+  /// invoked on all the entries of the array. The action will ultimatly work
+  /// on segments of the array. The environment is provided unmodified to each
+  /// segment. Please see the ArrayMapAction for more details.
+  ///
+  /// \param act - the action to perform on the entries of the array.
+  /// \param env - the environment to use in the action.
+  ///
+  /// \return - kSuccess
+  template <typename E>
+  ReturnCode map(const ArrayMapAction<T, E> &act, const E *env) {
+    hpx_run(&act.root_, &act.leaf_, &env, &data_);
+    return kSuccess;
   }
 
  private:

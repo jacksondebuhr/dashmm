@@ -49,7 +49,7 @@ There is one HPX-5 command line argument that may be of use. Specifying
 --hpx-threads=num on the command line will control how many scheduler threads
 HPX-5 is using. If this is not specified, then HPX-5 will use one thread per
 available core on the system. In principle, the number of scheduler threads
-is limited only by the available system resources. In practive, you will not
+is limited only by the available system resources. In practice, you will not
 improve performance using more HPX-5 threads than there are cores on your
 system.
 

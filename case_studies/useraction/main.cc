@@ -20,16 +20,20 @@ class ArrayMapAction {
   ArrayMapAction(void(*f)(T *, const size_t, const E *)) {
     HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, leaf_, f,
                         HPX_POINTER, HPX_SIZE_T, HPX_POINTER);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, spawn_, spawn_handler,
-                        HPX_SIZE_T, HPX_SIZE_T, HPX_ADDR,
-                        HPX_ACTION_T, HPX_POINTER, HPX_POINTER);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, root_, root_handler,
-                        HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T,
-                        HPX_ACTION_T, HPX_POINTER, HPX_POINTER);
+    if (!registered_) {
+      HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, spawn_, spawn_handler,
+                          HPX_SIZE_T, HPX_SIZE_T, HPX_ADDR,
+                          HPX_ACTION_T, HPX_POINTER, HPX_POINTER);
+      HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, root_, root_handler,
+                          HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T,
+                          HPX_ACTION_T, HPX_POINTER, HPX_POINTER);
+      registered_ = 1;
+    }
   }
 
-  hpx_action_t root() const {return root_;}
+  static hpx_action_t root() {return root_;}
   hpx_action_t leaf() const {return leaf_;}
+  static int registered() {return registered_;}
 
  private:
   static int root_handler(size_t count, size_t chunk_count, size_t chunk_size,
@@ -86,10 +90,14 @@ class ArrayMapAction {
     return HPX_SUCCESS;
   }
 
+  static int registered_;
   static hpx_action_t root_;
   static hpx_action_t spawn_;
   hpx_action_t leaf_;
 };
+
+template <typename T, typename E>
+int ArrayMapAction<T, E>::registered_ = 0;
 
 template <typename T, typename E>
 hpx_action_t ArrayMapAction<T, E>::root_ = HPX_ACTION_NULL;
@@ -144,11 +152,7 @@ void mappedaction_handler(SourceData *source, const size_t count,
 }
 
 void boogieboogieboogie(SourceData *source, const size_t count,
-                        const Environment *env) {
-  for (size_t i = 0; i < count; ++i) {
-    fprintf(stdout, "boogie: %lg\n", source[i].blah);
-  }
-}
+                        const Environment *env);
 
 
 // The user must create an instance of the object, so that it might be passed
@@ -194,4 +198,12 @@ int main(int argc, char **argv) {
 
   hpx_finalize();
   return 0;
+}
+
+
+void boogieboogieboogie(SourceData *source, const size_t count,
+                        const Environment *env) {
+  for (size_t i = 0; i < count; ++i) {
+    fprintf(stdout, "boogie: %lg\n", source[i].blah);
+  }
 }

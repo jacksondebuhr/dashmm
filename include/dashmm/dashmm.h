@@ -29,6 +29,7 @@
 
 // The built in expansions
 #include "builtins/laplace_com.h"
+#include "builtins/laplace_com_acc.h"
 #include "builtins/laplace_sph.h"
 
 
