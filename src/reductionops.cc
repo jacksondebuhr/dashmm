@@ -16,7 +16,7 @@
 /// \brief Implemention of common reduction operations
 
 
-#include "include/reductionops.h"
+#include "dashmm/reductionops.h"
 
 
 namespace dashmm {

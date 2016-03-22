@@ -3,10 +3,10 @@ CXXFLAGS = -std=c++11 -Wall -O3 -g
 INCLUDE = -I../../include $(shell pkg-config --cflags hpx)
 LIBS = -L../../lib -ldashmm $(shell pkg-config --libs hpx)
 
-SRC = testmain.cc
+SRC = stepping.cc
 OBJ = $(SRC:.cc=.o)
 
-EXEC = testdashmm
+EXEC = stepping
 
 all: $(EXEC)
 

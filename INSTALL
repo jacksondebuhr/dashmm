@@ -41,7 +41,8 @@ built by performing the following steps:
    'make'
 
    This will build the library statically, producing
-   /path/to/dashmm/libdashmm.a. This can then be linked into your application.
+   /path/to/dashmm/lib/libdashmm.a. This can then be linked into your
+   application.
 
 Please note that the build system uses pkg-config to set up correct compilation
 and linking options for HPX-5. So it is important to add the correct path to

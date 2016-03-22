@@ -12,25 +12,25 @@
 // =============================================================================
 
 
-/// \file include/laplace_sph.h
-/// \brief Implementation of laplace_sph_precompute()
+#ifndef __DASHMM_USER_INTERFACE_H__
+#define __DASHMM_USER_INTERFACE_H__
 
 
+// The basic interface
+#include "dashmm/array.h"
+#include "dashmm/evaluator.h"
+#include "dashmm/initfini.h"
+#include "dashmm/types.h"
+
+// The built in methods
+#include "builtins/bh_method.h"
+#include "builtins/direct_method.h"
+#include "builtins/fmm_method.h"
+
+// The built in expansions
+#include "builtins/laplace_com.h"
+#include "builtins/laplace_com_acc.h"
 #include "builtins/laplace_sph.h"
 
 
-namespace dashmm {
-
-
-void laplace_sph_precompute(int n_digits) {
-  // If we are not running on SMP, the following needs to be wrapped and
-  // broadcasted inside an hpx_run
-  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
-  if (entry == builtin_laplace_table_.end()) {
-    builtin_laplace_table_[n_digits] =
-      std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}};
-  }
-}
-
-
-} // namespace dashmm
+#endif // __DASHMM_USER_INTERFACE_H__

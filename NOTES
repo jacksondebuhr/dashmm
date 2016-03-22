@@ -1,19 +1,36 @@
-* First release TODO
-  - create a build system for making DASHMM into a library
-  - enlist Matt as an end-user for testing the ease of the build system
-  - Update the Basic user guide
-  - Start to work on the Advanced User Guide (we have a few of the advanced
-    features implemented.) Also, having a guide for implementing new internal
-    methods and expansions it would be helpful, as it would be easy to miss
-    something.
+OPEN QUESTIONS and TODO
+TODO: Make the Array type work from inside HPX-5 threads also
+TODO: Merge SourceRef and TargetRef. They are really just the same thing
+      with different names. Call is ArrayRef?
+TODO: Should we explicitly enforce the singleton nature of Evaluator?
+TODO: currently it is impossible to use the same tree for different Evaluators.
+      Do we want to decouple the tree?
+TODO: Perhaps we want to parameterize the nodes with some user data? So
+      the user can use the tree for other things as well.
+TODO: Should we just make the evaluator into a functor? Instead of evaluate,
+      we just overload ()?
+TODO: Factor the bit in evaluate_handler() that gets the domain
+TODO: In contribute for ExpansionLCO, can we change it so the user can just
+      pass in the expansion?
+TODO: Why is s_to_l_handler different than s_to_m_handler?
+TODO: See if we can work out a better way to work with the consider list.
+      All this to and from vectors is annoying.
+TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
+      member of TargerLCO to data();
+TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
+      constructor in some way?
+TODO: Do we want to decouple the registration from the evaluation? Two objects?
+      Some kind of template function?
+
+
+ (Recheck documentation)
+
+ (Do we do a minor release on the template stuff?)
+    I lean toward yes. v0.6?
+
 
 
 Some notes about issues or future features
-
-* In the future, we may want to have the ObjectHandle be something a little
-more specific. Perhaps a dashmm::Array object. Of course, like everything else
-it is backed by data in the GAS, but it would at least add some meaning to the
-symbols in the code.
 
 * We will need to improve the error handling in this thing quite a bit.
 Basically any way that the user-facing methods can go wrong should return
@@ -25,19 +42,9 @@ exposed in header files separate from the users.
 
 Interface Ideas
 
- * For the array get and put, should we perhaps have a template function that
-   accepts iterators here? This would make it work nicely with the STL
-
- * Do we want to define instead SourceSpec and TargetSpec to combine the
-   relevant arguments for evaluate()?
-
- * Is there a sensible way to templatize allocate_array?
 
  * Eventually the expansion should have a method indicating the number of
    charges. And the number of outputs (phi, ax, ay, az, whatever)
-
- * We should add a routine to check compatibility without having to call
-   evaluate to check method,expansion compatibility.
 
  * Provide C bindings before too long
 
@@ -47,20 +54,14 @@ Interface Ideas
 
 
 
-HOW TO ADD A NEW BUILT-IN METHOD
+Some more expansions
 
-1. Pick a name for it and create files include/****.h and src/****.cc
+ * Do LaplaceCOM with acceleration instead (or both)
+ * So LaplaceCOM with softened force (ala GADGET)
+ * Do one for Ewald technique for periodic BCs
+ * Do one for Short range forces
 
-2. Create the ID symbol in include/ids.h and choose a unique value for that id
+Some more methods
 
-3. Implement the new method (.h .cc)
-
-4. Add factory method in include/builtins.h and implement the factory in
-   src/builtins.cc
-
-5. Implement the creation action for that method in src/builtins.cc
-
-6. Add a line to register_built_in_methods() registering the method with
-   DASHMM
-
-7. Test the new method until you are satisfied it works.
+ * Can we do something more like GADGET's BH method?
+ *
