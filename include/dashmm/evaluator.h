@@ -286,6 +286,8 @@ class Evaluator {
 
   /// The evaluation action implementation
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
+    bool same_sandt = parms->sources.data() == parms->targets.data();
+
     // create source and target references
     // NOTE: These will need to be updated once we change the way array works
     // for distributed operation.
@@ -297,26 +299,33 @@ class Evaluator {
     hpx_gas_memget_sync(&trgmeta, parms->targets.data(), sizeof(trgmeta));
     targetref_t targets{trgmeta.data, trgmeta.count, trgmeta.count};
 
-    // find source and target bounds
+    // Get source bounds
     hpx_addr_t srcbnd = hpx_lco_future_new(sizeof(BoundsResult));
-    hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
-    assert(srcbnd != HPX_NULL && trgbnd != HPX_NULL);
-
+    assert(srcbnd != HPX_NULL);
     hpx_call(srcmeta.data, source_bounds_, srcbnd,
              &srcmeta.data, &srcmeta.count);
-    hpx_call(trgmeta.data, target_bounds_, trgbnd,
-             &trgmeta.data, &trgmeta.count);
 
     BoundsResult bounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
     hpx_lco_get(srcbnd, sizeof(BoundsResult), &bounds);
-    BoundsResult otherbounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-    hpx_lco_get(trgbnd, sizeof(BoundsResult), &otherbounds);
-    bounds.low.lower_bound(otherbounds.low);
-    bounds.high.upper_bound(otherbounds.high);
-
     hpx_lco_delete_sync(srcbnd);
-    hpx_lco_delete_sync(trgbnd);
 
+    // get target bounds - if targets != sources
+    if (!same_sandt) {
+      hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
+      assert(trgbnd != HPX_NULL);
+
+      hpx_call(trgmeta.data, target_bounds_, trgbnd,
+               &trgmeta.data, &trgmeta.count);
+
+      BoundsResult otherbounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
+      hpx_lco_get(trgbnd, sizeof(BoundsResult), &otherbounds);
+      bounds.low.lower_bound(otherbounds.low);
+      bounds.high.upper_bound(otherbounds.high);
+
+      hpx_lco_delete_sync(trgbnd);
+    }
+
+    // Get the overall domain
     DomainGeometry domain{bounds.low, bounds.high, 1.0002};
 
     // create source tree, wait for partitioning of source to finish,
@@ -329,10 +338,19 @@ class Evaluator {
     hpx_lco_wait(partition_done);
     hpx_lco_delete_sync(partition_done);
 
-    bool same_sandt = parms->sources.data() == parms->targets.data();
-    target_root.partition(targets, parms->refinement_limit, parms->n_digits,
-                          0, same_sandt,
-                          std::vector<sourcenode_t>{source_root});
+    hpx_addr_t targetpartdone =
+      target_root.partition(targets, parms->refinement_limit,
+                            parms->n_digits, 0, same_sandt,
+                            std::vector<sourcenode_t>{source_root});
+
+
+    // deal with one pathological case:
+    expansionlco_t srootexpand = source_root.expansion();
+    hpx_lco_wait(srootexpand.data());
+
+    // deal with another pathological case:
+    hpx_lco_wait(targetpartdone);
+    hpx_lco_delete_sync(targetpartdone);
 
     // clean up
     source_root.destroy();
@@ -395,7 +413,7 @@ template <typename S, typename T,
 hpx_action_t Evaluator<S, T, E, M>::target_bounds_ = HPX_ACTION_NULL;
 
 
-} //namespace dashmm
+} // namespace dashmm
 
 
 #endif // __DASHMM_EVALUATOR_H__

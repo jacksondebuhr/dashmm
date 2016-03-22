@@ -116,7 +116,7 @@ class ArrayMapAction {
     // in some way, where the user might give hints, or explicit instructions.
     size_t over_factor = 4;
     if (hpx_get_num_threads() == 1) {
-      // Avoid pointless overhead in for 1 thread
+      // Avoid pointless overhead for 1 thread
       over_factor = 1;
     }
     size_t n_per_chunk = total_count / (hpx_get_num_threads() * over_factor);

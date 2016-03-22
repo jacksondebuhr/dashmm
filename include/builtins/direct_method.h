@@ -61,7 +61,11 @@ class Direct {
   }
 
   /// In aggregate, Direct does nothing.
-  void aggregate(sourcenode_t &curr, int n_digits) const { }
+  void aggregate(sourcenode_t &curr, int n_digits) const {
+    curr.set_expansion(std::unique_ptr<expansion_t>{
+        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
+      });
+  }
 
   /// In inherit, Direct does nothing.
   void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {

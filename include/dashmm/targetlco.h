@@ -88,6 +88,7 @@ class TargetLCO {
     if (lco_ != HPX_NULL) {
       hpx_lco_delete_sync(lco_);
       lco_ = HPX_NULL;
+      n_targs_ = 0;
     }
   }
 
@@ -170,6 +171,7 @@ class TargetLCO {
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
+    delete [] input;
   }
 
  private:

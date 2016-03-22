@@ -83,9 +83,7 @@ class TargetNode {
   TargetNode(DomainGeometry g, Index idx, method_t method,
              targetnode_t *parent) {
     data_ = hpx_gas_alloc_local(1, sizeof(Data), 0);
-    if (data_ == HPX_NULL) {
-      return;
-    }
+    assert(data_ != HPX_NULL);
     local_ = nullptr;
 
     pin();
@@ -156,16 +154,23 @@ class TargetNode {
   /// \param same_sources_and_targets - are we in the case where the sources
   ///                 and targets are the same?
   /// \param consider - the list of source nodes in the consider list
-  void partition(targetref_t targets, int limit,
-                 int n_digits, int which_child,
-                 bool same_sources_and_targets,
-                 std::vector<sourcenode_t> consider) {
+  ///
+  /// \returns - a zero size future indicating that the work of the partition
+  ///            is finished. It is not safe to destroy either tree before the
+  ///            returned LCO triggers.
+  hpx_addr_t partition(targetref_t targets, int limit,
+                       int n_digits, int which_child,
+                       bool same_sources_and_targets,
+                       std::vector<sourcenode_t> consider) {
     hpx_addr_t done = hpx_lco_future_new(0);
     assert(done != HPX_NULL);
+    hpx_addr_t partdone = hpx_lco_future_new(0);
+    assert(partdone != HPX_NULL);
 
     size_t parms_size = partition_params_size(consider.size());
     PartitionParams *parms = partition_params_alloc(consider.size());
     parms->done = done;
+    parms->partdone = partdone;
     parms->same_sources_and_targets = same_sources_and_targets;
     parms->targets = targets;
     parms->limit = limit;
@@ -181,6 +186,8 @@ class TargetNode {
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
+
+    return partdone;
   }
 
   /// Is the node a leaf?
@@ -332,6 +339,7 @@ class TargetNode {
 
   struct PartitionParams {
     hpx_addr_t done;
+    hpx_addr_t partdone;
     // This should be expanded upon. This will be true only if the exact same
     // array is sent into evaluate as the source and target points. What this
     // means is that, if true, we can skip actual partitioning and instead
@@ -491,7 +499,7 @@ class TargetNode {
 
       hpx_gas_unpin(parms->targets.data());
 
-      targetref_t cparts[8] {};
+      targetref_t cparts[8] { };
       int n_children{0};
       {
         int n_offset{0};
@@ -507,11 +515,14 @@ class TargetNode {
 
       hpx_addr_t cdone = hpx_lco_and_new(n_children);
       assert(cdone != HPX_NULL);
+      hpx_addr_t partdone = hpx_lco_and_new(n_children);
+      assert(partdone != HPX_NULL);
 
       // set up the arguments to the partition actions; the constant parts
       PartitionParams *args = partition_params_alloc(consider.size());
       size_t argssize = partition_params_size(consider.size());
       args->done = cdone;
+      args->partdone = partdone;
       args->same_sources_and_targets = parms->same_sources_and_targets;
       args->limit = parms->limit;
       args->n_digits = parms->n_digits;
@@ -538,17 +549,26 @@ class TargetNode {
       }
       delete [] args;
 
+      // This propagates the targetlco finished signals back up the tree.
       hpx_call_when(cdone, cdone, hpx_lco_delete_action, parms->done,
                     nullptr, 0);
+      // This propagates the fact that these partition actions are done back
+      // up the tree.
+      hpx_call_when(partdone, partdone, hpx_lco_delete_action,
+                    parms->partdone, nullptr, 0);
     }
 
-    // At this point, all work on the current expansion will have been scheduled,
-    // so we mark the LCO as such.
+    // At this point, all work on the current expansion will have been
+    // scheduled, so we mark the LCO as such.
     node->expansion.finalize();
-    // Also, all the work on the targets for this node will have been scheduled as
-    // well.
+    // Also, all the work on the targets for this node will have been scheduled
+    // as well.
     if (!refine) {
       node->targets.finalize();
+    }
+
+    if (!refine) {
+      hpx_lco_set_lsync(parms->partdone, 0, nullptr, HPX_NULL);
     }
 
     return HPX_SUCCESS;

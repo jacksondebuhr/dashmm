@@ -293,7 +293,9 @@ class LaplaceCOMAcc {
   ///
   /// \param c - the new center of mass
   void set_xcom(const double c[3]) {
-    data_->xcom[0] = c[0];data_->xcom[1] = c[1];data_->xcom[2] = c[2];
+    data_->xcom[0] = c[0];
+    data_->xcom[1] = c[1];
+    data_->xcom[2] = c[2];
   }
 
   /// Set the quadrupole moments
@@ -302,8 +304,12 @@ class LaplaceCOMAcc {
   ///
   /// \param q - the new quadrupole moments
   void set_Q(const double q[6]) {
-    data_->Q[0] = q[0];data_->Q[1] = q[1];data_->Q[2] = q[2];
-    data_->Q[3] = q[3];data_->Q[4] = q[4];data_->Q[5] = q[5];
+    data_->Q[0] = q[0];
+    data_->Q[1] = q[1];
+    data_->Q[2] = q[2];
+    data_->Q[3] = q[3];
+    data_->Q[4] = q[4];
+    data_->Q[5] = q[5];
   }
 
  private:
