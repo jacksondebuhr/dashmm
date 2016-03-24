@@ -16,7 +16,7 @@
 #define __DASHMM_LAPLACE_SPH_EXPANSION_H__
 
 
-/// \file include/laplace_sph.h
+/// \file include/builtins/laplace_sph.h
 /// \brief Declaration of LaplaceSPH
 
 

@@ -16,7 +16,7 @@
 #define __DASHMM_SOURCE_REF_H__
 
 
-/// \file include/sourceref.h
+/// \file include/dashmm/sourceref.h
 /// \brief SourceRef object definition
 
 

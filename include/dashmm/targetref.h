@@ -16,7 +16,7 @@
 #define __DASHMM_TARGET_REF_H__
 
 
-/// \file include/targetref.h
+/// \file include/dashmm/targetref.h
 /// \brief TargetRef object definition
 
 

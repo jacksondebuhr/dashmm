@@ -16,7 +16,7 @@
 #define __DASHMM_ARRAY_H__
 
 
-/// \file include/array.h
+/// \file include/dashmm/array.h
 /// \brief Definitions needed to interact with DASHMM array objects.
 
 

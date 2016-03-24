@@ -16,7 +16,7 @@
 #define __DASHMM_ARRAY_MAP_ACTION_H__
 
 
-/// \file include/arraymapaction.h
+/// \file include/dashmm/arraymapaction.h
 /// \brief Definitions for actions mappable over an array.
 
 

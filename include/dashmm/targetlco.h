@@ -16,7 +16,7 @@
 #define __DASHMM_TARGET_LCO_H__
 
 
-/// \file include/targetlco.h
+/// \file include/dashmm/targetlco.h
 /// \brief TargetLCO object definition
 
 

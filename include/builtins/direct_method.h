@@ -16,7 +16,7 @@
 #define __DASHMM_DIRECT_METHOD_H__
 
 
-/// \file include/direct_method.h
+/// \file include/builtins/direct_method.h
 /// \brief Direction summation method
 
 

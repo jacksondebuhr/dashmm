@@ -16,7 +16,7 @@
 #define __DASHMM_LAPLACE_SPH_TABLE_H__
 
 
-/// \file include/laplace_sph_table.h
+/// \file include/builtins/laplace_sph_table.h
 /// \brief Declaration of precomputed tables for LaplaceSPH
 
 

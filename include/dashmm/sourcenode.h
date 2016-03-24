@@ -16,7 +16,7 @@
 #define __DASHMM_SOURCE_NODE_H__
 
 
-/// \file include/sourcenode.h
+/// \file include/dashmm/sourcenode.h
 /// \brief Source tree
 
 

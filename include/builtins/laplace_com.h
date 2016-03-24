@@ -16,7 +16,7 @@
 #define __DASHMM_LAPLACE_COM_EXPANSION_H__
 
 
-/// \file include/laplace_com.h
+/// \file include/builtins/laplace_com.h
 /// \brief Declaration of LaplaceCOM
 
 

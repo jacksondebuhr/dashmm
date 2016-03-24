@@ -16,7 +16,7 @@
 #define __DASHMM_DOMAIN_GEOMETRY_H__
 
 
-/// \file include/domaingeometry.h
+/// \file include/dashmm/domaingeometry.h
 /// \brief Object to represent the top-level domain
 
 

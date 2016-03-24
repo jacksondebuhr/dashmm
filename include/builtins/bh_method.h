@@ -16,7 +16,7 @@
 #define __DASHMM_BH_METHOD_H__
 
 
-/// \file include/bh_method.h
+/// \file include/builtins/bh_method.h
 /// \brief Declaration of BH method
 
 

@@ -16,7 +16,7 @@
 #define __DASHMM_TARGET_NODE_H__
 
 
-/// \file include/targetnode.h
+/// \file include/dashmm/targetnode.h
 /// \brief Target tree
 
 

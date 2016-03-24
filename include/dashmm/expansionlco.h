@@ -16,7 +16,7 @@
 #define __DASHMM_EXPANSION_REF_H__
 
 
-/// \file include/expansionlco.h
+/// \file include/dashmm/expansionlco.h
 /// \brief Interface to Expansion LCO
 
 

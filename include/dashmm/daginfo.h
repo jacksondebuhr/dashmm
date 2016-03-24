@@ -12,28 +12,19 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_REDUCTION_OPS_H__
-#define __DASHMM_REDUCTION_OPS_H__
+#ifndef __DASHMM_DAG_INFO_H__
+#define __DASHMM_DAG_INFO_H__
 
 
-/// \file include/dashmm/reductionops.h
-/// \brief Action identifiers for common reduction operations
-
-
-#include <hpx/hpx.h>
+/// \file include/dashmm/daginfo.h
+/// \brief Interface to Expansion LCO
 
 
 namespace dashmm {
 
-
-/// Identity operation for integer summation
-extern hpx_action_t int_sum_ident_op;
-
-/// Operation for integer summation
-extern hpx_action_t int_sum_op;
-
+//
 
 } // namespace dashmm
 
 
-#endif // __DASHMM_REDUCTION_OPS_H__
+#endif // __DASHMM_DAG_INFO_H__

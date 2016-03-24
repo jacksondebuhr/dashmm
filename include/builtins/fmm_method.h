@@ -16,7 +16,7 @@
 #define __DASHMM_FMM_METHOD_H__
 
 
-/// \file include/fmm_method.h
+/// \file include/builtins/fmm_method.h
 /// \brief Declaration of FMM Method
 
 

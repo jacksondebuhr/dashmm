@@ -16,7 +16,7 @@
 #define __DASHMM_EVALUATOR_H__
 
 
-/// \file include/evaluator.h
+/// \file include/dashmm/evaluator.h
 /// \brief Definition of DASHMM Evaluator object
 
 

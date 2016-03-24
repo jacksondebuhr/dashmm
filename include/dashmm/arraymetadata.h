@@ -16,7 +16,7 @@
 #define __DASHMM_ARRAY_META_DATA_H__
 
 
-/// \file include/arraymetadata.h
+/// \file include/dashmm/arraymetadata.h
 /// \brief Definition of ArrayMetaData.
 
 
