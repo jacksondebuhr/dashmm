@@ -40,6 +40,9 @@ class Method {
 
   /// TODO: The method will need a default constructor.
 
+  /// TODO: Revisit these. Do we need n_digits here anymore? The method
+  /// just makes the intermediate DAG
+
   /// Generate the expansion at the leaf of the source tree
   ///
   /// This operation is invoked at the leaves of the source tree to generate
@@ -56,7 +59,7 @@ class Method {
   ///
   /// \param curr - the current node of the source tree (will be a leaf)
   /// \param n_digits - the accuracy parameter for the expansion in question.
-  void generate(sourcenode_t &curr, int n_digits) const;
+  void generate(sourcenode_t *curr, int n_digits) const;
 
   /// Combine expansions from children of an internal source node
   ///
@@ -69,7 +72,7 @@ class Method {
   ///
   /// \param curr - the current node of the source tree (will be internal)
   /// \param n_digits - the accuracy parameter for the expansion in question.
-  void aggregate(sourcenode_t &curr, int n_digits) const;
+  void aggregate(sourcenode_t *curr, int n_digits) const;
 
   /// Inherit an expansion from a target node's parent
   ///
@@ -79,7 +82,7 @@ class Method {
   /// \param curr - the current node of the target tree
   /// \param n_digits - the accuracy parameter for the expansion in question.
   /// \which_child - which child @p curr is of its parent
-  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const;
+  void inherit(targetnode_t *curr, int n_digits, size_t which_child) const;
 
   /// Process the list of source nodes for a given target node
   ///
@@ -91,7 +94,7 @@ class Method {
   /// \param curr - the target node in question
   /// \param consider - a vector of the source nodes under consideration
   /// \param curr_is_leaf - indicates if @p curr is a leaf node
-  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
+  void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf) const;
 
   /// Decide if the node in the target tree should be refined
@@ -107,8 +110,8 @@ class Method {
   ///
   /// \returns - true if the refinement should proceed; false otherwise
   bool refine_test(bool same_sources_and_targets,
-                   const targetnode_t &curr,
-                   const std::vector<sourcenode_t> &consider) const;
+                   const targetnode_t *curr,
+                   const std::vector<sourcenode_t *> &consider) const;
 
  private:
   // Any data should be trivially copyable

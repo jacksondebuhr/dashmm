@@ -1,14 +1,25 @@
+THIS BRANCH TODO
+TODO: Go back over all the in-source documentation
+
+NOTE: Big problem with the tree construction. We want to build the tree in
+      one locality. And so to do that in the old style, this means we need to
+      have all the particles in that locality as well. Eventually, we want to
+      migrate the particle data to the locations where it is most advantageous.
+      So the question is, do we assume that the data is local, or do we instead
+      build the tree from distributed particle data.
+
+      Sure, initially we are still doing this for SMP mode, but we want to
+      get to where we can do distributed easily. So I want to think about this
+      kind of thing along the way.
+
+
 OPEN QUESTIONS and TODO
 TODO: Make the Array type work from inside HPX-5 threads also
-TODO: Merge SourceRef and TargetRef. They are really just the same thing
-      with different names. Call is ArrayRef?
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
 TODO: currently it is impossible to use the same tree for different Evaluators.
       Do we want to decouple the tree?
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
-TODO: Should we just make the evaluator into a functor? Instead of evaluate,
-      we just overload ()?
 TODO: Factor the bit in evaluate_handler() that gets the domain
 TODO: In contribute for ExpansionLCO, can we change it so the user can just
       pass in the expansion?
@@ -36,15 +47,9 @@ Some notes about issues or future features
 Basically any way that the user-facing methods can go wrong should return
 sensible error where possible instead of just being assertions that fail.
 
-* We really ought to hide all the internal interface stuff that has to be
-exposed in header files separate from the users.
 
 
 Interface Ideas
-
-
- * Eventually the expansion should have a method indicating the number of
-   charges. And the number of outputs (phi, ax, ay, az, whatever)
 
  * Provide C bindings before too long
 
@@ -56,7 +61,6 @@ Interface Ideas
 
 Some more expansions
 
- * Do LaplaceCOM with acceleration instead (or both)
  * So LaplaceCOM with softened force (ala GADGET)
  * Do one for Ewald technique for periodic BCs
  * Do one for Short range forces
@@ -64,4 +68,3 @@ Some more expansions
 Some more methods
 
  * Can we do something more like GADGET's BH method?
- *
