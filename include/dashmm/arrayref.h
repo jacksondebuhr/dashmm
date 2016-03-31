@@ -46,7 +46,7 @@ class ArrayRef {
   /// Default constructor.
   ArrayRef() : data_{HPX_NULL}, n_{0}, n_tot_{0} { }
 
-  /// Construct from a specific address and count.
+  /// Construct from a specific address and counts.
   ArrayRef(hpx_addr_t data, size_t n, size_t n_tot)
       : data_{data}, n_{n}, n_tot_{n_tot} { }
 

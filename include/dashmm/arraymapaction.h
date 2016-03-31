@@ -75,7 +75,7 @@ template <typename T, typename E>
 class ArrayMapAction {
  public:
   /// The function type for functions mapped onto Array elements.
-  typedef void (*map_function_t)(T *, const size_t, const size_t, const E *);
+  using map_function_t = void (*)(T *, const size_t, const size_t, const E *);
 
   /// Construct the ArrayMapAction
   ///

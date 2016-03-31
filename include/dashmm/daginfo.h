@@ -28,6 +28,7 @@
 namespace dashmm {
 
 
+/// Operation codes to indicate the type of edge
 enum class Operation {
   Nop;
   StoM;
@@ -43,6 +44,11 @@ enum class Operation {
 
 struct DAGNode;
 
+/// Edge in the explicit representation of the DAG
+///
+/// This is simply the target of the edge and the operation to peform on the
+/// edge. The source of the edge is implicit in that the DAGNode which has
+/// this edge in its list will be the source of the edge.
 struct DAGEdge {
   // TODO: Should this be const?
   const DAGNode *target;
@@ -52,15 +58,24 @@ struct DAGEdge {
   DAGEdge(const DAGNode *end, Operation inop) : target{end}, op{inop} { }
 };
 
+/// Node in the explicit representation of the DAG
+///
+/// In addition to the set of edges that emanate from this node, the number
+/// of inputs to this node is collected. This allows the eventual realization
+/// of the DAG as ExpansionLCOs to have the correct number of inputs. Also,
+/// when the distribution of the DAG is computed, the result will appear in
+/// the locality entry of this object.
 struct DAGNode {
   std::vector<DAGEdge> edges;    // these are out edges
   int incoming;                  // number of incoming edges
   int locality;                  // the locality where this will be placed
 
-  // TODO revisit this - the type here will need to be something else
-  // the expansion LCO holds more than just the address, the target LCO holds
-  // more than just the address. Do a union?
+  // This is less than ideal, but either object that will be stored only has
+  // two members, one an hpx_addr_t and one an int. So this will be the solution
+  // for now.
   hpx_addr_t global_addx;        // global address of object serving this node
+  int other_member;              // this is either n_digits for an expansion or
+                                 // n_targets for a target lco
 
   DAGNode() : edges{}, incoming{0}, locality{0}, global_addx{HPX_NULL} { }
   void add_input() {++incoming;}
@@ -87,11 +102,14 @@ class DAGInfo {
   ~DAGInfo() {
     hpx_lco_delete_sync(lock_);
     delete normal_;
+    normal_ = nullptr;
     if (expon_ != nullptr) {
       delete expon_;
+      expon_ = nullptr;
     }
     if (parts_ != nullptr) {
       delete parts_;
+      parts_ = nullptr;
     }
   }
 
@@ -121,9 +139,6 @@ class DAGInfo {
   const DAGNode *normal() {return normal_;}
   const DAGNode *expon() {return expon_;}
   const DAGNode *parts() {return parts_;}
-
-  // TODO: decide if we just make the above non-const, or if we go ahead and
-  // provide setters for the various things that will need setting.
 
   void StoM(DAGInfo *source) {
     assert(source->has_parts());

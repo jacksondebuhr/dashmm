@@ -29,7 +29,7 @@
 namespace dashmm {
 
 
-/// Forward declaration of Evaluator so that we can become friends
+/// Forward declaration of Evaluator so that Tree can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -186,7 +186,7 @@ class Tree {
     domain_ = DomainGeometry{bounds.low, bounds.high, 1.0002};
   }
 
-  // Document this - this also sets up the DAG stuff, or start to
+  // Document this - this also sets up the DAG stuff, or starts to
   hpx_addr_t partition_source_tree(sourceref_t sources) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
@@ -223,11 +223,10 @@ class Tree {
     return partdone;
   }
 
+  // TODO: document
   void partition(sourceref_t sources, targetref_t targets) {
-    // NOTE: There is a potential problem here. If the sources and targets
-    // have the same starting point, but have different lengths, then this
-    // will not work. But to use it that way is a usage error.
-    bool same_sandt = sources.data() == targets.data();
+    bool same_sandt = (sources.data() == targets.data()
+                        && sources.n() == targets.n());
 
     compute_domain(sources, targets, same_sandt);
 
@@ -329,7 +328,6 @@ class Tree {
     }
 
     // Otherwise, partition the sources and spawn more work
-    // NOTE: while still partitioning the sources for
     source_t *source_parts{nullptr};
     assert(hpx_gas_try_pin(parms->sources.data(), (void **)&source_parts));
 
@@ -488,7 +486,7 @@ class Tree {
       hpx_addr_t partdone = hpx_lco_and_new(n_children);
       assert(partdone != HPX_NULL);
 
-      // set up the arguments to the partition actions; the constant parts
+      // set up the arguments to the partition actions -- the constant parts
       TargetPartitionParams args{};
       args.tree = tree;
       args.partdone = partdone;
