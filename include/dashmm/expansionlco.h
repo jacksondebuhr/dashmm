@@ -78,6 +78,8 @@ class ExpansionLCO {
   ExpansionLCO(hpx_addr_t addr, int n_digits)
       : data_{addr}, n_digits_{n_digits} { }
 
+  // TODO I think this no longer makes sense. Instead, we need a constructor
+  // that takes in a DAGNode or something.
   /// Construct from an existing expansion - this will create a new LCO
   ExpansionLCO(std::unique_ptr<expansion_t> exp, hpx_addr_t where) {
     if (exp == nullptr) {
@@ -115,6 +117,9 @@ class ExpansionLCO {
 
   /// Accuracy of expansion
   int accuracy() const {return n_digits_;}
+
+  // TODO I think most of these disappear - the setting up of the DAG
+  // is done via the DAGInfo objects instead. So the operations all drop out.
 
   /// Set this expansion with the multipole expansion of the given sources
   ///
@@ -266,6 +271,7 @@ class ExpansionLCO {
     hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend, &n_trg);
   }
 
+  // TODO is this used anywhere? - no it would not be
   /// Add the given expansion to this expansion
   ///
   /// This will add the @p summand to this expansion. This is an asynchronous
@@ -281,6 +287,7 @@ class ExpansionLCO {
                   HPX_NULL, &data_, &n_digits_);
   }
 
+  // TODO is this needed?
   /// Create a new expansion of the same type referred to by this object.
   ///
   /// \param center - the center point for the next expansion.
@@ -292,6 +299,7 @@ class ExpansionLCO {
     return std::unique_ptr<expansion_t>{new expansion_t{center, n_digits}};
   }
 
+  // TODO no longer needed
   /// Signal to the expansion that all operations have been scheduled.
   ///
   /// This should be called only after all possible contributions to the
@@ -305,6 +313,7 @@ class ExpansionLCO {
     }
   }
 
+  // TODO no longer neede
   /// Signal to the expansion that it should expect an operation
   ///
   /// This will inform the underlying LCO of another eventual contribution to
@@ -342,6 +351,7 @@ class ExpansionLCO {
   // Types used internally
   ///////////////////////////////////////////////////////////////////
 
+  // TODO this needs to be updated
   /// Part of the internal representation of the Expansion LCO
   ///
   /// Expansion are user-defined LCOs. The data they contain are this object
@@ -355,6 +365,10 @@ class ExpansionLCO {
     size_t payload_size;
     char payload[];
   };
+
+  // TODO only one of these is left. Can we remove the required space at the
+  // start of the serialized expansions? Check into the targetlco stuff to
+  // get the answer probably.
 
   /// Behavior codes for the Expansion LCO
   ///
@@ -382,6 +396,7 @@ class ExpansionLCO {
   // LCO Implementation
   ///////////////////////////////////////////////////////////////////
 
+  // TODO this will also need to take in the out edges
   /// Initialization handler for Expansion LCOs
   ///
   /// This initialized an Expansion LCO given an input serialized
@@ -397,6 +412,7 @@ class ExpansionLCO {
     memcpy(head->payload, init, init_bytes);
   }
 
+  // TODO only the contribute part will remain
   /// The set operation handler for the Expansion LCO
   ///
   /// This takes one of three forms. The input to this is either a single integer
@@ -444,6 +460,7 @@ class ExpansionLCO {
     }
   }
 
+  // TODO this is simpler as well
   /// The predicate to detect triggering of the Expansion LCO
   ///
   /// The expansion LCO is triggered if it has been finalized and the number
@@ -456,6 +473,9 @@ class ExpansionLCO {
   ///////////////////////////////////////////////////////////////////
   // Other related actions
   ///////////////////////////////////////////////////////////////////
+
+  // TODO we need to add the action that is set up dependent on the LCO
+  // triggering, that then calls all the out edge actions that are needed.
 
   static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
