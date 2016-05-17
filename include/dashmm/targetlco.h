@@ -34,7 +34,9 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class> class Method>
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
 class Evaluator;
 
 
@@ -58,13 +60,15 @@ class Evaluator;
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class> class Method>
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
 class TargetLCO {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, Expansion>;
+  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
 
   using targetref_t = TargetRef<Target>;
 
@@ -158,7 +162,7 @@ class TargetLCO {
 
  private:
   /// Make Evaluator a friend -- it handles action registration
-  friend class Evaluator<Source, Target, Expansion, Method>;
+  friend class Evaluator<Source, Target, Expansion, Method, DistroPolicy>;
 
   /// LCO data type
   struct Data {
@@ -286,20 +290,26 @@ class TargetLCO {
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t TargetLCO<S, T, E, M>::init_ = HPX_ACTION_NULL;
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t TargetLCO<S, T, E, M, D>::init_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t TargetLCO<S, T, E, M>::operation_ = HPX_ACTION_NULL;
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t TargetLCO<S, T, E, M, D>::operation_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t TargetLCO<S, T, E, M>::predicate_ = HPX_ACTION_NULL;
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t TargetLCO<S, T, E, M, D>::predicate_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

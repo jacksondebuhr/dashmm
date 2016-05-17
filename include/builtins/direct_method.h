@@ -40,17 +40,22 @@ namespace dashmm {
 /// This is an O(N^2) method, so it should be used for only small numbers
 /// of targets.
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion>
+          template <typename, typename> class Expansion,
+          typename DistroPolicy>
 class Direct {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Direct<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, Direct>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, Direct>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Direct>;
+  using method_t = Direct<Source, Target, Expansion, DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct,
+                                      DistroPolicy>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, Direct,
+                                  DistroPolicy>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, Direct,
+                                  DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Direct,
+                                DistroPolicy>;
   using sourceref_t = SourceRef<Source>;
 
   /// In generate, Direct does nothing.

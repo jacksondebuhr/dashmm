@@ -34,18 +34,20 @@ namespace dashmm {
 /// A Method to implement classic FMM
 ///
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion>
+          template <typename, typename> class Expansion,
+          typename DistroPolicy>
 class FMM {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = FMM<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM>;
+  using method_t = FMM<Source, Target, Expansion, DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM,
+                                      DistroPolicy>;
   using sourceref_t = SourceRef<Source>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, FMM>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, FMM>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, FMM, DistroPolicy>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, FMM, DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM, DistroPolicy>;
 
   void generate(sourcenode_t &curr, int n_digits) const {
     curr.set_expansion(std::unique_ptr<expansion_t>{

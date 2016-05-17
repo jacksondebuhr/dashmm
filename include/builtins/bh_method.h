@@ -44,17 +44,19 @@ namespace dashmm {
 /// theta_c is the critical angle supplied when an instance of this method
 /// is constructed.
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion>
+          template <typename, typename> class Expansion,
+          typename DistroPolicy>
 class BH {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = BH<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, BH>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, BH>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, BH>;
+  using method_t = BH<Source, Target, Expansion, DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH,
+                                      DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, BH, DistroPolicy>;
+  using sourcenode_t = SourceNode<Source, Target, Expansion, BH, DistroPolicy>;
+  using targetnode_t = TargetNode<Source, Target, Expansion, BH, DistroPolicy>;
   using sourceref_t = SourceRef<Source>;
 
   BH() : theta_{0.0} { }

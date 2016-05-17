@@ -20,6 +20,7 @@
 #include "dashmm/array.h"
 #include "dashmm/evaluator.h"
 #include "dashmm/initfini.h"
+#include "dashmm/shareddata.h"
 #include "dashmm/types.h"
 
 // The built in methods
@@ -31,6 +32,9 @@
 #include "builtins/laplace_com.h"
 #include "builtins/laplace_com_acc.h"
 #include "builtins/laplace_sph.h"
+
+// The built in distribution policies
+#include "builtins/singlelocdistro.h"
 
 
 #endif // __DASHMM_USER_INTERFACE_H__

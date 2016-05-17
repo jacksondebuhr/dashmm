@@ -31,6 +31,8 @@
 #include "dashmm/targetref.h"
 #include "dashmm/tree.h"
 
+#include "builtins/singlelocdistro.h"
+
 
 
 namespace dashmm {
@@ -70,20 +72,27 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class> class Method>
+                    template <typename, typename> class
+                    typename> class Method,
+          typename DistroPolicy = SingleLocality>
 class Evaluator {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, Expansion>;
+  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
   using sourceref_t = SourceRef<Source>;
   using targetref_t = TargetRef<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
-  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method>;
-  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method>;
-  using tree_t = Tree<Source, Target, Expansion, Method>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
+                                DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
+                                      DistroPolicy>;
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method,
+                                DistroPolicy>;
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,
+                                DistroPolicy>;
+  using tree_t = Tree<Source, Target, Expansion, Method, DistroPolicy>;
+  using distropolicy_t = DistroPolicy;
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
@@ -172,12 +181,6 @@ class Evaluator {
                         HPX_POINTER, HPX_SIZE_T);
 
   }
-
-
-  // NOTE: the arrays are marked const, even though the data will be sorted
-  // and modified in both cases (just a sort of sources). The array object is
-  // a reference. And so the reference passed in will not change. Only the
-  // data that it is referring to will change.
 
   /// Perform a multipole moment evaluation
   ///
@@ -336,8 +339,10 @@ class Evaluator {
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::evaluate_ = HPX_ACTION_NULL;
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Evaluator<S, T, E, M, D>::evaluate_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm
