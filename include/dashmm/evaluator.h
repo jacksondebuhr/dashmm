@@ -115,6 +115,10 @@ class Evaluator {
                         expansionlco_t::predicate_,
                         expansionlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+                        expansionlco_t::spawn_out_edges_,
+                        expansionlco_t::spawn_out_edges_handler,
+                        HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_m_,
                         expansionlco_t::s_to_m_handler,
@@ -125,10 +129,6 @@ class Evaluator {
                         expansionlco_t::s_to_l_handler,
                         HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
                         HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        expansionlco_t::m_to_m_,
-                        expansionlco_t::m_to_m_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::m_to_l_,
                         expansionlco_t::m_to_l_handler,
@@ -136,23 +136,11 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         expansionlco_t::l_to_l_,
                         expansionlco_t::l_to_l_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        expansionlco_t::m_to_t_,
-                        expansionlco_t::m_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        expansionlco_t::l_to_t_,
-                        expansionlco_t::l_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
+                        HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_t_,
                         expansionlco_t::s_to_t_handler,
                         HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        expansionlco_t::add_,
-                        expansionlco_t::add_handler,
-                        HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::create_from_expansion_,
                         expansionlco_t::create_from_expansion_handler,

@@ -78,6 +78,22 @@ class Index {
                  level_ + 1};
   }
 
+  /// Compute which child of this Index's parent this index is
+  ///
+  /// The ordering of the children of a node are as follows,
+  /// where the triple of [+-] indicates which half of the node in each
+  /// direction the given child occupies:
+  /// 0: ---; 1: +--; 2: -+-; 3: ++-;
+  /// 4: --+; 5: +-+; 6: -++; 7: +++;
+  ///
+  /// \returns - which child this Index is
+  int which_child() const {
+    int xval = idx_[0] % 2;
+    int yval = (idx_[1] % 2) << 1;
+    int zval = (idx_[2] % 2) << 2;
+    return (xval + yval + zval);
+  }
+
  private:
   int idx_[3];
   int level_;

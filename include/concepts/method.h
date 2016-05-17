@@ -35,8 +35,8 @@ class Method {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method>;
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method>;
 
   /// TODO: The method will need a default constructor.
 

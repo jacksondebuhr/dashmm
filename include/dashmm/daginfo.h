@@ -77,7 +77,9 @@ struct DAGNode {
   int other_member;              // this is either n_digits for an expansion or
                                  // n_targets for a target lco
 
-  DAGNode() : edges{}, incoming{0}, locality{0}, global_addx{HPX_NULL} { }
+  DAGNode()
+      : edges{}, incoming{0}, locality{0}, global_addx{HPX_NULL},
+        other_member{0} { }
   void add_input() {++incoming;}
   void add_edge(const DAGNode *end, Operation op) {
     edges.push_back(DAGEdge{end, op})

@@ -15,6 +15,9 @@
 #define __DASHMM_SHARED_DATA_H__
 
 
+// TODO: proper documentation
+
+
 #include <cassert>
 #include <cstring>
 
@@ -124,9 +127,13 @@ template <typename T>
 class SharedData {
  public:
   SharedData(const T *value) : data_{HPX_NULL} {
-    hpx_addr_t *argaddr = &data_;
-    size_t bytes = sizeof(T);
-    hpx_run(&shared_data_construct_action, &bytes, &argaddr);
+    if (hpx_is_active()) {
+      data_ = hpx_gas_alloc_cyclic(hpx_get_num_ranks(), sizeof(T), 0);
+    } else {
+      hpx_addr_t *argaddr = &data_;
+      size_t bytes = sizeof(T);
+      hpx_run(&shared_data_construct_action, &bytes, &argaddr);
+    }
     assert(data_ != HPX_NULL);
   }
 
@@ -135,12 +142,15 @@ class SharedData {
   // We do not do this with a destructor becuase these objects might
   // exist at the end of their containing scope.
   //
-  // We can be sure that LocalData objects for this SharedData are all
-  // destroyed when this is called because this must be called from outside
-  // HPX, and the value object must be called from inside HPX.
+  // The user must assure that all LocalData objects are destroyed prior to
+  // this object, otherwise there will be a use-after-free error.
   void destroy() {
-    assert(!hpx_is_active());   // It is an error to use this from inside HPX
-    hpx_run(&shared_data_destroy_action, &data_);
+    if (hpx_is_active()) {
+      hpx_gas_free_sync(data_);
+    } else {
+      assert(!hpx_is_active());   // It is an error to use this from inside HPX
+      hpx_run(&shared_data_destroy_action, &data_);
+    }
     data_ = HPX_NULL;
   }
 

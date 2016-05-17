@@ -21,6 +21,7 @@
 
 
 #include "dashmm/domaingeometry.h"
+#include "dashmm/shareddata.h"
 #include "dashmm/sourcenode.h"
 #include "dashmm/targetnode.h"
 #include "dashmm/treeshared.h"
@@ -116,8 +117,8 @@ class Tree {
   using targetref_t = ArrayRef<Target>;
 
   Tree(DomainGeometry dom, method_t met, int limit, int digits)
-      : domain_{dom}, method_{met}, refinement_limit_{limit},
-        n_digits_{digits}, source_root_{nullptr}, target_root_{nullptr} { }
+      : method_{met}, refinement_limit_{limit}, n_digits_{digits},
+        source_root_{nullptr}, target_root_{nullptr}, domain_{&dom} { }
 
   ~Tree() {
     if (source_root_ != nullptr) {
@@ -129,7 +130,7 @@ class Tree {
   }
 
   /// Returns the domain represented by the tree
-  const DomainGeometry &domain() const {return domain_;}
+  LocalData<DomainGeometry> domain() const {return domain_.value();}
 
   /// Returns the method to use for constructing the DAG
   const method_t &method() const {return method;}
@@ -167,7 +168,7 @@ class Tree {
     hpx_lco_delete_sync(srcbnd);
 
     // get target bounds - if targets != sources
-    if (same) {
+    if (!same) {
       hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
       assert(trgbnd != HPX_NULL);
       hpx_addr_t tdata = targets.data();
@@ -183,7 +184,8 @@ class Tree {
     }
 
     // Finally, set the domain
-    domain_ = DomainGeometry{bounds.low, bounds.high, 1.0002};
+    DomainGeometry dom = DomainGeometry{bounds.low, bounds.high, 1.0002};
+    domain_.reset(&dom);
   }
 
   // Document this - this also sets up the DAG stuff, or starts to
@@ -335,7 +337,8 @@ class Tree {
     splits[0] = source_parts;
     splits[8] = &source_parts[parms->sources.n()];
 
-    Point cen{tree->domain_.center_from_index(node->idx)};
+    LocalData<DomainGeometry> ldom = tree->domain_.value();
+    Point cen{ldom->center_from_index(node->idx)};
     double z_center = cen.z();
     auto z_comp = [&z_center](source_t &a) {
                     return a.position.z() < z_center;
@@ -429,7 +432,8 @@ class Tree {
       splits[0] = T;
       splits[8] = &T[parms->targets.n()];
 
-      Point cen{tree->domain_.center_from_index(node->idx)};
+      LocalData<DomainGeometry> ldom = tree->domain_.value();
+      Point cen{ldom->center_from_index(node->idx)};
       double z_center = cen.z();
       auto z_comp = [&z_center](target_t &a) {
                       return a.position.z() < z_center;
@@ -524,7 +528,6 @@ class Tree {
 
 
   // Data that is constant for each node of the tree
-  DomainGeometry domain_;
   method_t method_;
   int refinement_limit_;
   int n_digits_;
@@ -532,6 +535,9 @@ class Tree {
   // The roots of the two trees
   sourcenode_t *source_root_;
   targetnode_t *target_root_;
+
+  // Members in SharedData
+  SharedData<DomainGeometry> domain_;
 
   // Actions
   static hpx_action_t source_bounds_;
