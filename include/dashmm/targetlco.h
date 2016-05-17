@@ -75,8 +75,9 @@ class TargetLCO {
   TargetLCO(hpx_addr_t data, int n_targs) : lco_{data}, n_targs_{n_targs} { }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
-  explicit TargetLCO(const targetref_t &targets) {
-    Init init{targets};
+  explicit TargetLCO(int n_inputs, const targetref_t &targets) {
+    // TODO update
+    Data init{n_inputs, targets};
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
     assert(lco_ != HPX_NULL);
@@ -96,25 +97,6 @@ class TargetLCO {
   hpx_addr_t lco() const {return lco_;}
 
   int n() const {return n_targs_;}
-
-  /// Indicate to the underlying LCO that all operations have been scheduled
-  void finalize() const {
-    if (lco_ != HPX_NULL) {
-      int code = kFinish;
-      hpx_lco_set_lsync(lco_, sizeof(code), &code, HPX_NULL);
-    }
-  }
-
-  /// Indicate to the underlying LCO that it should expect \param num more
-  /// operations
-  void schedule(int num) const {
-    if (lco_ != HPX_NULL) {
-      int input[2] = {kSetOnly, num};
-      // NOTE: This one must be remote complete so that there is no timing issue
-      // between scheduling an input and finalizing the schedule.
-      hpx_lco_set_rsync(lco_, sizeof(int) * 2, input);
-    }
-  }
 
   /// Contribute a S->T operation to the referred targets
   ///
@@ -180,14 +162,7 @@ class TargetLCO {
 
   /// LCO data type
   struct Data {
-    int arrived;
-    int scheduled;
-    int finished;
-    targetref_t targets;
-  };
-
-  /// LCO initialization type
-  struct Init {
+    int yet_to_arrive;
     targetref_t targets;
   };
 
@@ -218,20 +193,15 @@ class TargetLCO {
 
   /// Codes to define what the LCO set is doing.
   enum SetCodes {
-    kSetOnly = 1,
-    kStoT = 2,
-    kMtoT = 3,
-    kLtoT = 4,
-    kFinish = 5
+    kStoT = 0,
+    kMtoT = 1,
+    kLtoT = 2,
   };
 
   /// Initialize the LCO
   static void init_handler(Data *i, size_t bytes,
-                           Init *init, size_t init_bytes) {
-    i->arrived = 0;
-    i->scheduled = 0;
-    i->finished = 0;
-    i->targets = init->targets;
+                           Data *init, size_t init_bytes) {
+    *i = *init;
   }
 
   /// The 'set' operation on the LCO
@@ -239,9 +209,10 @@ class TargetLCO {
   /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
     int *code = static_cast<int *>(rhs);
-    if (*code == kSetOnly) {    // this is a pair of ints, a code and a count
-      lhs->scheduled += code[1];
-    } else if (*code == kStoT) {
+    lhs->yet_to_arrive -= 1;
+    assert(lhs->yet_to_arrive >= 0);
+
+    if (*code == kStoT) {
       // The input contains the sources
       StoT *input = static_cast<StoT *>(rhs);
 
@@ -255,11 +226,8 @@ class TargetLCO {
       expansion_t expand{nullptr, 0, -1};
       expand.S_to_T(input->sources, &input->sources[input->count],
                      targets, &targets[lhs->targets.n()]);
-      expand.release(); // NOTE: This is not strictly needed
 
       hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
     } else if (*code == kMtoT) {
       MtoT *input = static_cast<MtoT *>(rhs);
 
@@ -275,8 +243,6 @@ class TargetLCO {
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
     } else if (*code == kLtoT) {
       LtoT *input = static_cast<LtoT *>(rhs);
 
@@ -292,10 +258,6 @@ class TargetLCO {
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
-    } else if (*code == kFinish) {
-      lhs->finished = 1;
     } else {
       assert(0 && "Incorrect code to TargetLCO");
     }
@@ -304,7 +266,7 @@ class TargetLCO {
   /// The LCO is set if it has been finalized, and all scheduled operations
   /// have taken place.
   static bool predicate_handler(Data *i, size_t bytes) {
-    return i->finished && (i->arrived == i->scheduled);
+    return (i->yet_to_arrive == 0);
   }
 
   /// The global address of the LCO
