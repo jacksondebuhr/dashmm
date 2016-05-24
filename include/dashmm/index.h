@@ -29,9 +29,12 @@ namespace dashmm {
 /// node. Indices require 3 components in three dimensions. At level 0,
 /// the only possible index is (0, 0, 0). At level 1, there are eight
 /// possible indices, with each component having a value of 0 or 1.
+///
+/// To convert the index into real positions, a DomainGeometry object is
+/// needed. See the DomainGeometry documentation for more.
 class Index {
  public:
-  /// construct the index from components and level
+  /// Construct the index from components and level
   Index(int ix, int iy, int iz, int level)
       : idx_{ix, iy, iz}, level_{level} { }
 

@@ -72,6 +72,11 @@ class Array {
   /// Returns if the Array is valid.
   ///
   /// An Array is valid if it refers to an array in the global address space.
+  /// NOTE: This only tests that this object points to someplace in the global
+  /// address space. This is an incomplete test. A more complete test would
+  /// examing the data stored at the specified address for compatibility.
+  ///
+  /// \returns - true if this object refers to non-null global memory.
   bool valid() const {return data != HPX_NULL;}
 
   /// Return the global address of the Array meta data.
@@ -80,6 +85,11 @@ class Array {
   /// This creates an array object
   ///
   /// \param record_count - the number of records that will be in the array.
+  ///
+  /// \returns - kDomainError if the object already has an allocation;
+  ///            kAllocationError if the global memory cannot be allocated;
+  ///            kRuntimeError if there is an error in the runtime; or
+  ///            kSuccess otherwise.
   ReturnCode allocate(size_t record_count) {
     if (data_ != HPX_NULL) {
       // If the object already has data, do not allocate new data.
@@ -101,6 +111,8 @@ class Array {
   /// Destroy the Array
   ///
   /// This will destroy all global allocations associated with the Array.
+  /// If this does not return kSuccess, the global memory will not have been
+  /// released.
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
@@ -108,6 +120,7 @@ class Array {
       return kSuccess;
     }
     if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
+      data_ = HPX_NULL;
       return kSuccess;
     } else {
       return kRuntimeError;
@@ -161,6 +174,8 @@ class Array {
   /// Largely speaking, this will not be needed by DASHMM users. This array
   /// reference will refer to the entirety of the array.
   ///
+  /// NOTE: This routine cannot be called outside of an HPX-5 thread.
+  ///
   /// \returns - an ArrayRef indicating the entirety of this array.
   ArrayRef<T> ref() const {
     ArrayMetaData meta{};
@@ -189,7 +204,6 @@ class Array {
   /// The global address of the Array meta data.
   hpx_addr_t data_;
 };
-
 
 
 } // namespace dashmm

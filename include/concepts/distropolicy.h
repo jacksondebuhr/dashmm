@@ -12,33 +12,29 @@
 // =============================================================================
 
 
-// This will lay out the requirements on the DistroPolicy object type.
-// New policies will need to conform to this.
+/// DistroPolicy is a concept that specifies how the computation represented
+/// by the DAG is to be distributed around the available resources. The
+/// primary function of this policy is compute_distribution(). These objects
+/// can contain parameters that specify the behavior of the policy. These
+/// parameters should be specified at construction time.
+///
+/// DistroPolicy objects should be trivially copyable.
 
 class DistroPolicy {
 public:
-  // Distribution policies might need some input parameters if their behavior
-  // is tunable in any way. TODO: work out what that means for the use of this
-  // policy. Only the tree is going to use it really. Do we also pass in a
-  // default argument to evaluate (the policy object setup how it should be)?
-
-  // TODO does this need anything else?
-  //
-  // NOTE: this will compute the distribution of the non-terminal nodes.
-  // That is, anything not a source or target. It is assumed that those nodes
-  // have already had their locality computed.
-  //
-  // Here the source and target nodes are separated out to make some things
-  // simpler elsewhere in the library. But it could be useful to have a handle
-  // one starting and ending points for a specific policy.
+  /// Computes the distribution of the work represented by the given nodes.
+  ///
+  /// The only required element of a distribution policy is this one.
+  /// This will examine the internal nodes and assign a locality to them.
+  /// The sources and targets are assumed to have already had their
+  /// locality selected (based on the locality of the data represented by
+  /// those nodes of the DAG).
+  ///
+  /// After this call, all DAGNodes should have their locality set. It is
+  /// permitted to parallelize this work, but this routine must not return
+  /// before each locality has been set.
   void compute_distribution(const SharedData<DomainGeometry> &domain,
                             const std::vector<DAGNode *> &sources,
                             const std::vector<DAGNode *> &targets,
                             const std::vector<DAGNode *> &internal);
-
-  // Is this policy going to interact with the execution anywhere else?
-  // Perhaps eventually this can control the placment of the sources and
-  // targets?
-
-  // NOTE: the DistroPolicy will need the appropriate copy operations
 };

@@ -36,6 +36,10 @@ namespace dashmm {
 /// object cannot be used to destroy the memory in the global address space to
 /// which it refers.
 ///
+/// NOTE: This object is only intended to be used from an HPX-5 thread. Only
+/// slice() actually bears this restriction, but the remaining routines are of
+/// little use without access to slice().
+///
 /// This class is a template parameterized by the Record type.
 template <typename Record>
 class ArrayRef {

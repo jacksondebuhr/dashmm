@@ -24,14 +24,18 @@
 namespace dashmm {
 
 
-// A distribution policy that will place everything on one locality
-// only use if it definitely fits in memory
+/// This distribution policy places all content on the root locality
+///
+/// This is intended to be the simplest possibly distribution policy. It is
+/// unlikely to be a good choice, unless one is using only one locality to
+/// begin with.
 class SingleLocality {
 public:
   void compute_distribution(const SharedData<DomainGeometry> &domain,
-                            const std::vector<DAGNode *> &terminals,
+                            const std::vector<DAGNode *> &sources,
+                            const std::vector<DAGNode *> &targets,
                             const std::vector<DAGNode *> &internal);
-}
+};
 
 
 } // dashmm

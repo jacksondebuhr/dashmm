@@ -18,15 +18,15 @@
 namespace dashmm {
 
 
-// Set the locality of every node to be the root locality
 void SingleLocality::compute_distribution(
     const SharedData<DomainGeometry> &domain,
-    const std::vector<DAGNode *> &terminals,
+    const std::vector<DAGNode *> &sources,
+    const std::vector<DAGNode *> &targets,
     const std::vector<DAGNode *> &internal) {
   auto b = internal.begin();
   auto e = internal.end();
   for (auto i = b; i != e; ++i) {
-    ()*i)->locality = 0;
+    (*i)->locality = 0;
   }
 }
 

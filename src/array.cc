@@ -86,7 +86,8 @@ HPX_ACTION(HPX_DEFAULT, 0, allocate_array_action, allocate_array_handler,
 ///
 /// \returns - HPX_SUCCESS
 int deallocate_array_handler(hpx_addr_t obj) {
-  // NOTE: This should always work as this is called on the meta data
+  // NOTE: This should always work as this is called on the root locality,
+  // which is where the meta data was allocated.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     hpx_exit(HPX_ERROR);
@@ -119,7 +120,8 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
                       void *in_data) {
   *err = kSuccess;
 
-  // NOTE: This should always work as this is called on the meta data.
+  // NOTE: This should always work as this is called at the root locality, which
+  // is where the meta data was allocated.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     *err = kRuntimeError;
@@ -169,7 +171,8 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
                       void *out_data) {
   *err = kSuccess;
 
-  // NOTE: This will always work as the action is called on the meta data
+  // NOTE: This will always work as the action is called on the root locality,
+  // which is where the meta data was allocated.
   ArrayMetaData *meta{nullptr};
   if (!hpx_gas_try_pin(obj, (void **)&meta)) {
     *err = kRuntimeError;

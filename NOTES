@@ -36,6 +36,7 @@ Overall Plan to 1.0
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
+    - actually build the documentation with DoxyGen to see if it is done
  * As there is time, work on performance
     - Time various parts of the code
 
@@ -69,6 +70,8 @@ TODO: Perhaps we want to parameterize the nodes with some user data? So
 TODO: Do we want to decouple the registration from the evaluation? Two objects?
       Some kind of template function?
         (Not sure. It is not too onerous to do as we have been.)
+TODO: There is an overdecomposition factor in ArrayMapAction that is hard
+      coded. Explore this and pick one that performs well.
 
 
 
