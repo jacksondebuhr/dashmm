@@ -1,5 +1,45 @@
 THIS BRANCH TODO
+TODO: recheck code
+TODO: compile
+TODO: debug
 TODO: Go back over all the in-source documentation
+TODO: In contribute for ExpansionLCO, can we change it so the user can just
+      pass in the expansion?
+TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
+      member of TargetLCO to data();
+
+TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
+      constructor in some way?
+        (This is related to another step we need to take in the near future.
+         That being said, this might be solved automatically once we implement
+         that feature.)
+
+
+
+Overall Plan to 1.0
+
+ * Split DAG from Tree
+    This is well under way. See above.
+ * Full distribution of data and work
+    - build one locality tree from distributed particle data (and sort those
+      particles as needed)
+    - Array needs to be updated accordingly
+    - Introduce more distribution policies
+ * Kernel Parameters and Table generation
+ * Split Evaluate into pieces and expose more interface to users
+    - Enable repeat use of a DAG
+    - Potentially provide objects representing the tree and so on to the user
+      and some utility routines to use the resulting objects
+ * Finish interface
+    - Make it so that an advanced user could call all the needed stuff directly
+      from an HPX thread.
+ * Documentation clean up throughout
+    - advanced user guide; including how to define methods
+    - be sure to be clear about routines callable from HPX or not.
+ * As there is time, work on performance
+    - Time various parts of the code
+
+
 
 NOTE: Big problem with the tree construction. We want to build the tree in
       one locality. And so to do that in the old style, this means we need to
@@ -15,29 +55,21 @@ NOTE: Big problem with the tree construction. We want to build the tree in
 
 OPEN QUESTIONS and TODO
 TODO: Make the Array type work from inside HPX-5 threads also
+        (We have no use case for this just yet. Delay)
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
+        (This is not a bad idea, but it can wait, as long as the docs warn
+         users.)
 TODO: currently it is impossible to use the same tree for different Evaluators.
       Do we want to decouple the tree?
+        (This might be harder to do. The handles to the DAG make the tree for
+         one specific evaluation.)
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
-TODO: Factor the bit in evaluate_handler() that gets the domain
-TODO: In contribute for ExpansionLCO, can we change it so the user can just
-      pass in the expansion?
-TODO: Why is s_to_l_handler different than s_to_m_handler?
-TODO: See if we can work out a better way to work with the consider list.
-      All this to and from vectors is annoying.
-TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
-      member of TargerLCO to data();
-TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
-      constructor in some way?
+        (Cool idea; no use case. Delay)
 TODO: Do we want to decouple the registration from the evaluation? Two objects?
       Some kind of template function?
+        (Not sure. It is not too onerous to do as we have been.)
 
-
- (Recheck documentation)
-
- (Do we do a minor release on the template stuff?)
-    I lean toward yes. v0.6?
 
 
 
@@ -52,19 +84,21 @@ sensible error where possible instead of just being assertions that fail.
 Interface Ideas
 
  * Provide C bindings before too long
+      (Useful for people stuck back in the day, but might be of little utility.)
 
  * We should also in the near term get a base nearest neighbor search. This will
- be essential for SPH and Phil's MFV methods.
-  This would be useful in much wider contexts, however.
-
-
-
-Some more expansions
-
- * So LaplaceCOM with softened force (ala GADGET)
+   be essential for SPH and Phil's MFV methods.
+   This would be useful in much wider contexts, however.
+ * Do LaplaceCOM with softened force (ala GADGET)
  * Do one for Ewald technique for periodic BCs
  * Do one for Short range forces
 
 Some more methods
 
  * Can we do something more like GADGET's BH method?
+    (This is more tricky. The acceptability of an expansion is dependent on the
+     particle data of the targets. This would make the node-wide analysis
+     harder or more conservative than is needed.)
+ * Is there some room for performance improvement in BH where we might use
+   single particles for the decision? Is this just a matter of using a smaller
+   threshold? Will that pay any dividends?
