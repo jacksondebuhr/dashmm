@@ -38,6 +38,11 @@
 namespace dashmm {
 
 
+// TODO: Think about defining the default policy in some way that the
+// method implementers can just use whatever the default it. Perhaps a
+// using in some header file or something.
+
+
 /// Evaluator object
 ///
 /// This object is a central object in DASHMM evaluations. This object bears
@@ -174,6 +179,34 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::target_bounds_, tree_t::target_bounds_handler,
                         HPX_ADDR, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::create_S_expansions_from_DAG_,
+                        tree_t::create_S_expansions_from_DAG_handler,
+                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::create_T_expansions_from_DAG_,
+                        tree_t::create_T_expansions_from_DAG_handler,
+                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::edge_lists_,
+                        tree_t::edge_lists_handler,
+                        HPX_POINTER, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::instigate_dag_eval_,
+                        tree_t::instigate_dag_eval_handler,
+                        HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::termination_detection_,
+                        tree_t::termination_detection_handler,
+                        HPX_ADDR, HPX_POINTER, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::destroy_target_DAG_LCOs_,
+                        tree_t::destroy_target_DAG_LCOs_handler,
+                        HPX_POINTER, HPX_INT);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::destroy_internal_DAG_LCOs_,
+                        tree_t::destroy_internal_DAG_LCOs_handler,
+                        HPX_POINTER, HPX_INT);
 
     // Actions for the evaluation
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
@@ -213,13 +246,16 @@ class Evaluator {
   /// \param refinement_limint - the domain refinement limit
   /// \param method - a prototype of the method to use.
   /// \param expansion - a prototpe of the expansion to use.
+  /// \param distro - an instance of the distribution policy to use for this
+  ///                 execution.
   ///
   /// \returns - kSuccess on success; kRuntimeError if there is an error with
   ///            the runtime.
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
-                      const expansion_t &expansion) {
+                      const expansion_t &expansion
+                      const distropolicy_t &distro) {
     // pack the arguments and call the action
     EvaluateParams args{ };
     args.sources = sources;
@@ -227,6 +263,7 @@ class Evaluator {
     args.refinement_limit = refinement_limit;
     args.method = method;
     args.n_digits = expansion.accuracy();
+    args.distro = distro;
 
     if (HPX_SUCCESS != hpx_run(&evaluate_, &args, sizeof(args))) {
       return kRuntimeError;
@@ -250,6 +287,7 @@ class Evaluator {
     int refinement_limit;
     method_t method;
     int n_digits;
+    distropolicy_t distro;
   };
 
   /// The result of finding bounds
@@ -260,75 +298,42 @@ class Evaluator {
 
   /// The evaluation action implementation
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    bool same_sandt = parms->sources.data() == parms->targets.data();
-
-    // create source and target references
-    // NOTE: These will need to be updated once we change the way array works
+    // NOTE: These may need to be updated once we change the way array works
     // for distributed operation.
-    ArrayMetaData srcmeta;
-    hpx_gas_memget_sync(&srcmeta, parms->sources.data(), sizeof(srcmeta));
-    sourceref_t sources{srcmeta.data, srcmeta.count, srcmeta.count};
+    sourceref_t sources = parms->sources.ref();
+    targetref_t targets = parms->targets.ref();
 
-    ArrayMetaData trgmeta;
-    hpx_gas_memget_sync(&trgmeta, parms->targets.data(), sizeof(trgmeta));
-    targetref_t targets{trgmeta.data, trgmeta.count, trgmeta.count};
+    tree_t *tree = new tree_t{parms->method, parms->refinement_limit,
+                              parms->n_digits};
+    tree->partition(sources, targets);
 
-    // Get source bounds
-    hpx_addr_t srcbnd = hpx_lco_future_new(sizeof(BoundsResult));
-    assert(srcbnd != HPX_NULL);
-    hpx_call(srcmeta.data, source_bounds_, srcbnd,
-             &srcmeta.data, &srcmeta.count);
+    // NOTE: around here is where we can perform the table creation work,
+    // (Future feature)
 
-    BoundsResult bounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-    hpx_lco_get(srcbnd, sizeof(BoundsResult), &bounds);
-    hpx_lco_delete_sync(srcbnd);
+    std::vector<DAGNode *> source_nodes{}; // source nodes (known locality)
+    std::vector<DAGNode *> target_nodes{}; // target nodes (known locality)
+    std::vector<DAGNode *> internals{};    // nodes with locality to be computed
+    tree->collect_DAG_nodes(source_nodes, target_nodes, internals);
+    parms->distro.compute_distribution(domain_, source_nodes, target_nodes,
+                                       internals);
 
-    // get target bounds - if targets != sources
-    if (!same_sandt) {
-      hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
-      assert(trgbnd != HPX_NULL);
+    tree->create_expansions_from_DAG(parms->n_digits);
 
-      hpx_call(trgmeta.data, target_bounds_, trgbnd,
-               &trgmeta.data, &trgmeta.count);
+    // NOTE: the previous has to finish for the following. So the previous
+    // is a synchronous operation. The next three, however, are not. They all
+    // get their work going when they come to it and then they return.
 
-      BoundsResult otherbounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-      hpx_lco_get(trgbnd, sizeof(BoundsResult), &otherbounds);
-      bounds.low.lower_bound(otherbounds.low);
-      bounds.high.upper_bound(otherbounds.high);
+    tree->setup_edge_lists(internals);
+    tree->start_DAG_evaluation();
+    hpx_addr_t alldone = tree->setup_termination_detection(target_nodes);
 
-      hpx_lco_delete_sync(trgbnd);
-    }
-
-    // Get the overall domain
-    DomainGeometry domain{bounds.low, bounds.high, 1.0002};
-
-    // create source tree, wait for partitioning of source to finish,
-    // partition target tree.
-    sourcenode_t source_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_addr_t partition_done =
-      source_root.partition(sources, parms->refinement_limit, parms->n_digits);
-
-    targetnode_t target_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_lco_wait(partition_done);
-    hpx_lco_delete_sync(partition_done);
-
-    hpx_addr_t targetpartdone =
-      target_root.partition(targets, parms->refinement_limit,
-                            parms->n_digits, 0, same_sandt,
-                            std::vector<sourcenode_t>{source_root});
-
-
-    // deal with one pathological case:
-    expansionlco_t srootexpand = source_root.expansion();
-    hpx_lco_wait(srootexpand.data());
-
-    // deal with another pathological case:
-    hpx_lco_wait(targetpartdone);
-    hpx_lco_delete_sync(targetpartdone);
+    // NOTE: We could fairly easily convert to Continuation-Passing-Style here
+    hpx_lco_wait(alldone);
+    hpx_lco_delete_sync(alldone);
 
     // clean up
-    source_root.destroy();
-    target_root.destroy();
+    tree->destroy_DAG_LCOs(target_nodes, internals);
+    delete tree;
 
     // return
     hpx_exit(HPX_SUCCESS);

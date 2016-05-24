@@ -16,6 +16,25 @@
 #define __DASHMM_DAG_INFO_H__
 
 
+
+//TODO: Think about how this is going to work with the concurrent stuff
+// happening during the tree construction. The lock member of DAGInfo seems
+// to be about this, but I have not actually handled using it.
+//  Okay, we now have a locking protocol in place. Potentially something better
+//  could be done. But we shall have to see.
+//
+// So when we modify the nodes, we need to lock the node we are going to
+// modify. Because we do not ever need to grab multiple locks at a time, we
+// can just go ahead and do lock-operation-unlock and not have to worry about
+// deadlock.
+//
+// Next, we need to analyze to be sure that the requisite nodes exist before
+// trying to use them. Currently, we have assertions on all of that, but it
+// would be good to have some idea that it is correct before we run it the
+// first time.
+
+
+
 /// \file include/dashmm/daginfo.h
 /// \brief Interface for intermediate representation of DAG
 
@@ -121,9 +140,10 @@ class DAGInfo {
     assert(expon_ != nullptr);
   }
 
-  void add_parts() {
+  void add_parts(int loc) {
     assert(parts_ == nullptr);
     parts_ = new DAGNode{};
+    parts_->locality = loc;
     assert(parts_ != nullptr);
   }
 
@@ -138,51 +158,104 @@ class DAGInfo {
   bool has_expon() const {return expon_ != nullptr;}
   bool has_parts() const {return parts_ != nullptr;}
 
-  const DAGNode *normal() {return normal_;}
-  const DAGNode *expon() {return expon_;}
-  const DAGNode *parts() {return parts_;}
+  const DAGNode *normal() const {return normal_;}
+  const DAGNode *expon() const {return expon_;}
+  const DAGNode *parts() const {return parts_;}
+
+  void set_normal_expansion(const expansion_t &expand) {
+    normal_->global_addx = expand.data();
+    normal_->other_member = expand.accuracy();
+  }
+
+  void set_expon_expansion(const expansion_t &expand) {
+    if (expon_ != nullptr) {
+      expon_->global_addx = expand.data();
+      expon_->other_member = expand.accuracy();
+    }
+  }
+
+  void set_targetlco(const targetlco_t &targs) {
+    if (parts_ != nullptr) {
+      parts_->global_addx = targs.lco();
+      parts_->other_member = targs.n();
+    }
+  }
+
+  void set_sourceref(const sourceref_t &src) {
+    if (parts_ != nullptr) {
+      parts_->global_addx = src.data();
+      parts_->other_member = src.n();
+    }
+  }
 
   void StoM(DAGInfo *source) {
     assert(source->has_parts());
-    link_nodes(source->parts_, normal_, Operation::StoM);
+    link_nodes(source, source->parts_, this, normal_, Operation::StoM);
   }
 
   void StoL(DAGInfo *source) {
     assert(source->has_parts());
-    link_nodes(source->parts_, normal_, Operation::StoL);
+    link_nodes(source, source->parts_, this, normal_, Operation::StoL);
   }
 
   void MtoM(DAGInfo *source) {
-    link_nodes(source->normal_, normal_, Operation::MtoM);
+    link_nodes(source, source->normal_, this, normal_, Operation::MtoM);
   }
 
   void MtoL(DAGInfo *source) {
-    link_nodes(source->normal_, normal_, Operation::MtoL);
+    link_nodes(source, source->normal_, this, normal_, Operation::MtoL);
   }
 
   void LtoL(DAGInfo *source) {
-    link_nodes(source->normal_, normal_, Operation::LtoL);
+    link_nodes(source, source->normal_, this, normal_, Operation::LtoL);
   }
 
   void MtoT(DAGInfo *target) {
     assert(target->has_parts());
-    link_nodes(normal_, target->parts_, Operation::MtoT);
+    link_nodes(this, normal_, target, target->parts_, Operation::MtoT);
   }
 
   void LtoT(DAGInfo *target) {
     assert(target->has_parts());
-    link_nodes(normal_, target->parts_, Operation::LtoT);
+    link_nodes(this, normal_, target, target->parts_, Operation::LtoT);
   }
 
   void StoT(DAGInfo *source) {
     assert(source->has_parts());
     assert(has_parts());
-    link_nodes(source->parts_, parts_, Operation::StoT);
+    link_nodes(source, source->parts_, this, parts_, Operation::StoT);
   }
 
-  static void link_nodes(DAGNode *source, DAGNode *dest, Operation op) {
+  void lock() {
+    hpx_lco_sema_p(lock_);
+  }
+
+  void unlock() {
+    // TODO: can I get away with nonsync and ignore sync on this?
+    hpx_lco_sema_v_sync(lock_);
+  }
+
+  void collect_DAG_nodes(std::vector<DAGNode *> &terminals,
+                         std::vector<DAGNode *> &internals) {
+    internals.push_back(normal_);
+    if (expon_) {
+      internals.push_back(expon_);
+    }
+    if (parts_) {
+      terminals.push_back(parts_);
+    }
+  }
+
+  // TODO: why is this static?
+  static void link_nodes(DAGInfo *src_info, DAGNode *source,
+                         DAGInfo *dest_info, DAGNode *dest, Operation op) {
+    dest_info->lock();
     dest->add_input();
+    dest_info->unlock();
+
+    src_info->lock();
     source->add_edge(dest, op);
+    src_info->unlock();
   }
 
  private:

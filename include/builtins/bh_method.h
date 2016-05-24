@@ -45,7 +45,7 @@ namespace dashmm {
 /// is constructed.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          typename DistroPolicy>
+          typename DistroPolicy = SingleLocality>
 class BH {
  public:
   using source_t = Source;
@@ -68,75 +68,54 @@ class BH {
   double theta() const {return theta_;}
 
   /// In generate, BH will call S->M on the sources in a leaf node.
-  void generate(sourcenode_t &curr, int n_digits) const {
-    double scale = 0.0;
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
-    sourceref_t sources = curr.parts();
-    currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, scale);
+  void generate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.StoM(&curr->dag);
   }
 
   /// In aggregate, BH will call M->M to combine moments from the children
   /// of the current node.
-  void aggregate(sourcenode_t &curr, int n_digits) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
+  void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
     for (size_t i = 0; i < 8; ++i) {
-      sourcenode_t kid = curr.child(i);
-      if (kid.is_valid()) {
-        expansionlco_t kexp = kid.expansion();
-        currexp.M_to_M(kexp, i, 0.0);
+      sourcenode_t *kid = curr->child[i];
+      if (kid != nullptr) {
+        curr->dag.MtoM(&kid.dag);
       }
     }
   }
 
   /// In inherit, BH does nothing.
-  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
-  }
+  void inherit(targetnode_t *curr, DomainGeometry *domain) const { }
 
   /// In process, BH tests and uses multipole expansions.
-  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
-               bool curr_is_leaf) const {
-    std::vector<sourcenode_t> newcons{ };
-    double unused = 0.0;
+  void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
+               bool curr_is_leaf, DomainGeometry *domain) const {
+    std::vector<sourcenode_t *> newcons{ };
+    Point ccenter = domain->center_from_index(curr->idx);
+    double csize = domain->size_from_level(curr->idx.level());
 
     do {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
-        Point comp_point = nearest(i->center(), curr.center(), curr.size());
-        bool can_use = MAC(i->center(), i->size(), comp_point);
+        Point icenter = domain->center_from_index((*i)->idx);
+        double isize = domain->size_from_level((*i)->idx.level());
+        Point comp_point = nearest(icenter, ccenter, csize;
+        bool can_use = MAC(icenter, isize, comp_point);
 
         if (can_use) {
           if (!curr_is_leaf) {
             newcons.push_back(*i);
           } else {
-            expansionlco_t expand = i->expansion();
-            targetlco_t targets = curr.parts();
-            expand.M_to_T(targets, unused);
+            curr->dag.M_to_T(&(*i)->dag);
           }
-        } else if (i->is_leaf()) {
+        } else if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            expansionlco_t expand = i->expansion();
-            targetlco_t targets = curr.parts();
-            sourceref_t sources = i->parts();
-            expand.S_to_T(sources, targets);
+            (*i)->dag.StoT(&curr->dag);
           } else {
             newcons.push_back(*i);
           }
         } else {
           for (size_t j = 0; j < 8; ++j) {
-            // NOTE: This line will create the SourceNode, and then pull in a
-            // local version.
-            sourcenode_t kid = i->child(j);
-            if (kid.is_valid()) {
-              // NOTE: This will do the same thing. In distrib, that pull might
-              // be costly.
+            sourcenode_t *kid = (*i)->child[j];
+            if (kid != nullptr) {
               newcons.push_back(kid);
             }
           }
@@ -149,8 +128,8 @@ class BH {
   }
 
   // BH always calls for refinement
-  bool refine_test(bool same_sources_and_targets, const targetnode_t &curr,
-                   const std::vector<sourcenode_t> &consider) const {
+  bool refine_test(bool same_sources_and_targets, const targetnode_t *curr,
+                   const std::vector<sourcenode_t *> &consider) const {
     return true;
   }
 

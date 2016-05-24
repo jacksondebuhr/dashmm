@@ -26,6 +26,7 @@
 
 #include "dashmm/arraymetadata.h"
 #include "dashmm/arraymapaction.h"
+#include "dashmm/arrayref.h"
 #include "dashmm/types.h"
 
 
@@ -153,6 +154,18 @@ class Array {
     int *arg = &runcode;
     hpx_run(&array_put_action, &data_, &first, &last, &arg, &in_data);
     return static_cast<ReturnCode>(runcode);
+  }
+
+  /// Produce an ArrayRef from the Array
+  ///
+  /// Largely speaking, this will not be needed by DASHMM users. This array
+  /// reference will refer to the entirety of the array.
+  ///
+  /// \returns - an ArrayRef indicating the entirety of this array.
+  ArrayRef<T> ref() const {
+    ArrayMetaData meta{};
+    hpx_gas_memget_sync(&meta, data_, sizeof(meta));
+    return ArrayRef<T>{meta.data, meta.count, meta.count};
   }
 
   /// Map an action onto each record in the Array

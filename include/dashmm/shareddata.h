@@ -89,7 +89,7 @@ class LocalData {
     return *this;
   }
 
-  LocalData<T> &operator=(LocalDat<T> &&other) {
+  LocalData<T> &operator=(LocalData<T> &&other) {
     if (data_ != HPX_NULL) {
       hpx_gas_unpin(data_);
     }
@@ -105,6 +105,8 @@ class LocalData {
 
   const T& operator*() const {return *local_;}
   const T* operator->() const {return local_;}
+
+  T *value() const {return local_;}
 
  private:
    hpx_addr_t data_;
@@ -135,9 +137,15 @@ class SharedData {
       hpx_run(&shared_data_construct_action, &bytes, &argaddr);
     }
     assert(data_ != HPX_NULL);
+    if (value != nullptr) {
+      reset(value);
+    }
   }
 
   SharedData(hpx_addr_t data) : data_{data} { }
+
+  // TODO Do we want to have a rebind method, which causes the object to forget
+  // its association to global memory?
 
   // We do not do this with a destructor becuase these objects might
   // exist at the end of their containing scope.

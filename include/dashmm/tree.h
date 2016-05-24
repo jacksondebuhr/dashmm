@@ -82,6 +82,18 @@ class TreeNode {
     }
   }
 
+  int n_children() const {
+    int retval{0};
+    for (int i = 0; i < 8; ++i) {
+      if (child[i] != nullptr) {
+        ++retval;
+      }
+    }
+    return retval
+  }
+
+  bool is_leaf() const {return n_children() == 0;}
+
   Index idx;                // Index of the node
   treenode_t *parent;       // The parent of this node
   treenode_t *child[8];     // The children of this node
@@ -125,9 +137,9 @@ class Tree {
   using sourceref_t = ArrayRef<Source>;
   using targetref_t = ArrayRef<Target>;
 
-  Tree(DomainGeometry dom, method_t met, int limit, int digits)
+  Tree(method_t met, int limit, int digits)
       : method_{met}, refinement_limit_{limit}, n_digits_{digits},
-        source_root_{nullptr}, target_root_{nullptr}, domain_{&dom} { }
+        source_root_{nullptr}, target_root_{nullptr}, domain_{nullptr} { }
 
   ~Tree() {
     if (source_root_ != nullptr) {
@@ -136,6 +148,38 @@ class Tree {
     if (target_root_ != nullptr) {
       delete target_root_;
     }
+    domain_.destroy();
+  }
+
+  // delete the copy constructor and assignment
+  Tree(const Tree &other) = delete;
+  Tree &operator=(const Tree &other) = delete;
+
+  // define move construction and assignment
+  Tree(Tree &&other) {
+    method_ = other.method;
+    refinement_limit_ = other.refinement_limit_;
+    n_digits_ = other.n_digits_;
+    source_root_ = other.source_root_;
+    target_root_ = other.target_root_;
+    domain_ = other.domain_;
+
+    other.source_root_ = nullptr;
+    other.target_root_ = nullptr;
+  }
+
+  Tree &operator=(Tree &&other) {
+    method_ = other.method;
+    refinement_limit_ = other.refinement_limit_;
+    n_digits_ = other.n_digits_;
+    source_root_ = other.source_root_;
+    target_root_ = other.target_root_;
+    domain_ = other.domain_;
+
+    other.source_root_ = nullptr;
+    other.target_root_ = nullptr;
+
+    return *this;
   }
 
   /// Returns the domain represented by the tree
@@ -197,6 +241,7 @@ class Tree {
     domain_.reset(&dom);
   }
 
+  // TODO: document
   // Document this - this also sets up the DAG stuff, or starts to
   hpx_addr_t partition_source_tree(sourceref_t sources) {
     hpx_addr_t retval = hpx_lco_future_new(0);
@@ -211,7 +256,7 @@ class Tree {
     return retval;
   }
 
-  // NOTE: Same as previous
+  // TODO: document
   hpx_addr_t partition_target_tree(targetref_t targets,
                                    bool same_sources_and_targets,
                                    std::vector<sourcenode_t *> consider) {
@@ -250,6 +295,78 @@ class Tree {
                                                       consider);
     hpx_lco_wait(targetpartdone);
     hpx_lco_delete_sync(targetpartdone);
+  }
+
+  // TODO: document
+  void collect_DAG_nodes(std::vector<DAGNode *> &sources,
+                        std::vector<DAGNode *> &targets,
+                        std::vector<DAGNode *> &internals) {
+    // descend each tree adding as we go
+    collect_DAG_nodes_from_S_node(source_root_, sources, internals);
+    collect_DAG_nodes_from_T_node(target_root_, targets, internals);
+  }
+
+  // TODO: document
+  void create_expansions_from_DAG(int n_digits) {
+    hpx_addr_t done = hpx_lco_and_new(2);
+    assert(done != HPX_NULL);
+
+    tree_t *argthis = this;
+    hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
+             &done, &n_digits, &argthis, &source_root_);
+    hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
+             &done, &n_digits, &argthis, &target_root_);
+
+    hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
+  }
+
+  // TODO document
+  // TODO: is tree the right place for this?
+  hpx_addr_t setup_termination_detection(
+      const std::vector<DAGNode *> &targets) {
+    int n_targs = targets.size();
+
+    hpx_addr_t retval = hpx_lco_and_new(n_targs);
+    assert(retval != HPX_NULL);
+
+    DAGNode *data = targets.data();
+    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval, &data, &size);
+
+    return retval;
+  }
+
+  // TODO: document
+  // TODO: is tree the right place for this?
+  void setup_edge_lists(const std::vector<DAGNode *> &nodes) {
+    DAGNode *data = nodes.data();
+    int n_nodes = nodes.size();
+    hpx_call(HPX_HERE, edge_lists_, HPX_NULL, &data, &n_nodes);
+  }
+
+  // TODO: document
+  void start_DAG_evaluation() {
+    tree_t *targ = this;
+    hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL, &targ, &source_root_);
+  }
+
+  // TODO document
+  // TODO: is tree the right place for this?
+  void destroy_DAG_LCOs(const std::vector<DAGNode *> &targets,
+                        const std::vector<DAGNode *> &internal) {
+    hpx_addr_t done = hpx_lco_and_new(2);
+    assert(done != HPX_NULL):
+
+    DAGNode *data = targets.data();
+    int n_data = targets.size();
+    hpx_call(HPX_HERE, destroy_target_DAG_LCOs_, done, &data, &n_data);
+
+    data = internal.data();
+    n_data = internal.size();
+    hpx_call(HPX_HERE, destroy_target_DAG_LCOs_, done, &data, &n_data);
+
+    hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
   }
 
  private:
@@ -315,7 +432,8 @@ class Tree {
 
   static int source_child_done_handler(tree_t *tree, sourcenode_t *node,
                                        hpx_addr_t partdone) {
-    tree->method_.aggregate(node, tree->n_digits_);
+    auto domain = tree->domain_.value();
+    tree->method_.aggregate(node, domain.value());
     hpx_lco_delete_sync(partdone);
     return HPX_SUCCESS;
   }
@@ -325,13 +443,15 @@ class Tree {
     tree_t *tree = parms->tree;
     sourcenode_t *node = parms->node;
 
+    auto domain = tree->domain_.value();
+
     // If we are at a leaf, we can generate
     if (parms->sources.n() <= tree->refinement_limit_) {
       assert(node->sources.data() == HPX_NULL);
       node->sources = parms->sources;
 
-      node->dag.add_parts();
-      tree->method_.generate(node, tree->n_digits());
+      node->dag.add_parts(hpx_get_my_rank());
+      tree->method_.generate(node, domain->value());
 
       hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
 
@@ -427,11 +547,12 @@ class Tree {
     }
 
     if (!refine) {
-      node->dag.add_parts();
+      node->dag.add_parts(hpx_get_my_rank());
     }
 
-    tree->method_.inherit(node, tree->n_digits_, parms->which_child);
-    tree->method_.process(node, parms->consider, !refine);
+    auto domain = tree->domain_.value();
+    tree->method_.inherit(node, domain.value());
+    tree->method_.process(node, parms->consider, !refine, domain.value());
 
     if (refine) {
       // partition
@@ -535,6 +656,217 @@ class Tree {
     return HPX_SUCCESS;
   }
 
+  void collect_DAG_nodes_from_S_node(sourcenode_t *root,
+                                     std::vector<DAGNode *> &sources,
+                                     std::vector<DAGNode *> &internals) {
+    for (int i = 0; i < 8; ++i) {
+      if (root->child[i]) {
+        collect_DAG_nodes_from_S_node(root->child[i], sources, internals);
+      }
+    }
+    root->dag.collect_DAG_nodes(sources, internals);
+  }
+
+  void collect_DAG_nodes_from_T_node(targetnode_t *root,
+                                     std::vector<DAGNode *> &targets,
+                                     std::vector<DAGNode *> &internals) {
+    for (int i = 0; i < 8; ++i) {
+      if (root->child[i]) {
+        collect_DAG_nodes_from_T_node(root->child[i], targets, internals);
+      }
+    }
+    root->dag.collect_DAG_nodes(targets, internals);
+  }
+
+  static int create_S_expansions_from_DAG_handler(
+        hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
+    // create the normal expansion
+    auto domain = tree->domain_.value();
+    Point n_center = domain->center_from_index(node->idx);
+    std::unique_ptr<expansion_t> input_expand =
+        new expansion_t{n_center, n_digits};
+    expansionlco_t expand{node->dag.normal().incoming,
+                          node->dag.normal().edges.size(),
+                          *domain, node->idx, input_expand,
+                          HPX_THERE(node->dag.normal().locality)};
+    node->dag.set_normal_expansion(expand);
+
+    // NOTE: this is where we would make the intermediate expansion, but that
+    // is not supported just yet.
+
+    // spawn work at children
+    int n_children{node->n_children()};
+
+    if (n_children) {
+      hpx_addr_t cdone = hpx_lco_and_new(n_children);
+      assert(cdone != HPX_NULL);
+
+      for (int i = 0; i < 8; ++i) {
+        if (node->child[i] != nullptr) {
+          hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
+                   &cdone, &n_digits, &tree, &node->child[i]);
+        }
+      }
+
+      // This will set the parent's LCO as well as delete cdone
+      hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
+                                      cdone, hpx_lco_delete_action);
+    } else {
+      node->dag.set_sourceref(node->parts);
+
+      hpx_lco_set(done);
+    }
+
+    return HPX_SUCCESS;
+  }
+
+  static int create_T_expansions_from_DAG_handler(
+        hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
+    // create the normal expansion
+    auto domain = tree->domain_.value();
+    Point n_center = domain->center_from_index(node->idx);
+    std::unique_ptr<expansion_t> input_expand =
+        new expansion_t{n_center, n_digits};
+    expansionlco_t expand{node->dag.normal().incoming,
+                          node->dag.normal().edges.size(),
+                          *domain, node->idx, input_expand,
+                          HPX_THERE(node->dag.normal().locality)};
+    node->dag.set_normal_expansion(expand);
+
+    // NOTE: this is where we would make the intermediate expansion, but that
+    // is not supported just yet.
+
+    // spawn work at children
+    int n_children{node->n_children()};
+
+    // Here is where we make the target lco if needed
+    if (n_children == 0) {
+      targetlco_t tlco{node->parts.data(), node->parts.n()};
+      node->dag.set_targetlco(tlco);
+
+      hpx_lco_set(done);
+    } else {
+      hpx_addr_t cdone = hpx_lco_and_new(n_children);
+      assert(cdone != HPX_NULL);
+
+      for (int i = 0; i < 8; ++i) {
+        if (node->child[i] != nullptr) {
+          hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
+                   &cdone, &n_digits, &tree, &node->child[i]);
+        }
+      }
+
+      // This will set the parent's LCO as well as delete cdone
+      hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
+                                      cdone, hpx_lco_delete_action);
+    }
+
+    return HPX_SUCCESS;
+  }
+
+  static int edge_lists_handler(DAGNode *nodes, int n_nodes) {
+    // If this is a bottleneck, we can easily make this some kind of parfor
+    for (int i = 0; i < n_nodes; ++i) {
+      expansionlco_t expand{nodes[i].global_addx, nodes[i].other_member};
+      expand.set_out_edge_data(nodes[i].edges);
+    }
+  }
+
+  static int instigate_dag_eval_handler(tree_t *tree, sourcenode_t *node) {
+    int n_children{node->n_children()};
+    if (n_children > 0) {
+      for (int i = 0; i < 8; ++i) {
+        hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
+                 &tree, &node->child[i]);
+      }
+    } else {
+      // At a leaf, we do actual work
+      DAGNode *parts = node->dag.parts();
+      assert(parts != nullptr);
+      sourceref_t sources = node->parts;
+
+      // loop over edges
+      for (int i = 0; i < parts.edges.size(); ++i) {
+        DAGNode *normal = node->dag.normal();
+        assert(normal);
+        expansionlco_t expand{normal->global_addx, normal->other_member};
+
+        switch (parts.edges[i].op) {
+          case Operation::StoM:
+            auto domain = tree->domain_.value();
+            double scale = domain->size_from_level(node->idx.level());
+            Point center = domain->center_from_index(node->idx);
+            expand.S_to_M(center, sources, scale);
+            break;
+          case Operation::StoL:
+            double scale = domain->size_from_level(node->idx.level());
+            Point center = domain->center_from_index(node->idx);
+            expand.S_to_L(center, sources, scale);
+            break;
+          case Operation::StoT:
+            targetlco_t targets{parts.edges[i].target->global_addx,
+                                parts.edges[i].target->other_member};
+            expand.S_to_T(sources, targets);
+            break;
+          default:
+            assert(0 && "Trouble handling DAG instigation");
+            break;
+        }
+      }
+    }
+
+    return HPX_SUCCESS;
+  }
+
+  static int termination_detection_handler(hpx_addr_t done,
+                                           DAGNode *nodes, int n_targs) {
+    // If this is insufficiently parallel, we can always make this action
+    // call itself with smaller and smaller chunks of the array.
+    for (int i = 0; i < n_targs; ++i) {
+      assert(nodes[i] != nullptr);
+      hpx_call_when(nodes[i].global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    return HPX_SUCCESS;
+  }
+
+  static int destroy_target_DAG_LCOs_handler(DAGNode *nodes, int n_nodes) {
+    // We could do this more in parallel if needed.
+
+    // We use non-sync delete since some of these could be remote from this
+    // locality.
+    hpx_addr_t alldel = hpx_lco_and_new(n_nodes);
+    assert(alldel != HPX_NULL);
+
+    for (int i = 0; i < n_nodes; ++i) {
+      assert(node->global_addx != HPX_NULL);
+      hpx_lco_delete(node->global_addx, alldel);
+    }
+
+    hpx_lco_wait(alldel);
+    hpx_lco_delete_sync(alldel);
+
+    return HPX_SUCCESS;
+  }
+
+  static int destroy_internal_DAG_LCOs_handler(DAGNode *nodes, int n_nodes) {
+    // We could add more parallelism here if needed.
+
+    // Some of these might be remote, so we use async delete on these LCOs.
+    hpx_addr_t alldel = hpx_lco_and_new(n_nodes);
+    assert(alldel != HPX_NULL);
+
+    for (int i = 0; i < n_nodes; ++i) {
+      assert(node->global_addx != HPX_NULL);
+      hpx_lco_delete(node->global_addx, alldel);
+    }
+
+    hpx_lco_wait(alldel);
+    hpx_lco_delete_sync(alldel);
+
+    return HPX_SUCCESS;
+  }
 
   // Data that is constant for each node of the tree
   method_t method_;
@@ -554,6 +886,13 @@ class Tree {
   static hpx_action_t source_child_done_;
   static hpx_action_t source_partition_;
   static hpx_action_t target_partition_;
+  static hpx_action_t create_S_expansions_from_DAG_;
+  static hpx_action_t create_T_expansions_from_DAG_;
+  static hpx_action_t edge_lists_;
+  static hpx_action_t instigate_dag_eval_;
+  static hpx_action_t termination_detection_;
+  static hpx_action_t destroy_target_DAG_LCOs_;
+  static hpx_action_t destroy_internal_DAG_LCOs_;
 };
 
 
@@ -596,6 +935,64 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t Tree<S, T, E, M, D>::target_partition_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::create_S_expansions_from_DAG_ =
+    HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::create_T_expansions_from_DAG_ =
+    HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::edge_lists_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::instigate_dag_eval_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::termination_detection_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::destroy_target_DAG_LCOs_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::destroy_internal_DAG_LCOs_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

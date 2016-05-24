@@ -229,11 +229,8 @@ class ExpansionLCO {
   ///
   /// \param ops - the operations
   /// \param targets - the target LCO addresses
-  void set_out_edge_data(const std::vector<Operation> &ops,
-                         const std::vector<hpx_addr_t> &targets) {
-    assert(ops.size() == targets.size());
-    int n_out = ops.size();
-
+  void set_out_edge_data(const std::vector<DAGEdge> &edges) {
+    int n_out = edges.size();
     size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
     char *input_data = new char[bytes];
     assert(input_data);
@@ -246,8 +243,8 @@ class ExpansionLCO {
     codes[1] = n_out;
 
     for (int i = 0; i < n_out; ++i) {
-      records[i].op = ops[i];
-      records[i].target = targets[i];
+      records[i].op = edges[i].op;
+      records[i].target = edges[i].target->global_addx;
     }
 
     hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);

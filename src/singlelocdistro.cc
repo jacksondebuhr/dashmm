@@ -12,29 +12,23 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_SINGLE_LOC_DISTRO_H__
-#define __DASHMM_SINGLE_LOC_DISTRO_H__
-
-
-#include <vector>
-
-#include "dashmm/daginfo.h"
+#include "builtins/singlelocdistro.h"
 
 
 namespace dashmm {
 
 
-// A distribution policy that will place everything on one locality
-// only use if it definitely fits in memory
-class SingleLocality {
-public:
-  void compute_distribution(const SharedData<DomainGeometry> &domain,
-                            const std::vector<DAGNode *> &terminals,
-                            const std::vector<DAGNode *> &internal);
+// Set the locality of every node to be the root locality
+void SingleLocality::compute_distribution(
+    const SharedData<DomainGeometry> &domain,
+    const std::vector<DAGNode *> &terminals,
+    const std::vector<DAGNode *> &internal) {
+  auto b = internal.begin();
+  auto e = internal.end();
+  for (auto i = b; i != e; ++i) {
+    ()*i)->locality = 0;
+  }
 }
 
 
-} // dashmm
-
-
-#endif // __DASHMM_SINGLE_LOC_DISTRO_H__
+}
