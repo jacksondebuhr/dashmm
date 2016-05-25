@@ -97,7 +97,7 @@ class BH {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
         Point icenter = domain->center_from_index((*i)->idx);
         double isize = domain->size_from_level((*i)->idx.level());
-        Point comp_point = nearest(icenter, ccenter, csize;
+        Point comp_point = nearest(icenter, ccenter, csize);
         bool can_use = MAC(icenter, isize, comp_point);
 
         if (can_use) {

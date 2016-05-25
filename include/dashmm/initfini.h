@@ -41,7 +41,7 @@ namespace dashmm {
 /// \param argv [inout] - the arguments themselves
 ///
 /// \return kSuccess on successful initialization; kRuntimeError if there is a
-///         problem initializing the HPX-5 runtime; kInitError otherwise
+///         problem initializing the HPX-5 runtime;
 ReturnCode init(int *argc, char ***argv);
 
 
@@ -52,9 +52,6 @@ ReturnCode init(int *argc, char ***argv);
 ///
 /// \return kSuccess on successful shutdown; kFiniError otherwise
 ReturnCode finalize();
-
-
-
 
 
 } // namespace dashmm

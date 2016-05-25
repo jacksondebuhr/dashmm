@@ -80,7 +80,6 @@ class TargetLCO {
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
   explicit TargetLCO(int n_inputs, const targetref_t &targets) {
-    // TODO update
     Data init{n_inputs, targets};
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));
@@ -100,6 +99,7 @@ class TargetLCO {
   /// The global address of the referred to object
   hpx_addr_t lco() const {return lco_;}
 
+  /// The number of targets in the referred object
   int n() const {return n_targs_;}
 
   /// Contribute a S->T operation to the referred targets
@@ -107,7 +107,6 @@ class TargetLCO {
   /// \param n - the number of sources
   /// \param sources - the sources themselves
   void contribute_S_to_T(int n, source_t *sources) const {
-    // NOTE: we assume this is called local to the sources
     size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);

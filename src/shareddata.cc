@@ -12,6 +12,9 @@
 // =============================================================================
 
 
+/// \file src/shareddata.cc
+/// \brief Implementation of actions related to SharedData.
+
 // C / C++ stuff
 
 #include "dashmm/shareddata.h"
@@ -23,7 +26,8 @@ namespace dashmm {
 
 
 namespace {
-  void perform_reset(hpx_addr_t base, void *data, size_t bytes) {
+  void perform_reset(hpx_addr_t base, void *data, size_t bytes,
+                     hpx_addr_t cct) {
     int nranks = hpx_get_num_ranks();
     hpx_addr_t done = hpx_lco_and_new(nranks);
     assert(done != HPX_NULL);
@@ -33,8 +37,13 @@ namespace {
       hpx_gas_memput_lsync(offset, data, bytes, done);
     }
 
-    hpx_lco_wait(done);
-    hpx_lco_delete_sync(done);
+    if (cct == HPX_NULL) {
+      hpx_lco_wait(done);
+      hpx_lco_delete_sync(done);
+    } else {
+      hpx_call_when_with_continuation(done, cct, hpx_lco_set_action,
+                                      done, hpx_lco_delete_action);
+    }
   }
 }
 
@@ -58,7 +67,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 
 
 int shared_data_external_reset_handler(void *data, size_t UNUSED) {
-  perform_reset(data->base, data->data, data->bytes);
+  perform_reset(data->base, data->data, data->bytes, HPX_NULL);
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
@@ -68,7 +77,8 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
 
 
 int shared_data_internal_reset_handler(void *data, size_t UNUSED) {
-  perform_reset(data->base, data->data, data->bytes);
+  hpx_addr_t cct = hpx_thread_current_cont_target();
+  perform_reset(data->base, data->data, data->bytes, cct);
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,

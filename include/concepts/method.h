@@ -12,9 +12,6 @@
 // =============================================================================
 
 
-// TODO update documentation
-
-
 /// To qualify for the Method concept in DASHMM, a class must satisfy the
 /// following criteria. This file is not included anywhere in DASHMM, but it
 /// is in the source distribution as an example, and to explain the
@@ -22,7 +19,7 @@
 
 
 /// Methods in DASHMM are template classes parameterized over the types of
-/// sources and tagets as well as the Expansion. A full description of the
+/// sources and targets as well as the Expansion. A full description of the
 /// requirements of the Source, Target and Expansion can be found elsewhere.
 ///
 /// When creating a user-defined Method, the name Method in the following
@@ -30,6 +27,9 @@
 ///
 /// If desired, the implementer should indicate a default DistroPolicy.
 /// The best choice is the default policy for Evaluator objects.
+///
+/// Methods operate on the DAG which is explicitly represented in teh DAGInfo
+/// and DAGNode objects. See their documentation for more details.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           typename DistroPolicy>
@@ -48,35 +48,27 @@ class Method {
   using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,
                                 DistroPolicy>;
 
-  /// TODO: The method will need a default constructor.
+  /// Methods require a default constructor.
+  Method();
 
   /// Generate the expansion at the leaf of the source tree
   ///
   /// This operation is invoked at the leaves of the source tree to generate
-  /// the expansions for the sources. Typically, these will be multipole
-  /// expansions.
-  ///
-  /// It is assumed that generate will either create the expansion with the
-  /// needed data, or it will create an empty expansion and schedule the
-  /// contribution to the expansion. Internally, DASHMM will call finalize on
-  /// the expansion after generate() is called for a particular node.
-  /// Further, generate will not return until the expansion for @p curr has
-  /// been set. This does not require that all contributions have been made to
-  /// that expansion.
+  /// links in the DAG from sources into internal nodes of the DAG. Typically
+  /// this will schedule S->M operations.
   ///
   /// \param curr - the current node of the source tree (will be a leaf)
+  /// \param domain - the domain geometry for the tree
   void generate(sourcenode_t *curr, DomainGeometry *domain) const;
 
   /// Combine expansions from children of an internal source node
   ///
   /// This operation is invoked on internal nodes of the source tree to
-  /// combine the expansions of the children on the given node into the
-  /// expansion for the internal node.
-  ///
-  /// It is assumed that aggregate creates the expansion and schedules all
-  /// contributions to that expansion.
+  /// combine add the edges in the DAG that connect multipole moments on the
+  /// source tree into other multipole moments.
   ///
   /// \param curr - the current node of the source tree (will be internal)
+  /// \param domain - the domain geometry for the tree
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const;
 
   /// Inherit an expansion from a target node's parent
@@ -85,6 +77,7 @@ class Method {
   /// effect of the expansion collected at the parent of the given node.
   ///
   /// \param curr - the current node of the target tree
+  /// \param domain - the domain geometry for the tree
   void inherit(targetnode_t *curr, DomainGeometry *domain) const;
 
   /// Process the list of source nodes for a given target node
@@ -97,6 +90,7 @@ class Method {
   /// \param curr - the target node in question
   /// \param consider - a vector of the source nodes under consideration
   /// \param curr_is_leaf - indicates if @p curr is a leaf node
+  /// \param domain - the domain geometry for the tree
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const;
 

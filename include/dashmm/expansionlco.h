@@ -323,12 +323,12 @@ class ExpansionLCO {
   static void operation_handler(Header *lhs, void *rhs, size_t bytes) {
     int *code = static_cast<int *>(rhs);
 
+    // decrement the counter
+    lhs->yet_to_arrive -= 1;
+    assert(lhs->yet_to_arrive >= 0);
+
     switch (code[0]) {
       case SetOpCodes::kContribute:
-        // decrement the counter
-        lhs->yet_to_arrive -= 1;
-        assert(lhs->yet_to_arrive >= 0);
-
         expansion_t incoming{rhs, bytes, code[1]};
 
         // create the expansion from the payload
@@ -344,10 +344,6 @@ class ExpansionLCO {
 
         break;
       case SetOpCodes::kOutEdges:
-        // decrement the counter
-        lhs->yet_to_arrive -= 1;
-        assert(lhs->yet_to_arrive >= 0);
-
         int n_edges = code[1];
         // usage check
         assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
@@ -567,7 +563,7 @@ class ExpansionLCO {
     double scale = geo->size_from_level(head->index.level());
 
     // NOTE: we do not put in the correct number of targets. This is fine
-    // because contribute_M_to_T does not rely on this information.
+    // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
     destination.contribute_L_to_T(head->expansion_size, head->payload,
                                   n_digits, scale);

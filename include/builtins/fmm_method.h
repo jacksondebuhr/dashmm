@@ -70,9 +70,6 @@ class FMM {
 
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const {
-    //expansionlco_t currexp = curr.expansion();
-    //double scale = 1.0 / curr.size();
-    //targetlco_t targets = curr.parts();
     Index t_index = curr->idx;
 
     if (curr_is_leaf) {

@@ -1,7 +1,7 @@
 /// Source concept in DASHMM
 ///
 /// To qualify as a Source for DASHMM, a type should be trivially copyable,
-/// and should provide at one members accessible by name:
+/// and should provide one member accessible by name:
 ///
 /// Point position;
 ///

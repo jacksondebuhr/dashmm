@@ -50,7 +50,7 @@ class Evaluator;
 /// There is very little in the way of behavior attached to this object, so it
 /// exposes its data directly.
 ///
-/// NOTE: This object should only be created or destroyed from inside an HPX-5
+/// This object should only be created or destroyed from inside an HPX-5
 /// thread.
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
@@ -73,8 +73,6 @@ class TreeNode {
       : idx{i}, parent{p}, child{}, dag{}, parts{} { }
 
   ~TreeNode() {
-    // TODO Do we want to do the following in parallel? That is, spawn work
-    // for the children?
     for (int i = 0; i < 8; ++i) {
       if (child[i] != nullptr) {
         delete child[i];
@@ -241,8 +239,20 @@ class Tree {
     domain_.reset(&dom);
   }
 
-  // TODO: document
-  // Document this - this also sets up the DAG stuff, or starts to
+  /// Partition the source tree
+  ///
+  /// Given the sources, this will create the hierarchical subdivision of the
+  /// domain of this object. The domain of the tree should be set before this
+  /// is called. Further, during the partitioning, the method will be applied
+  /// and the portions of the DAG that connect in the source tree will be
+  /// constructed.
+  ///
+  /// Please note that this will sort the source records geometrically to aid
+  /// in the efficient evaluation of the multipole method.
+  ///
+  /// \param sources - the reference to the source particles
+  ///
+  /// \returns - an LCO that will trigger when the partitioning is complete.
   hpx_addr_t partition_source_tree(sourceref_t sources) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
@@ -256,7 +266,20 @@ class Tree {
     return retval;
   }
 
-  // TODO: document
+  /// Partition the target tree
+  ///
+  /// The hierarchical subdivision of the targets is computed by this routine.
+  /// Like with partition_source_tree(), this will sort the targets. The
+  /// domain of the tree should have been computed before calling this function.
+  /// As this partitioning is computed, the remainder of the DAG will be set up.
+  ///
+  /// \param targets - the reference to the target particles
+  /// \param same_sources_and_targets - true if the sources and targets are
+  ///                  identical.
+  /// \param consider - a list of nodes to pass into the method::process
+  ///                  function. Typically, this is just the source root.
+  ///
+  /// \returns - an LCO to indicate the completion of the partitioning
   hpx_addr_t partition_target_tree(targetref_t targets,
                                    bool same_sources_and_targets,
                                    std::vector<sourcenode_t *> consider) {
@@ -279,7 +302,13 @@ class Tree {
     return partdone;
   }
 
-  // TODO: document
+  /// Partition the tree given the provided source and target points
+  ///
+  /// This will compute not only the bounding geometry of the points, but
+  /// will also partition the tree. This operation is synchronous.
+  ///
+  /// \param sources - the reference to the source records
+  /// \param targets - the reference to the target records
   void partition(sourceref_t sources, targetref_t targets) {
     bool same_sandt = (sources.data() == targets.data()
                         && sources.n() == targets.n());
@@ -297,16 +326,36 @@ class Tree {
     hpx_lco_delete_sync(targetpartdone);
   }
 
-  // TODO: document
+  /// Traverse the tree and collect the DAG nodes
+  ///
+  /// This will collect the nodes of the DAG into three groups: the source
+  /// nodes of the DAG, the target nodes of the DAG, and all other nodes.
+  /// The source and target nodes are the input and output nodes respectively.
+  /// The remainder are those nodes containing an intermediate computation.
+  ///
+  /// This is a synchronous operation.
+  ///
+  /// \param sources - a vector that will be populated with the source DAG nodes
+  /// \param targets - a vector that will be populated with the target DAG nodes
+  /// \param internals - a vector that will be populated with all other DAG
+  ///                    nodes
   void collect_DAG_nodes(std::vector<DAGNode *> &sources,
                         std::vector<DAGNode *> &targets,
                         std::vector<DAGNode *> &internals) {
-    // descend each tree adding as we go
     collect_DAG_nodes_from_S_node(source_root_, sources, internals);
     collect_DAG_nodes_from_T_node(target_root_, targets, internals);
   }
 
-  // TODO: document
+  /// Create the LCOs from the DAG
+  ///
+  /// This will traverse the source and target tree creating any needed
+  /// expansion LCOs. Further, it will create the target LCOs in the target
+  /// tree.
+  ///
+  /// This is a synchronous operation.
+  ///
+  /// \param n_digits - the accuracy parameter of the expansion being used in
+  ///                   this evaluation.
   void create_expansions_from_DAG(int n_digits) {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
@@ -321,8 +370,16 @@ class Tree {
     hpx_lco_delete_sync(done);
   }
 
-  // TODO document
-  // TODO: is tree the right place for this?
+  // TODO: is tree the right place for this? Does not need any tree data
+  /// Sets up termination detection for a DASHMM evaluation
+  ///
+  /// This is an asynchronous operation. The returned LCO becomes the
+  /// responsibility of the caller.
+  ///
+  /// \param targets - vector of target nodes in the DAG
+  ///
+  /// \returns - LCO that will signal that all targets have completed their
+  ///            computation.
   hpx_addr_t setup_termination_detection(
       const std::vector<DAGNode *> &targets) {
     int n_targs = targets.size();
@@ -336,22 +393,46 @@ class Tree {
     return retval;
   }
 
-  // TODO: document
-  // TODO: is tree the right place for this?
+  // TODO: is tree the right place for this? Does not need any tree data
+  /// Sets the edge lists of the expansion LCOs
+  ///
+  /// This is a separate phase as the DAG is constructed before the LCOs
+  /// serving the work for a DAG node are created. Once the expansion LCOs
+  /// are created, the addresses can then be shared with any LCO that needs
+  /// that information.
+  ///
+  /// This is an asynchronous operation. The work will have started when this
+  /// function returns, but it may not have ended. There is no returned LCO
+  /// as the termination detection cannot trigger before this is done.
+  ///
+  /// \param nodes - vector of the internal nodes of the DAG.
   void setup_edge_lists(const std::vector<DAGNode *> &nodes) {
     DAGNode *data = nodes.data();
     int n_nodes = nodes.size();
     hpx_call(HPX_HERE, edge_lists_, HPX_NULL, &data, &n_nodes);
   }
 
-  // TODO: document
+  /// Initial the DAG evaluation
+  ///
+  /// This starts the work of the evalution by starting the S->* work at the
+  /// source nodes of the DAG.
+  ///
+  /// This is an asynchronous operation. The termination detection cannot
+  /// possibly trigger before this is completed, so waiting on the termination
+  /// of the full evaluation implicitly waits on this operation.
   void start_DAG_evaluation() {
     tree_t *targ = this;
     hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL, &targ, &source_root_);
   }
 
-  // TODO document
-  // TODO: is tree the right place for this?
+  // TODO: is tree the right place for this? - nothing of tree required
+  /// Destroys the LCOs associated with the DAG
+  ///
+  /// This is a synchronous operation. This destroys not only the expansion
+  /// LCOs, but also the target LCOs.
+  ///
+  /// \param targets - the target nodes of the DAG
+  /// \param internal - the internal nodes of the DAG
   void destroy_DAG_LCOs(const std::vector<DAGNode *> &targets,
                         const std::vector<DAGNode *> &internal) {
     hpx_addr_t done = hpx_lco_and_new(2);
@@ -378,6 +459,7 @@ class Tree {
     Point high;
   };
 
+  /// Marshalled argument type for source tree partitioning
   struct SourcePartitionParams {
     hpx_addr_t partdone;
     tree_t *tree;
@@ -385,6 +467,7 @@ class Tree {
     sourceref_t sources;
   };
 
+  /// Marshalled argument type for target tree partitioning
   struct TargetPartitionParams {
     tree_t *tree;
     targetnode_t *node;

@@ -44,7 +44,7 @@ class Expansion {
   ///
   /// Further, this constructor needs to be able to operate in a 'shallow'
   /// mode, where ptr = nullptr. This allows for situations where Expansion
-  /// is needed, but the speicif data for the expansion is not. The exemplar of
+  /// is needed, but the specific data for the expansion is not. The exemplar of
   /// this use is to perform an S->T operation.
   ///
   /// Again, n_digits is a required argument, but it can be ignored.

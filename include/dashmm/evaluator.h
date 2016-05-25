@@ -290,12 +290,6 @@ class Evaluator {
     distropolicy_t distro;
   };
 
-  /// The result of finding bounds
-  struct BoundsResult {
-    Point low;
-    Point high;
-  };
-
   /// The evaluation action implementation
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     // NOTE: These may need to be updated once we change the way array works
