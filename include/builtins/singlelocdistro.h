@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "dashmm/daginfo.h"
+#include "dashmm/domaingeometry.h"
+#include "dashmm/shareddata.h"
 
 
 namespace dashmm {

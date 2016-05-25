@@ -772,7 +772,7 @@ class Tree {
                           node->dag.normal().edges.size(),
                           *domain, node->idx, input_expand,
                           HPX_THERE(node->dag.normal().locality)};
-    node->dag.set_normal_expansion(expand);
+    node->dag.set_normal_expansion(expand.data(), expand.accuracy());
 
     // NOTE: this is where we would make the intermediate expansion, but that
     // is not supported just yet.
@@ -795,7 +795,7 @@ class Tree {
       hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
                                       cdone, hpx_lco_delete_action);
     } else {
-      node->dag.set_sourceref(node->parts);
+      node->dag.set_sourceref(node->parts.data(), node->parts.n());
 
       hpx_lco_set(done);
     }
@@ -814,7 +814,7 @@ class Tree {
                           node->dag.normal().edges.size(),
                           *domain, node->idx, input_expand,
                           HPX_THERE(node->dag.normal().locality)};
-    node->dag.set_normal_expansion(expand);
+    node->dag.set_normal_expansion(expand.data(), expand.accuracy());
 
     // NOTE: this is where we would make the intermediate expansion, but that
     // is not supported just yet.
@@ -825,7 +825,7 @@ class Tree {
     // Here is where we make the target lco if needed
     if (n_children == 0) {
       targetlco_t tlco{node->parts.data(), node->parts.n()};
-      node->dag.set_targetlco(tlco);
+      node->dag.set_targetlco(tlco.lco(), tlco.n());
 
       hpx_lco_set(done);
     } else {

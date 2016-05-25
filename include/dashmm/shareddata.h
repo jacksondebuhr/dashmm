@@ -228,9 +228,9 @@ class SharedData {
     } else {
       size_t argsize = sizeof(reset_args_t) + sizeof(T);
       reset_args_t *parms = new char[argsize];
-      parms.base = data_;
-      parms.bytes = sizeof(T);
-      memcpy(parms.data, value, sizeof(T));
+      parms->base = data_;
+      parms->bytes = sizeof(T);
+      memcpy(parms->data, value, sizeof(T));
       hpx_run(&shared_data_external_reset_action, parms, argsize);
       delete [] parms;
     }
@@ -250,15 +250,15 @@ class SharedData {
   /// \param value - the addess of the object to share. Cannot be null.
   ///
   /// \returns - address of an LCO that indicates completion of the reset.
-  hxp_addr_t reset_async(const T *value) {
+  hpx_addr_t reset_async(const T *value) {
     assert(hpx_is_active());
     assert(value != nullptr);
 
     size_t argsize = sizeof(reset_args_t) + sizeof(T);
     reset_args_t *parms = new char[argsize];
-    parms.base = data_;
-    parms.bytes = sizeof(T);
-    memcpy(parms.data, value, sizeof(T));
+    parms->base = data_;
+    parms->bytes = sizeof(T);
+    memcpy(parms->data, value, sizeof(T));
 
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);

@@ -30,15 +30,15 @@ namespace dashmm {
 
 /// Operation codes to indicate the type of edge
 enum class Operation {
-  Nop;
-  StoM;
-  StoL;
-  MtoM;
-  MtoL;
-  LtoL;
-  MtoT;
-  LtoT;
-  StoT;
+  Nop,
+  StoM,
+  StoL,
+  MtoM,
+  MtoL,
+  LtoL,
+  MtoT,
+  LtoT,
+  StoT,
 };
 
 
@@ -79,7 +79,7 @@ struct DAGNode {
         other_member{0} { }
   void add_input() {++incoming;}
   void add_edge(const DAGNode *end, Operation op) {
-    edges.push_back(DAGEdge{end, op})
+    edges.push_back(DAGEdge{end, op});
   }
 };
 
@@ -161,7 +161,7 @@ class DAGInfo {
   DAGInfo(const DAGInfo &other) = delete;
   DAGInfo &operator=(const DAGInfo &other) = delete;
   DAGInfo(const DAGInfo &&other) = delete;
-  DAGInfo &operator=(const DAGInfo &other) = delete;
+  DAGInfo &operator=(const DAGInfo &&other) = delete;
 
   bool has_interm() const {return interm_ != nullptr;}
   bool has_parts() const {return parts_ != nullptr;}
@@ -178,9 +178,9 @@ class DAGInfo {
   ///
   /// \param expand - the expansion LCO represented by this object's normal
   ///                 DAG node.
-  void set_normal_expansion(const expansionlco_t &expand) {
-    normal_->global_addx = expand.data();
-    normal_->other_member = expand.accuracy();
+  void set_normal_expansion(const hpx_addr_t addx, const int acc) {
+    normal_->global_addx = addx;
+    normal_->other_member = acc;
   }
 
   /// Sets the global data for the intermediate DAG node
@@ -191,10 +191,10 @@ class DAGInfo {
   ///
   /// \param expand - the expansion LCO represented by this object's
   ///                 intermediate DAG node.
-  void set_interm_expansion(const expansionlco_t &expand) {
+  void set_interm_expansion(const hpx_addr_t addx, const int acc) {
     if (interm_ != nullptr) {
-      interm_->global_addx = expand.data();
-      interm_->other_member = expand.accuracy();
+      interm_->global_addx = addx;
+      interm_->other_member = acc;
     }
   }
 
@@ -206,10 +206,10 @@ class DAGInfo {
   ///
   /// \param targs - the target LCO represented by this object's
   ///                particle DAG node.
-  void set_targetlco(const targetlco_t &targs) {
+  void set_targetlco(const hpx_addr_t addx, const int num) {
     if (parts_ != nullptr) {
-      parts_->global_addx = targs.lco();
-      parts_->other_member = targs.n();
+      parts_->global_addx = addx;
+      parts_->other_member = num;
     }
   }
 
@@ -222,10 +222,10 @@ class DAGInfo {
   ///
   /// \param src - a reference to the source particles represented by the
   ///              particle DAG node of this object.
-  void set_sourceref(const sourceref_t &src) {
+  void set_sourceref(const hpx_addr_t addx, const int num) {
     if (parts_ != nullptr) {
-      parts_->global_addx = src.data();
-      parts_->other_member = src.n();
+      parts_->global_addx = addx;
+      parts_->other_member = num;
     }
   }
 
@@ -372,7 +372,7 @@ class DAGInfo {
   DAGNode *normal_;
   DAGNode *interm_;
   DAGNode *parts_;   // source or target
-}
+};
 
 
 } // namespace dashmm
