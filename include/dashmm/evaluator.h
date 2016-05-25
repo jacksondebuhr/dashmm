@@ -255,7 +255,7 @@ class Evaluator {
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
                       const expansion_t &expansion
-                      const distropolicy_t &distro) {
+                      const distropolicy_t &distro = distropolicy_t{}) {
     // pack the arguments and call the action
     EvaluateParams args{ };
     args.sources = sources;
