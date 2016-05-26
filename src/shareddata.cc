@@ -42,7 +42,8 @@ namespace {
       hpx_lco_delete_sync(done);
     } else {
       hpx_call_when_with_continuation(done, cct, hpx_lco_set_action,
-                                      done, hpx_lco_delete_action);
+                                      done, hpx_lco_delete_action,
+                                      nullptr, 0);
     }
   }
 }

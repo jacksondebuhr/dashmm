@@ -479,11 +479,8 @@ class Tree {
     bool same_sources_and_targets;
     targetref_t targets;
     int which_child;
-    // NOTE: Normally this is not sound at all. But the memory associated
-    // with the actual vector elements will be local, as we are always
-    // partitioning the tree on one locality. So this is why we can get away
-    // with this for this action. If this is ever not done locally, then we
-    // shall need to change this.
+    // Actually, that was not a very deep thought, and was wrong for a not
+    // terribly surprising reason. This will take a moment to sort out.
     std::vector<sourcenode_t *> consider;
   };
 

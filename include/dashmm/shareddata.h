@@ -69,12 +69,12 @@ class LocalData {
 
   explicit LocalData(hpx_addr_t data) : data_{data}, local_{nullptr} {
     assert(data_ != HPX_NULL);
-    assert(hpx_gas_try_pin(data_, (void **)local_));
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
   }
 
   LocalData(const LocalData<T> &other) {
     data_ = other.data_;
-    assert(hpx_gas_try_pin(data_, (void **)local_));
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
   }
 
   LocalData(LocalData<T> &&other) {
@@ -100,7 +100,7 @@ class LocalData {
 
     // Then create updated reference
     data_ = other.data_;
-    assert(hpx_gas_try_pin(data_, (void **)local_));
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
 
     return *this;
   }
