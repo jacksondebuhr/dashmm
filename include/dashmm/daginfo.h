@@ -207,6 +207,7 @@ class DAGInfo {
   /// \param targs - the target LCO represented by this object's
   ///                particle DAG node.
   void set_targetlco(const hpx_addr_t addx, const int num) {
+    assert(parts_ != nullptr);
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
       parts_->other_member = num;

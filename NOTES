@@ -1,5 +1,4 @@
 THIS BRANCH TODO
-TODO: recheck code
 TODO: compile
 TODO: debug
 TODO: Go back over all the in-source documentation
@@ -7,6 +6,10 @@ TODO: In contribute for ExpansionLCO, can we change it so the user can just
       pass in the expansion?
 TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
       member of TargetLCO to data();
+TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
+      to do about this.
+TODO: Think about changing method to taking not a reference but a pointer to the
+      consider vector
 
 TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
       constructor in some way?
@@ -26,6 +29,7 @@ Overall Plan to 1.0
     - Array needs to be updated accordingly
     - Introduce more distribution policies
  * Kernel Parameters and Table generation
+ * Make intermediate expansions possible
  * Split Evaluate into pieces and expose more interface to users
     - Enable repeat use of a DAG
     - Potentially provide objects representing the tree and so on to the user

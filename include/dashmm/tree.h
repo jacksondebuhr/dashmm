@@ -286,7 +286,7 @@ class Tree {
   /// \returns - an LCO to indicate the completion of the partitioning
   hpx_addr_t partition_target_tree(targetref_t targets,
                                    bool same_sources_and_targets,
-                                   std::vector<sourcenode_t *> consider) {
+                                   std::vector<sourcenode_t *> *consider) {
     hpx_addr_t partdone = hpx_lco_future_new(0);
     assert(partdone != HPX_NULL);
 
@@ -323,7 +323,8 @@ class Tree {
     hpx_lco_wait(sourcedone);
     hpx_lco_delete_sync(sourcedone);
 
-    std::vector<sourcenode_t *> consider{source_root_};
+    std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
+    consider->push_back(source_root_);
     hpx_addr_t targetpartdone = partition_target_tree(targets, same_sandt,
                                                       consider);
     hpx_lco_wait(targetpartdone);
@@ -390,8 +391,8 @@ class Tree {
     hpx_addr_t retval = hpx_lco_and_new(n_targs);
     assert(retval != HPX_NULL);
 
-    DAGNode **data = targets.data();
-    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval, &data,
+    std::vector<DAGNode *> *argaddx = &targets;
+    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval, &argaddx,
              &n_targs);
 
     return retval;
@@ -479,9 +480,10 @@ class Tree {
     bool same_sources_and_targets;
     targetref_t targets;
     int which_child;
-    // Actually, that was not a very deep thought, and was wrong for a not
-    // terribly surprising reason. This will take a moment to sort out.
-    std::vector<sourcenode_t *> consider;
+    // We are always working on one locality for the tree construction, so we
+    // can get away with passing these pointers around. If we ever build the
+    // tree across localities, this will need to change.
+    std::vector<sourcenode_t *> *consider;
   };
 
   static int source_bounds_handler(hpx_addr_t data, size_t count) {
@@ -627,16 +629,17 @@ class Tree {
     bool refine = false;
     if (parms->targets.n() > tree->refinement_limit_) {
       refine = tree->method_.refine_test(parms->same_sources_and_targets, node,
-                                         parms->consider);
+                                         *parms->consider);
     }
 
     if (!refine) {
       node->dag.add_parts(hpx_get_my_rank());
+      node->parts = parms->targets;
     }
 
     auto domain = tree->domain_.value();
     tree->method_.inherit(node, domain.value());
-    tree->method_.process(node, parms->consider, !refine, domain.value());
+    tree->method_.process(node, *parms->consider, !refine, domain.value());
 
     if (refine) {
       // partition
@@ -709,7 +712,6 @@ class Tree {
       args.tree = tree;
       args.partdone = partdone;
       args.same_sources_and_targets = parms->same_sources_and_targets;
-      args.consider = parms->consider;
       size_t argssize = sizeof(args);
 
       for (int i = 0; i < 8; ++i) {
@@ -723,6 +725,8 @@ class Tree {
         args.node = node->child[i];
         args.targets = cparts[i];
         args.which_child = i;
+        args.consider = new std::vector<sourcenode_t *>{};
+        *args.consider = *parms->consider;
 
         hpx_call(HPX_HERE, target_partition_, HPX_NULL, &args, argssize);
       }
@@ -736,6 +740,9 @@ class Tree {
     if (!refine) {
       hpx_lco_set_lsync(parms->partdone, 0, nullptr, HPX_NULL);
     }
+
+    // Now we clear out the consider vector's memory
+    delete parms->consider;
 
     return HPX_SUCCESS;
   }
@@ -795,7 +802,7 @@ class Tree {
 
       // This will set the parent's LCO as well as delete cdone
       hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-                                      cdone, hpx_lco_delete_action);
+                                      cdone, hpx_lco_delete_action, nullptr, 0);
     } else {
       node->dag.set_sourceref(node->parts.data(), node->parts.n());
 
@@ -806,7 +813,7 @@ class Tree {
   }
 
   static int create_T_expansions_from_DAG_handler(
-        hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
+        hpx_addr_t done, int n_digits, tree_t *tree, targetnode_t *node) {
     // create the normal expansion
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
@@ -844,7 +851,7 @@ class Tree {
 
       // This will set the parent's LCO as well as delete cdone
       hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-                                      cdone, hpx_lco_delete_action);
+                                      cdone, hpx_lco_delete_action, nullptr, 0);
     }
 
     return HPX_SUCCESS;
@@ -923,12 +930,14 @@ class Tree {
   }
 
   static int termination_detection_handler(hpx_addr_t done,
-                                           DAGNode **nodes, int n_targs) {
+                                           std::vector<DAGNode *> *nodes,
+                                           int n_targs) {
     // If this is insufficiently parallel, we can always make this action
     // call itself with smaller and smaller chunks of the array.
     for (int i = 0; i < n_targs; ++i) {
-      assert(nodes[i] != nullptr);
-      hpx_call_when(nodes[i]->global_addx, done, hpx_lco_set_action,
+      assert((*nodes)[i] != nullptr);
+      assert((*nodes)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*nodes)[i]->global_addx, done, hpx_lco_set_action,
                     HPX_NULL, nullptr, 0);
     }
 

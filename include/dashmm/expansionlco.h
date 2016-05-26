@@ -588,8 +588,7 @@ class ExpansionLCO {
   }
 
   static int create_from_expansion_handler(void *payload, size_t bytes) {
-    size_t total_size = sizeof(Header) + bytes;
-    hpx_addr_t gdata = hpx_lco_user_new(total_size, init_, operation_,
+    hpx_addr_t gdata = hpx_lco_user_new(bytes, init_, operation_,
                                         predicate_, payload, bytes);
     assert(gdata != HPX_NULL);
     return HPX_THREAD_CONTINUE(gdata);
