@@ -277,7 +277,7 @@ class ExpansionLCO {
   struct OutEdgeRecord {
     Operation op;
     hpx_addr_t target;
-  }
+  };
 
   /// Marshalled parameter type for m_to_l_
   struct MtoLParams {
@@ -285,7 +285,7 @@ class ExpansionLCO {
     int n_digits;
     Index index;
     char payload[];
-  }
+  };
 
   /// Marshalled parameter type for l_to_l_
   struct LtoLParams {
@@ -295,9 +295,9 @@ class ExpansionLCO {
   };
 
   /// Operation codes for the LCOs set operation
-  enum class SetOpCodes {
-    kContribute;
-    kOutEdges;
+  enum SetOpCodes {
+    kContribute,
+    kOutEdges
   };
 
 
@@ -329,28 +329,31 @@ class ExpansionLCO {
 
     switch (code[0]) {
       case SetOpCodes::kContribute:
-        expansion_t incoming{rhs, bytes, code[1]};
+        {
+          expansion_t incoming{rhs, bytes, code[1]};
 
-        // create the expansion from the payload
-        int *n_digits = reinterpret_cast<int *>(lhs->payload + sizeof(int));
-        expansion_t expand{lhs->payload, lhs->expansion_size, *n_digits};
+          // create the expansion from the payload
+          int *n_digits = reinterpret_cast<int *>(lhs->payload + sizeof(int));
+          expansion_t expand{lhs->payload, lhs->expansion_size, *n_digits};
 
-        // add the one to the other
-        expand.add_expansion(&incoming);
+          // add the one to the other
+          expand.add_expansion(&incoming);
 
-        // release the data, because these objects do not actually own it
-        expand.release();
-        incoming.release();
-
+          // release the data, because these objects do not actually own it
+          expand.release();
+          incoming.release();
+        }
         break;
       case SetOpCodes::kOutEdges:
-        int n_edges = code[1];
-        // usage check
-        assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
+        {
+          int n_edges = code[1];
+          // usage check
+          assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
 
-        char *offset = &lhs->payload[lhs->expansion_size];
-        char *dest = static_cast<char *>(rhs) + sizeof(int) * 2;
-        memcpy(dest, offset, sizeof(OutEdgeRecord) * n_edges);
+          char *offset = &lhs->payload[lhs->expansion_size];
+          char *dest = static_cast<char *>(rhs) + sizeof(int) * 2;
+          memcpy(dest, offset, sizeof(OutEdgeRecord) * n_edges);
+        }
 
         break;
     }
@@ -412,8 +415,8 @@ class ExpansionLCO {
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {
     expansion_t local{nullptr, 0, n_digits};
-    auto multi = local.S_to_M(Point{cx, cy, cx}, sources, &sources[n_src],
-                              scale);
+    std::unique_ptr<expansion_t> multi = std::move(
+      local.S_to_M(Point{cx, cy, cx}, sources, &sources[n_src], scale));
     size_t bytes = multi->bytes();
     char *serial = static_cast<char *>(multi->release());
 
@@ -482,14 +485,18 @@ class ExpansionLCO {
   static int m_to_l_handler(MtoLParams *parms, size_t UNUSED) {
     hpx_addr_t target = hpx_thread_current_target();
 
-    Header *trg_data = static_cast<Header *>hpx_lco_user_get_user_data(target);
+    void *workaround{nullptr};
+    assert(hpx_gas_try_pin(target, &workaround));
+    Header *trg_data =
+        static_cast<Header *>(hpx_lco_user_get_user_data(workaround));
     Index t_index = trg_data->index;
-    LocalData<DomainGeometry> geo = trg_data->domain.value()
+    LocalData<DomainGeometry> geo = trg_data->domain.value();
+    hpx_gas_unpin(target);
     double s_size = geo->size_from_level(parms->index.level());
 
     // translate the source expansion
     expansion_t lexp{parms->payload, parms->bytes, parms->n_digits};
-    auto translated = lexp.M_to_L(parms->index, parms->s_size, t_index);
+    auto translated = lexp.M_to_L(parms->index, s_size, t_index);
     lexp.release();
 
     size_t bytes = translated->bytes();
@@ -526,13 +533,17 @@ class ExpansionLCO {
   static int l_to_l_handler(LtoLParams *parms, size_t UNUSED) {
     hpx_addr_t target = hpx_thread_current_target();
 
-    Header *trg_data = static_cast<Header *>hpx_lco_user_get_user_data(target);
+    void *workaround{nullptr};
+    assert(hpx_gas_try_pin(target, &workaround));
+    Header *trg_data =
+        static_cast<Header *>(hpx_lco_user_get_user_data(workaround));
     Index t_index = trg_data->index;
     int to_child = t_index.which_child();
-    LocalData<DomainGeometry> geo = trg_data->domain.value()
+    LocalData<DomainGeometry> geo = trg_data->domain.value();
+    hpx_gas_unpin(target);
     double t_size = geo->size_from_level(t_index.level());
 
-    expansion_t lexp{parms->payload, parms->expansion_size, parms->n_digits};
+    expansion_t lexp{parms->payload, parms->bytes, parms->n_digits};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
 
@@ -674,14 +685,6 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_t_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::add_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

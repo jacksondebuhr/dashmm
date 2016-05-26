@@ -126,8 +126,9 @@ class LaplaceSPH {
     return data_->expansion[i];
   }
 
-  void S_to_M(Point center, Source *first, Source *last,
-              double scale) const {
+  // TODO: This needs to be updated to return an expansion
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
+                                      double scale) const {
     data_->center = center;
     dcomplex_t *expansion = &data_->expansion[0];
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
@@ -177,6 +178,9 @@ class LaplaceSPH {
     delete [] legendre;
     delete [] powers_r;
     delete [] powers_ephi;
+
+    // TODO: fix this
+    return std::unique_ptr<expansion_t>{nullptr};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,

@@ -24,12 +24,11 @@
 
 #include <vector>
 
+#include "dashmm/arrayref.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
+#include "dashmm/tree.h"
 
 
 namespace dashmm {
@@ -55,9 +54,11 @@ class BH {
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH,
                                       DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, BH, DistroPolicy>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, BH, DistroPolicy>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, BH, DistroPolicy>;
-  using sourceref_t = SourceRef<Source>;
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, BH,
+                                DistroPolicy>;
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, BH,
+                                DistroPolicy>;
+  using sourceref_t = ArrayRef<Source>;
 
   BH() : theta_{0.0} { }
 
@@ -78,7 +79,7 @@ class BH {
     for (size_t i = 0; i < 8; ++i) {
       sourcenode_t *kid = curr->child[i];
       if (kid != nullptr) {
-        curr->dag.MtoM(&kid.dag);
+        curr->dag.MtoM(&kid->dag);
       }
     }
   }
@@ -104,7 +105,7 @@ class BH {
           if (!curr_is_leaf) {
             newcons.push_back(*i);
           } else {
-            curr->dag.M_to_T(&(*i)->dag);
+            curr->dag.MtoT(&(*i)->dag);
           }
         } else if ((*i)->is_leaf()) {
           if (curr_is_leaf) {

@@ -23,12 +23,11 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/array.h"
+#include "dashmm/arrayref.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetref.h"
 #include "dashmm/tree.h"
 
 #include "builtins/singlelocdistro.h"
@@ -77,7 +76,7 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class
+                    template <typename, typename> class,
                     typename> class Method,
           typename DistroPolicy = SingleLocality>
 class Evaluator {
@@ -86,8 +85,8 @@ class Evaluator {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion, DistroPolicy>;
-  using sourceref_t = SourceRef<Source>;
-  using targetref_t = TargetRef<Target>;
+  using sourceref_t = ArrayRef<Source>;
+  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
                                 DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
@@ -254,7 +253,7 @@ class Evaluator {
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
-                      const expansion_t &expansion
+                      const expansion_t &expansion,
                       const distropolicy_t &distro = distropolicy_t{}) {
     // pack the arguments and call the action
     EvaluateParams args{ };
@@ -284,7 +283,7 @@ class Evaluator {
   struct EvaluateParams {
     Array<source_t> sources;
     Array<target_t> targets;
-    int refinement_limit;
+    size_t refinement_limit;
     method_t method;
     int n_digits;
     distropolicy_t distro;
@@ -308,8 +307,8 @@ class Evaluator {
     std::vector<DAGNode *> target_nodes{}; // target nodes (known locality)
     std::vector<DAGNode *> internals{};    // nodes with locality to be computed
     tree->collect_DAG_nodes(source_nodes, target_nodes, internals);
-    parms->distro.compute_distribution(domain_, source_nodes, target_nodes,
-                                       internals);
+    parms->distro.compute_distribution(tree->domain_, source_nodes,
+                                       target_nodes, internals);
 
     tree->create_expansions_from_DAG(parms->n_digits);
 

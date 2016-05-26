@@ -24,11 +24,10 @@
 
 #include <vector>
 
+#include "dashmm/arrayref.h"
 #include "dashmm/expansionlco.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
+#include "dashmm/tree.h"
 
 
 
@@ -50,13 +49,13 @@ class Direct {
   using method_t = Direct<Source, Target, Expansion, DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct,
                                       DistroPolicy>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, Direct,
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Direct,
                                   DistroPolicy>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, Direct,
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Direct,
                                   DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Direct,
                                 DistroPolicy>;
-  using sourceref_t = SourceRef<Source>;
+  using sourceref_t = ArrayRef<Source>;
 
   /// In generate, Direct does nothing.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const { }

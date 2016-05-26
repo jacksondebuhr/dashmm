@@ -24,7 +24,7 @@
 
 #include <hpx/hpx.h>
 
-#include "dashmm/targetref.h"
+#include "dashmm/arrayref.h"
 
 
 namespace dashmm {
@@ -70,13 +70,19 @@ class TargetLCO {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion, DistroPolicy>;
 
-  using targetref_t = TargetRef<Target>;
+  using targetref_t = ArrayRef<Target>;
 
   /// Construct a default object
   TargetLCO() : lco_{HPX_NULL}, n_targs_{0} { }
 
   /// Construct from an existing LCO
-  TargetLCO(hpx_addr_t data, int n_targs) : lco_{data}, n_targs_{n_targs} { }
+  TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
+
+  // TODO fix this design flaw
+  TargetLCO(hpx_addr_t data, int n_targs) {
+    lco_ = data;
+    n_targs_ = (size_t)n_targs;
+  }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
   explicit TargetLCO(int n_inputs, const targetref_t &targets) {
@@ -100,7 +106,7 @@ class TargetLCO {
   hpx_addr_t lco() const {return lco_;}
 
   /// The number of targets in the referred object
-  int n() const {return n_targs_;}
+  size_t n() const {return n_targs_;}
 
   /// Contribute a S->T operation to the referred targets
   ///
@@ -275,7 +281,7 @@ class TargetLCO {
   /// The global address of the LCO
   hpx_addr_t lco_;
   /// The number of targets represented by the LCO.
-  int n_targs_;
+  size_t n_targs_;
 
   /// HPX function for LCO initialization
   static hpx_action_t init_;

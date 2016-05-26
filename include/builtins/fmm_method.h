@@ -20,12 +20,11 @@
 /// \brief Declaration of FMM Method
 
 
+#include "dashmm/arrayref.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
+#include "dashmm/tree.h"
 
 
 namespace dashmm {
@@ -44,9 +43,11 @@ class FMM {
   using method_t = FMM<Source, Target, Expansion, DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM,
                                       DistroPolicy>;
-  using sourceref_t = SourceRef<Source>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, FMM, DistroPolicy>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, FMM, DistroPolicy>;
+  using sourceref_t = ArrayRef<Source>;
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, FMM,
+                                DistroPolicy>;
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, FMM,
+                                DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM, DistroPolicy>;
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
@@ -57,7 +58,7 @@ class FMM {
     for (size_t i = 0; i < 8; ++i) {
       sourcenode_t *kid = curr->child[i];
       if (kid != nullptr) {
-        curr->dag.MtoM(&kid.dag);
+        curr->dag.MtoM(&kid->dag);
       }
     }
   }
@@ -78,10 +79,10 @@ class FMM {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
             curr->dag.StoL(&(*S)->dag);
           } else {
-            curr->dag.StoT(&(*S)->dag)
+            curr->dag.StoT(&(*S)->dag);
           }
         } else {
-          if (well_sep_test(S->index(), curr.index())) {
+          if (well_sep_test((*S)->idx, t_index)) {
             curr->dag.MtoL(&(*S)->dag);
           } else {
             proc_coll_recur(curr, *S);
@@ -91,7 +92,7 @@ class FMM {
 
       curr->dag.LtoT(&curr->dag);
     } else {
-      std::vector<sourcenode_t> newcons{ };
+      std::vector<sourcenode_t *> newcons{ };
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -106,7 +107,7 @@ class FMM {
           } else {
             bool S_is_leaf = true;
             for (size_t i = 0; i < 8; ++i) {
-              sourcenode_t child = (*S)->child[i];
+              sourcenode_t *child = (*S)->child[i];
               if (child != nullptr) {
                 newcons.push_back(child);
                 S_is_leaf = false;
@@ -174,7 +175,7 @@ class FMM {
       S->dag.MtoT(&T->dag);
     } else {
       if (S->is_leaf()) {
-        T->dag.StoT(&S->dag)
+        T->dag.StoT(&S->dag);
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];

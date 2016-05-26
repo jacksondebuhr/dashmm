@@ -128,8 +128,8 @@ class LaplaceCOMAcc {
     }
   }
 
-  void S_to_M(Point center, Source *first, Source *last,
-              double scale) const {
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
+                                      double scale) const {
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0);
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);

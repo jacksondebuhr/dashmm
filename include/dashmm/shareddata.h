@@ -227,7 +227,7 @@ class SharedData {
       hpx_lco_delete_sync(done);
     } else {
       size_t argsize = sizeof(reset_args_t) + sizeof(T);
-      reset_args_t *parms = new char[argsize];
+      reset_args_t *parms = reinterpret_cast<reset_args_t *>(new char[argsize]);
       parms->base = data_;
       parms->bytes = sizeof(T);
       memcpy(parms->data, value, sizeof(T));
@@ -255,7 +255,7 @@ class SharedData {
     assert(value != nullptr);
 
     size_t argsize = sizeof(reset_args_t) + sizeof(T);
-    reset_args_t *parms = new char[argsize];
+    reset_args_t *parms = reinterpret_cast<reset_args_t *>(new char[argsize]);
     parms->base = data_;
     parms->bytes = sizeof(T);
     memcpy(parms->data, value, sizeof(T));
