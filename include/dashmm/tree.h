@@ -452,7 +452,6 @@ class Tree {
     hpx_call(HPX_HERE, destroy_internal_DAG_LCOs_, done, &data, &n_data);
 
     hpx_lco_wait(done);
-fprintf(stdout, "Here it is?\n");fflush(stdout);
     hpx_lco_delete_sync(done);
   }
 
@@ -837,7 +836,8 @@ fprintf(stdout, "Here it is?\n");fflush(stdout);
 
     // Here is where we make the target lco if needed
     if (n_children == 0) {
-      targetlco_t tlco{node->parts.data(), node->parts.n()};
+      targetlco_t tlco{node->dag.parts()->incoming, node->parts,
+                       HPX_THERE(node->dag.parts()->locality)};
       node->dag.set_targetlco(tlco.lco(), tlco.n());
 
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);

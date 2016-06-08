@@ -350,8 +350,8 @@ class ExpansionLCO {
           // usage check
           assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
 
-          char *offset = &lhs->payload[lhs->expansion_size];
-          char *dest = static_cast<char *>(rhs) + sizeof(int) * 2;
+          char *dest = &lhs->payload[lhs->expansion_size];
+          char *offset = static_cast<char *>(rhs) + sizeof(int) * 2;
           memcpy(dest, offset, sizeof(OutEdgeRecord) * n_edges);
         }
 

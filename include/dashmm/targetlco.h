@@ -85,7 +85,8 @@ class TargetLCO {
   }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
-  explicit TargetLCO(int n_inputs, const targetref_t &targets) {
+  TargetLCO(int n_inputs, const targetref_t &targets, hpx_addr_t where) {
+    // TODO: transform this into an action that creates it at the correct place
     Data init{n_inputs, targets};
     lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
                             &init, sizeof(init));

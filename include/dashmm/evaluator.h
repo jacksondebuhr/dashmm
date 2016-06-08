@@ -20,6 +20,10 @@
 /// \brief Definition of DASHMM Evaluator object
 
 
+// TODO remove this incllude when debugging is finished
+#include <string>
+
+
 #include <hpx/hpx.h>
 
 #include "dashmm/array.h"
@@ -254,7 +258,7 @@ class Evaluator {
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
                       const expansion_t &expansion,
-                      const distropolicy_t &distro = distropolicy_t{}) {
+                      const distropolicy_t &distro = distropolicy_t { }) {
     // pack the arguments and call the action
     EvaluateParams args{ };
     args.sources = sources;
@@ -303,15 +307,15 @@ class Evaluator {
     // NOTE: around here is where we can perform the table creation work,
     // (Future feature)
 
-    std::vector<DAGNode *> source_nodes{}; // source nodes (known locality)
-    std::vector<DAGNode *> target_nodes{}; // target nodes (known locality)
-    std::vector<DAGNode *> internals{};    // nodes with locality to be computed
+    std::vector<DAGNode *> source_nodes{ }; // source nodes (known locality)
+    std::vector<DAGNode *> target_nodes{ }; // target nodes (known locality)
+    std::vector<DAGNode *> internals{ };    // nodes with locality to be computed
     tree->collect_DAG_nodes(source_nodes, target_nodes, internals);
     parms->distro.compute_distribution(tree->domain_, source_nodes,
                                        target_nodes, internals);
 
     tree->create_expansions_from_DAG(parms->n_digits);
-fprintf(stdout, "expansions created\n"); fflush(stdout);
+    //print_out_dag(source_nodes, target_nodes, internals);
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
@@ -326,13 +330,76 @@ fprintf(stdout, "expansions created\n"); fflush(stdout);
     hpx_lco_delete_sync(alldone);
 
     // clean up
-fprintf(stdout, "here\n"); fflush(stdout);
     tree->destroy_DAG_LCOs(target_nodes, internals);
-fprintf(stdout, "here\n"); fflush(stdout);
     delete tree;
 
     // return
     hpx_exit(HPX_SUCCESS);
+  }
+
+  static void print_out_dag(std::vector<DAGNode *> &source,
+                            std::vector<DAGNode *> &target,
+                            std::vector<DAGNode *> &internal) {
+    for (size_t i = 0; i < source.size(); ++i) {
+      fprintf(stdout, "SOURCE: %lu has %d sources and %d inputs\n",
+              source[i]->global_addx, source[i]->other_member,
+              source[i]->incoming);
+      print_out_edges(source[i]);
+    }
+    for (size_t i = 0; i < internal.size(); ++i) {
+      fprintf(stdout, "INTERNAL: %lu has %d inputs\n",
+              internal[i]->global_addx, internal[i]->incoming);
+      print_out_edges(internal[i]);
+    }
+    for (size_t i = 0; i < target.size(); ++i) {
+      fprintf(stdout, "TARGET: %lu has %d targets and %d inputs\n",
+              target[i]->global_addx, target[i]->other_member,
+              target[i]->incoming);
+      print_out_edges(target[i]);
+    }
+    fflush(stdout);
+  }
+
+  static void print_out_edges(DAGNode *node) {
+    for (size_t i = 0; i < node->edges.size(); ++i) {
+      auto str = code_to_print(node->edges[i].op);
+      fprintf(stdout, "  --> %lu performing %s\n",
+              node->edges[i].target->global_addx,
+              str.c_str());
+    }
+  }
+
+  static std::string code_to_print(Operation op) {
+    switch (op) {
+    case Operation::Nop:
+      return std::string("Nop");
+      break;
+    case Operation::StoM:
+      return std::string("StoM");
+      break;
+    case Operation::StoL:
+      return std::string("StoL");
+      break;
+    case Operation::MtoM:
+      return std::string("MtoM");
+      break;
+    case Operation::MtoL:
+      return std::string("MtoL");
+      break;
+    case Operation::LtoL:
+      return std::string("LtoL");
+      break;
+    case Operation::MtoT:
+      return std::string("MtoT");
+      break;
+    case Operation::LtoT:
+      return std::string("LtoT");
+      break;
+    case Operation::StoT:
+      return std::string("StoT");
+      break;
+    }
+    return std::string("ERROR");
   }
 };
 
