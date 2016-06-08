@@ -382,18 +382,22 @@ class Tree {
   /// responsibility of the caller.
   ///
   /// \param targets - vector of target nodes in the DAG
+  /// \param internals - vector of internal nodes in the DAG
   ///
   /// \returns - LCO that will signal that all targets have completed their
   ///            computation.
-  hpx_addr_t setup_termination_detection(std::vector<DAGNode *> &targets) {
+  hpx_addr_t setup_termination_detection(std::vector<DAGNode *> &targets,
+                                         std::vector<DAGNode *> &internals) {
     int n_targs = targets.size();
+    int n_internals = internals.size();
 
-    hpx_addr_t retval = hpx_lco_and_new(n_targs);
+    hpx_addr_t retval = hpx_lco_and_new(n_targs + n_internals);
     assert(retval != HPX_NULL);
 
     std::vector<DAGNode *> *argaddx = &targets;
+    std::vector<DAGNode *> *internalsaddx = &internals;
     hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval, &argaddx,
-             &n_targs);
+             &n_targs, &internalsaddx, &n_internals);
 
     return retval;
   }
@@ -938,13 +942,22 @@ class Tree {
 
   static int termination_detection_handler(hpx_addr_t done,
                                            std::vector<DAGNode *> *nodes,
-                                           int n_targs) {
+                                           int n_targs,
+                                           std::vector<DAGNode *> *inters,
+                                           int n_inters) {
     // If this is insufficiently parallel, we can always make this action
     // call itself with smaller and smaller chunks of the array.
     for (int i = 0; i < n_targs; ++i) {
       assert((*nodes)[i] != nullptr);
       assert((*nodes)[i]->global_addx != HPX_NULL);
       hpx_call_when((*nodes)[i]->global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    for (int i = 0; i < n_inters; ++i) {
+      assert((*inters)[i] != nullptr);
+      assert((*inters)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*inters)[i]->global_addx, done, hpx_lco_set_action,
                     HPX_NULL, nullptr, 0);
     }
 

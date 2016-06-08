@@ -122,6 +122,7 @@ class ExpansionLCO {
     hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
                   input_data, total_size);
     delete [] ldata;
+    delete [] input_data;
 
     data_ = retval;
     n_digits_ = n_digits;
