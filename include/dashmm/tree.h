@@ -449,9 +449,10 @@ class Tree {
 
     data = internal.data();
     n_data = internal.size();
-    hpx_call(HPX_HERE, destroy_target_DAG_LCOs_, done, &data, &n_data);
+    hpx_call(HPX_HERE, destroy_internal_DAG_LCOs_, done, &data, &n_data);
 
     hpx_lco_wait(done);
+fprintf(stdout, "Here it is?\n");fflush(stdout);
     hpx_lco_delete_sync(done);
   }
 
@@ -801,8 +802,10 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-                                      cdone, hpx_lco_delete_action, nullptr, 0);
+      //hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
+      //                                cdone, hpx_lco_delete_action, nullptr, 0);
+      hpx_call_when(cdone, cdone, hpx_lco_delete_action,
+                    done, nullptr, 0);
     } else {
       node->dag.set_sourceref(node->parts.data(), node->parts.n());
 
@@ -850,8 +853,10 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-                                      cdone, hpx_lco_delete_action, nullptr, 0);
+      //hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
+      //                                cdone, hpx_lco_delete_action, nullptr, 0);
+      hpx_call_when(cdone, cdone, hpx_lco_delete_action,
+                    done, nullptr, 0);
     }
 
     return HPX_SUCCESS;
@@ -870,8 +875,10 @@ class Tree {
     int n_children{node->n_children()};
     if (n_children > 0) {
       for (int i = 0; i < 8; ++i) {
-        hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
-                 &tree, &node->child[i]);
+        if (node->child[i] != nullptr) {
+          hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
+                  &tree, &node->child[i]);
+        }
       }
     } else {
       // At a leaf, we do actual work

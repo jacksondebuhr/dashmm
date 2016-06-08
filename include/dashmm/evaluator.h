@@ -311,6 +311,7 @@ class Evaluator {
                                        target_nodes, internals);
 
     tree->create_expansions_from_DAG(parms->n_digits);
+fprintf(stdout, "expansions created\n"); fflush(stdout);
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
@@ -325,7 +326,9 @@ class Evaluator {
     hpx_lco_delete_sync(alldone);
 
     // clean up
+fprintf(stdout, "here\n"); fflush(stdout);
     tree->destroy_DAG_LCOs(target_nodes, internals);
+fprintf(stdout, "here\n"); fflush(stdout);
     delete tree;
 
     // return

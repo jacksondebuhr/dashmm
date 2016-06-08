@@ -68,7 +68,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 
 
 int shared_data_external_reset_handler(reset_args_t *data, size_t UNUSED) {
-  perform_reset(data->base, data->data, data->bytes, HPX_NULL);
+  perform_reset(data->base, data->data, data->bytes, data->sync);
   hpx_exit(HPX_SUCCESS);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
@@ -78,8 +78,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
 
 
 int shared_data_internal_reset_handler(reset_args_t *data, size_t UNUSED) {
-  hpx_addr_t cct = hpx_thread_current_cont_target();
-  perform_reset(data->base, data->data, data->bytes, cct);
+  perform_reset(data->base, data->data, data->bytes, data->sync);
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,

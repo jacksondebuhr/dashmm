@@ -34,15 +34,14 @@ extern hpx_action_t shared_data_construct_action;
 /// Action for destroying shared data objects
 extern hpx_action_t shared_data_destroy_action;
 
-/// Action for synchronous not inside hpx reset
-extern hpx_action_t shared_data_external_reset_action;
-
-/// Action for asynchronous inside hpx reset
+/// Action for reset
 extern hpx_action_t shared_data_internal_reset_action;
+extern hpx_action_t shared_data_external_reset_action;
 
 
 /// Marshalled type for reset actions
 struct reset_args_t {
+  hpx_addr_t sync;
   hpx_addr_t base;
   size_t bytes;
   char data[];
@@ -214,7 +213,7 @@ class SharedData {
 
   /// Reset the value of the shared data
   ///
-  /// This will reset the value shared around the system to that provded
+  /// This will reset the value shared around the system to that provided
   /// by the argument. This method is synchronous: it will not return until
   /// the data has been updated at each locality.
   ///
@@ -228,6 +227,7 @@ class SharedData {
     } else {
       size_t argsize = sizeof(reset_args_t) + sizeof(T);
       reset_args_t *parms = reinterpret_cast<reset_args_t *>(new char[argsize]);
+      parms->sync = HPX_NULL;
       parms->base = data_;
       parms->bytes = sizeof(T);
       memcpy(parms->data, value, sizeof(T));
@@ -262,8 +262,9 @@ class SharedData {
 
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
+    parms->sync = retval;
 
-    hpx_call(HPX_HERE, shared_data_internal_reset_action, retval,
+    hpx_call(HPX_HERE, shared_data_internal_reset_action, HPX_NULL,
              parms, argsize);
 
     delete [] parms;

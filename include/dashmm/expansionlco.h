@@ -383,7 +383,7 @@ class ExpansionLCO {
 
     // Loop over the out edges, and spawn the work
     OutEdgeRecord *out_edges =
-      reinterpret_cast<OutEdgeRecord *>(head->payload[head->expansion_size]);
+      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
     for (int i = 0; i < head->out_edge_count; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
