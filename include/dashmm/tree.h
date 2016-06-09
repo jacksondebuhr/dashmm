@@ -892,16 +892,15 @@ class Tree {
 
       // loop over edges
       for (size_t i = 0; i < parts->edges.size(); ++i) {
-        const DAGNode *normal = node->dag.normal();
-        assert(normal);
-        expansionlco_t expand{normal->global_addx, normal->other_member};
-
         switch (parts->edges[i].op) {
           case Operation::Nop:
             assert(0 && "Trouble handling DAG instigation");
             break;
           case Operation::StoM:
             {
+              const DAGNode *normal = node->dag.normal();
+              assert(normal);
+              expansionlco_t expand{normal->global_addx, normal->other_member};
               auto domain = tree->domain_.value();
               double scale = domain->size_from_level(node->idx.level());
               Point center = domain->center_from_index(node->idx);
@@ -910,6 +909,10 @@ class Tree {
             break;
           case Operation::StoL:
             {
+              // Get target DAGNode
+              const DAGNode *normal = parts->edges[i].target;
+              assert(normal);
+              expansionlco_t expand{normal->global_addx, normal->other_member};
               auto domain = tree->domain_.value();
               double scale = domain->size_from_level(node->idx.level());
               Point center = domain->center_from_index(node->idx);
@@ -925,6 +928,9 @@ class Tree {
             break;
           case Operation::StoT:
             {
+              const DAGNode *normal = node->dag.normal();
+              assert(normal);
+              expansionlco_t expand{normal->global_addx, normal->other_member};
               targetlco_t targets{parts->edges[i].target->global_addx,
                                   parts->edges[i].target->other_member};
               expand.S_to_T(sources, targets);
