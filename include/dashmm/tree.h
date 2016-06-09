@@ -902,7 +902,7 @@ class Tree {
               assert(normal);
               expansionlco_t expand{normal->global_addx, normal->other_member};
               auto domain = tree->domain_.value();
-              double scale = domain->size_from_level(node->idx.level());
+              double scale = 1.0 / domain->size_from_level(node->idx.level());
               Point center = domain->center_from_index(node->idx);
               expand.S_to_M(center, sources, scale);
             }
@@ -914,7 +914,7 @@ class Tree {
               assert(normal);
               expansionlco_t expand{normal->global_addx, normal->other_member};
               auto domain = tree->domain_.value();
-              double scale = domain->size_from_level(node->idx.level());
+              double scale = 1.0 / domain->size_from_level(node->idx.level());
               Point center = domain->center_from_index(node->idx);
               expand.S_to_L(center, sources, scale);
             }

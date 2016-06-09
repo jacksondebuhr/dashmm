@@ -559,9 +559,13 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
+  // TODO update these to forward onto the target - but that does not work in
+  // this case. The target will not know its size. So we need to do something
+  // else. Perhaps we just save this data at DAG creation time. It will all
+  // be available.
   static void m_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
-    double scale = geo->size_from_level(head->index.level());
+    double scale = 1.0 / geo->size_from_level(head->index.level());
 
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
@@ -572,7 +576,7 @@ class ExpansionLCO {
 
   static void l_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
-    double scale = geo->size_from_level(head->index.level());
+    double scale = 1.0 / geo->size_from_level(head->index.level());
 
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.

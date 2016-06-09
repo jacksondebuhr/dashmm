@@ -315,7 +315,7 @@ class Evaluator {
                                        target_nodes, internals);
 
     tree->create_expansions_from_DAG(parms->n_digits);
-    //print_out_dag(source_nodes, target_nodes, internals);
+    print_out_dag(source_nodes, target_nodes, internals);
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
