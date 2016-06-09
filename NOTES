@@ -10,6 +10,8 @@ TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
 TODO: Think about changing method to taking not a reference but a pointer to the
       consider vector
+TODO: We should cull unused nodes from the DAG, and unused expansions from the
+      computation
 
 TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
       constructor in some way?

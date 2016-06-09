@@ -105,11 +105,11 @@ class BH {
           if (!curr_is_leaf) {
             newcons.push_back(*i);
           } else {
-            curr->dag.MtoT(&(*i)->dag);
+            (*i)->dag.MtoT(&curr->dag);
           }
         } else if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            (*i)->dag.StoT(&curr->dag);
+            curr->dag.StoT(&(*i)->dag);
           } else {
             newcons.push_back(*i);
           }

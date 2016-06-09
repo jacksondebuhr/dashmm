@@ -74,7 +74,7 @@ class Direct {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
         if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            (*i)->dag.StoT(&curr->dag);
+            curr->dag.StoT(&(*i)->dag);
           } else {
             newcons.push_back(*i);
           }
