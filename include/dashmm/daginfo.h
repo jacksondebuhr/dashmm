@@ -74,9 +74,11 @@ struct DAGNode {
   int other_member;              /// this is either n_digits for an expansion or
                                  /// n_targets for a target lco
 
-  DAGNode()
+  Index idx;                     /// index of the containing node
+
+  DAGNode(Index i)
       : edges{}, incoming{0}, locality{0}, global_addx{HPX_NULL},
-        other_member{0} { }
+        other_member{0}, idx{i} { }
   void add_input() {++incoming;}
   void add_edge(const DAGNode *end, Operation op) {
     edges.push_back(DAGEdge{end, op});
@@ -108,8 +110,8 @@ class DAGInfo {
   /// nodes.
   ///
   /// This cannot be used outside of an HPX-5 thread.
-  DAGInfo() {
-    normal_ = new DAGNode{};
+  DAGInfo(Index idx) : idx_{idx} {
+    normal_ = new DAGNode{idx_};
     assert(normal_ != nullptr);
     interm_ = nullptr;
     parts_ = nullptr;
@@ -141,7 +143,7 @@ class DAGInfo {
   /// with this object.
   void add_interm() {
     assert(interm_ == nullptr);
-    interm_ = new DAGNode{};
+    interm_ = new DAGNode{idx_};
     assert(interm_ != nullptr);
   }
 
@@ -152,7 +154,7 @@ class DAGInfo {
   /// targets in the target tree.
   void add_parts(int loc) {
     assert(parts_ == nullptr);
-    parts_ = new DAGNode{};
+    parts_ = new DAGNode{idx_};
     parts_->locality = loc;
     assert(parts_ != nullptr);
   }
@@ -358,18 +360,17 @@ class DAGInfo {
   }
 
  private:
-   void lock() {
-     hpx_lco_sema_p(lock_);
-   }
+  void lock() {
+    hpx_lco_sema_p(lock_);
+  }
 
-   void unlock() {
-     // TODO: can I get away with nonsync and ignore sync on this?
-     hpx_lco_sema_v_sync(lock_);
-   }
+  void unlock() {
+    // TODO: can I get away with nonsync and ignore sync on this?
+    hpx_lco_sema_v_sync(lock_);
+  }
 
+  Index idx_;
   hpx_addr_t lock_;
-  // We do these as heap allocations so that only those that are needed
-  // are created.
   DAGNode *normal_;
   DAGNode *interm_;
   DAGNode *parts_;   // source or target
