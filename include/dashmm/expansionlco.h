@@ -417,7 +417,7 @@ class ExpansionLCO {
                             int n_digits) {
     expansion_t local{nullptr, 0, n_digits};
     std::unique_ptr<expansion_t> multi = std::move(
-      local.S_to_M(Point{cx, cy, cx}, sources, &sources[n_src], scale));
+      local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale));
     size_t bytes = multi->bytes();
     char *serial = static_cast<char *>(multi->release());
 

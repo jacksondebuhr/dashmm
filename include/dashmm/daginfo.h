@@ -24,6 +24,8 @@
 
 #include <hpx/hpx.h>
 
+#include "dashmm/index.h"
+
 
 namespace dashmm {
 
