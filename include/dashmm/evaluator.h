@@ -20,8 +20,7 @@
 /// \brief Definition of DASHMM Evaluator object
 
 
-// TODO remove this incllude when debugging is finished
-#include <string>
+#define DOJSONOUTPUT
 
 
 #include <hpx/hpx.h>
@@ -36,6 +35,9 @@
 
 #include "builtins/singlelocdistro.h"
 
+#ifdef DOJSONOUTPUT
+#include "dashmm/dagtojson.h"
+#endif
 
 
 namespace dashmm {
@@ -315,7 +317,9 @@ class Evaluator {
                                        target_nodes, internals);
 
     tree->create_expansions_from_DAG(parms->n_digits);
-    print_out_dag(source_nodes, target_nodes, internals);
+#ifdef DOJSONOUTPUT
+    output_dag_as_JSON(source_nodes, target_nodes, internals);
+#endif
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
@@ -336,70 +340,6 @@ class Evaluator {
 
     // return
     hpx_exit(HPX_SUCCESS);
-  }
-
-  static void print_out_dag(std::vector<DAGNode *> &source,
-                            std::vector<DAGNode *> &target,
-                            std::vector<DAGNode *> &internal) {
-    for (size_t i = 0; i < source.size(); ++i) {
-      fprintf(stdout, "SOURCE: %lu has %d sources and %d inputs\n",
-              source[i]->global_addx, source[i]->other_member,
-              source[i]->incoming);
-      print_out_edges(source[i]);
-    }
-    for (size_t i = 0; i < internal.size(); ++i) {
-      fprintf(stdout, "INTERNAL: %lu has %d inputs\n",
-              internal[i]->global_addx, internal[i]->incoming);
-      print_out_edges(internal[i]);
-    }
-    for (size_t i = 0; i < target.size(); ++i) {
-      fprintf(stdout, "TARGET: %lu has %d targets and %d inputs\n",
-              target[i]->global_addx, target[i]->other_member,
-              target[i]->incoming);
-      print_out_edges(target[i]);
-    }
-    fflush(stdout);
-  }
-
-  static void print_out_edges(DAGNode *node) {
-    for (size_t i = 0; i < node->edges.size(); ++i) {
-      auto str = code_to_print(node->edges[i].op);
-      fprintf(stdout, "  %s --> %lu\n", str.c_str(),
-              node->edges[i].target->global_addx);
-    }
-  }
-
-  static std::string code_to_print(Operation op) {
-    switch (op) {
-    case Operation::Nop:
-      return std::string("Nop");
-      break;
-    case Operation::StoM:
-      return std::string("StoM");
-      break;
-    case Operation::StoL:
-      return std::string("StoL");
-      break;
-    case Operation::MtoM:
-      return std::string("MtoM");
-      break;
-    case Operation::MtoL:
-      return std::string("MtoL");
-      break;
-    case Operation::LtoL:
-      return std::string("LtoL");
-      break;
-    case Operation::MtoT:
-      return std::string("MtoT");
-      break;
-    case Operation::LtoT:
-      return std::string("LtoT");
-      break;
-    case Operation::StoT:
-      return std::string("StoT");
-      break;
-    }
-    return std::string("ERROR");
   }
 };
 
