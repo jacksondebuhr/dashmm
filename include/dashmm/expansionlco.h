@@ -219,10 +219,13 @@ class ExpansionLCO {
   ///
   /// \param bytes - the size of the input serialized expansion
   /// \param payload - the serialized expansion data
-  void contribute(size_t bytes, char *payload) {
+  void contribute(std::unique_ptr<expansion_t> &&expand) {
+    size_t bytes = expand->bytes();
+    char *payload = static_cast<char *>(expand->release());
     int *code = reinterpret_cast<int *>(payload);
     code[0] = SetOpCodes::kContribute;
     hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
+    delete [] payload;
   }
 
   /// Set the out edge data for this expansion LCO
@@ -247,6 +250,7 @@ class ExpansionLCO {
     for (int i = 0; i < n_out; ++i) {
       records[i].op = edges[i].op;
       records[i].target = edges[i].target->global_addx;
+      records[i].tidx = edges[i].target->idx;
     }
 
     hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);
@@ -279,6 +283,7 @@ class ExpansionLCO {
   struct OutEdgeRecord {
     Operation op;
     hpx_addr_t target;
+    Index tidx;
   };
 
   /// Marshalled parameter type for m_to_l_
@@ -392,10 +397,12 @@ class ExpansionLCO {
           m_to_m_out_edge(head, out_edges[i].target, n_digits);
           break;
         case Operation::MtoL:
-          m_to_l_out_edge(head, out_edges[i].target, n_digits);
+          m_to_l_out_edge(head, out_edges[i].target, out_edges[i].tidx,
+                          n_digits);
           break;
         case Operation::LtoL:
-          l_to_l_out_edge(head, out_edges[i].target, n_digits);
+          l_to_l_out_edge(head, out_edges[i].target, out_edges[i].tidx,
+                          n_digits);
           break;
         case Operation::MtoT:
           m_to_t_out_edge(head, out_edges[i].target, n_digits);
@@ -419,12 +426,9 @@ class ExpansionLCO {
     expansion_t local{nullptr, 0, n_digits};
     std::unique_ptr<expansion_t> multi = std::move(
       local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale));
-    size_t bytes = multi->bytes();
-    char *serial = static_cast<char *>(multi->release());
 
     expansionlco_t total{expand, n_digits};
-    total.contribute(bytes, serial);
-    delete [] serial;
+    total.contribute(std::move(multi));
 
     return HPX_SUCCESS;
   }
@@ -435,12 +439,9 @@ class ExpansionLCO {
     expansion_t local{nullptr, 0, n_digits};
     auto multi = local.S_to_L(Point{cx, cy, cz}, sources, &sources[n_src],
                               scale);
-    size_t bytes = multi->bytes();
-    char *serial = static_cast<char *>(multi->release());
 
     expansionlco_t total{expand, n_digits};
-    total.contribute(bytes, serial);
-    delete [] serial;
+    total.contribute(std::move(multi));
 
     return HPX_SUCCESS;
   }
@@ -454,114 +455,36 @@ class ExpansionLCO {
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
     expansionlco_t destination{target, n_digits};
-    destination.contribute(bytes, transexpand);
-
-    delete [] transexpand;
+    destination.contribute(std::move(translated));
   }
 
-  // TODO: assess if this will be easier with the target and source indices
-  // available.
-  static void m_to_l_out_edge(Header *head, hpx_addr_t target, int n_digits) {
-    // Get a parcel
-    size_t msg_size = head->expansion_size + sizeof(MtoLParams);
-    hpx_parcel_t *parc = hpx_parcel_acquire(nullptr, msg_size);
-    assert(parc != nullptr);
-
-    // Setup the parcel
-    hpx_parcel_set_action(parc, m_to_l_);
-    hpx_parcel_set_target(parc, target);
-
-    // Fill the parcel payload
-    MtoLParams *message = static_cast<MtoLParams *>(hpx_parcel_get_data(parc));
-    message->bytes = head->expansion_size;
-    message->n_digits = n_digits;
-    message->index = head->index;
-    memcpy(message->payload, head->payload, head->expansion_size);
-
-    // Send the parcel - this will release the acquired parcel
-    hpx_parcel_send_sync(parc);
-  }
-
-  static int m_to_l_handler(MtoLParams *parms, size_t UNUSED) {
-    hpx_addr_t target = hpx_thread_current_target();
-
-    void *workaround{nullptr};
-    assert(hpx_gas_try_pin(target, &workaround));
-    Header *trg_data =
-        static_cast<Header *>(hpx_lco_user_get_user_data(workaround));
-    Index t_index = trg_data->index;
-    LocalData<DomainGeometry> geo = trg_data->domain.value();
-    hpx_gas_unpin(target);
-    double s_size = geo->size_from_level(parms->index.level());
+  static void m_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx,
+                              int n_digits) {
+    LocalData<DomainGeometry> geo = head->domain.value();
+    double s_size = geo->size_from_level(head->index.level());
 
     // translate the source expansion
-    expansion_t lexp{parms->payload, parms->bytes, parms->n_digits};
-    auto translated = lexp.M_to_L(parms->index, s_size, t_index);
+    expansion_t lexp{head->payload, head->expansion_size, n_digits};
+    auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
-    // perform the set
-    expansionlco_t lco{target, parms->n_digits};
-    lco.contribute(bytes, transexpand);
-
-    delete [] transexpand;
-    return HPX_SUCCESS;
+    expansionlco_t lco{target, n_digits};
+    lco.contribute(std::move(translated));
   }
 
-  // TODO: assess if this will be easier with the target and source indices
-  // available.
-  static void l_to_l_out_edge(Header *head, hpx_addr_t target, int n_digits) {
-    // Get a parcel
-    size_t msg_size = head->expansion_size + sizeof(LtoLParams);
-    hpx_parcel_t *parc = hpx_parcel_acquire(nullptr, msg_size);
-    assert(parc != nullptr);
+  static void l_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx,
+                              int n_digits) {
+    int to_child = tidx.which_child();
+    LocalData<DomainGeometry> geo = head->domain.value();
+    double t_size = geo->size_from_level(tidx.level());
 
-    // Setup the parcel
-    hpx_parcel_set_action(parc, l_to_l_);
-    hpx_parcel_set_target(parc, target);
-
-    // Fill the parcel payload
-    LtoLParams *message = static_cast<LtoLParams *>(hpx_parcel_get_data(parc));
-    message->bytes = head->expansion_size;
-    message->n_digits = n_digits;
-    memcpy(message->payload, head->payload, head->expansion_size);
-
-    // Send the parcel - this will release the acquired parcel
-    hpx_parcel_send_sync(parc);
-  }
-
-  static int l_to_l_handler(LtoLParams *parms, size_t UNUSED) {
-    hpx_addr_t target = hpx_thread_current_target();
-
-    void *workaround{nullptr};
-    assert(hpx_gas_try_pin(target, &workaround));
-    Header *trg_data =
-        static_cast<Header *>(hpx_lco_user_get_user_data(workaround));
-    Index t_index = trg_data->index;
-    int to_child = t_index.which_child();
-    LocalData<DomainGeometry> geo = trg_data->domain.value();
-    hpx_gas_unpin(target);
-    double t_size = geo->size_from_level(t_index.level());
-
-    expansion_t lexp{parms->payload, parms->bytes, parms->n_digits};
+    expansion_t lexp{head->payload, head->expansion_size, n_digits};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
-    expansionlco_t total{target, parms->n_digits};
-    total.contribute(bytes, transexpand);
-
-    delete [] transexpand;
-
-    return HPX_SUCCESS;
+    expansionlco_t total{target, n_digits};
+    total.contribute(std::move(translated));
   }
 
   static void m_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
@@ -610,8 +533,6 @@ class ExpansionLCO {
   static hpx_action_t spawn_out_edges_;
   static hpx_action_t s_to_m_;
   static hpx_action_t s_to_l_;
-  static hpx_action_t m_to_l_;
-  static hpx_action_t l_to_l_;
   static hpx_action_t s_to_t_;
   static hpx_action_t create_from_expansion_;
 
@@ -666,22 +587,6 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::m_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::l_to_l_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
