@@ -165,7 +165,6 @@ class LaplaceCOMAcc {
 
   void M_to_T(Target *first, Target *last, double scale) const {
     assert(valid());
-    // TODO
     for (auto i = first; i != last; ++i) {
       Point pos{i->position};
 

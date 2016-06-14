@@ -20,9 +20,6 @@
 /// \brief Definition of DASHMM Evaluator object
 
 
-#define DOJSONOUTPUT
-
-
 #include <hpx/hpx.h>
 
 #include "dashmm/array.h"
@@ -34,10 +31,6 @@
 #include "dashmm/tree.h"
 
 #include "builtins/singlelocdistro.h"
-
-#ifdef DOJSONOUTPUT
-#include "dashmm/dagtojson.h"
-#endif
 
 
 namespace dashmm {
@@ -121,6 +114,9 @@ class Evaluator {
                         targetlco_t::predicate_,
                         targetlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        targetlco_t::create_, targetlco_t::create_at_locality,
+                        HPX_POINTER, HPX_SIZE_T);
 
     // ExpansionLCO related
     HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
@@ -195,7 +191,7 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::edge_lists_,
                         tree_t::edge_lists_handler,
-                        HPX_POINTER, HPX_INT);
+                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::instigate_dag_eval_,
                         tree_t::instigate_dag_eval_handler,
@@ -203,15 +199,12 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::termination_detection_,
                         tree_t::termination_detection_handler,
-                        HPX_ADDR, HPX_POINTER, HPX_INT, HPX_POINTER, HPX_INT);
+                        HPX_ADDR, HPX_POINTER, HPX_SIZE_T, HPX_POINTER,
+                        HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        tree_t::destroy_target_DAG_LCOs_,
-                        tree_t::destroy_target_DAG_LCOs_handler,
-                        HPX_POINTER, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        tree_t::destroy_internal_DAG_LCOs_,
-                        tree_t::destroy_internal_DAG_LCOs_handler,
-                        HPX_POINTER, HPX_INT);
+                        tree_t::destroy_DAG_LCOs_,
+                        tree_t::destroy_DAG_LCOs_handler,
+                        HPX_POINTER, HPX_SIZE_T);
 
     // Actions for the evaluation
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
@@ -309,33 +302,29 @@ class Evaluator {
     // NOTE: around here is where we can perform the table creation work,
     // (Future feature)
 
-    std::vector<DAGNode *> source_nodes{ }; // source nodes (known locality)
-    std::vector<DAGNode *> target_nodes{ }; // target nodes (known locality)
-    std::vector<DAGNode *> internals{ };    // nodes with locality to be computed
-    tree->collect_DAG_nodes(source_nodes, target_nodes, internals);
-    parms->distro.compute_distribution(tree->domain_, source_nodes,
-                                       target_nodes, internals);
+    DAG dag{};
+    tree->collect_DAG_nodes(dag);
+    // TODO: add a routine to remove pointless nodes from the DAG
+    parms->distro.compute_distribution(dag);
 
     tree->create_expansions_from_DAG(parms->n_digits);
 #ifdef DOJSONOUTPUT
-    output_dag_as_JSON(source_nodes, target_nodes, internals);
+    dag.toJSON("sample.json");
 #endif
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
     // get their work going when they come to it and then they return.
 
-    tree->setup_edge_lists(internals);
+    tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation();
-    hpx_addr_t alldone = tree->setup_termination_detection(target_nodes,
-                                                           internals);
+    hpx_addr_t alldone = tree->setup_termination_detection(dag);
 
-    // NOTE: We could fairly easily convert to Continuation-Passing-Style here
     hpx_lco_wait(alldone);
     hpx_lco_delete_sync(alldone);
 
     // clean up
-    tree->destroy_DAG_LCOs(target_nodes, internals);
+    tree->destroy_DAG_LCOs(dag);
     delete tree;
 
     // return

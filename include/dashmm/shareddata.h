@@ -34,8 +34,10 @@ extern hpx_action_t shared_data_construct_action;
 /// Action for destroying shared data objects
 extern hpx_action_t shared_data_destroy_action;
 
-/// Action for reset
+/// Action for reset from within an HPX-5 thread
 extern hpx_action_t shared_data_internal_reset_action;
+
+/// Action for reset from outside an HPX-5 thread
 extern hpx_action_t shared_data_external_reset_action;
 
 
@@ -181,7 +183,7 @@ class SharedData {
   /// This does not allocate new memory. Instead, this is used to interpret
   /// a given global address as a SharedData object. This cannot assure that
   /// the given address actually contains data for an object of type T.
-  SharedData(hpx_addr_t data) : data_{data} { }
+  explicit SharedData(hpx_addr_t data) : data_{data} { }
 
   /// Destroy the global data backing this object.
   ///
@@ -205,7 +207,6 @@ class SharedData {
     if (hpx_is_active()) {
       hpx_gas_free_sync(data_);
     } else {
-      assert(!hpx_is_active());   // It is an error to use this from inside HPX
       hpx_run(&shared_data_destroy_action, &data_);
     }
     data_ = HPX_NULL;

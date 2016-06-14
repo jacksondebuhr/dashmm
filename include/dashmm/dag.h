@@ -12,14 +12,14 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_DAG_INFO_H__
-#define __DASHMM_DAG_INFO_H__
+#ifndef __DASHMM_DAG_H__
+#define __DASHMM_DAG_H__
 
 
-/// \file include/dashmm/daginfo.h
+/// \file include/dashmm/dag.h
 /// \brief Interface for intermediate representation of DAG
 
-
+#include <string>
 #include <vector>
 
 #include <hpx/hpx.h>
@@ -52,11 +52,13 @@ struct DAGNode;
 /// edge. The source of the edge is implicit in that the DAGNode which has
 /// this edge in its list will be the source of the edge.
 struct DAGEdge {
-  const DAGNode *target;
-  Operation op;
+  const DAGNode *source;    /// Source node of the edge
+  const DAGNode *target;    /// Target node of the edge
+  Operation op;             /// Operation to perform along edge
 
-  DAGEdge() : target{nullptr}, op{Operation::Nop} { }
-  DAGEdge(const DAGNode *end, Operation inop) : target{end}, op{inop} { }
+  DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop} { }
+  DAGEdge(const DAGNode *start, const DAGNode *end, Operation inop)
+    : source{start}, target{end}, op{inop} { }
 };
 
 
@@ -68,23 +70,38 @@ struct DAGEdge {
 /// when the distribution of the DAG is computed, the result will appear in
 /// the locality entry of this object.
 struct DAGNode {
-  std::vector<DAGEdge> edges;    /// these are out edges
-  int incoming;                  /// number of incoming edges
-  int locality;                  /// the locality where this will be placed
+  std::vector<DAGEdge> out_edges;   /// these are out edges
+  std::vector<DAGEdge> in_edges;    /// these are in edges
+  Index idx;                        /// index of the containing node
 
+  int locality;                  /// the locality where this will be placed
   hpx_addr_t global_addx;        /// global address of object serving this node
   int other_member;              /// this is either n_digits for an expansion or
                                  /// n_targets for a target lco
 
-  Index idx;                     /// index of the containing node
-
   DAGNode(Index i)
-      : edges{}, incoming{0}, locality{0}, global_addx{HPX_NULL},
-        other_member{0}, idx{i} { }
-  void add_input() {++incoming;}
-  void add_edge(const DAGNode *end, Operation op) {
-    edges.push_back(DAGEdge{end, op});
+      : out_edges{}, in_edges{}, idx{i}, locality{0}, global_addx{HPX_NULL},
+        other_member{0} { }
+  void add_out_edge(const DAGNode *end, Operation op) {
+    out_edges.push_back(DAGEdge{this, end, op});
   }
+  void add_in_edge(const DAGNode *start, Operation op) {
+    in_edges.push_back(DAGEdge{start, this, op});
+  }
+};
+
+
+// TODO do this up properly
+class DAG {
+ public:
+  DAG() : source_leaves{}, source_nodes{}, target_nodes{}, target_leaves{} { }
+
+  void toJSON(std::string fname);
+
+  std::vector<DAGNode *> source_leaves;
+  std::vector<DAGNode *> source_nodes;
+  std::vector<DAGNode *> target_nodes;
+  std::vector<DAGNode *> target_leaves;
 };
 
 
@@ -161,7 +178,6 @@ class DAGInfo {
     assert(parts_ != nullptr);
   }
 
-  // TODO: be aware that these might need to change
   DAGInfo(const DAGInfo &other) = delete;
   DAGInfo &operator=(const DAGInfo &other) = delete;
   DAGInfo(const DAGInfo &&other) = delete;
@@ -353,11 +369,11 @@ class DAGInfo {
   static void link_nodes(DAGInfo *src_info, DAGNode *source,
                          DAGInfo *dest_info, DAGNode *dest, Operation op) {
     dest_info->lock();
-    dest->add_input();
+    dest->add_in_edge(source, op);
     dest_info->unlock();
 
     src_info->lock();
-    source->add_edge(dest, op);
+    source->add_out_edge(dest, op);
     src_info->unlock();
   }
 
@@ -367,8 +383,7 @@ class DAGInfo {
   }
 
   void unlock() {
-    // TODO: can I get away with nonsync and ignore sync on this?
-    hpx_lco_sema_v_sync(lock_);
+    hpx_lco_sema_v(lock_, HPX_NULL);
   }
 
   Index idx_;

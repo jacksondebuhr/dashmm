@@ -20,6 +20,7 @@
 ///
 /// DistroPolicy objects should be trivially copyable.
 
+
 class DistroPolicy {
 public:
   /// Computes the distribution of the work represented by the given nodes.
@@ -33,8 +34,5 @@ public:
   /// After this call, all DAGNodes should have their locality set. It is
   /// permitted to parallelize this work, but this routine must not return
   /// before each locality has been set.
-  void compute_distribution(const SharedData<DomainGeometry> &domain,
-                            const std::vector<DAGNode *> &sources,
-                            const std::vector<DAGNode *> &targets,
-                            const std::vector<DAGNode *> &internal);
+  void compute_distribution(DAG &dag);
 };

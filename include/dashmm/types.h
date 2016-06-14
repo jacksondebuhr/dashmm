@@ -46,6 +46,7 @@ enum ReturnCode {
 };
 
 
+/// Alias to standard library complex number type
 using dcomplex_t = std::complex<double>;
 
 

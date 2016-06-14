@@ -1,17 +1,25 @@
 THIS BRANCH TODO
-TODO: compile
-TODO: debug
-TODO: Go back over all the in-source documentation
+TODO: Look at TODO in the code, and address where possible
+TODO: Perhaps add the indices to out edge descriptors in the expansion LCO so
+      that we can simplify some things. In particular, M->L needs information
+      at both ends currently. But if the target index were available, it would
+      not have to be two actions. Similar for L->L. Also, likely we shall need
+      this for the exponential stuff.
+TODO: Merge degsplit with dev.
 TODO: In contribute for ExpansionLCO, can we change it so the user can just
       pass in the expansion?
-TODO: change the data() member of ExpansionLCO to be lco(). Or change the loc()
-      member of TargetLCO to data();
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
 TODO: Think about changing method to taking not a reference but a pointer to the
       consider vector
 TODO: We should cull unused nodes from the DAG, and unused expansions from the
       computation
+TODO: Improve the way that we optionally put out the DAG information. Perhaps
+      this would be another version of evaluate, but which takes an additional
+      template parameter serving the DAG output. This would then force the
+      factorization of evaluate even higher.
+TODO: create standard regression and performance testing script to determine
+      quality of a build.
 
 TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
       constructor in some way?
@@ -23,8 +31,8 @@ TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
 
 Overall Plan to 1.0
 
- * Split DAG from Tree
-    This is well under way. See above.
+ * DONE Split DAG from Tree
+
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those
       particles as needed)

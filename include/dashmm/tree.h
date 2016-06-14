@@ -23,6 +23,7 @@
 #include "dashmm/arrayref.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
+#include "dashmm/dag.h"
 #include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 
@@ -42,7 +43,7 @@ class Evaluator;
 
 /// Node of either the source or target tree
 ///
-/// This class is parameterized with the typical STEM types for DASHMM, but
+/// This class is parameterized with the typical STEMD types for DASHMM, but
 /// also includes one more parameter, which will always be either Source or
 /// Target. The only different in the two trees is that the reference to the
 /// array is either an array of Sources or Targets, hence the extra parameter.
@@ -340,15 +341,12 @@ class Tree {
   ///
   /// This is a synchronous operation.
   ///
-  /// \param sources - a vector that will be populated with the source DAG nodes
-  /// \param targets - a vector that will be populated with the target DAG nodes
-  /// \param internals - a vector that will be populated with all other DAG
-  ///                    nodes
-  void collect_DAG_nodes(std::vector<DAGNode *> &sources,
-                        std::vector<DAGNode *> &targets,
-                        std::vector<DAGNode *> &internals) {
-    collect_DAG_nodes_from_S_node(source_root_, sources, internals);
-    collect_DAG_nodes_from_T_node(target_root_, targets, internals);
+  /// \param dag - a DAG object to be populated
+  void collect_DAG_nodes(DAG &dag) {
+    collect_DAG_nodes_from_S_node(source_root_, dag.source_leaves,
+                                  dag.source_nodes);
+    collect_DAG_nodes_from_T_node(target_root_, dag.target_leaves,
+                                  dag.target_nodes);
   }
 
   /// Create the LCOs from the DAG
@@ -376,6 +374,8 @@ class Tree {
   }
 
   // TODO: is tree the right place for this? Does not need any tree data
+  //  Likely this should just move to evaluator - not DAG as that would then
+  //  require we templatize that type, which should be avoided if possible.
   /// Sets up termination detection for a DASHMM evaluation
   ///
   /// This is an asynchronous operation. The returned LCO becomes the
@@ -386,18 +386,20 @@ class Tree {
   ///
   /// \returns - LCO that will signal that all targets have completed their
   ///            computation.
-  hpx_addr_t setup_termination_detection(std::vector<DAGNode *> &targets,
-                                         std::vector<DAGNode *> &internals) {
-    int n_targs = targets.size();
-    int n_internals = internals.size();
+  hpx_addr_t setup_termination_detection(DAG &dag) {
+    size_t n_targs = dag.target_leaves.size();
+    size_t n_tinternal = dag.target_nodes.size();
+    size_t n_sinternal = dag.source_nodes.size();
 
-    hpx_addr_t retval = hpx_lco_and_new(n_targs + n_internals);
+    hpx_addr_t retval = hpx_lco_and_new(n_targs + n_tinternal + n_sinternal);
     assert(retval != HPX_NULL);
 
-    std::vector<DAGNode *> *argaddx = &targets;
-    std::vector<DAGNode *> *internalsaddx = &internals;
-    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval, &argaddx,
-             &n_targs, &internalsaddx, &n_internals);
+    std::vector<DAGNode *> *argaddx = &dag.target_leaves;
+    std::vector<DAGNode *> *tinternalsaddx = &dag.target_nodes;
+    std::vector<DAGNode *> *sinternalsaddx = &dag.source_nodes;
+    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval,
+             &argaddx, &n_targs, &tinternalsaddx, &n_tinternal,
+             &sinternalsaddx, &n_sinternal);
 
     return retval;
   }
@@ -414,11 +416,14 @@ class Tree {
   /// function returns, but it may not have ended. There is no returned LCO
   /// as the termination detection cannot trigger before this is done.
   ///
-  /// \param nodes - vector of the internal nodes of the DAG.
-  void setup_edge_lists(std::vector<DAGNode *> &nodes) {
-    DAGNode **data = nodes.data();
-    int n_nodes = nodes.size();
-    hpx_call(HPX_HERE, edge_lists_, HPX_NULL, &data, &n_nodes);
+  /// \param dag - DAG object
+  void setup_edge_lists(DAG &dag) {
+    DAGNode **sdata = dag.source_nodes.data();
+    size_t n_snodes = dag.source_nodes.size();
+    DAGNode **tdata = dag.target_nodes.data();
+    size_t n_tnodes = dag.target_nodes.size();
+    hpx_call(HPX_HERE, edge_lists_, HPX_NULL,
+             &sdata, &n_snodes, &tdata, &n_tnodes);
   }
 
   /// Initial the DAG evaluation
@@ -442,18 +447,21 @@ class Tree {
   ///
   /// \param targets - the target nodes of the DAG
   /// \param internal - the internal nodes of the DAG
-  void destroy_DAG_LCOs(std::vector<DAGNode *> &targets,
-                        std::vector<DAGNode *> &internal) {
-    hpx_addr_t done = hpx_lco_and_new(2);
+  void destroy_DAG_LCOs(DAG &dag) {
+    hpx_addr_t done = hpx_lco_and_new(3);
     assert(done != HPX_NULL);
 
-    DAGNode **data = targets.data();
-    int n_data = targets.size();
-    hpx_call(HPX_HERE, destroy_target_DAG_LCOs_, done, &data, &n_data);
+    DAGNode **data = dag.target_leaves.data();
+    size_t n_data = dag.target_leaves.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
 
-    data = internal.data();
-    n_data = internal.size();
-    hpx_call(HPX_HERE, destroy_internal_DAG_LCOs_, done, &data, &n_data);
+    data = dag.target_nodes.data();
+    n_data = dag.target_nodes.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+
+    data = dag.source_nodes.data();
+    n_data = dag.source_nodes.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -781,11 +789,11 @@ class Tree {
     std::unique_ptr<expansion_t> input_expand{
       new expansion_t{n_center, n_digits}
     };
-    expansionlco_t expand(node->dag.normal()->incoming,
-                          node->dag.normal()->edges.size(),
+    expansionlco_t expand(node->dag.normal()->in_edges.size(),
+                          node->dag.normal()->out_edges.size(),
                           tree->domain_, node->idx, std::move(input_expand),
                           HPX_THERE(node->dag.normal()->locality));
-    node->dag.set_normal_expansion(expand.data(), expand.accuracy());
+    node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
 
     // NOTE: this is where we would make the intermediate expansion, but that
     // is not supported just yet.
@@ -805,8 +813,6 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      //hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-      //                                cdone, hpx_lco_delete_action, nullptr, 0);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     } else {
@@ -826,11 +832,11 @@ class Tree {
     std::unique_ptr<expansion_t> input_expand{
       new expansion_t{n_center, n_digits}
     };
-    expansionlco_t expand(node->dag.normal()->incoming,
-                          node->dag.normal()->edges.size(),
+    expansionlco_t expand(node->dag.normal()->in_edges.size(),
+                          node->dag.normal()->out_edges.size(),
                           tree->domain_, node->idx, std::move(input_expand),
                           HPX_THERE(node->dag.normal()->locality));
-    node->dag.set_normal_expansion(expand.data(), expand.accuracy());
+    node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
 
     // NOTE: this is where we would make the intermediate expansion, but that
     // is not supported just yet.
@@ -840,7 +846,7 @@ class Tree {
 
     // Here is where we make the target lco if needed
     if (n_children == 0) {
-      targetlco_t tlco{node->dag.parts()->incoming, node->parts,
+      targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
                        HPX_THERE(node->dag.parts()->locality)};
       node->dag.set_targetlco(tlco.lco(), tlco.n());
 
@@ -857,8 +863,6 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      //hpx_call_when_with_continuation(cdone, done, hpx_lco_set_action,
-      //                                cdone, hpx_lco_delete_action, nullptr, 0);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     }
@@ -866,11 +870,16 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  static int edge_lists_handler(DAGNode **nodes, int n_nodes) {
+  static int edge_lists_handler(DAGNode **snodes, size_t n_snodes,
+                                DAGNode **tnodes, size_t n_tnodes) {
     // If this is a bottleneck, we can easily make this some kind of parfor
-    for (int i = 0; i < n_nodes; ++i) {
-      expansionlco_t expand{nodes[i]->global_addx, nodes[i]->other_member};
-      expand.set_out_edge_data(nodes[i]->edges);
+    for (size_t i = 0; i < n_snodes; ++i) {
+      expansionlco_t expand{snodes[i]->global_addx, snodes[i]->other_member};
+      expand.set_out_edge_data(snodes[i]->out_edges);
+    }
+    for (size_t i = 0; i < n_tnodes; ++i) {
+      expansionlco_t expand{tnodes[i]->global_addx, tnodes[i]->other_member};
+      expand.set_out_edge_data(tnodes[i]->out_edges);
     }
     return HPX_SUCCESS;
   }
@@ -891,8 +900,8 @@ class Tree {
       sourceref_t sources = node->parts;
 
       // loop over edges
-      for (size_t i = 0; i < parts->edges.size(); ++i) {
-        switch (parts->edges[i].op) {
+      for (size_t i = 0; i < parts->out_edges.size(); ++i) {
+        switch (parts->out_edges[i].op) {
           case Operation::Nop:
             assert(0 && "Trouble handling DAG instigation");
             break;
@@ -910,7 +919,7 @@ class Tree {
           case Operation::StoL:
             {
               // Get target DAGNode
-              const DAGNode *normal = parts->edges[i].target;
+              const DAGNode *normal = parts->out_edges[i].target;
               assert(normal);
               expansionlco_t expand{normal->global_addx, normal->other_member};
               auto domain = tree->domain_.value();
@@ -931,8 +940,8 @@ class Tree {
               const DAGNode *normal = node->dag.normal();
               assert(normal);
               expansionlco_t expand{normal->global_addx, normal->other_member};
-              targetlco_t targets{parts->edges[i].target->global_addx,
-                                  parts->edges[i].target->other_member};
+              targetlco_t targets{parts->out_edges[i].target->global_addx,
+                                  parts->out_edges[i].target->other_member};
               expand.S_to_T(sources, targets);
             }
             break;
@@ -947,56 +956,46 @@ class Tree {
   }
 
   static int termination_detection_handler(hpx_addr_t done,
-                                           std::vector<DAGNode *> *nodes,
-                                           int n_targs,
-                                           std::vector<DAGNode *> *inters,
-                                           int n_inters) {
+                                           std::vector<DAGNode *> *targs,
+                                           size_t n_targs,
+                                           std::vector<DAGNode *> *tint,
+                                           size_t n_tint,
+                                           std::vector<DAGNode *> *sint,
+                                           size_t n_sint) {
     // If this is insufficiently parallel, we can always make this action
     // call itself with smaller and smaller chunks of the array.
-    for (int i = 0; i < n_targs; ++i) {
-      assert((*nodes)[i] != nullptr);
-      assert((*nodes)[i]->global_addx != HPX_NULL);
-      hpx_call_when((*nodes)[i]->global_addx, done, hpx_lco_set_action,
+    for (size_t i = 0; i < n_targs; ++i) {
+      assert((*targs)[i] != nullptr);
+      assert((*targs)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*targs)[i]->global_addx, done, hpx_lco_set_action,
                     HPX_NULL, nullptr, 0);
     }
 
-    for (int i = 0; i < n_inters; ++i) {
-      assert((*inters)[i] != nullptr);
-      assert((*inters)[i]->global_addx != HPX_NULL);
-      hpx_call_when((*inters)[i]->global_addx, done, hpx_lco_set_action,
+    for (size_t i = 0; i < n_tint; ++i) {
+      assert((*tint)[i] != nullptr);
+      assert((*tint)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*tint)[i]->global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    for (size_t i = 0; i < n_sint; ++i) {
+      assert((*sint)[i] != nullptr);
+      assert((*sint)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*sint)[i]->global_addx, done, hpx_lco_set_action,
                     HPX_NULL, nullptr, 0);
     }
 
     return HPX_SUCCESS;
   }
 
-  static int destroy_target_DAG_LCOs_handler(DAGNode **nodes, int n_nodes) {
-    // We could do this more in parallel if needed.
-
-    // We use non-sync delete since some of these could be remote from this
-    // locality.
-    hpx_addr_t alldel = hpx_lco_and_new(n_nodes);
-    assert(alldel != HPX_NULL);
-
-    for (int i = 0; i < n_nodes; ++i) {
-      assert(nodes[i]->global_addx != HPX_NULL);
-      hpx_lco_delete(nodes[i]->global_addx, alldel);
-    }
-
-    hpx_lco_wait(alldel);
-    hpx_lco_delete_sync(alldel);
-
-    return HPX_SUCCESS;
-  }
-
-  static int destroy_internal_DAG_LCOs_handler(DAGNode **nodes, int n_nodes) {
+  static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes) {
     // We could add more parallelism here if needed.
 
     // Some of these might be remote, so we use async delete on these LCOs.
     hpx_addr_t alldel = hpx_lco_and_new(n_nodes);
     assert(alldel != HPX_NULL);
 
-    for (int i = 0; i < n_nodes; ++i) {
+    for (size_t i = 0; i < n_nodes; ++i) {
       assert(nodes[i]->global_addx != HPX_NULL);
       hpx_lco_delete(nodes[i]->global_addx, alldel);
     }
@@ -1030,8 +1029,7 @@ class Tree {
   static hpx_action_t edge_lists_;
   static hpx_action_t instigate_dag_eval_;
   static hpx_action_t termination_detection_;
-  static hpx_action_t destroy_target_DAG_LCOs_;
-  static hpx_action_t destroy_internal_DAG_LCOs_;
+  static hpx_action_t destroy_DAG_LCOs_;
 };
 
 
@@ -1123,15 +1121,7 @@ template <typename S, typename T,
                     template <typename, typename> class,
                     typename> class M,
           typename D>
-hpx_action_t Tree<S, T, E, M, D>::destroy_target_DAG_LCOs_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, E, M, D>::destroy_internal_DAG_LCOs_ = HPX_ACTION_NULL;
+hpx_action_t Tree<S, T, E, M, D>::destroy_DAG_LCOs_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

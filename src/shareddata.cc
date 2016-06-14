@@ -15,11 +15,8 @@
 /// \file src/shareddata.cc
 /// \brief Implementation of actions related to SharedData.
 
-// C / C++ stuff
 
 #include "dashmm/shareddata.h"
-
-// other DASHMM stuff
 
 
 namespace dashmm {

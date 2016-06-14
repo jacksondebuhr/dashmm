@@ -11,6 +11,7 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
 #ifndef __DASHMM_EXPANSION_LCO_H__
 #define __DASHMM_EXPANSION_LCO_H__
 
@@ -25,7 +26,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arrayref.h"
-#include "dashmm/daginfo.h"
+#include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
@@ -141,7 +142,7 @@ class ExpansionLCO {
   }
 
   /// Return the global address of the referred data.
-  hpx_addr_t data() const {return data_;}
+  hpx_addr_t lco() const {return data_;}
 
   /// Is the object currently referring to global data?
   bool valid() const {return data_ != HPX_NULL;}
@@ -462,6 +463,8 @@ class ExpansionLCO {
     delete [] transexpand;
   }
 
+  // TODO: assess if this will be easier with the target and source indices
+  // available.
   static void m_to_l_out_edge(Header *head, hpx_addr_t target, int n_digits) {
     // Get a parcel
     size_t msg_size = head->expansion_size + sizeof(MtoLParams);
@@ -511,6 +514,8 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
+  // TODO: assess if this will be easier with the target and source indices
+  // available.
   static void l_to_l_out_edge(Header *head, hpx_addr_t target, int n_digits) {
     // Get a parcel
     size_t msg_size = head->expansion_size + sizeof(LtoLParams);
@@ -559,10 +564,6 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  // TODO update these to forward onto the target - but that does not work in
-  // this case. The target will not know its size. So we need to do something
-  // else. Perhaps we just save this data at DAG creation time. It will all
-  // be available.
   static void m_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double scale = 1.0 / geo->size_from_level(head->index.level());

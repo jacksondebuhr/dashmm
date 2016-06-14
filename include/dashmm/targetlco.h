@@ -78,18 +78,16 @@ class TargetLCO {
   /// Construct from an existing LCO
   TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
 
-  // TODO fix this design flaw
+  // TODO fix this design flaw <--- what do I mean here?
   TargetLCO(hpx_addr_t data, int n_targs) {
     lco_ = data;
     n_targs_ = (size_t)n_targs;
   }
 
   /// Construct an LCO from input TargetRef. This will create the LCO.
-  TargetLCO(int n_inputs, const targetref_t &targets, hpx_addr_t where) {
-    // TODO: transform this into an action that creates it at the correct place
-    Data init{n_inputs, targets};
-    lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
-                            &init, sizeof(init));
+  TargetLCO(size_t n_inputs, const targetref_t &targets, hpx_addr_t where) {
+    Data init{static_cast<int>(n_inputs), targets};
+    hpx_call_sync(where, create_, &lco_, sizeof(lco_), &init, sizeof(init));
     assert(lco_ != HPX_NULL);
     n_targs_ = targets.n();
   }
@@ -279,6 +277,13 @@ class TargetLCO {
     return (i->yet_to_arrive == 0);
   }
 
+  /// Action to create the LCO at a given locality
+  static int create_at_locality(Data *init, size_t bytes) {
+    hpx_addr_t retval = hpx_lco_user_new(bytes, init_, operation_, predicate_,
+                                         init, bytes);
+    return HPX_THREAD_CONTINUE(retval);
+  }
+
   /// The global address of the LCO
   hpx_addr_t lco_;
   /// The number of targets represented by the LCO.
@@ -290,6 +295,8 @@ class TargetLCO {
   static hpx_action_t operation_;
   /// HPX function for LCO predicate
   static hpx_action_t predicate_;
+  /// Action for locality aware construction
+  static hpx_action_t create_;
 };
 
 
@@ -316,6 +323,14 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t TargetLCO<S, T, E, M, D>::predicate_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t TargetLCO<S, T, E, M, D>::create_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

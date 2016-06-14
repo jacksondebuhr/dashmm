@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include "dashmm/daginfo.h"
+#include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/shareddata.h"
 
@@ -33,10 +33,7 @@ namespace dashmm {
 /// begin with.
 class SingleLocality {
 public:
-  void compute_distribution(const SharedData<DomainGeometry> &domain,
-                            const std::vector<DAGNode *> &sources,
-                            const std::vector<DAGNode *> &targets,
-                            const std::vector<DAGNode *> &internal);
+  void compute_distribution(DAG &dag);
 };
 
 
