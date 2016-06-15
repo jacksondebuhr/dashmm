@@ -23,6 +23,9 @@ TODO: Improve the way that we optionally put out the DAG information. Perhaps
       this would be another version of evaluate, but which takes an additional
       template parameter serving the DAG output. This would then force the
       factorization of evaluate even higher.
+        Or perhaps once there is a mechanism to get the DAG for a given
+        evaluation, we can just go ahead and return that the user, and they
+        can call whatever methods they want on it.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
 
