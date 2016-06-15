@@ -44,7 +44,7 @@ class Expansion {
   ///
   /// Further, this constructor needs to be able to operate in a 'shallow'
   /// mode, where ptr = nullptr. This allows for situations where Expansion
-  /// is needed, but the speicif data for the expansion is not. The exemplar of
+  /// is needed, but the specific data for the expansion is not. The exemplar of
   /// this use is to perform an S->T operation.
   ///
   /// Again, n_digits is a required argument, but it can be ignored.
@@ -126,9 +126,9 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /// \param scale - scaling factor
-  void S_to_M(Point center, source_t *first, source_t *last,
-              double scale) const;
+  /// \param scale - scaling factor (one over the size of the source box)
+  std::unique_ptr<expansion_t> S_to_M(Point center, source_t *first,
+                                      source_t *last, double scale) const;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -139,7 +139,7 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /// \param scale - scaling factor
+  /// \param scale - scaling factor (one over the size of the target box)
   ///
   /// \returns - The resulting local expansion
   std::unique_ptr<expansion_t> S_to_L(Point center,
@@ -190,14 +190,14 @@ class Expansion {
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor
+  /// \param scale - scaling factor (one over the size of source box)
   void M_to_T(target_t *first, target_t *last, double scale) const;
 
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor
+  /// \param scale - scaling factor (one over the size of the target box)
   void L_to_T(target_t *first, target_t *last, double scale) const;
 
   /// Compute the direct interaction between sources and targets

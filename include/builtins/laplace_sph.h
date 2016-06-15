@@ -16,7 +16,7 @@
 #define __DASHMM_LAPLACE_SPH_EXPANSION_H__
 
 
-/// \file include/laplace_sph.h
+/// \file include/builtins/laplace_sph.h
 /// \brief Declaration of LaplaceSPH
 
 
@@ -126,13 +126,13 @@ class LaplaceSPH {
     return data_->expansion[i];
   }
 
-  void S_to_M(Point center, Source *first, Source *last,
-              double scale) const {
-    data_->center = center;
-    dcomplex_t *expansion = &data_->expansion[0];
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
+                                      Source *last, double scale) const {
+    expansion_t *retval{new expansion_t{center, n_digits_}}; 
+    dcomplex_t *expansion = &retval->data_->expansion[0]; 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
-    int p = table->p();
-    const double *sqf = table->sqf();
+    int p = table->p(); 
+    const double *sqf = table->sqf(); 
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -177,6 +177,8 @@ class LaplaceSPH {
     delete [] legendre;
     delete [] powers_r;
     delete [] powers_ephi;
+
+    return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,

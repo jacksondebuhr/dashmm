@@ -12,28 +12,32 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_REDUCTION_OPS_H__
-#define __DASHMM_REDUCTION_OPS_H__
+#ifndef __DASHMM_SINGLE_LOC_DISTRO_H__
+#define __DASHMM_SINGLE_LOC_DISTRO_H__
 
 
-/// \file include/dashmm/reductionops.h
-/// \brief Action identifiers for common reduction operations
+#include <vector>
 
-
-#include <hpx/hpx.h>
+#include "dashmm/dag.h"
+#include "dashmm/domaingeometry.h"
+#include "dashmm/shareddata.h"
 
 
 namespace dashmm {
 
 
-/// Identity operation for integer summation
-extern hpx_action_t int_sum_ident_op;
+/// This distribution policy places all content on the root locality
+///
+/// This is intended to be the simplest possibly distribution policy. It is
+/// unlikely to be a good choice, unless one is using only one locality to
+/// begin with.
+class SingleLocality {
+public:
+  void compute_distribution(DAG &dag);
+};
 
-/// Operation for integer summation
-extern hpx_action_t int_sum_op;
+
+} // dashmm
 
 
-} // namespace dashmm
-
-
-#endif // __DASHMM_REDUCTION_OPS_H__
+#endif // __DASHMM_SINGLE_LOC_DISTRO_H__

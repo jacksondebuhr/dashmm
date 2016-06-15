@@ -12,28 +12,21 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_REDUCTION_OPS_H__
-#define __DASHMM_REDUCTION_OPS_H__
-
-
-/// \file include/dashmm/reductionops.h
-/// \brief Action identifiers for common reduction operations
-
-
-#include <hpx/hpx.h>
+#include "builtins/singlelocdistro.h"
 
 
 namespace dashmm {
 
 
-/// Identity operation for integer summation
-extern hpx_action_t int_sum_ident_op;
+void SingleLocality::compute_distribution(DAG &dag) {
+  for (auto i: dag.source_nodes) {
+    i->locality = 0;
+  }
 
-/// Operation for integer summation
-extern hpx_action_t int_sum_op;
+  for (auto i: dag.target_nodes) {
+    i->locality = 0;
+  }
+}
 
 
-} // namespace dashmm
-
-
-#endif // __DASHMM_REDUCTION_OPS_H__
+}

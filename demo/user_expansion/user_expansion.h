@@ -185,9 +185,10 @@ class User {
 
   // This routine will set this expansion to the multipole moments generated
   // by the given sources.
-  void S_to_M(dashmm::Point center, Source *first,
+  std::unique_ptr<User> S_to_M(dashmm::Point center, Source *first,
               Source *last, double scale) const {
     fprintf(stdout, "S->M for %ld sources\n", last - first);
+    return std::unique_ptr<User>{new User{center, acc_}};
   }
 
   // This will generate a local expansion at the given center for the

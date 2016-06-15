@@ -16,7 +16,7 @@
 #define __DASHMM_INDEX_H__
 
 
-/// \file include/index.h
+/// \file include/dashmm/index.h
 /// \brief An index type for specifying relative node geometry
 
 
@@ -29,9 +29,12 @@ namespace dashmm {
 /// node. Indices require 3 components in three dimensions. At level 0,
 /// the only possible index is (0, 0, 0). At level 1, there are eight
 /// possible indices, with each component having a value of 0 or 1.
+///
+/// To convert the index into real positions, a DomainGeometry object is
+/// needed. See the DomainGeometry documentation for more.
 class Index {
  public:
-  /// construct the index from components and level
+  /// Construct the index from components and level
   Index(int ix, int iy, int iz, int level)
       : idx_{ix, iy, iz}, level_{level} { }
 
@@ -76,6 +79,22 @@ class Index {
                  (idx_[1] << 1) + (which & 2 ? 1 : 0),
                  (idx_[2] << 1) + (which & 4 ? 1 : 0),
                  level_ + 1};
+  }
+
+  /// Compute which child of this Index's parent this index is
+  ///
+  /// The ordering of the children of a node are as follows,
+  /// where the triple of [+-] indicates which half of the node in each
+  /// direction the given child occupies:
+  /// 0: ---; 1: +--; 2: -+-; 3: ++-;
+  /// 4: --+; 5: +-+; 6: -++; 7: +++;
+  ///
+  /// \returns - which child this Index is
+  int which_child() const {
+    int xval = idx_[0] % 2;
+    int yval = (idx_[1] % 2) << 1;
+    int zval = (idx_[2] % 2) << 2;
+    return (xval + yval + zval);
   }
 
  private:

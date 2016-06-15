@@ -16,7 +16,7 @@
 #define __DASHMM_LAPLACE_COM_EXPANSION_H__
 
 
-/// \file include/laplace_com.h
+/// \file include/builtins/laplace_com.h
 /// \brief Declaration of LaplaceCOM
 
 
@@ -128,11 +128,13 @@ class LaplaceCOM {
     }
   }
 
-  void S_to_M(Point center, Source *first, Source *last,
-              double scale) const {
-    calc_mtot(first, last);
-    calc_xcom(first, last);
-    calc_Q(first, last);
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
+                                      double scale) const {
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0);
+    temp->calc_mtot(first, last);
+    temp->calc_xcom(first, last);
+    temp->calc_Q(first, last);
+    return std::unique_ptr<expansion_t>{temp};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center,

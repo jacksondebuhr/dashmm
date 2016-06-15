@@ -16,7 +16,7 @@
 #define __DASHMM_ARRAY_MAP_ACTION_H__
 
 
-/// \file include/arraymapaction.h
+/// \file include/dashmm/arraymapaction.h
 /// \brief Definitions for actions mappable over an array.
 
 
@@ -75,7 +75,7 @@ template <typename T, typename E>
 class ArrayMapAction {
  public:
   /// The function type for functions mapped onto Array elements.
-  typedef void (*map_function_t)(T *, const size_t, const size_t, const E *);
+  using map_function_t = void (*)(T *, const size_t, const size_t, const E *);
 
   /// Construct the ArrayMapAction
   ///

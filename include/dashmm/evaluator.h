@@ -16,25 +16,29 @@
 #define __DASHMM_EVALUATOR_H__
 
 
-/// \file include/evaluator.h
+/// \file include/dashmm/evaluator.h
 /// \brief Definition of DASHMM Evaluator object
 
 
 #include <hpx/hpx.h>
 
 #include "dashmm/array.h"
+#include "dashmm/arrayref.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
-#include "dashmm/targetref.h"
+#include "dashmm/tree.h"
 
+#include "builtins/singlelocdistro.h"
 
 
 namespace dashmm {
+
+
+// TODO: Think about defining the default policy in some way that the
+// method implementers can just use whatever the default it. Perhaps a
+// using in some header file or something.
 
 
 /// Evaluator object
@@ -71,19 +75,27 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class> class Method>
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy = SingleLocality>
 class Evaluator {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, Expansion>;
-  using sourceref_t = SourceRef<Source>;
-  using targetref_t = TargetRef<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
+  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
+  using sourceref_t = ArrayRef<Source>;
+  using targetref_t = ArrayRef<Target>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
+                                DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
+                                      DistroPolicy>;
+  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method,
+                                DistroPolicy>;
+  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,
+                                DistroPolicy>;
+  using tree_t = Tree<Source, Target, Expansion, Method, DistroPolicy>;
+  using distropolicy_t = DistroPolicy;
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
@@ -91,30 +103,37 @@ class Evaluator {
   /// For this to work, the related classes must mark Evaluator as a friend.
   Evaluator() {
     // TargetLCO related
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         targetlco_t::init_, targetlco_t::init_handler,
                         HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         targetlco_t::operation_,
                         targetlco_t::operation_handler,
                         HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         targetlco_t::predicate_,
                         targetlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        targetlco_t::create_, targetlco_t::create_at_locality,
+                        HPX_POINTER, HPX_SIZE_T);
 
     // ExpansionLCO related
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         expansionlco_t::init_, expansionlco_t::init_handler,
                         HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         expansionlco_t::operation_,
                         expansionlco_t::operation_handler,
                         HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         expansionlco_t::predicate_,
                         expansionlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+                        expansionlco_t::spawn_out_edges_,
+                        expansionlco_t::spawn_out_edges_handler,
+                        HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_m_,
                         expansionlco_t::s_to_m_handler,
@@ -125,88 +144,66 @@ class Evaluator {
                         expansionlco_t::s_to_l_handler,
                         HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
                         HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::m_to_m_,
-                        expansionlco_t::m_to_m_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        expansionlco_t::m_to_l_,
-                        expansionlco_t::m_to_l_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::l_to_l_,
-                        expansionlco_t::l_to_l_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::m_to_t_,
-                        expansionlco_t::m_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::l_to_t_,
-                        expansionlco_t::l_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_t_,
                         expansionlco_t::s_to_t_handler,
                         HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::add_,
-                        expansionlco_t::add_handler,
-                        HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::create_from_expansion_,
                         expansionlco_t::create_from_expansion_handler,
                         HPX_POINTER, HPX_SIZE_T);
 
-    // Source Node related
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        sourcenode_t::self_delete_,
-                        sourcenode_t::self_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        sourcenode_t::node_delete_,
-                        sourcenode_t::node_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        sourcenode_t::child_done_,
-                        sourcenode_t::child_done_handler,
-                        HPX_POINTER, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
-                        sourcenode_t::partition_,
-                        sourcenode_t::partition_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-
-    // Target Node related
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        targetnode_t::self_delete_,
-                        targetnode_t::self_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        targetnode_t::node_delete_,
-                        targetnode_t::node_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
-                        targetnode_t::partition_,
-                        targetnode_t::partition_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+    // Tree related
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::source_child_done_,
+                        tree_t::source_child_done_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        tree_t::source_partition_,
+                        tree_t::source_partition_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        tree_t::target_partition_,
+                        tree_t::target_partition_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::source_bounds_, tree_t::source_bounds_handler,
+                        HPX_ADDR, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::target_bounds_, tree_t::target_bounds_handler,
+                        HPX_ADDR, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::create_S_expansions_from_DAG_,
+                        tree_t::create_S_expansions_from_DAG_handler,
+                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::create_T_expansions_from_DAG_,
+                        tree_t::create_T_expansions_from_DAG_handler,
+                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::edge_lists_,
+                        tree_t::edge_lists_handler,
+                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::instigate_dag_eval_,
+                        tree_t::instigate_dag_eval_handler,
+                        HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::termination_detection_,
+                        tree_t::termination_detection_handler,
+                        HPX_ADDR, HPX_POINTER, HPX_SIZE_T, HPX_POINTER,
+                        HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::destroy_DAG_LCOs_,
+                        tree_t::destroy_DAG_LCOs_handler,
+                        HPX_POINTER, HPX_SIZE_T);
 
     // Actions for the evaluation
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         evaluate_, evaluate_handler,
                         HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        source_bounds_, source_bounds_handler,
-                        HPX_ADDR, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        target_bounds_, target_bounds_handler,
-                        HPX_ADDR, HPX_SIZE_T);
+
   }
-
-
-  // NOTE: the arrays are marked const, even though the data will be sorted
-  // and modified in both cases (just a sort of sources). The array object is
-  // a reference. And so the reference passed in will not change. Only the
-  // data that it is referring to will change.
 
   /// Perform a multipole moment evaluation
   ///
@@ -239,13 +236,16 @@ class Evaluator {
   /// \param refinement_limint - the domain refinement limit
   /// \param method - a prototype of the method to use.
   /// \param expansion - a prototpe of the expansion to use.
+  /// \param distro - an instance of the distribution policy to use for this
+  ///                 execution.
   ///
   /// \returns - kSuccess on success; kRuntimeError if there is an error with
   ///            the runtime.
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
-                      const expansion_t &expansion) {
+                      const expansion_t &expansion,
+                      const distropolicy_t &distro = distropolicy_t { }) {
     // pack the arguments and call the action
     EvaluateParams args{ };
     args.sources = sources;
@@ -253,6 +253,7 @@ class Evaluator {
     args.refinement_limit = refinement_limit;
     args.method = method;
     args.n_digits = expansion.accuracy();
+    args.distro = distro;
 
     if (HPX_SUCCESS != hpx_run(&evaluate_, &args, sizeof(args))) {
       return kRuntimeError;
@@ -273,123 +274,53 @@ class Evaluator {
   struct EvaluateParams {
     Array<source_t> sources;
     Array<target_t> targets;
-    int refinement_limit;
+    size_t refinement_limit;
     method_t method;
     int n_digits;
-  };
-
-  /// The result of finding bounds
-  struct BoundsResult {
-    Point low;
-    Point high;
+    distropolicy_t distro;
   };
 
   /// The evaluation action implementation
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    bool same_sandt = parms->sources.data() == parms->targets.data();
-
-    // create source and target references
-    // NOTE: These will need to be updated once we change the way array works
+    // NOTE: These may need to be updated once we change the way array works
     // for distributed operation.
-    ArrayMetaData srcmeta;
-    hpx_gas_memget_sync(&srcmeta, parms->sources.data(), sizeof(srcmeta));
-    sourceref_t sources{srcmeta.data, srcmeta.count, srcmeta.count};
+    sourceref_t sources = parms->sources.ref();
+    targetref_t targets = parms->targets.ref();
 
-    ArrayMetaData trgmeta;
-    hpx_gas_memget_sync(&trgmeta, parms->targets.data(), sizeof(trgmeta));
-    targetref_t targets{trgmeta.data, trgmeta.count, trgmeta.count};
+    tree_t *tree = new tree_t{parms->method, parms->refinement_limit,
+                              parms->n_digits};
+    tree->partition(sources, targets);
 
-    // Get source bounds
-    hpx_addr_t srcbnd = hpx_lco_future_new(sizeof(BoundsResult));
-    assert(srcbnd != HPX_NULL);
-    hpx_call(srcmeta.data, source_bounds_, srcbnd,
-             &srcmeta.data, &srcmeta.count);
+    // NOTE: around here is where we can perform the table creation work,
+    // (Future feature)
 
-    BoundsResult bounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-    hpx_lco_get(srcbnd, sizeof(BoundsResult), &bounds);
-    hpx_lco_delete_sync(srcbnd);
+    DAG dag{};
+    tree->collect_DAG_nodes(dag);
+    // TODO: add a routine to remove pointless nodes from the DAG
+    parms->distro.compute_distribution(dag);
 
-    // get target bounds - if targets != sources
-    if (!same_sandt) {
-      hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
-      assert(trgbnd != HPX_NULL);
+    tree->create_expansions_from_DAG(parms->n_digits);
+#ifdef DOJSONOUTPUT
+    dag.toJSON("sample.json");
+#endif
 
-      hpx_call(trgmeta.data, target_bounds_, trgbnd,
-               &trgmeta.data, &trgmeta.count);
+    // NOTE: the previous has to finish for the following. So the previous
+    // is a synchronous operation. The next three, however, are not. They all
+    // get their work going when they come to it and then they return.
 
-      BoundsResult otherbounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-      hpx_lco_get(trgbnd, sizeof(BoundsResult), &otherbounds);
-      bounds.low.lower_bound(otherbounds.low);
-      bounds.high.upper_bound(otherbounds.high);
+    tree->setup_edge_lists(dag);
+    tree->start_DAG_evaluation();
+    hpx_addr_t alldone = tree->setup_termination_detection(dag);
 
-      hpx_lco_delete_sync(trgbnd);
-    }
-
-    // Get the overall domain
-    DomainGeometry domain{bounds.low, bounds.high, 1.0002};
-
-    // create source tree, wait for partitioning of source to finish,
-    // partition target tree.
-    sourcenode_t source_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_addr_t partition_done =
-      source_root.partition(sources, parms->refinement_limit, parms->n_digits);
-
-    targetnode_t target_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_lco_wait(partition_done);
-    hpx_lco_delete_sync(partition_done);
-
-    hpx_addr_t targetpartdone =
-      target_root.partition(targets, parms->refinement_limit,
-                            parms->n_digits, 0, same_sandt,
-                            std::vector<sourcenode_t>{source_root});
-
-
-    // deal with one pathological case:
-    expansionlco_t srootexpand = source_root.expansion();
-    hpx_lco_wait(srootexpand.data());
-
-    // deal with another pathological case:
-    hpx_lco_wait(targetpartdone);
-    hpx_lco_delete_sync(targetpartdone);
+    hpx_lco_wait(alldone);
+    hpx_lco_delete_sync(alldone);
 
     // clean up
-    source_root.destroy();
-    target_root.destroy();
+    tree->destroy_DAG_LCOs(dag);
+    delete tree;
 
     // return
     hpx_exit(HPX_SUCCESS);
-  }
-
-  /// The source bounds discovery action implementation.
-  static int source_bounds_handler(hpx_addr_t data, size_t count) {
-    source_t *user{nullptr};
-    assert(hpx_gas_try_pin(data, (void **)&user));
-
-    BoundsResult retval{Point{1.0e34, 1.0e34, 1.0e34},
-                        Point{-1.0e34, -1.0e34, -1.0e34}};
-
-    for (size_t i = 0; i < count; ++i) {
-      retval.low.lower_bound(user[i].position);
-      retval.high.upper_bound(user[i].position);
-    }
-
-    return HPX_THREAD_CONTINUE(retval);
-  }
-
-  /// The target bounds discovery action implementation.
-  static int target_bounds_handler(hpx_addr_t data, size_t count) {
-    target_t *user{nullptr};
-    assert(hpx_gas_try_pin(data, (void **)&user));
-
-    BoundsResult retval{Point{1.0e34, 1.0e34, 1.0e34},
-                        Point{-1.0e34, -1.0e34, -1.0e34}};
-
-    for (size_t i = 0; i < count; ++i) {
-      retval.low.lower_bound(user[i].position);
-      retval.high.upper_bound(user[i].position);
-    }
-
-    return HPX_THREAD_CONTINUE(retval);
   }
 };
 
@@ -397,20 +328,10 @@ class Evaluator {
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::evaluate_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::source_bounds_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::target_bounds_ = HPX_ACTION_NULL;
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Evaluator<S, T, E, M, D>::evaluate_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

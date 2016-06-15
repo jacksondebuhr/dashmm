@@ -16,7 +16,7 @@
 #define __DASHMM_TYPES_H__
 
 
-/// \file include/types.h
+/// \file include/dashmm/types.h
 /// \brief Basic type definitions used throughout DASHMM
 
 
@@ -46,6 +46,7 @@ enum ReturnCode {
 };
 
 
+/// Alias to standard library complex number type
 using dcomplex_t = std::complex<double>;
 
 
