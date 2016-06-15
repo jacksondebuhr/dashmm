@@ -1,6 +1,5 @@
 THIS BRANCH TODO
 TODO: Look at TODO in the code, and address where possible
-TODO: Merge dagsplit with dev.
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
           Basically, leave it better than you found it.
