@@ -39,15 +39,9 @@
 
 namespace dashmm {
 
-/*
+
 namespace {
 
-class FullDAGEdge {
- public:
-  const DAGNode *source;
-  const DAGNode *target;
-  Operation op;
-};
 
 enum class NodeType {
   Source,
@@ -57,12 +51,14 @@ enum class NodeType {
   Unknown
 };
 
+
 class Edge {
  public:
   int source;
   int target;
   Operation op;
 };
+
 
 class Node {
  public:
@@ -73,6 +69,7 @@ class Node {
 
   Node() : id{""}, type{NodeType::Unknown}, locality{-1}, depth{0} { }
 };
+
 
 std::string node_type_to_print(NodeType type) {
   switch (type) {
@@ -93,6 +90,7 @@ std::string node_type_to_print(NodeType type) {
   }
   return std::string("ERROR");
 }
+
 
 std::string edge_code_to_print(Operation op) {
   switch (op) {
@@ -128,66 +126,6 @@ std::string edge_code_to_print(Operation op) {
 }
 
 
-NodeType edge_type_to_node_type(Operation op) {
-  switch (op) {
-    case Operation::Nop:
-      return NodeType::Unknown;
-      break;
-    case Operation::StoM:
-      return NodeType::Source;
-      break;
-    case Operation::StoL:
-      return NodeType::Source;
-      break;
-    case Operation::MtoM:
-      return NodeType::Multipole;
-      break;
-    case Operation::MtoL:
-      return NodeType::Multipole;
-      break;
-    case Operation::LtoL:
-      return NodeType::Local;
-      break;
-    case Operation::MtoT:
-      return NodeType::Multipole;
-      break;
-    case Operation::LtoT:
-      return NodeType::Local;
-      break;
-    case Operation::StoT:
-      return NodeType::Source;
-      break;
-  }
-  return NodeType::Unknown;
-}
-
-
-void collect_full_edges_from_vector(std::vector<DAGNode *> &nodes,
-                                    std::vector<FullDAGEdge> &edges) {
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    for (size_t j = 0; j < nodes[i]->out_edges.size(); ++j) {
-      edges.emplace_back(
-        FullDAGEdge{nodes[i], nodes[i]->out_edges[j].target,
-                    nodes[i]->out_edges[j].op}
-      );
-    }
-  }
-}
-
-
-std::vector<FullDAGEdge> collect_full_dag_edges(
-    std::vector<DAGNode *> &source, std::vector<DAGNode *> &target,
-    std::vector<DAGNode *> &internal) {
-  std::vector<FullDAGEdge> retval{};
-
-  collect_full_edges_from_vector(source, retval);
-  collect_full_edges_from_vector(internal, retval);
-  collect_full_edges_from_vector(target, retval);
-
-  return retval;
-}
-
-
 void add_dagnode_to_index_entries(std::vector<DAGNode *> &nodes,
                                   std::map<const DAGNode *, int> &dtoi) {
   for (size_t i = 0; i < nodes.size(); ++i) {
@@ -195,73 +133,76 @@ void add_dagnode_to_index_entries(std::vector<DAGNode *> &nodes,
   }
 }
 
-std::map<const DAGNode *, int> create_dagnode_to_index(
-    std::vector<DAGNode *> &source, std::vector<DAGNode *> &target,
-    std::vector<DAGNode *> &internal) {
+
+std::map<const DAGNode *, int> create_dagnode_to_index(DAG &dag) {
   std::map<const DAGNode *, int> retval{};
   retval[nullptr] = 0;    // we use nullptr for the count
 
-  add_dagnode_to_index_entries(source, retval);
-  add_dagnode_to_index_entries(internal, retval);
-  add_dagnode_to_index_entries(target, retval);
+  add_dagnode_to_index_entries(dag.source_leaves, retval);
+  add_dagnode_to_index_entries(dag.source_nodes, retval);
+  add_dagnode_to_index_entries(dag.target_nodes, retval);
+  add_dagnode_to_index_entries(dag.target_leaves, retval);
 
   return retval;
 }
 
 
+void append_out_edges(std::map<const DAGNode *, int> &dtoi,
+                      const std::vector<DAGNode *> &nodes,
+                      std::vector<Edge> &edges) {
+  // loop over the nodes
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    // loop over the out edges
+    std::vector<DAGEdge> &out = nodes[i]->out_edges;
+    for (size_t j = 0; j < out.size(); ++j) {
+      edges.emplace_back(
+        Edge{dtoi[out[j].source], dtoi[out[j].target], out[j].op}
+      );
+    }
+  }
+}
+
+
 std::vector<Edge> create_edges(std::map<const DAGNode *, int> &dtoi,
-                               std::vector<FullDAGEdge> &edges) {
+                               DAG &dag) {
   std::vector<Edge> retval{};
 
-  for (size_t i = 0; i < edges.size(); ++i) {
-    retval.emplace_back(
-      Edge{dtoi[edges[i].source], dtoi[edges[i].target], edges[i].op}
-    );
-  }
+  append_out_edges(dtoi, dag.source_leaves, retval);
+  append_out_edges(dtoi, dag.source_nodes, retval);
+  append_out_edges(dtoi, dag.target_nodes, retval);
+  // No target_leaves, as they have no out edges
 
   return retval;
 }
 
 
 std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
-                               std::vector<DAGNode *> &source,
-                               std::vector<DAGNode *> &target,
-                               std::vector<DAGNode *> &internal) {
+                               DAG &dag) {
   std::vector<Node> retval(dtoi.size() - 1);
-  for (size_t i = 0; i < source.size(); ++i) {
-    retval[dtoi[source[i]]].type = NodeType::Source;
-    retval[dtoi[source[i]]].locality = source[i]->locality;
+
+  for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
+    retval[dtoi[dag.source_leaves[i]]].type = NodeType::Source;
+    retval[dtoi[dag.source_leaves[i]]].locality
+        = dag.source_leaves[i]->locality;
   }
-  for (size_t i = 0; i < internal.size(); ++i) {
-    retval[dtoi[internal[i]]].locality = internal[i]->locality;
+  for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
+    retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
+    retval[dtoi[dag.source_nodes[i]]].locality = dag.source_nodes[i]->locality;
   }
-  for (size_t i = 0; i < target.size(); ++i) {
-    retval[dtoi[target[i]]].type = NodeType::Target;
-    retval[dtoi[target[i]]].locality = target[i]->locality;
+  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
+    retval[dtoi[dag.target_nodes[i]]].type = NodeType::Local;
+    retval[dtoi[dag.target_nodes[i]]].locality = dag.target_nodes[i]->locality;
+  }
+  for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
+    retval[dtoi[dag.target_leaves[i]]].type = NodeType::Target;
+    retval[dtoi[dag.target_leaves[i]]].locality
+        = dag.target_leaves[i]->locality;
   }
   return retval;
 }
 
 
-void compute_internal_types(std::map<const DAGNode *, int> &dtoi,
-                            std::vector<DAGNode *> &internals,
-                            std::vector<Node> &nodes) {
-  // loop over the internals and see if there are edges that make it
-  // clear which is which - if there are not out edges, this is likely
-  // L from a BH run - actually, the source root gets incorrectly identified
-  // this way
-  //TODO fix that source root problem
-  for (size_t i = 0; i < internals.size(); ++i) {
-    if (internals[i]->out_edges.size()) {
-      nodes[dtoi[internals[i]]].type
-          = edge_type_to_node_type(internals[i]->out_edges[0].op);
-    } else {
-      nodes[dtoi[internals[i]]].type = NodeType::Local;
-    }
-  }
-}
-
-
+// TODO make this actually do the depth
 void compute_depths(std::vector<Node> &nodes, int &n_src, int &n_trg) {
   int source_num{1};
   int target_num{1};
@@ -362,32 +303,22 @@ void print_json(std::vector<Node> &nodes, std::vector<Edge> &edges,
 } // unnamed namespace
 
 
-void output_dag_as_JSON(std::vector<DAGNode *> &source,
-                        std::vector<DAGNode *> &target,
-                        std::vector<DAGNode *> &internal) {
+void DAG::toJSON(std::string fname) {
   // Create a mapping from DAGNode * to index
-  auto dagnode_to_index = create_dagnode_to_index(source, target, internal);
+  auto dagnode_to_index = create_dagnode_to_index(*this);
 
   // Create the edge records
-  auto full_edges = collect_full_dag_edges(source, target, internal);
-  std::vector<Edge> E = create_edges(dagnode_to_index, full_edges);
+  std::vector<Edge> E = create_edges(dagnode_to_index, *this);
 
   // Get the nodes made
-  std::vector<Node> N = create_nodes(dagnode_to_index, source, target,
-                                     internal);
-  compute_internal_types(dagnode_to_index, internal, N);
+  std::vector<Node> N = create_nodes(dagnode_to_index, *this);
+
   int n_s, n_t;
   compute_depths(N, n_s, n_t);
   create_unique_node_ids(N);
 
   // output
   print_json(N, E, n_s, n_t);
-}
-*/
-
-
-void DAG::toJSON(std::string fname) {
-  // TODO
 }
 
 
