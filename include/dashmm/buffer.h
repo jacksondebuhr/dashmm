@@ -71,7 +71,7 @@ class ReadBuffer : public Buffer {
   }
 
   template <typename T>
-  T *interpret_advance() {
+  T *interpret() {
     T *retval = reinterpret_cast<T *>(cursor());
     if (!advance(sizeof(T))) {
       retval = nullptr;
