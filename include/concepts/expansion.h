@@ -43,65 +43,68 @@ class Expansion {
   /// bytes argument allows for variable length expansions in DASHMM.
   ///
   /// Further, this constructor needs to be able to operate in a 'shallow'
-  /// mode, where ptr = nullptr. This allows for situations where Expansion
-  /// is needed, but the specific data for the expansion is not. The exemplar of
-  /// this use is to perform an S->T operation.
-  ///
-  /// Again, n_digits is a required argument, but it can be ignored.
-  Expansion(void *ptr, size_t bytes, int n_digits)
+  /// mode, where views contains no views. This allows for situations where
+  /// Expansion is needed, but the specific data for the expansion is not.
+  /// The exemplar of this use is to perform an S->T operation. The expansion
+  /// will get a value for n_digits from the provided ViewSet.
+  Expansion(ViewSet &views);
 
   /// The destructor should delete the allocated memory of the object. In the
   /// simplest style of implementation, this means that only if the object
-  /// is valid() will the destructor delete any memory.
+  /// is valid() for any of its views should the object delete any data.
   ~Expansion();
 
   /// Release the internal data for an expansion
   ///
   /// Expansion objects need to support the ability to export the data making
-  /// up the expansion in a contiguous chunk of memory. These serialized
-  /// versions of the expansion are used throughout the system. When release
-  /// is called, the expansion object is then 'empty' in a sense, and the
-  /// expansion no longer owns any data.
-  ///
-  /// At the beginning of the serialized version of the expansion must be
-  /// two integers. The first is a code that will be used internally by
-  /// DASHMM and does not need to be given a value. The second is the integer
-  /// given as the n_digits in the construction of the specific instance of
-  /// the object.
-  ///
-  /// The caller of this function assumes ownership of the released data,
-  /// and it is the caller's responsibility to release the data. This should be
-  /// done with delete [], as the memory will have been allocated with
-  /// new char [some_size].
+  /// up the expansion into a given buffer (see view() below). Further,
+  /// Expansion objects need to be able to be constructed in a shallow way
+  /// from existing data. release() will break the association of the object
+  /// with the data serving one or more valid views. When an Expansion is
+  /// created from existing data, that data is owned by some other object or
+  /// context, and for this object to free that memory would be an error.
   ///
   /// After having been released, this object must report false when valid() is
   /// invoked.
   ///
   /// The simplest way to implement this is to have the object store a pointer
   /// to memory allocated on the heap (cast from new char [size]). And then
-  /// release() will just return that pointer, and set this objects member to
-  /// nullptr.
-  void *release();
+  /// release() will just set this objects member to nullptr.
+  void release();
 
-  /// The size in bytes of the serialized expansion data
-  size_t bytes() const;
-
-  /// Returns if the expansion is valid.
+  /// Returns if the indicated views are valid
   ///
   /// An expansion is valid if it has data associated with it. After calling
   /// release(), an expansion will be invalidated.
-  bool valid() const;
+  bool valid(const ViewSet &view) const;
+
+  /// Return the current number of views for the object.
+  ///
+  /// This will either be the full number for a directly created object, or
+  /// it will be a smaller number if the object is created from a ViewSet.
+  int view_count() const;
+
+  /// Fill in the data for a view object
+  ///
+  /// Given a ViewSet that contains the view indices, this will populate the
+  /// bytes and data members for the ViewSet. Note that this does not mean a
+  /// copy will be made of the data, but merely that the data pointers will be
+  /// valid.
+  void get_views(ViewSet &view) const;
+
+  /// Get all the current views of the object
+  ViewSet get_all_views() const;
 
   /// Returns the accuracy of the expansion - this is the number given to the
   /// constructor as n_digits, or is some nonsense value if n_digits is not
   /// used.
   int accuracy() const;
 
-  /// The number of terms in the expansion.
-  size_t size() const;
-
   /// The point around which the expansion is defined.
   Point center() const;
+
+  /// The number of terms in the expansion.
+  size_t view_size(int view) const;
 
   /// Get a term of the expansion.
   ///
@@ -114,7 +117,7 @@ class Expansion {
   /// \returns - the complex double version of the term; real expansions should
   ///            nevertheless return terms as a complex number for compatibility
   ///            with complex expansions.
-  dcomplex_t term(size_t i) const;
+  dcomplex_t view_term(int view, size_t i) const;
 
 
   /// Create a multipole expansion for a given set of source points
@@ -146,6 +149,7 @@ class Expansion {
                                       source_t *first, source_t *last,
                                       double scale) const;
 
+  // TODO
   /// Change center of a multipole expansion
   ///
   /// This will convert a multipole expansion of a child node to a multipole
@@ -160,6 +164,7 @@ class Expansion {
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const;
 
+  // TODO
   /// Convert a multipole to a local expansion
   ///
   /// This will convert a multipole expansion in the source tree into
@@ -173,6 +178,7 @@ class Expansion {
   std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
                                       Index t_index) const;
 
+  // TODO
   /// Convert a local expansion to a local expansion for a child
   ///
   /// This converts the local expansion of a parent node into a local expansion
@@ -186,6 +192,7 @@ class Expansion {
   std::unique_ptr<expansion_t> L_to_L(int to_child,
                                       double t_size) const;
 
+  // TODO
   /// Apply a multipole expansion to a set of targets
   ///
   /// \param first - the first target point
@@ -193,6 +200,7 @@ class Expansion {
   /// \param scale - scaling factor (one over the size of source box)
   void M_to_T(target_t *first, target_t *last, double scale) const;
 
+  // TODO
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
@@ -208,6 +216,16 @@ class Expansion {
   /// \param t_last - one past the last target point
   void S_to_T(source_t *s_first, source_t *s_last,
               target_t *t_first, target_t *t_last) const;
+
+  // TODO - make sure these are all; finish writeup
+  //
+  // I think the plan here is to not have to worry about views for the
+  // operations. The various operations get their indices, and if the needed
+  // views are not available, it should just have some error. Probably an
+  // assertion failure to start.
+  void M_to_I(Index s_index) const;
+  void I_to_I(Index s_index, Index t_index) const;
+  void I_to_L(Index t_index) const;
 
   /// Add an expansion to this expansion
   ///

@@ -78,7 +78,9 @@ class TargetLCO {
   /// Construct from an existing LCO
   TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
 
-  // TODO fix this design flaw <--- what do I mean here?
+  // TODO fix this design flaw
+  //  That I need an overload of this constructor is a bit annoying. Not sure
+  //  if this is a big problem, but it is worth looking into.
   TargetLCO(hpx_addr_t data, int n_targs) {
     lco_ = data;
     n_targs_ = (size_t)n_targs;
@@ -216,7 +218,9 @@ class TargetLCO {
   ///
   /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
-    int *code = static_cast<int *>(rhs);
+    ReadBuffer readbuf{rhs, bytes};
+    int *code = readbuf.interpret<int>();
+
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
@@ -237,7 +241,7 @@ class TargetLCO {
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kMtoT) {
-      MtoT *input = static_cast<MtoT *>(rhs);
+      MtoT *input = readbuf.interpret<MtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -246,13 +250,15 @@ class TargetLCO {
       // as the actual target data.
       assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{input->data, input->bytes, input->n_digits};
+      ViewSet views{};
+      views.interpret(readbuf);
+      expansion_t expand{views};
       expand.M_to_T(targets, &targets[lhs->targets.n()], input->scale);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
-      LtoT *input = static_cast<LtoT *>(rhs);
+      LtoT *input = readbuf.interpret<LtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -261,7 +267,9 @@ class TargetLCO {
       // as the actual target data.
       assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{input->data, input->bytes, input->n_digits};
+      ViewSet views{};
+      views.interpret(readbuf);
+      expansion_t expand{views};
       expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
       expand.release();
 

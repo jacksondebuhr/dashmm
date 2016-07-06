@@ -26,6 +26,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arrayref.h"
+#include "dashmm/buffer.h"
 #include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/index.h"
@@ -33,6 +34,7 @@
 #include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/types.h"
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {
@@ -105,7 +107,8 @@ class ExpansionLCO {
                hpx_addr_t where) {
     assert(expand != nullptr);
 
-    size_t bytes = expand->bytes();
+    ViewSet views = expand->get_all_views();
+    size_t bytes = views.bytes();
     size_t total_size = sizeof(Header) + bytes + sizeof(OutEdgeRecord) * n_out;
 
     Header *input_data = reinterpret_cast<Header *>(new char[total_size]);
@@ -116,8 +119,8 @@ class ExpansionLCO {
     input_data->out_edge_count = n_out;
 
     int n_digits = expand->accuracy();
-    char *ldata = reinterpret_cast<char *>(expand->release());
-    memcpy(input_data->payload, ldata, bytes);
+    WriteBuffer inbuf{input_data->payload, bytes};
+    views.serialize(inbuf);
 
     hpx_addr_t retval{HPX_NULL};
     hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
@@ -220,12 +223,29 @@ class ExpansionLCO {
   /// \param bytes - the size of the input serialized expansion
   /// \param payload - the serialized expansion data
   void contribute(std::unique_ptr<expansion_t> &&expand) {
-    size_t bytes = expand->bytes();
-    char *payload = static_cast<char *>(expand->release());
-    int *code = reinterpret_cast<int *>(payload);
-    code[0] = SetOpCodes::kContribute;
-    hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
-    delete [] payload;
+    ViewSet views = expand->get_all_views();
+    size_t bytes = views.bytes();
+
+    hpx_parcel_t *parc = hpx_parcel_acquire(nullptr, bytes + sizeof(int));
+    assert(parc != nullptr);
+
+    hpx_parcel_set_action(parc, hpx_lco_set_action);
+    hpx_parcel_set_target(parc, data_);
+
+    WriteBuffer parcbuf{hpx_parcel_get_data(parc), bytes + sizeof(int)};
+
+    int opcode = SetOpCodes::kContribute;
+    parcbuf.write(&opcode, sizeof(opcode));
+    views.serialize(parcbuf);
+
+    // TODO: Is this correct?
+    // We do not need local completion because we do not own this parcel, so
+    // we will not delete it. And so since we are already copied into the
+    // parcel, we can go ahead and move on with life.
+    hpx_parcel_send(parc, HPX_NULL);
+
+    // NOTE: No release is needed. The argument will go out of scope at this
+    // point, and the data will be freed.
   }
 
   /// Set the out edge data for this expansion LCO
@@ -286,21 +306,6 @@ class ExpansionLCO {
     Index tidx;
   };
 
-  /// Marshalled parameter type for m_to_l_
-  struct MtoLParams {
-    size_t bytes;
-    int n_digits;
-    Index index;
-    char payload[];
-  };
-
-  /// Marshalled parameter type for l_to_l_
-  struct LtoLParams {
-    size_t bytes;
-    int n_digits;
-    char payload[];
-  };
-
   /// Operation codes for the LCOs set operation
   enum SetOpCodes {
     kContribute,
@@ -328,20 +333,26 @@ class ExpansionLCO {
   /// Set will either save the out edges, or add the input expansion to
   /// the expansion stored in this LCO.
   static void operation_handler(Header *lhs, void *rhs, size_t bytes) {
-    int *code = static_cast<int *>(rhs);
+    ReadBuffer input{static_cast<char *>(rhs), bytes};
+
+    int *code = input.interpret<int>();
 
     // decrement the counter
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
-    switch (code[0]) {
+    switch (*code) {
       case SetOpCodes::kContribute:
         {
-          expansion_t incoming{rhs, bytes, code[1]};
+          ViewSet views{};
+          views.interpret(input);
+          expansion_t incoming{views};
 
           // create the expansion from the payload
-          int *n_digits = reinterpret_cast<int *>(lhs->payload + sizeof(int));
-          expansion_t expand{lhs->payload, lhs->expansion_size, *n_digits};
+          ReadBuffer here{lhs->payload, lhs->expansion_size};
+          ViewSet here_views{};
+          here_views.interpret(here);
+          expansion_t expand{here_views};
 
           // add the one to the other
           expand.add_expansion(&incoming);
@@ -353,13 +364,15 @@ class ExpansionLCO {
         break;
       case SetOpCodes::kOutEdges:
         {
-          int n_edges = code[1];
-          // usage check
+          int n_edges{};
+          input.read(&n_edges);
+
+          // Usage Check
           assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
 
-          char *dest = &lhs->payload[lhs->expansion_size];
-          char *offset = static_cast<char *>(rhs) + sizeof(int) * 2;
-          memcpy(dest, offset, sizeof(OutEdgeRecord) * n_edges);
+          WriteBuffer dest{&lhs->payload[lhs->expansion_size],
+                           sizeof(OutEdgeRecord) * n_edges};
+          dest.write(input);
         }
 
         break;
@@ -423,9 +436,9 @@ class ExpansionLCO {
   static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {
-    expansion_t local{nullptr, 0, n_digits};
-    std::unique_ptr<expansion_t> multi = std::move(
-      local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale));
+    expansion_t local{ViewSet{n_digits}};
+    auto multi = local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src],
+                              scale));
 
     expansionlco_t total{expand, n_digits};
     total.contribute(std::move(multi));
@@ -436,7 +449,7 @@ class ExpansionLCO {
   static int s_to_l_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {
-    expansion_t local{nullptr, 0, n_digits};
+    expansion_t local{ViewSet{n_digits}};
     auto multi = local.S_to_L(Point{cx, cy, cz}, sources, &sources[n_src],
                               scale);
 
@@ -451,7 +464,9 @@ class ExpansionLCO {
     double s_size = geo->size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
-    expansion_t lexp{head->payload, head->expansion_size, n_digits};
+    ViewSet views{};
+    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    expansion_t lexp{views};
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
 
@@ -465,7 +480,9 @@ class ExpansionLCO {
     double s_size = geo->size_from_level(head->index.level());
 
     // translate the source expansion
-    expansion_t lexp{head->payload, head->expansion_size, n_digits};
+    ViewSet views{};
+    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    expansion_t lexp{views};
     auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
 
@@ -479,7 +496,9 @@ class ExpansionLCO {
     LocalData<DomainGeometry> geo = head->domain.value();
     double t_size = geo->size_from_level(tidx.level());
 
-    expansion_t lexp{head->payload, head->expansion_size, n_digits};
+    ViewSet views{};
+    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
 
