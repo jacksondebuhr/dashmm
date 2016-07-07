@@ -20,6 +20,7 @@
 /// \brief Declaration of LaplaceCOM
 
 
+#include <cassert>
 #include <cmath>
 #include <complex>
 #include <memory>
@@ -28,6 +29,7 @@
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/types.h"
+#include "dashmm/viewset.h"
 
 
 // NOTE: Built-in Methods and Expansions will be part of the dashmm namespace.
@@ -36,8 +38,6 @@ namespace dashmm {
 
 
 struct LaplaceCOMData {
-  int reserved;
-  int n_digits; // unused
   double mtot;
   double xcom[3];
   double Q[6];
@@ -71,11 +71,10 @@ class LaplaceCOM {
   using target_t = Target;
   using expansion_t = LaplaceCOM<Source, Target>;
 
-  LaplaceCOM(Point center, int n_digits) {
+  LaplaceCOM(Point center, int n_digits, ExpansionRole role) {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
     assert(valid());
-    data_->n_digits = -1; // unused
     data_->mtot = 0.0;
     data_->xcom[0] = 0.0;
     data_->xcom[1] = 0.0;
@@ -88,9 +87,13 @@ class LaplaceCOM {
     data_->Q[5] = 0.0;
   }
 
-  LaplaceCOM(void *ptr, size_t bytes, int n_digits)
-      : data_{static_cast<LaplaceCOMData *>(ptr)},
-        bytes_{sizeof(LaplaceCOMData)} { }
+  LaplaceCOM(ViewSet &views) {
+    assert(views.count() < 2);
+    bytes_ = sizeof(LaplaceCOMData);
+    if (views.count() == 1) {
+      data_ = reinterpret_cast<LaplaceCOMData *>(views.view_data(0));
+    }
+  }
 
   ~LaplaceCOM() {
     if (valid()) {
@@ -99,26 +102,53 @@ class LaplaceCOM {
     }
   }
 
-  void *release() {
-    LaplaceCOMData *retval = data_;
+  void release() {
     data_ = nullptr;
+  }
+
+  bool valid(const ViewSet &view) const {
+    assert(view.count() < 2);
+    return data_ != nullptr;
+  }
+
+  int view_count() const {
+    if (data_) return 1;
+    return 0;
+  }
+
+  void get_views(ViewSet &view) const {
+    assert(view.count() < 2);
+    if (view.count() > 0) {
+      view.set_bytes(0, sizeof(LaplaceCOMData));
+      view.set_data(0, data_);
+    }
+    view.set_n_digits(-1);
+    view.set_role(kSourcePrimary);
+  }
+
+  ViewSet get_all_views() const {
+    ViewSet retval{};
+    retval.add_view(0);
+    get_views(retval);
     return retval;
   }
 
-  size_t bytes() const {return bytes_;}
-
-  bool valid() const {return data_ != nullptr;}
-
   int accuracy() const {return -1;}
 
-  size_t size() const {return 10;}
+  ExpansionRole role() const {return kSourcePrimary;}
 
   Point center() const {
     assert(valid());
     return Point{data_->xcom[0], data_->xcom[1], data_->xcom[2]};
   }
 
-  dcomplex_t term(size_t i) const {
+  size_t view_size(int view) const {
+    assert(view == 0);
+    return 10;
+  }
+
+  dcomplex_t view_term(int view, size_t i) const {
+    assert(view == 0);
     if (i == 0) {
       return dcomplex_t{data_->mtot};
     } else if (i < 4) {
@@ -130,7 +160,8 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
                                       double scale) const {
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0);
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+                                        kSourcePrimary);
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
     temp->calc_Q(first, last);
@@ -146,7 +177,8 @@ class LaplaceCOM {
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
     assert(valid());
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0);
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+                                        kSourcePrimary);
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
     temp->set_Q(data_->Q);
@@ -207,6 +239,18 @@ class LaplaceCOM {
 
       targ->phi += dcomplex_t{sum};
     }
+  }
+
+  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
   }
 
   void add_expansion(const expansion_t *temp1) {

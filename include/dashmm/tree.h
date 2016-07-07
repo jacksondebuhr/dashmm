@@ -787,7 +787,7 @@ class Tree {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
     std::unique_ptr<expansion_t> input_expand{
-      new expansion_t{n_center, n_digits}
+      new expansion_t{n_center, n_digits, kSourcePrimary}
     };
     expansionlco_t expand(node->dag.normal()->in_edges.size(),
                           node->dag.normal()->out_edges.size(),
@@ -795,8 +795,18 @@ class Tree {
                           HPX_THERE(node->dag.normal()->locality));
     node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
 
-    // NOTE: this is where we would make the intermediate expansion, but that
-    // is not supported just yet.
+    // If there is to be an intermediate expansion, create that
+    if (node->dag.has_interm()) {
+      std::unique_ptr<expansion_t> interm_expand{
+        new expansion_t{n_center, n_digits, kSourceIntermediate}
+      };
+      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+                                node->dag.interm()->out_edges.size(),
+                                tree->domain_, node->idx,
+                                std::move(interm_expand),
+                                HPX_THERE(node->dag.interm()->locality));
+      node->dag.set_interm_expansion(intexp_lco.lco(), intexp_lco.accuracy());
+    }
 
     // spawn work at children
     int n_children{node->n_children()};
@@ -830,7 +840,7 @@ class Tree {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
     std::unique_ptr<expansion_t> input_expand{
-      new expansion_t{n_center, n_digits}
+      new expansion_t{n_center, n_digits, kTargetPrimary}
     };
     expansionlco_t expand(node->dag.normal()->in_edges.size(),
                           node->dag.normal()->out_edges.size(),
@@ -838,8 +848,18 @@ class Tree {
                           HPX_THERE(node->dag.normal()->locality));
     node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
 
-    // NOTE: this is where we would make the intermediate expansion, but that
-    // is not supported just yet.
+    // If there is to be an intermediate expansion, create that
+    if (node->dag.has_interm()) {
+      std::unique_ptr<expansion_t> interm_expand{
+        new expansion_t{n_center, n_digits, kTargetIntermediate}
+      };
+      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+                                node->dag.interm()->out_edges.size(),
+                                tree->domain_, node->idx,
+                                std::move(interm_expand),
+                                HPX_THERE(node->dag.interm()->locality));
+      node->dag.set_interm_expansion(intexp_lco.lco(), intexp_lco.accuracy());
+    }
 
     // spawn work at children
     int n_children{node->n_children()};

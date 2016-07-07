@@ -15,6 +15,13 @@ void ViewSet::destroy() {
 }
 
 
+void ViewSet::clear() {
+  views_.clear();
+  n_digits_ = -1;
+  role_ = kNoRoleNeeded;
+}
+
+
 void ViewSet::add_view(int index) {
   add_view(index, 0, nullptr);
 }
@@ -31,7 +38,7 @@ size_t ViewSet::bytes() const {
     retval += views_[i].bytes;
   }
 
-  retval += 2 * sizeof(int);  // for count and n_digits
+  retval += 3 * sizeof(int);  // for count and n_digits and role
   retval += views_.size() * sizeof(int);
   retval += views_.size() * sizeof(size_t);
 
@@ -41,6 +48,9 @@ size_t ViewSet::bytes() const {
 
 void ViewSet::serialize(WriteBuffer &buffer) {
   bool e = buffer.write(&n_digits_, sizeof(n_digits_));
+  assert(e);
+  int rtemp = role_;  // control the size of the output
+  e = buffer.write(&rtemp, sizeof(rtemp));
   assert(e);
   e = buffer.write(count());
   assert(e);
@@ -67,6 +77,11 @@ void ViewSet::interpret(ReadBuffer &buffer) {
 
   bool e = buffer.read(&n_digits_);
   assert(e);
+
+  int rtemp{};
+  e = buffer.read(&rtemp);
+  assert(e);
+  role_ = rtemp;
 
   int ct{0};
   e = buffer.read(&ct, sizeof(ct));

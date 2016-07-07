@@ -41,6 +41,9 @@ enum class Operation {
   MtoT,
   LtoT,
   StoT,
+  MtoI,
+  ItoI,
+  ItoL
 };
 
 
@@ -337,6 +340,43 @@ class DAGInfo {
     assert(source->has_parts());
     assert(has_parts());
     link_nodes(source, source->parts_, this, parts_, Operation::StoT);
+  }
+
+  /// Create an M->I link in the DAG
+  ///
+  /// This will connect the normal DAG node of the given object to this
+  /// object's intermediate DAG node with an M->I edge.
+  ///
+  /// \param source - the DAGInfo object containing the normal node in
+  ///                 question
+  void MtoI(DAGInfo *source) {
+    assert(has_interm());
+    link_nodes(source, source->normal_, this, interm_, Operation::MtoI);
+  }
+
+  /// Create an I->I link in the DAG
+  ///
+  /// This will connect the intermediate DAG node of the given object to this
+  /// object's intermediate DAG node with an I->I edge.
+  ///
+  /// \param source - the DAGInfo object containing the intermediate node in
+  ///                 question
+  void ItoI(DAGInfo *source) {
+    assert(has_interm());
+    assert(source->has_interm());
+    link_nodes(source, source->interm_, this, interm_, Operation::ItoI);
+  }
+
+  /// Create an I->L link in the DAG
+  ///
+  /// This will connect the intermediate DAG node of the given object to this
+  /// object's normal DAG node with an I->L edge.
+  ///
+  /// \param source - the DAGInfo object containing the intermediate node in
+  ///                 question
+  void ItoL(DAGInfo *source) {
+    assert(source->has_interm());
+    link_nodes(source, source->interm_, this, normal_, Operation::ItoL);
   }
 
   /// Collect the DAG nodes from this object

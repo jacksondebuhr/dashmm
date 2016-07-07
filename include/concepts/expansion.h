@@ -18,6 +18,26 @@
 /// Expansion concept.
 
 
+/*
+
+TODO: Think about this more
+
+We have this whole view thing set up, but is that really what we need?
+Perhaps we are always going to send all of the active views. When I call
+M->I, it will create a new Expansion with only the relevant views. And then
+we will go ahead and interpret at the far end all of that. So perhaps we always
+send every extant view. It is just that the Expansion operation implementations
+need to be able to create expansions with only a subset of possible views.
+
+So the operations that create incomplete (meaning only a subset of views are
+valid) expansions will just need to be served by some internal stuff.
+
+The one final problem is how to specify what sort of expansion this will be
+using the center, n_digits mode of operation.
+
+*/
+
+
 /// Expansions in DASHMM are template classes parameterized over the types of
 /// the sources and targets. A full description of the requirements of the
 /// Source and Target types can be found elsewhere.
@@ -37,7 +57,7 @@ class Expansion {
   /// accuracy parameter. For FMM, this might be the number of digits
   /// requested. The type is not obligated to use either of these parameters,
   /// but the type must provide a constructor of this form.
-  Expansion(Point center, int n_digits);
+  Expansion(Point center, int n_digits, ExpansionRole role);
 
   /// The second creates the expansion from previously existing data. The
   /// bytes argument allows for variable length expansions in DASHMM.
@@ -48,6 +68,14 @@ class Expansion {
   /// The exemplar of this use is to perform an S->T operation. The expansion
   /// will get a value for n_digits from the provided ViewSet.
   Expansion(ViewSet &views);
+
+  /// Likely, an Expansion will need a third constructor as well. This
+  /// takes a ViewSet but does allocation for the views. This is to allow
+  /// for operations to only return subsets of the views of an expansion
+  /// if only a subset is needed. This constructor would only be called
+  /// from user code inside the Expansion's implementation, and would only
+  /// be needed if there are multiple views in an expansion.
+  Expansion(Point center, int n_digits, ExpansionRole role, ViewSet &views);
 
   /// The destructor should delete the allocated memory of the object. In the
   /// simplest style of implementation, this means that only if the object
@@ -76,6 +104,8 @@ class Expansion {
   ///
   /// An expansion is valid if it has data associated with it. After calling
   /// release(), an expansion will be invalidated.
+  ///
+  /// If view is empty, check all existing views
   bool valid(const ViewSet &view) const;
 
   /// Return the current number of views for the object.
@@ -99,6 +129,9 @@ class Expansion {
   /// constructor as n_digits, or is some nonsense value if n_digits is not
   /// used.
   int accuracy() const;
+
+  /// Get the role of this expansion
+  ExpansionRole role() const;
 
   /// The point around which the expansion is defined.
   Point center() const;
@@ -149,7 +182,6 @@ class Expansion {
                                       source_t *first, source_t *last,
                                       double scale) const;
 
-  // TODO
   /// Change center of a multipole expansion
   ///
   /// This will convert a multipole expansion of a child node to a multipole
@@ -164,7 +196,6 @@ class Expansion {
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const;
 
-  // TODO
   /// Convert a multipole to a local expansion
   ///
   /// This will convert a multipole expansion in the source tree into
@@ -178,7 +209,6 @@ class Expansion {
   std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
                                       Index t_index) const;
 
-  // TODO
   /// Convert a local expansion to a local expansion for a child
   ///
   /// This converts the local expansion of a parent node into a local expansion
@@ -192,7 +222,6 @@ class Expansion {
   std::unique_ptr<expansion_t> L_to_L(int to_child,
                                       double t_size) const;
 
-  // TODO
   /// Apply a multipole expansion to a set of targets
   ///
   /// \param first - the first target point
@@ -200,7 +229,6 @@ class Expansion {
   /// \param scale - scaling factor (one over the size of source box)
   void M_to_T(target_t *first, target_t *last, double scale) const;
 
-  // TODO
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
@@ -217,15 +245,15 @@ class Expansion {
   void S_to_T(source_t *s_first, source_t *s_last,
               target_t *t_first, target_t *t_last) const;
 
-  // TODO - make sure these are all; finish writeup
+  // TODO - finish writeup
   //
   // I think the plan here is to not have to worry about views for the
   // operations. The various operations get their indices, and if the needed
   // views are not available, it should just have some error. Probably an
   // assertion failure to start.
-  void M_to_I(Index s_index) const;
-  void I_to_I(Index s_index, Index t_index) const;
-  void I_to_L(Index t_index) const;
+  std::unique_ptr<expansion_t> M_to_I(Index s_index) const;
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const;
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const;
 
   /// Add an expansion to this expansion
   ///

@@ -33,11 +33,15 @@ namespace {
 
 class ViewSet {
  public:
-  ViewSet() : views_{} { }
-  explicit ViewSet(int ndig) : views_{}, n_digits_{ndig} { }
+  ViewSet() : views_{}, n_digits_{-1}, role_{kNoRoleNeeded} { }
+  ViewSet(int ndig, ExpansionRole role)
+      : views_{}, n_digits_{ndig}, role_{role} { }
 
   //destroy the represented data
   void destroy();
+
+  //reset the view set
+  void clear();
 
   //things to add to the set
   void add_view(int index);
@@ -47,12 +51,14 @@ class ViewSet {
   void set_bytes(int view, size_t bytes) {views_[view].bytes = bytes;}
   void set_data(int view, char *data) {views_[view].data = data;}
   void set_n_digits(int ndig) {n_digits_ = ndig;}
+  void set_role(ExpansionRole role) {role_ = role;}
 
   //things to read given entries
   int view_index(int view) const {return views_[view].index;}
   size_t view_bytes(int view) const {return views_[view].bytes;}
   char *view_data(int view) const {return views_[view].data;}
   int n_digits() const {return n_digits_;}
+  ExpansionRole role() const {return role_;}
 
   //collective information
   int count() const {return views_.size();}
@@ -70,6 +76,7 @@ class ViewSet {
  private:
   std::vector<View> views_;
   int n_digits_;
+  ExpansionRole role_;
 };
 
 

@@ -50,6 +50,27 @@ enum ReturnCode {
 using dcomplex_t = std::complex<double>;
 
 
+/// Role codes for Expansion objects
+///
+/// Expansions are objects that can take up to four forms based on where they
+/// are in the DAG. DAG nodes are associated with the nodes of either the source
+/// or target tree. There are two roles that an Expansion can take for each tree
+/// that the DAG node might be associated with: a primary expansion and an
+/// intermediate expansion. For example, classic FMM uses only primary
+/// expansion, which are called multipole expansions on the source tree, and
+/// local expansions on the target tree. More advanced FMM implementations use
+/// intermediate expansions on both trees. A fifth role is added to account for
+/// cases where access is needed to the S->T operation, but no other expansion
+/// data is required.
+enum ExpansionRole {
+  kSourcePrimary,
+  kSourceIntermediate,
+  kTargetPrimary,
+  kTargetIntermediate,
+  kNoRoleNeeded
+};
+
+
 } // namespace dashmm
 
 

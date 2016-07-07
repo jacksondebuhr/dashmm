@@ -12,7 +12,7 @@
 // =============================================================================
 
 
-/// \file src/dagtojson.cc
+/// \file src/dag.cc
 /// \brief Implementation of JSON format DAG output
 ///
 /// The intent of this file it to make an easily digestible form of the
@@ -120,6 +120,15 @@ std::string edge_code_to_print(Operation op) {
     break;
   case Operation::StoT:
     return std::string("StoT");
+    break;
+  case Operation::MtoI:
+    return std::string("MtoI");
+    break;
+  case Operation::ItoI:
+    return std::string("ItoI");
+    break;
+  case Operation::ItoL:
+    return std::string("ItoL");
     break;
   }
   return std::string("ERROR");
