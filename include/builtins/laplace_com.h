@@ -96,7 +96,7 @@ class LaplaceCOM {
   }
 
   ~LaplaceCOM() {
-    if (valid()) {
+    if (valid(ViewSet{})) {
       delete [] data_;
       data_ = nullptr;
     }

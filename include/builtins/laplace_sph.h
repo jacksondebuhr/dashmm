@@ -31,6 +31,7 @@
 #include "builtins/laplace_sph_table.h"
 #include "dashmm/point.h"
 #include "dashmm/types.h"
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {
@@ -68,7 +69,7 @@ class LaplaceSPH {
   using target_t = Target;
   using expansion_t = LaplaceSPH<Source, Target>;
 
-  LaplaceSPH(Point center, int n_digits) {
+  LaplaceSPH(Point center, int n_digits, ExpansionRole role) {
     LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
     assert(entry != builtin_laplace_table_.end());
     uLaplaceSPHTable &table = entry->second;
@@ -80,59 +81,93 @@ class LaplaceSPH {
     data_->n_digits = n_digits;
     data_->center = center;
     n_digits_ = n_digits;
+    role_ = role;
     for (int i = 0; i < n_terms; ++i)
       data_->expansion[i] = 0;
   }
 
-  LaplaceSPH(void *ptr, size_t bytes, int n_digits)
-      : n_digits_{n_digits} {
-    data_ = static_cast<LaplaceSPHData *>(ptr);
-    bytes_ = bytes;
-    if (data_)
-      data_->n_digits = n_digits;
+  LaplaceSPH(ViewSet &views) {
+    assert(views.count() < 2);
+    n_digits_ = views.n_digits();
+    role_ = views.role();
+
+    if (views.count()) {
+      data_ = reinterpret_cast<LaplaceSPHData *>(views.view_data(0));
+      bytes_ = views.view_bytes();
+      if (data_)
+        data_->n_digits = n_digits_;
+    } else {
+      bytes_ = 0;
+      data_ = nullptr;
+    }
   }
 
   ~LaplaceSPH() {
-    if (valid()) {
+    if (valid(ViewSet{})) {
       delete [] data_;
       data_ = nullptr;
     }
   }
 
-  void *release() {
-    LaplaceSPHData *retval = data_;
+  void release() {
     data_ = nullptr;
+  }
+
+  bool valid(const ViewSet &view) const {
+    assert(view.count() < 2);
+    return data_ != nullptr;
+  }
+
+  int view_count() const {
+    if (data_) return 1;
+    return 0;
+  }
+
+  void get_views(ViewSet &view) const {
+    assert(view.count() < 2);
+    if (view.count() > 0) {
+      view.set_bytes(0, bytes_);
+      view.set_data(0, data_);
+    }
+    view.set_n_digits(n_digits_);
+    view.set_role(role_);
+  }
+
+  ViewSet get_all_views() const {
+    ViewSet retval{};
+    retval.add_view(0);
+    get_views(retval);
     return retval;
   }
 
-  size_t bytes() const {return bytes_;}
-
-  bool valid() const {return data_ != nullptr;}
-
   int accuracy() const {return n_digits_;}
 
-  size_t size() const {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
-    int p = table->p();
-    return (p + 1) * (p + 2) / 2;
-  }
+  ExpansionRole role() const {return role_;}
 
   Point center() const {
     assert(valid());
     return data_->center;
   }
 
-  dcomplex_t term(size_t i) const {
+  size_t view_size(int view) const {
+    assert(view == 0);
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
+    int p = table->p();
+    return (p + 1) * (p + 2) / 2;
+  }
+
+  dcomplex_t view_term(int view, size_t i) const {
+    assert(view == 0);
     return data_->expansion[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last, double scale) const {
-    expansion_t *retval{new expansion_t{center, n_digits_}}; 
-    dcomplex_t *expansion = &retval->data_->expansion[0]; 
+    expansion_t *retval{new expansion_t{center, n_digits_, kSourcePrimary}};
+    dcomplex_t *expansion = &retval->data_->expansion[0];
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
-    int p = table->p(); 
-    const double *sqf = table->sqf(); 
+    int p = table->p();
+    const double *sqf = table->sqf();
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -183,7 +218,7 @@ class LaplaceSPH {
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last, double scale) const {
-    expansion_t *retval{new expansion_t{center, n_digits_}};
+    expansion_t *retval{new expansion_t{center, n_digits_, kTargetPrimary}};
     dcomplex_t *expansion = &retval->data_->expansion[0];
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -246,7 +281,8 @@ class LaplaceSPH {
     double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = data_->center.z() + (from_child < 4 ? h : -h);
 
-    expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits_,
+                                        kSourcePrimary}};
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -329,7 +365,8 @@ class LaplaceSPH {
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
 
-    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits_,
+                                        kTargetPrimary}};
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
 
@@ -392,7 +429,8 @@ class LaplaceSPH {
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, n_digits_}};
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, n_digits_,
+                                        kTargetPrimary}};
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -600,6 +638,18 @@ class LaplaceSPH {
     }
   }
 
+  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
   void add_expansion(const expansion_t *temp1) {
     dcomplex_t *expansion = &data_->expansion[0];
     for (size_t i = 0; i < temp1->size(); ++i)
@@ -610,6 +660,7 @@ class LaplaceSPH {
   LaplaceSPHData *data_;
   size_t bytes_;
   int n_digits_;
+  ExpansionRole role_;
 
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) {
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
