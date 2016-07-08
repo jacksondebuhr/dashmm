@@ -199,7 +199,7 @@ void perform_evaluation_test(InputArguments args) {
   // We create a specific expansion that will be passed into evaluate so that
   // the requested number of digits can be propagated through the evaluation.
   User<SourceData, TargetData> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, args.accuracy
+    dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded
   };
 
 

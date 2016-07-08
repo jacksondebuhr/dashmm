@@ -22,6 +22,7 @@
 #define __USER_EXPANSION_H__
 
 
+#include <cassert>
 #include <cstdio>
 
 #include <memory>
@@ -37,7 +38,6 @@
 // is the accuracy parameter for this instance of the Expansion. After these,
 // the data can take any form so long as it is trivially copyable.
 struct UserData {
-  int reserved;
   int acc;
   //Whatever else that is needed. One example might be
   //
@@ -89,13 +89,14 @@ class User {
   //
   // DASHMM expects that the data provided by release() will have been allocated
   // using new char [].
-  User(dashmm::Point center, int n_digits) {
+  User(dashmm::Point center, int n_digits, dashmm::ExpansionRole role) {
     // If there was more complication to UserData, this next line would need to
     // be modified.
     bytes_ = sizeof(UserData);
     acc_ = n_digits;
+    role_ = role;
     data_ = reinterpret_cast<UserData *>(new char [bytes_]);
-    assert(valid());
+    assert(valid(dashmm::ViewSet{}));
     data_->acc = acc_;
     data_->center = center;
   }
@@ -111,13 +112,22 @@ class User {
   // nevertheless be able to perform those operations not requiring the
   // expansion data. In these 'empty' constructions, n_digits will still be
   // supplied.
-  User(void *ptr, size_t bytes, int n_digits)
-      : data_{static_cast<UserData *>(ptr)}, bytes_{bytes}, acc_{n_digits} { }
+  User(const dashmm::ViewSet &views) {
+    assert(views.count() < 2);
+    bytes_ = sizeof(UserData);
+    acc_ = views.n_digits();
+    role_ = views.role();
+    if (views.count() == 1) {
+      data_ = reinterpret_cast<UserData *>(views.view_data(0));
+    } else {
+      data_ = nullptr;
+    }
+  }
 
   // Expansion objects that still own their data should release that resource
   // when they are destroyed. See release().
   ~User() {
-    if (valid()) {
+    if (valid(dashmm::ViewSet{})) {
       delete [] data_;
       data_ = nullptr;
     }
@@ -139,44 +149,66 @@ class User {
   // render this object invalid. Otherwise, when this object was destroyed, an
   // attempt would be made to free the data, which is precisely what is not
   // intended.
-  void *release() {
-    UserData *retval = data_;
+  void release() {
     data_ = nullptr;
-    return retval;
   }
-
-  // The size of the serialized expansion. This is especially important for
-  // Expansions that might have different numbers of terms based on the
-  // supplied accuracy parameter.
-  size_t bytes() const  {return bytes_;}
 
   // This tests if this object is valid; that is, does this object own some
   // data.
-  bool valid() const  {return data_ != nullptr;}
+  bool valid(const dashmm::ViewSet &view) const {
+    assert(view.count() < 2);
+    return data_ != nullptr;
+  }
+
+  int view_count() const {
+    if (data_) return 1;
+    return 0;
+  }
+
+  void get_views(dashmm::ViewSet &view) const {
+    assert(view.count() < 2);
+    if (view.count() > 0) {
+      view.set_bytes(0, sizeof(UserData));
+      view.set_data(0, (char *)data_);
+    }
+    view.set_n_digits(acc_);
+    view.set_role(role_);
+  }
+
+  dashmm::ViewSet get_all_views() const {
+    dashmm::ViewSet retval{};
+    retval.add_view(0);
+    get_views(retval);
+    return retval;
+  }
 
   // This returns the accuracy paramter with which the object was constructed.
   int accuracy() const  {return acc_;}
 
-  // This gives the number of terms in the expansion.
-  //
-  // Currently, User does not have any terms. Typically, the result of this
-  // function will depend on acc_.
-  size_t size() const {
-    return 0;
-  }
+  dashmm::ExpansionRole role() const {return role_;}
 
   // This gives the point around which this Expansion is defined.
   dashmm::Point center() const {
-    if (valid()) {
+    if (valid(dashmm::ViewSet{})) {
       return data_->center;
     } else {
       return dashmm::Point(0.0, 0.0, 0.0);
     }
   }
 
+  // This gives the number of terms in the expansion.
+  //
+  // Currently, User does not have any terms. Typically, the result of this
+  // function will depend on acc_.
+  size_t view_size(int view) const {
+    return 0;
+  }
+
   // This returns a specific term in the expansion. dcomplex_t is an
   // alias for std::complex<double>.
-  dashmm::dcomplex_t term(size_t i) const {return dashmm::dcomplex_t{};}
+  dashmm::dcomplex_t view_term(int view, size_t i) const {
+    return dashmm::dcomplex_t{};
+  }
 
   // The following operations (S->M, S->L, M->M, M->L, L->L, M->T, L->T, S->T)
   // would all have to be implemented for the the specific use-case. For now,
@@ -188,7 +220,8 @@ class User {
   std::unique_ptr<User> S_to_M(dashmm::Point center, Source *first,
               Source *last, double scale) const {
     fprintf(stdout, "S->M for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_}};
+    return std::unique_ptr<User>{new User{center, acc_,
+                                          dashmm::kSourcePrimary}};
   }
 
   // This will generate a local expansion at the given center for the
@@ -196,7 +229,8 @@ class User {
   std::unique_ptr<User> S_to_L(dashmm::Point center, Source *first,
                                Source *last, double scale) const {
     fprintf(stdout, "S->L for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_}};
+    return std::unique_ptr<User>{new User{center, acc_,
+                                          dashmm::kTargetPrimary}};
   }
 
   // This will translate a multipole expansion from a child node to its parent.
@@ -206,7 +240,8 @@ class User {
     double px = data_->center.x() + (from_child % 2 == 0 ? h : -h);
     double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = data_->center.z() + (from_child < 4 ? h : -h);
-    return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz}, acc_}};
+    return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz}, acc_,
+                                          dashmm::kSourcePrimary}};
   }
 
   // This will translate a multipole expansion into a local expansion.
@@ -219,7 +254,8 @@ class User {
     double tx = data_->center.x() - t2s_x * s_size;
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
-    return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz}, acc_}};
+    return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz}, acc_,
+                                          dashmm::kTargetPrimary}};
   }
 
   // This will translate a local expansion from a parent node to one of
@@ -230,7 +266,8 @@ class User {
     double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
-    return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz}, acc_}};
+    return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz}, acc_,
+                                          dashmm::kTargetPrimary}};
   }
 
   // This will compute the effect of a multipole expansion on a set of
@@ -254,6 +291,19 @@ class User {
             s_last - s_first, t_last - t_first);
   }
 
+  std::unique_ptr<expansion_t> M_to_I(dashmm::Index s_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index,
+                                      dashmm::Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
+  std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index) const {
+    return std::unique_ptr<expansion_t>{nullptr};
+  }
+
   // The routine will add the provided expansion to this expansion.
   void add_expansion(const User *temp1) {
     fprintf(stdout, "Adding an expansion\n");
@@ -271,6 +321,8 @@ class User {
   // This stores the accuracy parameter passed into the constuctor for this
   // object.
   int acc_;
+
+  dashmm::ExpansionRole role_;
 };
 
 
