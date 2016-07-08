@@ -86,11 +86,13 @@ class LaplaceCOMAcc {
     data_->Q[5] = 0.0;
   }
 
-  LaplaceCOMAcc(ViewSet &views) {
+  LaplaceCOMAcc(const ViewSet &views) {
     assert(views.count() < 2);
     bytes_ = sizeof(LaplaceCOMAccData);
     if (views.count() == 1) {
       data_ = reinterpret_cast<LaplaceCOMAccData *>(views.view_data(0));
+    } else {
+      data_ = nullptr;
     }
   }
 
@@ -101,12 +103,12 @@ class LaplaceCOMAcc {
     }
   }
 
-  void *release() {
+  void release() {
     data_ = nullptr;
   }
 
   bool valid(const ViewSet &view) const {
-    assert(view.count() < 2)
+    assert(view.count() < 2);
     return data_ != nullptr;
   }
 
@@ -118,8 +120,8 @@ class LaplaceCOMAcc {
   void get_views(ViewSet &view) const {
     assert(view.count() < 2);
     if (view.count() > 0) {
-      viee.set_bytes(0, sizeof(LaplaceCOMAccData));
-      view.set_data(0, data_);
+      view.set_bytes(0, sizeof(LaplaceCOMAccData));
+      view.set_data(0, (char *)data_);
     }
     view.set_n_digits(-1);
     view.set_role(kSourcePrimary);

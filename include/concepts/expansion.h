@@ -67,7 +67,7 @@ class Expansion {
   /// Expansion is needed, but the specific data for the expansion is not.
   /// The exemplar of this use is to perform an S->T operation. The expansion
   /// will get a value for n_digits from the provided ViewSet.
-  Expansion(ViewSet &views);
+  Expansion(const ViewSet &views);
 
   /// Likely, an Expansion will need a third constructor as well. This
   /// takes a ViewSet but does allocation for the views. This is to allow

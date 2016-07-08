@@ -9,7 +9,7 @@ void ViewSet::destroy() {
     //delete if non-null
     if (views_[i].data != nullptr) {
       delete [] views_[i].data;
-      views_[i].data == nullptr;
+      views_[i].data = nullptr;
     }
   }
 }
@@ -47,10 +47,9 @@ size_t ViewSet::bytes() const {
 
 
 void ViewSet::serialize(WriteBuffer &buffer) {
-  bool e = buffer.write(&n_digits_, sizeof(n_digits_));
+  bool e = buffer.write((char *)&n_digits_, sizeof(n_digits_));
   assert(e);
-  int rtemp = role_;  // control the size of the output
-  e = buffer.write(&rtemp, sizeof(rtemp));
+  e = buffer.write((char *)&role_, sizeof(role_));
   assert(e);
   e = buffer.write(count());
   assert(e);
@@ -78,21 +77,19 @@ void ViewSet::interpret(ReadBuffer &buffer) {
   bool e = buffer.read(&n_digits_);
   assert(e);
 
-  int rtemp{};
-  e = buffer.read(&rtemp);
+  e = buffer.read(&role_);
   assert(e);
-  role_ = rtemp;
 
   int ct{0};
-  e = buffer.read(&ct, sizeof(ct));
+  e = buffer.read((char *)&ct, sizeof(ct));
   assert(e);
 
   for (int i = 0; i < ct; ++i) {
     int idx{};
     size_t bts{};
-    e = buffer.read(&idx, sizeof(idx));
+    e = buffer.read((char *)&idx, sizeof(idx));
     assert(e);
-    e = buffer.read(&bts, sizeof(bts));
+    e = buffer.read((char *)&bts, sizeof(bts));
     assert(e);
 
     add_view(idx, bts, nullptr);

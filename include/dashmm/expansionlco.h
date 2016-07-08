@@ -125,7 +125,6 @@ class ExpansionLCO {
     hpx_addr_t retval{HPX_NULL};
     hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
                   input_data, total_size);
-    delete [] ldata;
     delete [] input_data;
 
     data_ = retval;
@@ -232,10 +231,10 @@ class ExpansionLCO {
     hpx_parcel_set_action(parc, hpx_lco_set_action);
     hpx_parcel_set_target(parc, data_);
 
-    WriteBuffer parcbuf{hpx_parcel_get_data(parc), bytes + sizeof(int)};
+    WriteBuffer parcbuf{(char *)hpx_parcel_get_data(parc), bytes + sizeof(int)};
 
     int opcode = SetOpCodes::kContribute;
-    parcbuf.write(&opcode, sizeof(opcode));
+    parcbuf.write((char *)&opcode, sizeof(opcode));
     views.serialize(parcbuf);
 
     // TODO: Is this correct?
@@ -436,9 +435,9 @@ class ExpansionLCO {
   static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {
-    expansion_t local{ViewSet{n_digits}};
+    expansion_t local{ViewSet{n_digits, kNoRoleNeeded}};
     auto multi = local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src],
-                              scale));
+                              scale);
 
     expansionlco_t total{expand, n_digits};
     total.contribute(std::move(multi));
@@ -449,7 +448,7 @@ class ExpansionLCO {
   static int s_to_l_handler(Source *sources, int n_src, double cx, double cy,
                             double cz, double scale, hpx_addr_t expand,
                             int n_digits) {
-    expansion_t local{ViewSet{n_digits}};
+    expansion_t local{ViewSet{n_digits, kNoRoleNeeded}};
     auto multi = local.S_to_L(Point{cx, cy, cz}, sources, &sources[n_src],
                               scale);
 
@@ -465,7 +464,8 @@ class ExpansionLCO {
     int from_child = head->index.which_child();
 
     ViewSet views{};
-    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
@@ -481,7 +481,8 @@ class ExpansionLCO {
 
     // translate the source expansion
     ViewSet views{};
-    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
@@ -497,7 +498,8 @@ class ExpansionLCO {
     double t_size = geo->size_from_level(tidx.level());
 
     ViewSet views{};
-    views.interpret(ReadBuffer{head->payload, head->expansion_size});
+    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();

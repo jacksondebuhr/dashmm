@@ -77,7 +77,7 @@ class LaplaceSPH {
     int n_terms = (p + 1) * (p + 2) / 2;
     bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
     data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
-    assert(valid());
+    assert(valid(ViewSet{}));
     data_->n_digits = n_digits;
     data_->center = center;
     n_digits_ = n_digits;
@@ -86,14 +86,14 @@ class LaplaceSPH {
       data_->expansion[i] = 0;
   }
 
-  LaplaceSPH(ViewSet &views) {
+  LaplaceSPH(const ViewSet &views) {
     assert(views.count() < 2);
     n_digits_ = views.n_digits();
     role_ = views.role();
 
     if (views.count()) {
       data_ = reinterpret_cast<LaplaceSPHData *>(views.view_data(0));
-      bytes_ = views.view_bytes();
+      bytes_ = views.view_bytes(0);
       if (data_)
         data_->n_digits = n_digits_;
     } else {
@@ -127,7 +127,7 @@ class LaplaceSPH {
     assert(view.count() < 2);
     if (view.count() > 0) {
       view.set_bytes(0, bytes_);
-      view.set_data(0, data_);
+      view.set_data(0, (char *)data_);
     }
     view.set_n_digits(n_digits_);
     view.set_role(role_);
@@ -145,7 +145,7 @@ class LaplaceSPH {
   ExpansionRole role() const {return role_;}
 
   Point center() const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     return data_->center;
   }
 
@@ -652,8 +652,8 @@ class LaplaceSPH {
 
   void add_expansion(const expansion_t *temp1) {
     dcomplex_t *expansion = &data_->expansion[0];
-    for (size_t i = 0; i < temp1->size(); ++i)
-      expansion[i] += temp1->term(i);
+    for (size_t i = 0; i < temp1->view_size(0); ++i)
+      expansion[i] += temp1->view_term(0, i);
   }
 
  private:

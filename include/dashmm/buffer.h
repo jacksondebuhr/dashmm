@@ -16,6 +16,7 @@
 #define __DASHMM_BUFFER_H__
 
 
+#include <cassert>
 #include <cstring>
 
 
@@ -43,7 +44,7 @@ public:
     return adv == bytes;
   }
 
-private:
+protected:
   char *base_;
   char *offset_;
   size_t total_;
@@ -53,13 +54,16 @@ private:
 
 class ReadBuffer : public Buffer {
  public:
+  //
+  ReadBuffer(char *base, size_t total) : Buffer{base, total} { }
+
   bool read(char *data, size_t bytes) {
     if (complete()) return false;
 
     size_t toread = (bytes <= remain_) ? bytes : remain_;
     memcpy(data, offset_, toread);
 
-    offset += toread;
+    offset_ += toread;
     remain_ -= toread;
 
     return toread == bytes;
@@ -67,7 +71,7 @@ class ReadBuffer : public Buffer {
 
   template <typename T>
   bool read(T *value) {
-    return read(value, sizeof(T));
+    return read(reinterpret_cast<char *>(value), sizeof(T));
   }
 
   template <typename T>
@@ -78,12 +82,14 @@ class ReadBuffer : public Buffer {
     }
     return retval;
   }
-}
+};
 
 
 class WriteBuffer : public Buffer {
  public:
-  bool write(char *data, size_t bytes) {
+  WriteBuffer(char *base, size_t total) : Buffer{base, total} { }
+
+  bool write(const char *data, size_t bytes) {
     if (complete()) return false;
 
     size_t towrite = (bytes <= remain_) ? bytes : remain_;
@@ -105,7 +111,7 @@ class WriteBuffer : public Buffer {
     bool e = input.read(offset_, towrite);
     assert(e);
 
-    offset += towrite;
+    offset_ += towrite;
     remain_ -= towrite;
 
     return towrite == inputleft;
@@ -113,7 +119,7 @@ class WriteBuffer : public Buffer {
 
   template <typename T>
   bool write(const T value) {
-    return write(&value, sizeof(T));
+    return write(reinterpret_cast<const char *>(&value), sizeof(T));
   }
 };
 

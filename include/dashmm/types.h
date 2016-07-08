@@ -63,11 +63,11 @@ using dcomplex_t = std::complex<double>;
 /// cases where access is needed to the S->T operation, but no other expansion
 /// data is required.
 enum ExpansionRole {
-  kSourcePrimary,
-  kSourceIntermediate,
-  kTargetPrimary,
-  kTargetIntermediate,
-  kNoRoleNeeded
+  kSourcePrimary = 0,
+  kSourceIntermediate = 1,
+  kTargetPrimary = 2,
+  kTargetIntermediate = 3,
+  kNoRoleNeeded = 4
 };
 
 

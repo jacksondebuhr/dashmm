@@ -25,6 +25,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arrayref.h"
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {
@@ -218,8 +219,8 @@ class TargetLCO {
   ///
   /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
-    ReadBuffer readbuf{rhs, bytes};
-    int *code = readbuf.interpret<int>();
+    int *code = reinterpret_cast<int *>(rhs);
+    ReadBuffer readbuf{(char *)rhs, bytes};
 
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
@@ -235,7 +236,7 @@ class TargetLCO {
       // as the actual target data.
       assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{nullptr, 0, -1};
+      expansion_t expand(ViewSet{});
       expand.S_to_T(input->sources, &input->sources[input->count],
                      targets, &targets[lhs->targets.n()]);
 
@@ -252,7 +253,7 @@ class TargetLCO {
 
       ViewSet views{};
       views.interpret(readbuf);
-      expansion_t expand{views};
+      expansion_t expand(views);
       expand.M_to_T(targets, &targets[lhs->targets.n()], input->scale);
       expand.release();
 
@@ -269,7 +270,7 @@ class TargetLCO {
 
       ViewSet views{};
       views.interpret(readbuf);
-      expansion_t expand{views};
+      expansion_t expand(views);
       expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
       expand.release();
 

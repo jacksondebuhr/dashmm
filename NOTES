@@ -22,6 +22,9 @@ DONE * tree.h - very little to do here. We just need to create the intermediate
             expansions when they exist.
 DONE * evaluator.h - nothing to do here
 
+TODO: update documentation
+TODO: clean up code where possible
+TODO: create test case for new ViewSet stuff
 
 TODO: decide if I want to add assertions around the calls to the Expansion
       operations to make sure the Expansion Role is correct.

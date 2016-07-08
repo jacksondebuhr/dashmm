@@ -74,7 +74,7 @@ class LaplaceCOM {
   LaplaceCOM(Point center, int n_digits, ExpansionRole role) {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
-    assert(valid());
+    assert(valid(ViewSet{}));
     data_->mtot = 0.0;
     data_->xcom[0] = 0.0;
     data_->xcom[1] = 0.0;
@@ -87,11 +87,13 @@ class LaplaceCOM {
     data_->Q[5] = 0.0;
   }
 
-  LaplaceCOM(ViewSet &views) {
+  LaplaceCOM(const ViewSet &views) {
     assert(views.count() < 2);
     bytes_ = sizeof(LaplaceCOMData);
     if (views.count() == 1) {
       data_ = reinterpret_cast<LaplaceCOMData *>(views.view_data(0));
+    } else {
+      data_ = nullptr;
     }
   }
 
@@ -120,7 +122,7 @@ class LaplaceCOM {
     assert(view.count() < 2);
     if (view.count() > 0) {
       view.set_bytes(0, sizeof(LaplaceCOMData));
-      view.set_data(0, data_);
+      view.set_data(0, (char *)data_);
     }
     view.set_n_digits(-1);
     view.set_role(kSourcePrimary);
@@ -138,7 +140,7 @@ class LaplaceCOM {
   ExpansionRole role() const {return kSourcePrimary;}
 
   Point center() const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     return Point{data_->xcom[0], data_->xcom[1], data_->xcom[2]};
   }
 
@@ -176,7 +178,7 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
                                         kSourcePrimary);
     temp->set_mtot(data_->mtot);
@@ -196,7 +198,7 @@ class LaplaceCOM {
   }
 
   void M_to_T(Target *first, Target *last, double scale) const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     for (auto i = first; i != last; ++i) {
       Point pos{i->position};
 
@@ -254,12 +256,16 @@ class LaplaceCOM {
   }
 
   void add_expansion(const expansion_t *temp1) {
-    double M2 = temp1->term(0).real();
-    double D2[3] = {temp1->term(1).real(), temp1->term(2).real(),
-                    temp1->term(3).real()};
-    double Q2[6] = {temp1->term(4).real(), temp1->term(5).real(),
-                    temp1->term(6).real(), temp1->term(7).real(),
-                    temp1->term(8).real(), temp1->term(9).real()};
+    double M2 = temp1->view_term(0, 0).real();
+    double D2[3] = {temp1->view_term(0, 1).real(),
+                    temp1->view_term(0, 2).real(),
+                    temp1->view_term(0, 3).real()};
+    double Q2[6] = {temp1->view_term(0, 4).real(),
+                    temp1->view_term(0, 5).real(),
+                    temp1->view_term(0, 6).real(),
+                    temp1->view_term(0, 7).real(),
+                    temp1->view_term(0, 8).real(),
+                    temp1->view_term(0, 9).real()};
 
     double Mprime = data_->mtot + M2;
 
@@ -330,7 +336,7 @@ class LaplaceCOM {
   /// \param first - the first source
   /// \param last - (one past the) last source
   void calc_mtot(Source *first, Source *last) const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     data_->mtot = 0.0;
     for (auto i = first; i != last; ++i) {
       data_->mtot += i->charge;
@@ -342,7 +348,7 @@ class LaplaceCOM {
   /// \param first - the first source
   /// \param last - (one past the) last source
   void calc_xcom(Source *first, Source *last) const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     data_->xcom[0] = 0.0;
     data_->xcom[1] = 0.0;
     data_->xcom[2] = 0.0;
@@ -364,7 +370,7 @@ class LaplaceCOM {
   /// \param first - the first source
   /// \param last - (one past the) last source
   void calc_Q(Source *first, Source *last) const {
-    assert(valid());
+    assert(valid(ViewSet{}));
     for (int i = 0; i < 6; ++i) {
       data_->Q[i] = 0;
     }

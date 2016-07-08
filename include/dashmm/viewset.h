@@ -16,19 +16,20 @@
 #define __DASHMM_VIEW_SET_H__
 
 
+#include <vector>
+
 #include "dashmm/buffer.h"
+#include "dashmm/types.h"
 
 
 namespace dashmm {
 
 
-namespace {
-  struct View {
-    int index;
-    size_t bytes;
-    char *data;
-  };
-}
+struct View {
+  int index;
+  size_t bytes;
+  char *data;
+};
 
 
 class ViewSet {

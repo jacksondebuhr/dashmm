@@ -369,7 +369,7 @@ void perform_evaluation_test(InputArguments args) {
   double tf{};
   if (args.test_case == std::string{"bh"}) {
     dashmm::LaplaceCOM<SourceData, TargetData> expansion{
-        dashmm::Point{0.0, 0.0, 0.0}, 0};
+        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
     dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
     t0 = getticks();
@@ -380,7 +380,7 @@ void perform_evaluation_test(InputArguments args) {
   } else if (args.test_case == std::string{"fmm"}) {
     dashmm::laplace_sph_precompute(args.accuracy);
     dashmm::LaplaceSPH<SourceData, TargetData> expansion{
-          dashmm::Point{0.0, 0.0, 0.0}, args.accuracy};
+          dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded};
     dashmm::FMM<SourceData, TargetData, dashmm::LaplaceSPH> method{};
 
     t0 = getticks();
@@ -403,7 +403,7 @@ void perform_evaluation_test(InputArguments args) {
     //do direct evaluation
     dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
     dashmm::LaplaceCOM<SourceData, TargetData> direxp{
-        dashmm::Point{0.0, 0.0, 0.0}, 0};
+        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
     err = directeval.evaluate(source_handle, test_handle, args.refinement_limit,
                               direct, direxp);
     assert(err == dashmm::kSuccess);
