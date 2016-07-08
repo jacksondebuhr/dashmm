@@ -240,7 +240,7 @@ void perform_time_stepping(InputArguments args) {
 
   // Prototypes for the expansion and method
   dashmm::LaplaceCOMAcc<Particle, Particle> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, 0
+    dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded
   };
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
