@@ -4,17 +4,6 @@
 namespace dashmm {
 
 
-void ViewSet::destroy() {
-  for (size_t i = 0; i < views_.size(); ++i) {
-    //delete if non-null
-    if (views_[i].data != nullptr) {
-      delete [] views_[i].data;
-      views_[i].data = nullptr;
-    }
-  }
-}
-
-
 void ViewSet::clear() {
   views_.clear();
   n_digits_ = -1;
