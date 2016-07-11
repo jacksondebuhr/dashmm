@@ -1,30 +1,8 @@
 THIS BRANCH TODO
-TODO: The following need to be looked over
 
- * builtins/ methods and expansions and src
-    -laplace COM , laplace COMAcc, BH , FMM and Direct are done
-
- * buffer.h - This has a good first round of work. Go back over and improve
-    where possible.
- * expansionlco.h - This has a good first round of work. Go back over and
-   improve where possible
-      Add new operations. The out_edge_ and so on for M->I, I->I, and I->L
- * targetlco.h - This has a good first round of work. Go back over and improve
-   where possible.
- * viewset.h - This has a good first implementation. Go back over and improve.
- * viewset.cc - This has a good first implementation. Go back over and improve.
-
- * dashmm.h - to make sure all relevant things are included
-
-DONE * dag.h - add new operations this is done I think
-DONE * dag.cc - this is probably done
-DONE * tree.h - very little to do here. We just need to create the intermediate
-            expansions when they exist.
-DONE * evaluator.h - nothing to do here
-
-TODO: update documentation
 TODO: clean up code where possible
-TODO: create test case for new ViewSet stuff
+TODO: create test case for new ViewSet stuff? Or just do the real thing and
+      have done with it.
 
 TODO: decide if I want to add assertions around the calls to the Expansion
       operations to make sure the Expansion Role is correct.
@@ -88,6 +66,8 @@ Overall Plan to 1.0
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
+    - consider placing the user-facing heads into a different directory than
+      the internal stuff
  * As there is time, work on performance
     - Time various parts of the code
 
