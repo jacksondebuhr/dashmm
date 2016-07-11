@@ -19,6 +19,7 @@
 /// \file include/dashmm/dag.h
 /// \brief Interface for intermediate representation of DAG
 
+
 #include <string>
 #include <vector>
 
@@ -49,11 +50,8 @@ enum class Operation {
 
 struct DAGNode;
 
+
 /// Edge in the explicit representation of the DAG
-///
-/// This is simply the target of the edge and the operation to peform on the
-/// edge. The source of the edge is implicit in that the DAGNode which has
-/// this edge in its list will be the source of the edge.
 struct DAGEdge {
   const DAGNode *source;    /// Source node of the edge
   const DAGNode *target;    /// Target node of the edge
@@ -66,12 +64,6 @@ struct DAGEdge {
 
 
 /// Node in the explicit representation of the DAG
-///
-/// In addition to the set of edges that emanate from this node, the number
-/// of inputs to this node is collected. This allows the eventual realization
-/// of the DAG as ExpansionLCOs to have the correct number of inputs. Also,
-/// when the distribution of the DAG is computed, the result will appear in
-/// the locality entry of this object.
 struct DAGNode {
   std::vector<DAGEdge> out_edges;   /// these are out edges
   std::vector<DAGEdge> in_edges;    /// these are in edges
@@ -94,11 +86,32 @@ struct DAGNode {
 };
 
 
-// TODO do this up properly
+/// DAG object
+///
+/// This is the explicit representation of the DAG for the particular
+/// evaluation. This object is constructed on a single locality, and so does
+/// not inhabit the global address space. The DAG object is a template from
+/// which the particular evaluation will be created. The distribution policy
+/// will operate on the DAG object to compute a distribution of the work
+/// around the system.
+///
+/// To avoid cumbersome interfaces, this object provides direct access to its
+/// member data, which are four vectors of DAGNodes: one each for the source
+/// nodes of the DAG, the target nodes of the DAG, the nodes of the DAG
+/// associated with the nodes of the source tree, and the nods of the DAG
+/// associated with the nodes of the target tree.
+///
+/// Typically, DASHMM users implementing a new Method will work with DAGInfo
+/// objects rather than the DAG directly.
 class DAG {
  public:
   DAG() : source_leaves{}, source_nodes{}, target_nodes{}, target_leaves{} { }
 
+  /// Print the DAG out in JSON format.
+  ///
+  /// This will open a file with the given name, and write out the DAG
+  /// information to that file is JSON format. See the implementation for
+  /// details about what is included.
   void toJSON(std::string fname);
 
   std::vector<DAGNode *> source_leaves;
@@ -110,7 +123,7 @@ class DAG {
 
 /// DAG information relevant for a given tree node
 ///
-/// Each node of the tree will have a DAGInfo member. This will store the
+/// Each node of the trees will have a DAGInfo member. This will store the
 /// relevant information about the DAG for each tree node. This is the object
 /// that Methods will use to construct the DAG. Each DAGInfo object will
 /// represent up to three nodes of the DAG: one each for sources/targets,
@@ -118,7 +131,8 @@ class DAG {
 ///
 /// A DAGInfo will create the normal expansion node when constructed. The
 /// particle node or the intermediate node will be created on an as-needed
-/// basis.
+/// basis. Source and Target nodes will be created during tree construction.
+/// Intermediate nodes should be added by Methods that need them.
 ///
 /// This object uses HPX-5 to manage the concurrent modification of the DAG,
 /// so this object cannot be used outside of an HPX-5 thread. DASHMM users will
@@ -186,11 +200,19 @@ class DAGInfo {
   DAGInfo(const DAGInfo &&other) = delete;
   DAGInfo &operator=(const DAGInfo &&other) = delete;
 
+  /// Does the tree node have an intermediate DAG node?
   bool has_interm() const {return interm_ != nullptr;}
+
+  /// Does the tree node have either a source or target DAG node?
   bool has_parts() const {return parts_ != nullptr;}
 
+  /// Retrieve the normal DAG node
   const DAGNode *normal() const {return normal_;}
+
+  /// Retrieve the intermediate DAG node
   const DAGNode *interm() const {return interm_;}
+
+  /// Return the source or target DAG node
   const DAGNode *parts() const {return parts_;}
 
   /// Sets the global data for the normal DAG node

@@ -74,12 +74,14 @@ class Array {
   /// An Array is valid if it refers to an array in the global address space.
   /// NOTE: This only tests that this object points to someplace in the global
   /// address space. This is an incomplete test. A more complete test would
-  /// examing the data stored at the specified address for compatibility.
+  /// examine the data stored at the specified address for compatibility.
   ///
   /// \returns - true if this object refers to non-null global memory.
   bool valid() const {return data != HPX_NULL;}
 
   /// Return the global address of the Array meta data.
+  ///
+  /// \returns - the global address of the Array meta data.
   hpx_addr_t data() const {return data_;}
 
   /// This creates an array object
