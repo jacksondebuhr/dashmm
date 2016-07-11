@@ -19,8 +19,9 @@
 
 
 /// Methods in DASHMM are template classes parameterized over the types of
-/// sources and targets as well as the Expansion. A full description of the
-/// requirements of the Source, Target and Expansion can be found elsewhere.
+/// sources and targets, the Expansion and a Distribution Policy. A full
+/// description of the requirements of the Source, Target and Expansion can
+/// be found elsewhere.
 ///
 /// When creating a user-defined Method, the name Method in the following
 /// should be replaced by the name of the new Method type.
@@ -28,7 +29,7 @@
 /// If desired, the implementer should indicate a default DistroPolicy.
 /// The best choice is the default policy for Evaluator objects.
 ///
-/// Methods operate on the DAG which is explicitly represented in teh DAGInfo
+/// Methods operate on the DAG which is explicitly represented in the DAGInfo
 /// and DAGNode objects. See their documentation for more details.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,

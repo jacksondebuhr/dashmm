@@ -18,24 +18,42 @@
 /// Expansion concept.
 
 
-/*
-
-TODO: Think about this more
-
-We have this whole view thing set up, but is that really what we need?
-Perhaps we are always going to send all of the active views. When I call
-M->I, it will create a new Expansion with only the relevant views. And then
-we will go ahead and interpret at the far end all of that. So perhaps we always
-send every extant view. It is just that the Expansion operation implementations
-need to be able to create expansions with only a subset of possible views.
-
-So the operations that create incomplete (meaning only a subset of views are
-valid) expansions will just need to be served by some internal stuff.
-
-The one final problem is how to specify what sort of expansion this will be
-using the center, n_digits mode of operation.
-
-*/
+/// First, some background information:
+///
+/// The concept of Expansion in DASHMM is similar to but distint from the
+/// concept of a mathematical expansion of a given kernel function. The
+/// DASHMM Expansion object is better thought of as a collection of
+/// mathematical expansion. This allows for advances methods to be applied
+/// using DASHMM, such as the merge-and-shift technique, which results in
+/// sets of expansions for a given node of the tree.
+///
+/// The first distinction between mathematical expansions and the concept
+/// in DASHMM is that the Expansion objects will serve multiple sorts of
+/// expansions during a typical calculation. This notion is represented as
+/// the ExpansionRole, a required argument for constructing most Expansion
+/// objects. The mathematical nature of the expansion is often different for
+/// nodes in the Source tree and nodes in the Target tree. Further, there
+/// are intermediate expansions that might be employed in advanced versions
+/// of multipole methods. These intermediate expansions may also take different
+/// forms if they are associated with a Source node or a Target node.
+///
+/// Second, to allow for the possibility that one node of the DAG, that is,
+/// the part of the compuation represented by an Expansion, might need multiple
+/// mathematical expanions. One use for this is to enable certain advanced
+/// multipole methods, but one might also use the same evaluation to perform
+/// multipole method computations on multiple kernels at the same time.
+///
+/// Thus, Expansion implementations are required to present a set of views
+/// of the contained data. Each view is one mathematical expansion, each of
+/// which is logically related in some way, be that by supplying different
+/// required expansions for an advanced method, or by representing other
+/// forces involved in a given problem.
+///
+/// Not all operations for an Expansion will need every view to be performed,
+/// and not all views will be created by any given operation. The exact
+/// details of which operations need which views are not the concern of
+/// DASHMM, but rather are the concern of the implentor of the specific
+/// Expansion class.
 
 
 /// Expansions in DASHMM are template classes parameterized over the types of
@@ -55,12 +73,13 @@ class Expansion {
   ///
   /// The first creates the object with the given center and the given
   /// accuracy parameter. For FMM, this might be the number of digits
-  /// requested. The type is not obligated to use either of these parameters,
-  /// but the type must provide a constructor of this form.
+  /// requested. Further, the provided role will indicate how the Expansion
+  /// will be used. There is no requirement to use any of these arguments,
+  /// but the constructor must aceept them.
   Expansion(Point center, int n_digits, ExpansionRole role);
 
-  /// The second creates the expansion from previously existing data. The
-  /// bytes argument allows for variable length expansions in DASHMM.
+  /// The second creates the expansion from previously existing data specified
+  /// with a ViewSet object.
   ///
   /// Further, this constructor needs to be able to operate in a 'shallow'
   /// mode, where views contains no views. This allows for situations where
@@ -75,6 +94,9 @@ class Expansion {
   /// if only a subset is needed. This constructor would only be called
   /// from user code inside the Expansion's implementation, and would only
   /// be needed if there are multiple views in an expansion.
+  ///
+  /// NOTE: This, however, is not a requirement of the Expansion concept, but
+  /// merely a suggestion of an easy way to serve the other operations.
   Expansion(Point center, int n_digits, ExpansionRole role, ViewSet &views);
 
   /// The destructor should delete the allocated memory of the object. In the
@@ -97,7 +119,7 @@ class Expansion {
   ///
   /// The simplest way to implement this is to have the object store a pointer
   /// to memory allocated on the heap (cast from new char [size]). And then
-  /// release() will just set this objects member to nullptr.
+  /// release() will just set this object's member to nullptr.
   void release();
 
   /// Returns if the indicated views are valid
@@ -105,7 +127,7 @@ class Expansion {
   /// An expansion is valid if it has data associated with it. After calling
   /// release(), an expansion will be invalidated.
   ///
-  /// If view is empty, check all existing views
+  /// If view is empty, this will check all views.
   bool valid(const ViewSet &view) const;
 
   /// Return the current number of views for the object.
@@ -136,7 +158,10 @@ class Expansion {
   /// The point around which the expansion is defined.
   Point center() const;
 
-  /// The number of terms in the expansion.
+  /// The number of terms in the expansion for the specified view.
+  ///
+  /// Do not confuse this with the size of the data in bytes for the given
+  /// view. That may be retried using get_views().
   size_t view_size(int view) const;
 
   /// Get a term of the expansion.
@@ -145,6 +170,7 @@ class Expansion {
   /// implementation will decide if this is range checked. To be safe, assume
   /// that the input is not range checked.
   ///
+  /// \param view - the view in question
   /// \param i - the term to return
   ///
   /// \returns - the complex double version of the term; real expansions should
@@ -245,14 +271,30 @@ class Expansion {
   void S_to_T(source_t *s_first, source_t *s_last,
               target_t *t_first, target_t *t_last) const;
 
-  // TODO - finish writeup
-  //
-  // I think the plan here is to not have to worry about views for the
-  // operations. The various operations get their indices, and if the needed
-  // views are not available, it should just have some error. Probably an
-  // assertion failure to start.
+  /// Compute an intermediate expansion from a multipole expansion.
+  ///
+  /// \param s_index - the index of the tree node for which this expansion
+  ///                  applies
+  ///
+  /// \returns - the resulting intermediate expansion.
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const;
+
+  /// Compute an intermediate expansion from an intermediate expansion.
+  ///
+  /// \param s_index - the index of the tree node for which this expansion
+  ///                  applies
+  /// \param t_index - the index of the tree node for which the resulting
+  ///                  expansion should apply.
+  ///
+  /// \returns - the resulting intermediate expansion.
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const;
+
+  /// Compute a local expansion from an intermediate expansion.
+  ///
+  /// \param t_index - the index of the tree node for which this expansion
+  ///                  applies
+  ///
+  /// \returns - the resulting local expansion.
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const;
 
   /// Add an expansion to this expansion
