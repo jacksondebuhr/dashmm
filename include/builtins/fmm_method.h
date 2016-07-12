@@ -21,6 +21,7 @@
 
 
 #include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
 #include "dashmm/targetlco.h"
@@ -34,7 +35,7 @@ namespace dashmm {
 ///
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          typename DistroPolicy = SingleLocality>
+          typename DistroPolicy = DefaultDistributionPolicy>
 class FMM {
  public:
   using source_t = Source;

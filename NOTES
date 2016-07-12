@@ -20,6 +20,8 @@ TODO: Improve the way that we optionally put out the DAG information. Perhaps
         can call whatever methods they want on it.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
+TODO: Decide if we should move setup_termination_detection, setup_edge_lists
+      and destroy_DAG_LCOs into evaluator
 
 TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
       constructor in some way?

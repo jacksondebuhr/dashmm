@@ -373,9 +373,6 @@ class Tree {
     hpx_lco_delete_sync(done);
   }
 
-  // TODO: is tree the right place for this? Does not need any tree data
-  //  Likely this should just move to evaluator - not DAG as that would then
-  //  require we templatize that type, which should be avoided if possible.
   /// Sets up termination detection for a DASHMM evaluation
   ///
   /// This is an asynchronous operation. The returned LCO becomes the
@@ -404,7 +401,6 @@ class Tree {
     return retval;
   }
 
-  // TODO: is tree the right place for this? Does not need any tree data
   /// Sets the edge lists of the expansion LCOs
   ///
   /// This is a separate phase as the DAG is constructed before the LCOs
@@ -439,7 +435,6 @@ class Tree {
     hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL, &targ, &source_root_);
   }
 
-  // TODO: is tree the right place for this? - nothing of tree required
   /// Destroys the LCOs associated with the DAG
   ///
   /// This is a synchronous operation. This destroys not only the expansion

@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
 #include "dashmm/targetlco.h"
@@ -44,7 +45,7 @@ namespace dashmm {
 /// is constructed.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
-          typename DistroPolicy = SingleLocality>
+          typename DistroPolicy = DefaultDistributionPolicy>
 class BH {
  public:
   using source_t = Source;

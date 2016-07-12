@@ -24,21 +24,15 @@
 
 #include "dashmm/array.h"
 #include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
-#include "builtins/singlelocdistro.h"
-
 
 namespace dashmm {
-
-
-// TODO: Think about defining the default policy in some way that the
-// method implementers can just use whatever the default it. Perhaps a
-// using in some header file or something.
 
 
 /// Evaluator object
@@ -77,7 +71,7 @@ template <typename Source, typename Target,
           template <typename, typename,
                     template <typename, typename> class,
                     typename> class Method,
-          typename DistroPolicy = SingleLocality>
+          typename DistroPolicy = DefaultDistributionPolicy>
 class Evaluator {
  public:
   using source_t = Source;
@@ -296,7 +290,6 @@ class Evaluator {
 
     DAG dag{};
     tree->collect_DAG_nodes(dag);
-    // TODO: add a routine to remove pointless nodes from the DAG
     parms->distro.compute_distribution(dag);
 
     tree->create_expansions_from_DAG(parms->n_digits);

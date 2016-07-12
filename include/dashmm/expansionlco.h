@@ -237,7 +237,6 @@ class ExpansionLCO {
     parcbuf.write((char *)&opcode, sizeof(opcode));
     views.serialize(parcbuf);
 
-    // TODO: Is this correct?
     // We do not need local completion because we do not own this parcel, so
     // we will not delete it. And so since we are already copied into the
     // parcel, we can go ahead and move on with life.
