@@ -79,7 +79,9 @@ class Method {
   ///
   /// \param curr - the current node of the target tree
   /// \param domain - the domain geometry for the tree
-  void inherit(targetnode_t *curr, DomainGeometry *domain) const;
+  /// \param curr_us_leaf - indicates the the current node is a leaf
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const;
 
   /// Process the list of source nodes for a given target node
   ///

@@ -11,21 +11,6 @@ TODO: Look at TODO in the code, and address where possible
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
           Basically, leave it better than you found it.
-TODO: We should cull unused nodes from the DAG, and unused expansions from the
-      computation
-        Currently, these are created as a spawn through the trees. We would
-        want to change this first so that the LCOs are created from the DAG
-        object.
-
-        Or, we would have to do something where removing a node from the DAG
-        removes it from the DAGInfo of the containing node. That would
-        also be acceptable. This would mean we have to save the DAGInfo for the
-        nodes of the DAG.
-
-        Then, we would need an easy way to get nodes linked forward or backward
-        from a given node. Also, a way to remove edges to or from a given node.
-
-        Then, a routine to actually perform the culling.
 TODO: Improve the way that we optionally put out the DAG information. Perhaps
       this would be another version of evaluate, but which takes an additional
       template parameter serving the DAG output. This would then force the

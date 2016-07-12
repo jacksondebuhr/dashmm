@@ -426,7 +426,7 @@ class Tree {
              &sdata, &n_snodes, &tdata, &n_tnodes);
   }
 
-  /// Initial the DAG evaluation
+  /// Initiate the DAG evaluation
   ///
   /// This starts the work of the evalution by starting the S->* work at the
   /// source nodes of the DAG.
@@ -548,7 +548,6 @@ class Tree {
       assert(node->parts.data() == HPX_NULL);
       node->parts = parms->sources;
 
-      node->dag.add_parts(hpx_get_my_rank());
       tree->method_.generate(node, domain.value());
 
       hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
@@ -645,12 +644,11 @@ class Tree {
     }
 
     if (!refine) {
-      node->dag.add_parts(hpx_get_my_rank());
       node->parts = parms->targets;
     }
 
     auto domain = tree->domain_.value();
-    tree->method_.inherit(node, domain.value());
+    tree->method_.inherit(node, domain.value(), !refine);
     tree->method_.process(node, *parms->consider, !refine, domain.value());
 
     if (refine) {
@@ -783,17 +781,20 @@ class Tree {
 
   static int create_S_expansions_from_DAG_handler(
         hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
-    // create the normal expansion
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
-    std::unique_ptr<expansion_t> input_expand{
-      new expansion_t{n_center, n_digits, kSourcePrimary}
-    };
-    expansionlco_t expand(node->dag.normal()->in_edges.size(),
-                          node->dag.normal()->out_edges.size(),
-                          tree->domain_, node->idx, std::move(input_expand),
-                          HPX_THERE(node->dag.normal()->locality));
-    node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
+
+    // create the normal expansion if needed
+    if (node->dag.has_normal()) {
+      std::unique_ptr<expansion_t> input_expand{
+        new expansion_t{n_center, n_digits, kSourcePrimary}
+      };
+      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+                            node->dag.normal()->out_edges.size(),
+                            tree->domain_, node->idx, std::move(input_expand),
+                            HPX_THERE(node->dag.normal()->locality));
+      node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
+    }
 
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm()) {
@@ -836,17 +837,20 @@ class Tree {
 
   static int create_T_expansions_from_DAG_handler(
         hpx_addr_t done, int n_digits, tree_t *tree, targetnode_t *node) {
-    // create the normal expansion
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
-    std::unique_ptr<expansion_t> input_expand{
-      new expansion_t{n_center, n_digits, kTargetPrimary}
-    };
-    expansionlco_t expand(node->dag.normal()->in_edges.size(),
-                          node->dag.normal()->out_edges.size(),
-                          tree->domain_, node->idx, std::move(input_expand),
-                          HPX_THERE(node->dag.normal()->locality));
-    node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
+
+    // create the normal expansion if needed
+    if (node->dag.has_normal()) {
+      std::unique_ptr<expansion_t> input_expand{
+        new expansion_t{n_center, n_digits, kTargetPrimary}
+      };
+      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+                            node->dag.normal()->out_edges.size(),
+                            tree->domain_, node->idx, std::move(input_expand),
+                            HPX_THERE(node->dag.normal()->locality));
+      node->dag.set_normal_expansion(expand.lco(), expand.accuracy());
+    }
 
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm()) {
@@ -957,9 +961,9 @@ class Tree {
             break;
           case Operation::StoT:
             {
-              const DAGNode *normal = node->dag.normal();
-              assert(normal);
-              expansionlco_t expand{normal->global_addx, normal->other_member};
+              // S_to_T on expansion LCOs do not need any of the
+              // expansionlco_t's state, so we create a default object.
+              expansionlco_t expand{HPX_NULL, 0};
               targetlco_t targets{parts->out_edges[i].target->global_addx,
                                   parts->out_edges[i].target->other_member};
               expand.S_to_T(sources, targets);

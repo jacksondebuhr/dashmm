@@ -58,13 +58,20 @@ class Direct {
   using sourceref_t = ArrayRef<Source>;
 
   /// In generate, Direct does nothing.
-  void generate(sourcenode_t *curr, DomainGeometry *domain) const { }
+  void generate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.add_parts(hpx_get_my_rank());  // TODO fix
+  }
 
   /// In aggregate, Direct does nothing.
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const { }
 
   /// In inherit, Direct does nothing.
-  void inherit(targetnode_t *curr, DomainGeometry *domain) const { }
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const {
+    if (curr_is_leaf) {
+      curr->dag.add_parts(hpx_get_my_rank()); // TODO fix
+    }
+  }
 
   /// In process, Direct will collect all leaf nodes and apply S->T for each
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,

@@ -147,8 +147,7 @@ class DAGInfo {
   ///
   /// This cannot be used outside of an HPX-5 thread.
   DAGInfo(Index idx) : idx_{idx} {
-    normal_ = new DAGNode{idx_};
-    assert(normal_ != nullptr);
+    normal_ = nullptr;
     interm_ = nullptr;
     parts_ = nullptr;
     lock_ = hpx_lco_sema_new(1);
@@ -161,8 +160,10 @@ class DAGInfo {
   /// outside of an HPX-5 thread.
   ~DAGInfo() {
     hpx_lco_delete_sync(lock_);
-    delete normal_;
-    normal_ = nullptr;
+    if (normal_) {
+      delete normal_;
+      normal_ = nullptr;
+    }
     if (interm_ != nullptr) {
       delete interm_;
       interm_ = nullptr;
@@ -171,6 +172,15 @@ class DAGInfo {
       delete parts_;
       parts_ = nullptr;
     }
+  }
+
+  /// Add the normal node
+  ///
+  /// This will add a normal DAG node for the tree node owning this object.
+  void add_normal() {
+    assert(normal_ == nullptr);
+    normal_ = new DAGNode{idx_};
+    assert(normal_ != nullptr);
   }
 
   /// Add an intermediate node
@@ -199,6 +209,9 @@ class DAGInfo {
   DAGInfo &operator=(const DAGInfo &other) = delete;
   DAGInfo(const DAGInfo &&other) = delete;
   DAGInfo &operator=(const DAGInfo &&other) = delete;
+
+  /// Does the tree node have a normal DAG node?
+  bool has_normal() const {return normal_ != nullptr;}
 
   /// Does the tree node have an intermediate DAG node?
   bool has_interm() const {return interm_ != nullptr;}
@@ -283,6 +296,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the source node in question
   void StoM(DAGInfo *source) {
     assert(source->has_parts());
+    assert(source->has_normal());
     link_nodes(source, source->parts_, this, normal_, Operation::StoM);
   }
 
@@ -294,6 +308,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the source node in question
   void StoL(DAGInfo *source) {
     assert(source->has_parts());
+    assert(source->has_normal());
     link_nodes(source, source->parts_, this, normal_, Operation::StoL);
   }
 
@@ -304,6 +319,8 @@ class DAGInfo {
   ///
   /// \param source - the DAGInfo object containing the normal node in question
   void MtoM(DAGInfo *source) {
+    assert(source->has_normal());
+    assert(has_normal());
     link_nodes(source, source->normal_, this, normal_, Operation::MtoM);
   }
 
@@ -314,6 +331,8 @@ class DAGInfo {
   ///
   /// \param source - the DAGInfo object containing the normal node in question
   void MtoL(DAGInfo *source) {
+    assert(source->has_normal());
+    assert(has_normal());
     link_nodes(source, source->normal_, this, normal_, Operation::MtoL);
   }
 
@@ -324,6 +343,8 @@ class DAGInfo {
   ///
   /// \param source - the DAGInfo object containing the normal node in question
   void LtoL(DAGInfo *source) {
+    assert(source->has_normal());
+    assert(has_normal());
     link_nodes(source, source->normal_, this, normal_, Operation::LtoL);
   }
 
@@ -335,6 +356,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the particle node in
   ///                 question
   void MtoT(DAGInfo *target) {
+    assert(has_normal());
     assert(target->has_parts());
     link_nodes(this, normal_, target, target->parts_, Operation::MtoT);
   }
@@ -347,6 +369,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the particle node in
   ///                 question
   void LtoT(DAGInfo *target) {
+    assert(has_normal());
     assert(target->has_parts());
     link_nodes(this, normal_, target, target->parts_, Operation::LtoT);
   }
@@ -372,6 +395,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the normal node in
   ///                 question
   void MtoI(DAGInfo *source) {
+    assert(source->has_normal());
     assert(has_interm());
     link_nodes(source, source->normal_, this, interm_, Operation::MtoI);
   }
@@ -398,6 +422,7 @@ class DAGInfo {
   ///                 question
   void ItoL(DAGInfo *source) {
     assert(source->has_interm());
+    assert(has_normal());
     link_nodes(source, source->interm_, this, normal_, Operation::ItoL);
   }
 
@@ -410,7 +435,9 @@ class DAGInfo {
   /// \param internals - the vector containing the rest of the nodes
   void collect_DAG_nodes(std::vector<DAGNode *> &terminals,
                          std::vector<DAGNode *> &internals) {
-    internals.push_back(normal_);
+    if (normal_) {
+      internals.push_back(normal_);
+    }
     if (interm_) {
       internals.push_back(interm_);
     }

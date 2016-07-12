@@ -70,12 +70,15 @@ class BH {
 
   /// In generate, BH will call S->M on the sources in a leaf node.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.add_parts(hpx_get_my_rank()); // TODO: Fix this call to HPX
+    curr->dag.add_normal();
     curr->dag.StoM(&curr->dag);
   }
 
   /// In aggregate, BH will call M->M to combine moments from the children
   /// of the current node.
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.add_normal();
     for (size_t i = 0; i < 8; ++i) {
       sourcenode_t *kid = curr->child[i];
       if (kid != nullptr) {
@@ -85,7 +88,12 @@ class BH {
   }
 
   /// In inherit, BH does nothing.
-  void inherit(targetnode_t *curr, DomainGeometry *domain) const { }
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const {
+    if (curr_is_leaf) {
+      curr->dag.add_parts(hpx_get_my_rank()); // TODO fix this!
+    }
+  }
 
   /// In process, BH tests and uses multipole expansions.
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
