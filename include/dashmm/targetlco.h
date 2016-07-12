@@ -79,14 +79,6 @@ class TargetLCO {
   /// Construct from an existing LCO
   TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
 
-  // TODO fix this design flaw
-  //  That I need an overload of this constructor is a bit annoying. Not sure
-  //  if this is a big problem, but it is worth looking into.
-  TargetLCO(hpx_addr_t data, int n_targs) {
-    lco_ = data;
-    n_targs_ = (size_t)n_targs;
-  }
-
   /// Construct an LCO from input TargetRef. This will create the LCO.
   TargetLCO(size_t n_inputs, const targetref_t &targets, hpx_addr_t where) {
     Data init{static_cast<int>(n_inputs), targets};

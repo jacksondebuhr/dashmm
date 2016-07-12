@@ -211,7 +211,6 @@ std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
 }
 
 
-// TODO make this actually do the depth
 void compute_depths(std::vector<Node> &nodes, int &n_src, int &n_trg) {
   int source_num{1};
   int target_num{1};

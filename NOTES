@@ -7,10 +7,12 @@ TODO: create test case for new ViewSet stuff? Or just do the real thing and
 TODO: decide if I want to add assertions around the calls to the Expansion
       operations to make sure the Expansion Role is correct.
 
-TODO: Look at TODO in the code, and address where possible
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
           Basically, leave it better than you found it.
+        - One place this is annoying is in the 'other_member' member of dag
+          nodes. At the moment, we use the larger size there, and case to
+          integers for the accuracy.
 TODO: Improve the way that we optionally put out the DAG information. Perhaps
       this would be another version of evaluate, but which takes an additional
       template parameter serving the DAG output. This would then force the

@@ -210,7 +210,7 @@ class ExpansionLCO {
   void S_to_T(sourceref_t sources, targetlco_t targets) const {
     int n_src = sources.n();
     hpx_addr_t tsend = targets.lco();
-    int n_trg = targets.n();
+    size_t n_trg = targets.n();
     hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend, &n_trg);
   }
 
@@ -530,7 +530,7 @@ class ExpansionLCO {
   }
 
   static int s_to_t_handler(Source *sources, int n_sources,
-                            hpx_addr_t target, int n_trg) {
+                            hpx_addr_t target, size_t n_trg) {
     targetlco_t targets{target, n_trg};
     targets.contribute_S_to_T(n_sources, sources);
     return HPX_SUCCESS;

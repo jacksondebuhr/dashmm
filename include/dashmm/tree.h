@@ -901,11 +901,13 @@ class Tree {
                                 DAGNode **tnodes, size_t n_tnodes) {
     // If this is a bottleneck, we can easily make this some kind of parfor
     for (size_t i = 0; i < n_snodes; ++i) {
-      expansionlco_t expand{snodes[i]->global_addx, snodes[i]->other_member};
+      expansionlco_t expand{snodes[i]->global_addx,
+                            (int)snodes[i]->other_member};
       expand.set_out_edge_data(snodes[i]->out_edges);
     }
     for (size_t i = 0; i < n_tnodes; ++i) {
-      expansionlco_t expand{tnodes[i]->global_addx, tnodes[i]->other_member};
+      expansionlco_t expand{tnodes[i]->global_addx,
+                            (int)tnodes[i]->other_member};
       expand.set_out_edge_data(tnodes[i]->out_edges);
     }
     return HPX_SUCCESS;
@@ -936,7 +938,8 @@ class Tree {
             {
               const DAGNode *normal = node->dag.normal();
               assert(normal);
-              expansionlco_t expand{normal->global_addx, normal->other_member};
+              expansionlco_t expand{normal->global_addx,
+                                    (int)normal->other_member};
               auto domain = tree->domain_.value();
               double scale = 1.0 / domain->size_from_level(normal->idx.level());
               Point center = domain->center_from_index(normal->idx);
@@ -948,7 +951,8 @@ class Tree {
               // Get target DAGNode
               const DAGNode *normal = parts->out_edges[i].target;
               assert(normal);
-              expansionlco_t expand{normal->global_addx, normal->other_member};
+              expansionlco_t expand{normal->global_addx,
+                                    (int)normal->other_member};
               auto domain = tree->domain_.value();
               double scale = 1.0 / domain->size_from_level(normal->idx.level());
               Point center = domain->center_from_index(normal->idx);

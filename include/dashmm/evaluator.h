@@ -141,7 +141,7 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_t_,
                         expansionlco_t::s_to_t_handler,
-                        HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
+                        HPX_POINTER, HPX_INT, HPX_ADDR, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::create_from_expansion_,
                         expansionlco_t::create_from_expansion_handler,
