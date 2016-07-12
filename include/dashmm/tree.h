@@ -550,6 +550,10 @@ class Tree {
 
       tree->method_.generate(node, domain.value());
 
+      // NOTE: this will likely change in full distribution
+      // Set the source locality
+      node->dag.set_parts_loclity(hpx_get_my_rank());
+
       hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
 
       return HPX_SUCCESS;
@@ -650,6 +654,10 @@ class Tree {
     auto domain = tree->domain_.value();
     tree->method_.inherit(node, domain.value(), !refine);
     tree->method_.process(node, *parms->consider, !refine, domain.value());
+
+    // NOTE: This will change in full distribution
+    // Set locality on the targets
+    node->dag.set_parts_loclity(hpx_get_my_rank());
 
     if (refine) {
       // partition

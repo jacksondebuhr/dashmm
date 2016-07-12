@@ -70,7 +70,7 @@ class BH {
 
   /// In generate, BH will call S->M on the sources in a leaf node.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_parts(hpx_get_my_rank()); // TODO: Fix this call to HPX
+    curr->dag.add_parts();
     curr->dag.add_normal();
     curr->dag.StoM(&curr->dag);
   }
@@ -91,7 +91,7 @@ class BH {
   void inherit(targetnode_t *curr, DomainGeometry *domain,
                bool curr_is_leaf) const {
     if (curr_is_leaf) {
-      curr->dag.add_parts(hpx_get_my_rank()); // TODO fix this!
+      curr->dag.add_parts();
     }
   }
 

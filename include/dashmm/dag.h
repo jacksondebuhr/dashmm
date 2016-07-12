@@ -198,10 +198,9 @@ class DAGInfo {
   /// This will add a particle DAG node for the tree node associated with this
   /// object. This will represent either sources in the source tree, or
   /// targets in the target tree.
-  void add_parts(int loc) {
+  void add_parts() {
     assert(parts_ == nullptr);
     parts_ = new DAGNode{idx_};
-    parts_->locality = loc;
     assert(parts_ != nullptr);
   }
 
@@ -285,6 +284,13 @@ class DAGInfo {
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
       parts_->other_member = num;
+    }
+  }
+
+  /// Sets locality on the particle node
+  void set_parts_loclity(int loc) {
+    if (parts_ != nullptr) {
+      parts_->locality = loc;
     }
   }
 

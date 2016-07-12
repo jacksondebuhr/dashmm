@@ -59,7 +59,7 @@ class Direct {
 
   /// In generate, Direct does nothing.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_parts(hpx_get_my_rank());  // TODO fix
+    curr->dag.add_parts();
   }
 
   /// In aggregate, Direct does nothing.
@@ -69,7 +69,7 @@ class Direct {
   void inherit(targetnode_t *curr, DomainGeometry *domain,
                bool curr_is_leaf) const {
     if (curr_is_leaf) {
-      curr->dag.add_parts(hpx_get_my_rank()); // TODO fix
+      curr->dag.add_parts();
     }
   }
 

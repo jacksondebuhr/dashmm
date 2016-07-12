@@ -51,7 +51,7 @@ class FMM {
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM, DistroPolicy>;
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_parts(hpx_get_my_rank()); // TODO fix!
+    curr->dag.add_parts();
     curr->dag.add_normal();
     curr->dag.StoM(&curr->dag);
   }
@@ -69,7 +69,7 @@ class FMM {
   void inherit(targetnode_t *curr, DomainGeometry *domain,
                bool curr_is_leaf) const {
     if (curr_is_leaf) {
-      curr->dag.add_parts(hpx_get_my_rank()); // TODO fix
+      curr->dag.add_parts();
     }
     curr->dag.add_normal();
     if (curr->parent != nullptr) {
