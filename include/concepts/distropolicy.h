@@ -23,6 +23,11 @@
 
 class DistroPolicy {
 public:
+  /// Construct a default version of the distribution policy. This can
+  /// either be a constructor taking no arguments, or a constructor with all
+  /// arguments having a default value.
+  DistroPolicy();
+
   /// Computes the distribution of the work represented by the given nodes.
   ///
   /// The only required element of a distribution policy is this one.

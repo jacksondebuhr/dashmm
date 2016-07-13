@@ -239,7 +239,7 @@ class SharedData {
 
   /// Reset the value of the shared data.
   ///
-  /// This will reset the valuye shared around the system to that provided
+  /// This will reset the value shared around the system to that provided
   /// by the arguments. This method is asynchronous: it can return before the
   /// data has been updated everywhere. The returned address is for an LCO that
   /// can be used to wait on completion of the update.

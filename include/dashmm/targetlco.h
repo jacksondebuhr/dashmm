@@ -56,8 +56,8 @@ class Evaluator;
 /// interact with the object very often. Mostly they will pass objects of this
 /// type to ExpansionLCO objects.
 ///
-/// This is a template class parameterized by the Source, Target, Expansion
-/// and Method types for a particular evaluation of DASHMM.
+/// This is a template class parameterized by the Source, Target, Expansion,
+/// Method and DistroPolicy types for a particular evaluation of DASHMM.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,

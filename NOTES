@@ -1,3 +1,140 @@
+The basic idea for the distributed execution:
+
+Bo is working on this bit as a stand alone test case for creating the tree.
+We shall likely write up the tree creation scheme and the resulting scaling
+and performance.
+ * Each locality will create its own copy of the tree
+ * Each locality will start with some (unsorted) set of the S/T locations
+ * First, each locality will create a uniform tree to a certain level,
+   partitioning the particles owned into the maximum level.
+ * Then, each will share the counts of particles at those max level nodes
+   with all other localities.
+ * The totals will then be used to perform a rough split of those nodes with
+   among the localities. This algorithm will be deterministic, so that each
+   locality will compute the same distribution.
+ * Then each locality will send their exported particles to the correct
+   locality.
+ * At each locality, when all have arrived, the branches of the tree are
+   refined to the limit.
+ * Then, each locality will share the list of leaves with all other localities.
+ * Each locality ends up with the same tree built in local memory, though only
+   certain S/T are local.
+
+At this point, each tree can then build a DAG locally using the user's selected
+Method.
+
+Then, each locality can then use the selected Distribution policy to compute
+the localities of the nodes of the DAG (this will be only the non-terminal
+DAG nodes).
+
+Then, each locality can create those LCOs that are owned by that locality and
+can then populate the relevant edge information. DAG nodes that are remote
+would be given HPX_THERE(loc) as an address.
+
+Then each locality can setup the dependent out edge actions.
+
+Then each locality can start the work on the sources it owns.
+
+The out edge spawn action will have to be ready to either do the current thing,
+or send an action to the remote locality that will first look up the address
+before doing the set. This remote action should continue the result of the
+lookup back to the original LCO where an action will get the user data, and
+update the line in the out edge table inside the LCO.
+  NOTE: The return should only happen if the DAG is going to be reused.
+        Otherwise, this is overkill.
+  NOTE: This creates a possible problem for the termination detection. If the
+        LCOs start to get deleted on the last iteration, a return message
+        could arrive at a destroyed LCO. This bears some thinking.
+
+
+The point of this branch is to implement the stuff at the end. To really test
+it, we shall need to have the repeat use interface ready. We shall need to have
+the interface to the tree construction specified (even if we fake it for the
+time being by having copies of the data everywhere and by constructing the
+full tree everywhere).
+ - The application of the Method to the tree now must occur after the tree
+   is constructed. There are multiple phases to construction, and we cannot
+   do this as we go.
+ - This means we shall have to have the evaluation broken into pieces with the
+   relevant API exposed to perform piecemeal evaluation.
+
+
+
+
+FIRST TASK
+
+Go over all the code and look for places that have SMP assumptions that will
+break when fully distributed.
+ * include
+   - dashmm
+    : array.h
+        Largely speaking, the interface should not change too much for this.
+        The existing things will still be needed when fully distributed, but
+        their implementation should likely change. Further, we shall need to
+        extend the interface with some new things, even if only for internal
+        user.
+    : arraymapaction.h
+        Once again, to the extent possible, this should keep its interface.
+        Once again, the implementation will need to be updated.
+    : arraymetadata.h
+        This will need to change, but those are tied in with the overall change
+        to how the Array works internally.
+    : arrayref.h
+        This too will need to change. The distribution of the data will mean
+        that this will have to become more complicated.
+    : evaluator.h
+        There is some work needed for dealing with the source references that
+        will need to wait on working out Array, but mostly this is written
+        at a higher level. So this should be pretty easy to get ready. One
+        good place to start here would be to start defining the broken down
+        API for the evaluation. Then we can just use that.
+    : expansionlco.h
+        * to be able to handle resets, we do not want to explicitly copy the
+          out edge record stuff, even though currently nothing was provided
+          there. When it is reset, we do not want the existing information
+          in the out edges to be scrubbed.
+        * We shall need to add an "empty" set out edge data mode for the set
+          operation. This is for subsequent uses. Probably extend
+          set_out_edge_data with a boolean to indicate reset or not.
+        * The spawn_out_edges_handler will need to detect if the edge data
+          is just the HPX_THERE address and send the result to the correct
+          locality where it might look up the correct global address.
+          Though, the work will likely be complete on the sender side still as
+          we will have access to the indices and so on.
+        * Probably the way to handle this is to make the out_edge handlers
+          just return the newly created expansion, and then farm that out to
+          either contribute() or to the remote action for lookups. Though, the
+          stuff going to Targets is a bit different.
+    : targetlco.h
+        The change in Array and ArrayRef will impact here also.
+        Otherwise, this should be fine provided the LCO is always colocated
+        with the Target data it is representing.
+    : tree.h
+   - builtins
+    : laplace_sph.h
+        We want to see if there is a way to obviate the need to explicitly call
+        the table constructor.
+    : laplace_sph_table.h
+        We want to see if there is a way to avoid the explicit construction of
+        the table. Also, having a good elegant mechanism for users to implement
+        similar tables that does not look at all like using HPX-5 would be
+        great.
+ * src
+  : array.cc
+      This whole thing will need an update. We do not yet have the Array
+      implementation worked out for the distributed case. There is likely to
+      be significant change to how it works internally.
+  : laplace_sph.cc
+      We want to see if there is a way to obviate the need to explicitly call
+      the table constructor.
+  : laplace_sph_table.cc
+      We want to see if there is a way to avoid the explicit construction of
+      the table. Also, having a good elegant mechanism for users to implement
+      similar tables, that does not look at all like using HPX-5 would be
+      great.
+
+
+
 THIS BRANCH TODO
 
 TODO: clean up code where possible
@@ -36,14 +173,20 @@ TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
 Overall Plan to 1.0
 
  * DONE Split DAG from Tree
+ * Make intermediate expansions possible
+    This is provisionally DONE. This did not break the current operation of
+    all existing examples. However, a specific example was not created to test
+    this. Instead, the full Merge-And-Shift FMM will be implemented. If there
+    are problems, then these can be easily addressed in whatever state the
+    code is in.
 
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those
       particles as needed)
     - Array needs to be updated accordingly
     - Introduce more distribution policies
+
  * Kernel Parameters and Table generation
- * Make intermediate expansions possible
  * Split Evaluate into pieces and expose more interface to users
     - Enable repeat use of a DAG
     - Potentially provide objects representing the tree and so on to the user

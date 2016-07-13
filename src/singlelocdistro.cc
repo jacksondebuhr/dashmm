@@ -20,11 +20,11 @@ namespace dashmm {
 
 void SingleLocality::compute_distribution(DAG &dag) {
   for (auto i: dag.source_nodes) {
-    i->locality = 0;
+    i->locality = locality_;
   }
 
   for (auto i: dag.target_nodes) {
-    i->locality = 0;
+    i->locality = locality_;
   }
 }
 

@@ -71,7 +71,7 @@ struct DAGNode {
 
   int locality;                  /// the locality where this will be placed
   hpx_addr_t global_addx;        /// global address of object serving this node
-  size_t other_member;              /// this is either n_digits for an expansion or
+  size_t other_member;           /// this is either n_digits for an expansion or
                                  /// n_targets for a target lco
 
   DAGNode(Index i)

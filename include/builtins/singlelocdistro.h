@@ -32,8 +32,13 @@ namespace dashmm {
 /// unlikely to be a good choice, unless one is using only one locality to
 /// begin with.
 class SingleLocality {
-public:
+ public:
+  SingleLocality(int loc = 0) : locality_{loc} { }
+
   void compute_distribution(DAG &dag);
+
+ private:
+  int locality_;
 };
 
 
