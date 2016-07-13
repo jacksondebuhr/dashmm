@@ -399,20 +399,28 @@ class ExpansionLCO {
     Header *head{nullptr};
     hpx_lco_getref(lco_, 1, (void **)&head);
 
+    ViewSet views{};
+    if (head->out_edge_count > 0) {
+      ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+      views.interpret(inbuf);
+    }
+
     // Loop over the out edges, and spawn the work
+    // TODO: Read in the view just a single time, and pass that into the
+    //  following functions.
     OutEdgeRecord *out_edges =
       reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
     for (int i = 0; i < head->out_edge_count; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
-          m_to_m_out_edge(head, out_edges[i].target, n_digits);
+          m_to_m_out_edge(head, views, out_edges[i].target, n_digits);
           break;
         case Operation::MtoL:
-          m_to_l_out_edge(head, out_edges[i].target, out_edges[i].tidx,
+          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
                           n_digits);
           break;
         case Operation::LtoL:
-          l_to_l_out_edge(head, out_edges[i].target, out_edges[i].tidx,
+          l_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
                           n_digits);
           break;
         case Operation::MtoT:
@@ -421,7 +429,19 @@ class ExpansionLCO {
         case Operation::LtoT:
           l_to_t_out_edge(head, out_edges[i].target, n_digits);
           break;
+        case Operation::MtoI:
+          m_to_i_out_edge(head, views, out_edges[i].target, n_digits);
+          break;
+        case Operation::ItoI:
+          i_to_i_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
+                          n_digits);
+          break;
+        case Operation::ItoL:
+          i_to_l_out_edge(views, out_edges[i].target, out_edges[i].tidx,
+                          n_digits);
+          break;
         default:
+          assert(0 && "Impossible operation during out edge spawn");
           break;
       }
     }
@@ -457,14 +477,12 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  static void m_to_m_out_edge(Header *head, hpx_addr_t target, int n_digits) {
+  static void m_to_m_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double s_size = geo->size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
-    ViewSet views{};
-    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
-    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
@@ -473,15 +491,12 @@ class ExpansionLCO {
     destination.contribute(std::move(translated));
   }
 
-  static void m_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx,
-                              int n_digits) {
+  static void m_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double s_size = geo->size_from_level(head->index.level());
 
     // translate the source expansion
-    ViewSet views{};
-    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
-    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
@@ -490,15 +505,12 @@ class ExpansionLCO {
     lco.contribute(std::move(translated));
   }
 
-  static void l_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx,
-                              int n_digits) {
+  static void l_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx, int n_digits) {
     int to_child = tidx.which_child();
     LocalData<DomainGeometry> geo = head->domain.value();
     double t_size = geo->size_from_level(tidx.level());
 
-    ViewSet views{};
-    ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
-    views.interpret(inbuf);
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
@@ -527,6 +539,36 @@ class ExpansionLCO {
     targetlco_t destination{target, 0};
     destination.contribute_L_to_T(head->expansion_size, head->payload,
                                   n_digits, scale);
+  }
+
+  static void m_to_i_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, int n_digits) {
+    expansion_t lexp{views};
+    auto translated = lexp.M_to_I(head->index);
+    lexp.release();
+
+    expansionlco_t lco{target, n_digits};
+    lco.contribute(std::move(translated));
+  }
+
+  static void i_to_i_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx, int n_digits) {
+    expansion_t lexp{views};
+    auto translated = lexp.I_to_I(head->index, tidx);
+    lexp.release();
+
+    expansionlco_t lco{target, n_digits};
+    lco.contribute(std::move(translated));
+  }
+
+  static void i_to_l_out_edge(const ViewSet &views, hpx_addr_t target,
+                              Index tidx, int n_digits) {
+    expansion_t lexp{views};
+    auto translated = lexp.I_to_L(tidx);
+    lexp.release();
+
+    expansionlco_t lco{target, n_digits};
+    lco.contribute(std::move(translated));
   }
 
   static int s_to_t_handler(Source *sources, int n_sources,
