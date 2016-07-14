@@ -47,14 +47,16 @@ update the line in the out edge table inside the LCO.
         could arrive at a destroyed LCO. This bears some thinking.
 
 
+
+(OKAY, STUFF I CAN DO NOW IS HERE)
 The point of this branch is to implement the stuff at the end. To really test
 it, we shall need to have the repeat use interface ready. We shall need to have
 the interface to the tree construction specified (even if we fake it for the
 time being by having copies of the data everywhere and by constructing the
 full tree everywhere).
- - The application of the Method to the tree now must occur after the tree
+DONE - The application of the Method to the tree now must occur after the tree
    is constructed. There are multiple phases to construction, and we cannot
-   do this as we go.
+   do this as we go. <---- start with this
  - This means we shall have to have the evaluation broken into pieces with the
    relevant API exposed to perform piecemeal evaluation.
 
@@ -110,6 +112,15 @@ break when fully distributed.
         Otherwise, this should be fine provided the LCO is always colocated
         with the Target data it is representing.
     : tree.h
+        * The array reference type will impact this.
+        * The tree will no longer partition at the same time as it generates
+          the DAG.
+        * Largely speaking, the tree is still going to live in local memory. It
+          is just that there are stages in the construction when the various
+          trees speak with one another.
+        * So yeah, this is likely to change significantly. I think I should
+          first work out how the interface will want to look. And then go from
+          there.
    - builtins
     : laplace_sph.h
         We want to see if there is a way to obviate the need to explicitly call

@@ -285,6 +285,7 @@ class Tree {
   ///                  function. Typically, this is just the source root.
   ///
   /// \returns - an LCO to indicate the completion of the partitioning
+  // TODO remove consider from this
   hpx_addr_t partition_target_tree(targetref_t targets,
                                    bool same_sources_and_targets,
                                    std::vector<sourcenode_t *> *consider) {
@@ -299,7 +300,6 @@ class Tree {
     input.partdone = partdone;
     input.same_sources_and_targets = same_sources_and_targets;
     input.targets = targets;
-    input.which_child = 0;
     input.consider = consider;
 
     hpx_call(HPX_THERE(0), target_partition_, HPX_NULL, &input, sizeof(input));
@@ -314,10 +314,7 @@ class Tree {
   ///
   /// \param sources - the reference to the source records
   /// \param targets - the reference to the target records
-  void partition(sourceref_t sources, targetref_t targets) {
-    bool same_sandt = (sources.data() == targets.data()
-                        && sources.n() == targets.n());
-
+  void partition(sourceref_t sources, targetref_t targets, bool same_sandt) {
     compute_domain(sources, targets, same_sandt);
 
     hpx_addr_t sourcedone = partition_source_tree(sources);
@@ -330,6 +327,41 @@ class Tree {
                                                       consider);
     hpx_lco_wait(targetpartdone);
     hpx_lco_delete_sync(targetpartdone);
+  }
+
+  /// Create the DAG for this tree using the method specified at creation.
+  ///
+  /// This will allocate and collect the DAG nodes into the returned object.
+  ///
+  /// \returns - the resulting DAG.
+  DAG create_DAG(bool same_sandt) {
+    // Do work on the source tree
+    hpx_addr_t sdone = hpx_lco_future_new(0);
+    assert(sdone != HPX_NULL);
+
+    tree_t *thetree = this;
+    hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
+             &thetree, &source_root_, &sdone);
+
+    hpx_lco_wait(sdone);
+    hpx_lco_delete_sync(sdone);
+
+    // Do work on the target tree
+    hpx_addr_t tdone = hpx_lco_future_new(0);
+    assert(tdone != HPX_NULL);
+
+    std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
+    consider->push_back(source_root_);
+    int samearg = same_sandt ? 1 : 0;  // No HPX_BOOL type for action args
+    hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
+             &thetree, &target_root_, &consider, &samearg, &tdone);
+
+    hpx_lco_wait(tdone);
+    hpx_lco_delete_sync(tdone);
+
+    DAG retval{};
+    collect_DAG_nodes(retval);
+    return retval;
   }
 
   /// Traverse the tree and collect the DAG nodes
@@ -486,7 +518,6 @@ class Tree {
     hpx_addr_t partdone;
     bool same_sources_and_targets;
     targetref_t targets;
-    int which_child;
     // We are always working on one locality for the tree construction, so we
     // can get away with passing these pointers around. If we ever build the
     // tree across localities, this will need to change.
@@ -523,14 +554,6 @@ class Tree {
     return HPX_THREAD_CONTINUE(retval);
   }
 
-  static int source_child_done_handler(tree_t *tree, sourcenode_t *node,
-                                       hpx_addr_t partdone) {
-    auto domain = tree->domain_.value();
-    tree->method_.aggregate(node, domain.value());
-    hpx_lco_delete_sync(partdone);
-    return HPX_SUCCESS;
-  }
-
   static int source_partition_handler(SourcePartitionParams *parms,
                                       size_t UNUSED) {
     tree_t *tree = parms->tree;
@@ -538,19 +561,12 @@ class Tree {
 
     auto domain = tree->domain_.value();
 
+    assert(node->parts.data() == HPX_NULL);
+    node->parts = parms->sources;
+
     // If we are at a leaf, we can generate
     if (parms->sources.n() <= tree->refinement_limit_) {
-      assert(node->parts.data() == HPX_NULL);
-      node->parts = parms->sources;
-
-      tree->method_.generate(node, domain.value());
-
-      // NOTE: this will likely change in full distribution
-      // Set the source locality
-      node->dag.set_parts_loclity(hpx_get_my_rank());
-
       hpx_lco_set(parms->partdone, 0, nullptr, HPX_NULL, HPX_NULL);
-
       return HPX_SUCCESS;
     }
 
@@ -624,9 +640,8 @@ class Tree {
       hpx_call(HPX_HERE, source_partition_, HPX_NULL, &args, sizeof(args));
     }
 
-    // When the child has finished partitioning, we aggregate on this node
-    hpx_call_when(childpartdone, HPX_HERE, source_child_done_,
-                  parms->partdone, &tree, &node, &childpartdone);
+    hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
+                  parms->partdone, nullptr, 0);
 
     return HPX_SUCCESS;
   }
@@ -636,25 +651,9 @@ class Tree {
     targetnode_t *node = parms->node;
     tree_t *tree = parms->tree;
 
-    bool refine = false;
+    node->parts = parms->targets;
+
     if (parms->targets.n() > tree->refinement_limit_) {
-      refine = tree->method_.refine_test(parms->same_sources_and_targets, node,
-                                         *parms->consider);
-    }
-
-    if (!refine) {
-      node->parts = parms->targets;
-    }
-
-    auto domain = tree->domain_.value();
-    tree->method_.inherit(node, domain.value(), !refine);
-    tree->method_.process(node, *parms->consider, !refine, domain.value());
-
-    // NOTE: This will change in full distribution
-    // Set locality on the targets
-    node->dag.set_parts_loclity(hpx_get_my_rank());
-
-    if (refine) {
       // partition
       target_t *T{nullptr};
       assert(hpx_gas_try_pin(parms->targets.data(), (void **)&T));
@@ -737,9 +736,8 @@ class Tree {
 
         args.node = node->child[i];
         args.targets = cparts[i];
-        args.which_child = i;
         args.consider = new std::vector<sourcenode_t *>{};
-        *args.consider = *parms->consider;
+        *args.consider = *parms->consider; // TODO consider not needed
 
         hpx_call(HPX_HERE, target_partition_, HPX_NULL, &args, argssize);
       }
@@ -748,14 +746,87 @@ class Tree {
       // up the tree.
       hpx_call_when(partdone, partdone, hpx_lco_delete_action,
                     parms->partdone, nullptr, 0);
-    }
-
-    if (!refine) {
+    } else {
       hpx_lco_set_lsync(parms->partdone, 0, nullptr, HPX_NULL);
     }
 
     // Now we clear out the consider vector's memory
     delete parms->consider;
+
+    return HPX_SUCCESS;
+  }
+
+  static int source_apply_method_child_done_handler(tree_t *tree,
+                                                    sourcenode_t *node,
+                                                    hpx_addr_t done) {
+    auto domain = tree->domain_.value();
+    tree->method_.aggregate(node, domain.value());
+    hpx_lco_delete_sync(done);
+    return HPX_SUCCESS;
+  }
+
+  static int source_apply_method_handler(tree_t *tree, sourcenode_t *node,
+                                         hpx_addr_t done) {
+    int n_children = node->n_children();
+    if (n_children == 0) {
+      auto domain = tree->domain_.value();
+      tree->method_.generate(node, domain.value());
+      node->dag.set_parts_locality(hpx_get_my_rank());
+      hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
+      return HPX_SUCCESS;
+    }
+
+    hpx_addr_t cdone = hpx_lco_and_new(n_children);
+    assert(cdone != HPX_NULL);
+
+    for (int i = 0; i < 8; ++i) {
+      if (node->child[i] == nullptr) continue;
+      hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
+               &tree, &node->child[i], &cdone);
+    }
+
+    // Once the children are done, call aggregate here, continuing a set to
+    // done once that has happened.
+    hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, done,
+                  &tree, &node, &cdone);
+
+    return HPX_SUCCESS;
+  }
+
+  static int target_apply_method_handler(tree_t *tree, targetnode_t *node,
+                                         std::vector<sourcenode_t *> *consider,
+                                         int same_sandt, hpx_addr_t done) {
+    bool refine = false;
+    if (node->parts.n() > tree->refinement_limit_) {
+      refine = tree->method_.refine_test((bool)same_sandt, node, *consider);
+    }
+
+    auto domain = tree->domain_.value();
+    tree->method_.inherit(node, domain.value(), !refine);
+    tree->method_.process(node, *consider, !refine, domain.value());
+    node->dag.set_parts_locality(hpx_get_my_rank());
+
+    if (refine) {
+      int n_children = node->n_children();
+      hpx_addr_t cdone = hpx_lco_and_new(n_children);
+      assert(cdone);
+
+      for (int i = 0; i < 8; ++i) {
+        if (node->child[i] == nullptr) continue;
+        std::vector<sourcenode_t *> *ccons =
+            new std::vector<sourcenode_t *>{};
+        *ccons = *consider;
+        hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
+                 &tree, &node->child[i], &ccons, &same_sandt, &cdone);
+      }
+
+      hpx_call_when(cdone, cdone, hpx_lco_delete_action,
+                    done, nullptr, 0);
+    } else {
+      hpx_lco_set_lsync(done, 0, nullptr, HPX_NULL);
+    }
+
+    delete consider;
 
     return HPX_SUCCESS;
   }
@@ -1052,9 +1123,13 @@ class Tree {
   // Actions
   static hpx_action_t source_bounds_;
   static hpx_action_t target_bounds_;
-  static hpx_action_t source_child_done_;
   static hpx_action_t source_partition_;
   static hpx_action_t target_partition_;
+
+  static hpx_action_t source_apply_method_child_done_;
+  static hpx_action_t source_apply_method_;
+  static hpx_action_t target_apply_method_;
+
   static hpx_action_t create_S_expansions_from_DAG_;
   static hpx_action_t create_T_expansions_from_DAG_;
   static hpx_action_t edge_lists_;
@@ -1086,14 +1161,6 @@ template <typename S, typename T,
                     template <typename, typename> class,
                     typename> class M,
           typename D>
-hpx_action_t Tree<S, T, E, M, D>::source_child_done_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
 hpx_action_t Tree<S, T, E, M, D>::source_partition_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
@@ -1103,6 +1170,31 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t Tree<S, T, E, M, D>::target_partition_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::source_apply_method_child_done_ =
+    HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::source_apply_method_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::target_apply_method_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

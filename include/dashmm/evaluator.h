@@ -148,10 +148,6 @@ class Evaluator {
                         HPX_POINTER, HPX_SIZE_T);
 
     // Tree related
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        tree_t::source_child_done_,
-                        tree_t::source_child_done_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         tree_t::source_partition_,
                         tree_t::source_partition_handler,
@@ -160,6 +156,19 @@ class Evaluator {
                         tree_t::target_partition_,
                         tree_t::target_partition_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::source_apply_method_child_done_,
+                        tree_t::source_apply_method_child_done_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::source_apply_method_,
+                        tree_t::source_apply_method_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::target_apply_method_,
+                        tree_t::target_apply_method_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_POINTER,
+                        HPX_INT, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::source_bounds_, tree_t::source_bounds_handler,
                         HPX_ADDR, HPX_SIZE_T);
@@ -280,16 +289,17 @@ class Evaluator {
     // for distributed operation.
     sourceref_t sources = parms->sources.ref();
     targetref_t targets = parms->targets.ref();
+    bool same_sandt = (sources.data() == targets.data()
+                        && sources.n() == targets.n());;
 
     tree_t *tree = new tree_t{parms->method, parms->refinement_limit,
                               parms->n_digits};
-    tree->partition(sources, targets);
+    tree->partition(sources, targets, same_sandt);
 
     // NOTE: around here is where we can perform the table creation work,
     // (Future feature)
 
-    DAG dag{};
-    tree->collect_DAG_nodes(dag);
+    DAG dag = tree->create_DAG(same_sandt);
     parms->distro.compute_distribution(dag);
 
     tree->create_expansions_from_DAG(parms->n_digits);

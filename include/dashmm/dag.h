@@ -288,7 +288,7 @@ class DAGInfo {
   }
 
   /// Sets locality on the particle node
-  void set_parts_loclity(int loc) {
+  void set_parts_locality(int loc) {
     if (parts_ != nullptr) {
       parts_->locality = loc;
     }
