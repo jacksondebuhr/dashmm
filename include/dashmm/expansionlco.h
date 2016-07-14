@@ -109,9 +109,9 @@ class ExpansionLCO {
 
     ViewSet views = expand->get_all_views();
     size_t bytes = views.bytes();
-    size_t total_size = sizeof(Header) + bytes + sizeof(OutEdgeRecord) * n_out;
+    size_t less_edges = sizeof(Header) + bytes;
 
-    Header *input_data = reinterpret_cast<Header *>(new char[total_size]);
+    Header *input_data = reinterpret_cast<Header *>(new char[less_edges]);
     input_data->yet_to_arrive = n_in + 1; // to account for setting out edges
     input_data->expansion_size = bytes;
     input_data->domain = domain;
@@ -124,7 +124,7 @@ class ExpansionLCO {
 
     hpx_addr_t retval{HPX_NULL};
     hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
-                  input_data, total_size);
+                  input_data, less_edges);
     delete [] input_data;
 
     data_ = retval;
@@ -322,7 +322,7 @@ class ExpansionLCO {
   /// and the out edges).
   static void init_handler(Header *head, size_t bytes,
                            Header *init, size_t init_bytes) {
-    assert(bytes == init_bytes);
+    assert(bytes == init_bytes + sizeof(OutEdgeRecord) * init->out_edge_count);
     memcpy(head, init, init_bytes);
   }
 
@@ -578,8 +578,9 @@ class ExpansionLCO {
     return HPX_SUCCESS;
   }
 
-  static int create_from_expansion_handler(void *payload, size_t bytes) {
-    hpx_addr_t gdata = hpx_lco_user_new(bytes, init_, operation_,
+  static int create_from_expansion_handler(Header *payload, size_t bytes) {
+    size_t total = bytes + sizeof(OutEdgeRecord) * payload->out_edge_count;
+    hpx_addr_t gdata = hpx_lco_user_new(total, init_, operation_,
                                         predicate_, payload, bytes);
     assert(gdata != HPX_NULL);
     return HPX_THREAD_CONTINUE(gdata);

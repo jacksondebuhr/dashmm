@@ -91,7 +91,7 @@ break when fully distributed.
         good place to start here would be to start defining the broken down
         API for the evaluation. Then we can just use that.
     : expansionlco.h
-        * to be able to handle resets, we do not want to explicitly copy the
+      D * to be able to handle resets, we do not want to explicitly copy the
           out edge record stuff, even though currently nothing was provided
           there. When it is reset, we do not want the existing information
           in the out edges to be scrubbed.
@@ -113,7 +113,7 @@ break when fully distributed.
         with the Target data it is representing.
     : tree.h
         * The array reference type will impact this.
-        * The tree will no longer partition at the same time as it generates
+      D * The tree will no longer partition at the same time as it generates
           the DAG.
         * Largely speaking, the tree is still going to live in local memory. It
           is just that there are stages in the construction when the various
