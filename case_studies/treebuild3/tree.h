@@ -45,18 +45,25 @@ private:
 
 class Node {
 public:
-  Node(Index idx = Index{}): idx_{idx}, first_{0}, last_{0}, parent_{nullptr} {
+  Node() : idx_{}, first_{0}, last_{0}, parent_{nullptr} {
+    for (int i = 0; i < 8; ++i) 
+      child_[i] = nullptr;
+  }
+
+  Node(Index idx): idx_{idx}, first_{0}, last_{0}, parent_{nullptr} {
     for (int i = 0; i < 8; ++i) 
       child_[i] = nullptr; 
     sema_ = hpx_lco_sema_new(1); 
+    complete_ = hpx_lco_and_new(8); 
   }
 
-  Node(Index idx, int first, int last, Node *parent) : 
-    idx_{idx}, first_{first}, last_{last}, parent_{parent}, is_leaf_{false}
+  Node(Index, int first, int last, Node *parent) : 
+    idx_{idx}, first_{first}, last_{last}, parent_{parent} 
   {
     for (int i = 0; i < 8; ++i) 
       child_[i] = nullptr; 
     sema_ = hpx_lco_sema_new(1); 
+    complete_ = hpx_lco_and_new(8); 
   }
 
   ~Node() {
@@ -65,7 +72,11 @@ public:
         delete child_[i];
     }
 
-    hpx_lco_delete_sync(sema_);
+    if (sema_ != HPX_NULL) 
+      hpx_lco_delete_sync(sema_);
+
+    if (complete_ != HPX_NULL) 
+      hpx_lco_delete_sync(complete_); 
   }
 
   Index index() const {return idx_;}
@@ -73,18 +84,29 @@ public:
   int last() const {return last_;}
   Node *parent() const {return parent_;}
   Node *child(int i) const {return child_[i];}
-  
+
+  void set_index(Index idx) {idx_ = idx;}
+  void set_first(int first) {first_ = first;}
+  void set_last(int last) {last_ = last;}
+  void set_parent(const Node *parent) {parent_ = parent;}
+  void set_child(int i, const Node *child) {child_[i] = child;} 
+
+  void partition(Point *P, int *swap, int *bin, int *map, int threshold, 
+                 double corner_x, double corner_y, double corner_z, 
+                 double size);
+
+  int n_descendants() const; 
+  void compress(int *branch, int *tree, int parent, int &curr) const; 
+  void extract(const int *branch, const int *tree, int n_nodes); 
+
 private: 
   Index idx_; 
   int first_; 
   int last_; 
   Node *parent_; 
   Node *child_[8]; 
-  std::vector<const Node *> list1_; 
-  std::vector<const Node *> list2_; 
-  std::vector<const Node *> list3_; 
-  std::vector<const Node *> list4_; 
   hpx_addr_t sema_;
+  hpx_addr_t complete_; 
 } Node; 
 
 extern hpx_action_t allocate_points_action; 
@@ -95,18 +117,42 @@ extern hpx_action_t domain_geometry_init_action;
 extern hpx_action_t domain_geometry_op_action; 
 extern hpx_action_t domain_geometry_predicate_action; 
 extern hpx_action_t set_domain_geometry_action; 
-extern hpx_action_t coarse_grid_count_init_action; 
-extern hpx_action_t coarse_grid_count_op_action; 
-extern hpx_action_t coarse_grid_count_predicate_action; 
-extern hpx_action_t init_coarse_partition_action; 
-extern hpx_action_t coarse_partition_action; 
-extern hpx_action_t exchange_coarse_grid_count_action; 
-
+extern hpx_action_t unif_grid_count_init_action; 
+extern hpx_action_t unif_grid_count_op_action; 
+extern hpx_action_t unif_grid_count_predicate_action; 
+extern hpx_action_t init_partition_action; 
+extern hpx_action_t create_dual_tree_action; 
+extern hpx_action_t exchange_count_action; 
+extern hpx_action_t exchange_point_action; 
+extern hpx_action_t send_node_action; 
+extern hpx_action_t recv_node_action; 
 
 int *distribute_points(int num_ranks, const int *global, int len); 
 
+// Domain geometry
+double corner_x; 
+double corner_y; 
+double corner_z; 
+double size; 
 
+// Coarse level uniform partition
+int unif_level; 
+hpx_addr_t unif_count; 
+hpx_addr_t unif_grid; 
+hpx_addr_t unif_done; 
 
-extern hpx_action_t delete_tree_action; 
-extern hpx_action_t test_action; 
+// Sorted points and distribution across localities
+hpx_addr_t sorted_src; 
+hpx_addr_t sorted_tar; 
+int *distribute; 
+
+// Adaptive partition
+int threshold; 
+int *swap_src;
+int *bin_src; 
+int *map_src; 
+int *swap_tar; 
+int *bin_tar; 
+int *map_tar; 
+
 #endif 
