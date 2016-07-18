@@ -20,6 +20,7 @@
 /// \brief Interface to Expansion LCO
 
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -252,28 +253,46 @@ class ExpansionLCO {
   ///
   /// \param ops - the operations
   /// \param targets - the target LCO addresses
-  void set_out_edge_data(const std::vector<DAGEdge> &edges) {
+  void set_out_edge_data(std::vector<DAGEdge> &edges) {
     int n_out = edges.size();
     size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
     char *input_data = new char[bytes];
     assert(input_data);
 
     int *codes = reinterpret_cast<int *>(input_data);
-    OutEdgeRecord *records =
-        reinterpret_cast<OutEdgeRecord *>(input_data + sizeof(int) * 2);
-
     codes[0] = SetOpCodes::kOutEdges;
     codes[1] = n_out;
 
-    for (int i = 0; i < n_out; ++i) {
-      records[i].op = edges[i].op;
-      records[i].target = edges[i].target->global_addx;
-      records[i].tidx = edges[i].target->idx;
+    if (n_out) {
+      std::sort(edges.begin(), edges.end(), DAG::compare_edge_locality);
+
+      OutEdgeRecord *records =
+          reinterpret_cast<OutEdgeRecord *>(input_data + sizeof(int) * 2);
+
+      for (int i = 0; i < n_out; ++i) {
+        records[i].op = edges[i].op;
+        records[i].target = edges[i].target->global_addx;
+        records[i].tidx = edges[i].target->idx;
+        records[i].locality = edges[i].target->locality;
+      }
     }
 
     hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);
 
     delete [] input_data;
+  }
+
+  /// Result the underlying LCO
+  ///
+  /// This will not only reset the underlying LCO, but will also perform an
+  /// 'empty' set of the out edge data.
+  void reset() {
+    if (data_ == HPX_NULL) return;
+
+    hpx_lco_reset_sync(data_);
+
+    std::vector<DAGEdge> empty{};
+    set_out_edge_data(empty);
   }
 
  private:
@@ -302,6 +321,7 @@ class ExpansionLCO {
     Operation op;
     hpx_addr_t target;
     Index tidx;
+    int locality;
   };
 
   /// Operation codes for the LCOs set operation
@@ -365,12 +385,15 @@ class ExpansionLCO {
           int n_edges{};
           input.read(&n_edges);
 
-          // Usage Check
-          assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
-
-          WriteBuffer dest{&lhs->payload[lhs->expansion_size],
-                           sizeof(OutEdgeRecord) * n_edges};
-          dest.write(input);
+          if (n_edges) {
+            // Usage Check
+            assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
+            // We use out edge count here for the size so that an incorrect use
+            // does not write outside of bounds.
+            WriteBuffer dest{&lhs->payload[lhs->expansion_size],
+                             sizeof(OutEdgeRecord) * lhs->out_edge_count};
+            dest.write(input);
+          }
         }
 
         break;
@@ -389,9 +412,6 @@ class ExpansionLCO {
   // Other related actions
   ///////////////////////////////////////////////////////////////////
 
-  // I think the approach is going to be to do the action immediately,
-  // moving through the list in serial. If this ends up being a problem, we
-  // shall have to make each into an action, and accept the overhead.
   static int spawn_out_edges_handler(int n_digits) {
     hpx_addr_t lco_ = hpx_thread_current_target();
     // HACK: This action is local to the expansion, so we getref here with
@@ -399,6 +419,103 @@ class ExpansionLCO {
     Header *head{nullptr};
     hpx_lco_getref(lco_, 1, (void **)&head);
 
+    // Shortcut to the work in the case of a single locality
+    if (hpx_get_num_ranks() == 1) {
+      spawn_out_edges_work(head, n_digits);
+      hpx_lco_release(lco_, head);
+      return HPX_SUCCESS;
+    }
+
+    // Make a scratch space for the sends
+    size_t total_size = sizeof(Header) + head->expansion_size +
+                        sizeof(OutEdgeRecord) * head->out_edge_count;
+    // TODO increase by sizeof(hpx_addr_t) when return messages happen
+    // Actually, this will need to be two of these. One for the tree
+    // local pointer array, and one for the return address - actually, if
+    // we do the return as a continuation action, we do not need two
+    Header *scratch = reinterpret_cast<Header *>(new char [total_size]);
+    memcpy(scratch, head, total_size);
+
+    // Once we have the copy, we are done with the LCO data
+    hpx_lco_release(lco_, head);
+
+    // Get reference to out edges
+    OutEdgeRecord *out_edges = reinterpret_cast<OutEdgeRecord *>(
+        &scratch->payload[scratch->expansion_size]);
+
+    // make a local copy of the edge count, and set the n_digits for remotes
+    int save_count = scratch->out_edge_count;
+    head->yet_to_arrive = n_digits;
+
+    // loop over the sorted edges
+    int my_rank = hpx_get_my_rank();
+    OutEdgeRecord *begin = out_edges;
+    OutEdgeRecord *end = &out_edges[save_count];
+    while (begin != end) {
+      int curr_rank = begin->locality;
+
+      // Find end of current locality's edges
+      OutEdgeRecord *curr = begin;
+      while (curr->locality == curr_rank && curr != end) {
+        curr += 1;    // look at next record
+      }
+
+      //move into start of range
+      head->out_edge_count = curr - begin;
+      size_t send_edges_size = sizeof(OutEdgeRecord) * head->out_edge_count;
+      if (begin != out_edges) {
+        std::move(begin, curr, out_edges);
+      }
+
+      // Now send the parcel or do the work
+      if (curr_rank == my_rank) {
+        spawn_out_edges_work(scratch, n_digits);
+      } else {
+        size_t message_size = sizeof(Header) + head->expansion_size
+                                           + send_edges_size;
+                                    // TODO + (1/2) x hpx_addr_t eventually
+
+        hpx_parcel_t *parc = hpx_parcel_acquire(scratch, message_size);
+        hpx_parcel_set_action(parc, spawn_out_edges_from_remote_);
+        hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
+        // TODO eventually we may need a continuation action and target
+
+        // NOTE: we need to wait for local completion because we are going to
+        // modify the buffer in place for the next locality
+        hpx_parcel_send_sync(parc);
+      }
+
+      //advance
+      begin = curr;
+    }
+
+    delete [] scratch;
+
+    // done
+    return HPX_SUCCESS;
+  }
+
+  static int spawn_out_edges_from_remote_handler(Header *head,
+                                                 size_t msg_size) {
+    // Detect if the edges have unknown target addresses and lookup the
+    // correct edges
+    // TODO: this is currently not something that will need to happen
+
+    // Send the response message if any lookups were performed
+    // TODO: this is not needed just yet. NOTE: the return message will need
+    // to be sure that the other sends have finished... Is this an argument
+    // for copies on the origin side?
+    // TODO: decide if this is a continuation action, or a return action
+    // sent from here
+
+    // NOTE: we use yet_to_arrive to send the n_digits with these messages.
+    // At this point, yet_to_arrive is 0, so if that is needed, just use 0.
+    spawn_out_edges_work(head, head->yet_to_arrive);
+
+    return HPX_SUCCESS;
+  }
+
+  static void spawn_out_edges_work(Header *head, int n_digits) {
     ViewSet views{};
     if (head->out_edge_count > 0) {
       ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
@@ -406,10 +523,13 @@ class ExpansionLCO {
     }
 
     // Loop over the out edges, and spawn the work
-    // TODO: Read in the view just a single time, and pass that into the
-    //  following functions.
     OutEdgeRecord *out_edges =
       reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+
+    // TODO: should we sort so that the ->T operations go last?
+    // Or do two loops, one that skips the ->T and one that does only ->T
+    // Explore this when we can measure performance more accurately, or with
+    // more detail.
     for (int i = 0; i < head->out_edge_count; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
@@ -445,10 +565,6 @@ class ExpansionLCO {
           break;
       }
     }
-
-    hpx_lco_release(lco_, head);
-
-    return HPX_SUCCESS;
   }
 
   static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
@@ -594,6 +710,7 @@ class ExpansionLCO {
 
   // The actions for the various operations
   static hpx_action_t spawn_out_edges_;
+  static hpx_action_t spawn_out_edges_from_remote_;
   static hpx_action_t s_to_m_;
   static hpx_action_t s_to_l_;
   static hpx_action_t s_to_t_;
@@ -641,6 +758,15 @@ template <typename S, typename T,
                     template <typename, typename> class,
                     typename> class M,
           typename D>
+hpx_action_t ExpansionLCO<S, T, E, M, D>::spawn_out_edges_from_remote_ =
+    HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
 hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_m_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
@@ -665,8 +791,8 @@ template <typename S, typename T,
                     template <typename, typename> class,
                     typename> class M,
           typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::create_from_expansion_
-    = HPX_ACTION_NULL;
+hpx_action_t ExpansionLCO<S, T, E, M, D>::create_from_expansion_ =
+    HPX_ACTION_NULL;
 
 
 } // namespace dashmm

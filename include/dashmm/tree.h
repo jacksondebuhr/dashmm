@@ -939,18 +939,19 @@ class Tree {
       node->dag.set_interm_expansion(intexp_lco.lco(), intexp_lco.accuracy());
     }
 
-    // spawn work at children
-    int n_children{node->n_children()};
+    // NOTE: this spawn through the tree does not end when the tree ends.
+    // Instead, we have to check if this node has a parts node in the DAG.
+    // If so, this branch is done, and we need not spawn more.
 
     // Here is where we make the target lco if needed
-    if (n_children == 0) {
+    if (node->dag.has_parts()) {
       targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
                        HPX_THERE(node->dag.parts()->locality)};
       node->dag.set_targetlco(tlco.lco(), tlco.n());
 
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
     } else {
-      hpx_addr_t cdone = hpx_lco_and_new(n_children);
+      hpx_addr_t cdone = hpx_lco_and_new(node->n_children());
       assert(cdone != HPX_NULL);
 
       for (int i = 0; i < 8; ++i) {
@@ -995,9 +996,13 @@ class Tree {
       }
     } else {
       // At a leaf, we do actual work
-      const DAGNode *parts = node->dag.parts();
+      DAGNode *parts = node->dag.parts();
       assert(parts != nullptr);
       sourceref_t sources = node->parts;
+
+      // We first sort the out edges by locality
+      std::sort(parts->out_edges.begin(), parts->out_edges.end(),
+                DAG::compare_edge_locality);
 
       // loop over edges
       for (size_t i = 0; i < parts->out_edges.size(); ++i) {
@@ -1030,11 +1035,11 @@ class Tree {
               expand.S_to_L(center, sources, scale);
             }
             break;
-          case Operation::MtoM:
-          case Operation::MtoL:
-          case Operation::LtoL:
-          case Operation::MtoT:
-          case Operation::LtoT:
+          case Operation::MtoM:   // NOTE: Fall-through
+          case Operation::MtoL:   //   |
+          case Operation::LtoL:   //   |
+          case Operation::MtoT:   //   |
+          case Operation::LtoT:   //   v
             assert(0 && "Trouble handling DAG instigation");
             break;
           case Operation::StoT:

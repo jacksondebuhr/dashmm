@@ -95,7 +95,7 @@ break when fully distributed.
           out edge record stuff, even though currently nothing was provided
           there. When it is reset, we do not want the existing information
           in the out edges to be scrubbed.
-        * We shall need to add an "empty" set out edge data mode for the set
+      D * We shall need to add an "empty" set out edge data mode for the set
           operation. This is for subsequent uses. Probably extend
           set_out_edge_data with a boolean to indicate reset or not.
         * The spawn_out_edges_handler will need to detect if the edge data
@@ -103,10 +103,18 @@ break when fully distributed.
           locality where it might look up the correct global address.
           Though, the work will likely be complete on the sender side still as
           we will have access to the indices and so on.
-        * Probably the way to handle this is to make the out_edge handlers
-          just return the newly created expansion, and then farm that out to
-          either contribute() or to the remote action for lookups. Though, the
-          stuff going to Targets is a bit different.
+            This has to wait on the new style of tree creation, the simple
+            early distribution will know all addresses from the start.
+        * We also want to send the expansion data across the network only a
+          single time for each locality. So we want to first sort the out edges
+          by the target locality. Then the expansion data is sent across the
+          network. At the far side it will go ahead and perform the translations
+          and then the local lco sets. -- further, the ->T operations should
+          be performed last
+              Okay - sorting is done
+              This is implemented, but is not tested. Currently, there is no
+              distribution possible. Perhaps I will get everything ready,
+              and then run with some nonsense distribution just to test it.
     : targetlco.h
         The change in Array and ArrayRef will impact here also.
         Otherwise, this should be fine provided the LCO is always colocated
@@ -121,6 +129,10 @@ break when fully distributed.
         * So yeah, this is likely to change significantly. I think I should
           first work out how the interface will want to look. And then go from
           there.
+        * For the spawn of the S->?, we want to sort the out edges by locality
+          and send to each locality only once, and then do the set of edges
+          on the far side. Further, the ->T operations should be performed last
+              Okay - sorting is done
    - builtins
     : laplace_sph.h
         We want to see if there is a way to obviate the need to explicitly call

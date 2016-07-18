@@ -53,12 +53,12 @@ struct DAGNode;
 
 /// Edge in the explicit representation of the DAG
 struct DAGEdge {
-  const DAGNode *source;    /// Source node of the edge
-  const DAGNode *target;    /// Target node of the edge
+  DAGNode *source;          /// Source node of the edge
+  DAGNode *target;          /// Target node of the edge
   Operation op;             /// Operation to perform along edge
 
   DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop} { }
-  DAGEdge(const DAGNode *start, const DAGNode *end, Operation inop)
+  DAGEdge(DAGNode *start, DAGNode *end, Operation inop)
     : source{start}, target{end}, op{inop} { }
 };
 
@@ -77,10 +77,10 @@ struct DAGNode {
   DAGNode(Index i)
       : out_edges{}, in_edges{}, idx{i}, locality{0}, global_addx{HPX_NULL},
         other_member{0} { }
-  void add_out_edge(const DAGNode *end, Operation op) {
+  void add_out_edge(DAGNode *end, Operation op) {
     out_edges.push_back(DAGEdge{this, end, op});
   }
-  void add_in_edge(const DAGNode *start, Operation op) {
+  void add_in_edge(DAGNode *start, Operation op) {
     in_edges.push_back(DAGEdge{start, this, op});
   }
 };
@@ -113,6 +113,15 @@ class DAG {
   /// information to that file is JSON format. See the implementation for
   /// details about what is included.
   void toJSON(std::string fname);
+
+  static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
+    return a.target->locality < b.target->locality;
+  }
+
+  static bool operation_to_target(Operation op) {
+    return op == Operation::MtoT || op == Operation::LtoT
+                                 || op == Operation::StoT;
+  }
 
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
@@ -219,13 +228,13 @@ class DAGInfo {
   bool has_parts() const {return parts_ != nullptr;}
 
   /// Retrieve the normal DAG node
-  const DAGNode *normal() const {return normal_;}
+  DAGNode *normal() const {return normal_;}
 
   /// Retrieve the intermediate DAG node
-  const DAGNode *interm() const {return interm_;}
+  DAGNode *interm() const {return interm_;}
 
   /// Return the source or target DAG node
-  const DAGNode *parts() const {return parts_;}
+  DAGNode *parts() const {return parts_;}
 
   /// Sets the global data for the normal DAG node
   ///

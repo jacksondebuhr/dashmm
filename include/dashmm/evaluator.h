@@ -128,6 +128,10 @@ class Evaluator {
                         expansionlco_t::spawn_out_edges_,
                         expansionlco_t::spawn_out_edges_handler,
                         HPX_INT);
+    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_MARSHALLED,
+                        expansionlco_t::spawn_out_edges_from_remote_,
+                        expansionlco_t::spawn_out_edges_from_remote_handler,
+                        HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
                         expansionlco_t::s_to_m_,
                         expansionlco_t::s_to_m_handler,
