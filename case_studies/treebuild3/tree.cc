@@ -890,16 +890,37 @@ int finalize_partition_handler(void *unused, size_t size) {
   
   int dim3 = pow(8, unif_level); 
   Node *n = reinterpret_cast<Node *>(meta_g->data); 
+
   for (int i = 0; i < dim3; ++i) {
+    Node *curr = &n[i]; 
+    hpx_lco_delete_sync(curr->sema()); 
+    hpx_lco_delete_sync(curr->complete()); 
+
     if (distribute[i] == rank) {
-      n[i].destroy(); 
-      n[i + dim3].destroy();
+      for (int j = 0; j < 8; ++j) {
+        Node *child = curr->child(j); 
+        if (child) 
+          child->destroy(false);
+      }
     } else {
-      n[i].destroy(false); 
-      n[i + dim3].destroy();
+      for (int j = 0; j < 8; ++j) {
+        Node *child = curr->child(j); 
+        if (child) 
+          child->destroy(true); 
+      }
+
+      for (int j = 0; j < 8; ++j) {
+        Node *child = curr->child(j); 
+        if (child) {
+          delete [] child;
+          break;
+        }
+      }
     }
   }
-  
+
+  delete [] meta_g->data; 
+
   hpx_gas_unpin(count); 
   hpx_gas_unpin(done); 
   hpx_gas_unpin(grid); 
@@ -1100,17 +1121,16 @@ void Node::extract(const int *branch, const int *tree, int n_nodes) {
   }
 }
 
-void Node::destroy(bool recursive) {
+void Node::destroy(bool allocated_in_array) {
+  for (int i = 0; i < 8; ++i) {
+    if (child_[i]) 
+      child_[i]->destroy(allocated_in_array);
+  }
   if (sema_ != HPX_NULL)
     hpx_lco_delete_sync(sema_); 
   if (complete_ != HPX_NULL)
-    hpx_lco_delete_sync(sema_); 
-
-  if (recursive) {
-    for (int i = 0; i < 8; ++i) {
-      if (child_[i]) 
-        child_[i]->destroy(recursive);
-    }
-  }
+    hpx_lco_delete_sync(complete_); 
+  if (allocated_in_array == false) 
+    delete this;
 }
-      
+

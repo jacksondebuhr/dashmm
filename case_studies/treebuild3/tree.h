@@ -55,7 +55,7 @@ class Node {
 public:
   Node() : idx_{}, first_{0}, last_{0}, parent_{nullptr} {
     for (int i = 0; i < 8; ++i) 
-      child_[i] = nullptr;
+      child_[i] = nullptr; 
   }
 
   Node(Index idx): idx_{idx}, first_{0}, last_{0}, parent_{nullptr} {
@@ -66,7 +66,7 @@ public:
   }
 
   Node(Index idx, int first, int last, Node *parent) : 
-    idx_{idx}, first_{first}, last_{last}, parent_{parent} 
+    idx_{idx}, first_{first}, last_{last}, parent_{parent}
   {
     for (int i = 0; i < 8; ++i) 
       child_[i] = nullptr; 
@@ -74,7 +74,7 @@ public:
     complete_ = hpx_lco_and_new(8); 
   }
 
-  ~Node() {}; 
+  ~Node() {}
 
   Index index() const {return idx_;}
   int first() const {return first_;}
@@ -91,15 +91,14 @@ public:
   void set_child(int i, Node *child) {child_[i] = child;} 
   void set_sema(hpx_addr_t sema) {sema_ = sema;}
   void set_complete(hpx_addr_t complete) {complete_ = complete;}
-
-  void destroy(bool recursive = true); 
-
+  
   void partition(Point *P, int *swap, int *bin, int *map, int threshold, 
                  double corner_x, double corner_y, double corner_z, 
                  double size);
   int n_descendants() const; 
   void compress(int *branch, int *tree, int parent, int &curr) const; 
   void extract(const int *branch, const int *tree, int n_nodes); 
+  void destroy(bool allocated_in_array); 
 
 private: 
   Index idx_; 
@@ -107,6 +106,7 @@ private:
   int last_; 
   Node *parent_; 
   Node *child_[8]; 
+  bool within_array_; 
   hpx_addr_t sema_;
   hpx_addr_t complete_; 
 };
