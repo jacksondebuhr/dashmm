@@ -3,12 +3,9 @@
 #include "tree.h"
 
 void usage(std::string exec) {
-  std::cout << "Usage: " << exec 
-            << "--datatype=[c/s] " 
-            << "--nsrc-per-rank=num " 
-            << "--ntar-per-rank=num "
-            << "--threshold=num "
-            << std::endl; 
+  std::cout << "Usage: " << exec << "--datatype=[c/s] " 
+            << "--nsrc-per-rank=num " << "--ntar-per-rank=num "
+            << "--threshold=num " << std::endl; 
 }
 
 int main(int argc, char *argv[]) {
@@ -55,23 +52,9 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  hpx_addr_t sources{HPX_NULL}; 
-  hpx_addr_t targets{HPX_NULL}; 
-  hpx_addr_t *sources_addr = &sources; 
-  hpx_addr_t *targets_addr = &targets; 
-
-  if (hpx_run(&allocate_points_action, &nsrc_per_rank, &ntar_per_rank, 
-              &datatype, &sources_addr, &targets_addr)) {
-    std::cout << "Failed to allocate points" << std::endl; 
-  }
-  
-  if (hpx_run(&partition_points_action, &nsrc_per_rank, &sources, 
-              &ntar_per_rank, &targets, &threshold)) {
-    std::cout << "Failed to partition points" << std::endl; 
-  }
-
-  if (hpx_run(&delete_points_action, &sources, &targets)) {
-    std::cout << "Failed to delete points" << std::endl;
+  if (hpx_run(&main_action, &nsrc_per_rank, &ntar_per_rank, 
+              &datatype, &threshold)) {
+    std::cout << "Failed to run main action" << std::endl;
   }
 
   hpx_finalize(); 

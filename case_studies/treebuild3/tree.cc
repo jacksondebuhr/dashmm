@@ -3,7 +3,50 @@
 #include <cstdint> 
 #include <cstring>
 #include <iostream>
+#include <algorithm>
 #include "tree.h"
+
+double corner_x; 
+double corner_y; 
+double corner_z; 
+double size; 
+
+int unif_level; 
+hpx_addr_t unif_count; 
+hpx_addr_t unif_grid; 
+hpx_addr_t unif_done; 
+
+hpx_addr_t sorted_src; 
+hpx_addr_t sorted_tar; 
+int *distribute; 
+
+int threshold; 
+int *swap_src; 
+int *bin_src; 
+int *map_src; 
+int *swap_tar; 
+int *bin_tar; 
+int *map_tar; 
+
+void set_points_in_cube(Point *p, int count) {
+  for (int i = 0; i < count; ++i) {
+    double x = 1.0 * rand() / RAND_MAX - 0.5; 
+    double y = 1.0 * rand() / RAND_MAX - 0.5; 
+    double z = 1.0 * rand() / RAND_MAX - 0.5; 
+    p[i] = Point{x, y, z};
+  }
+}
+
+void set_points_on_sphere(Point *p, int count) {
+  for (int i = 0; i < count; ++i) {
+    double theta = 1.0 * rand() / RAND_MAX * M_PI_2; 
+    double phi = 1.0 * rand() / RAND_MAX * M_PI * 2; 
+    double x = sin(theta) * cos(phi); 
+    double y = sin(theta) * sin(phi); 
+    double z = cos(theta); 
+    p[i] = Point{x, y, z}; 
+  }
+}
 
 uint64_t split(unsigned k) {  
   uint64_t split = k & 0x1fffff; 
@@ -15,770 +58,109 @@ uint64_t split(unsigned k) {
   return split;
 }
 
-uint64_t morton_key(const index_t *index) {
+uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
   uint64_t key = 0;
   key |= split(x) | split(y) << 1 | split(z) << 2;
   return key;
 }
 
-int allocate_points_handler(int nsrc, int ntar, char datatype, 
-                            hpx_addr_t *src_handle, 
-                            hpx_addr_t *tar_handle) {
-  int num_ranks = hpx_get_num_ranks(); 
-  hpx_addr_t src = hpx_gas_calloc_cyclic(num_ranks, sizeof(Point) * nsrc, 0); 
-  hpx_addr_t tar = hpx_gas_calloc_cyclic(num_ranks, sizeof(Point) * ntar, 0); 
-  *src_handle = src; 
-  *tar_handle = tar; 
-  hpx_bcast_rsync(set_points_action, &src, &tar, &nsrc, &ntar, &datatype); 
-  hpx_exit(HPX_SUCCESS); 
-}
-HPX_ACTION(HPX_DEFAULT, 0, allocate_points_action, allocate_points_handler, 
-           HPX_INT, HPX_INT, HPX_CHAR, HPX_POINTER, HPX_POINTER); 
+int *distribute_points(int num_ranks, const int *global, int len) {
+  int *ret = new int[num_ranks]; 
 
+  const int *s = global; // Source counts
+  const int *t = &global[len]; // Target counts
 
-int set_points_handler(hpx_addr_t src, hpx_addr_t tar, int nsrc, int ntar, 
-                       char datatype) {
+  int *scan = new int[len]; 
+  scan[0] = s[0] + t[0]; 
+  for (int i = 1; i < len; ++i) 
+    scan[i] = scan[i - 1] + s[i] + t[i]; 
+
+  int q = scan[len - 1] / num_ranks; 
+  int r = scan[len - 1] % num_ranks; 
+
+  int rank = 0; 
+  int iterator = -1; 
+  int bound = q + (r != 0); 
+
+  while (rank < num_ranks) {
+    if (rank) 
+      bound = scan[iterator] + q + (rank <= r); 
+    iterator++; 
+    int i; 
+    for (i = iterator; i < len; ++i) {
+      if (scan[i] <= bound && scan[i + 1] > bound)
+        break;
+    }
+    ret[rank++] = i; 
+    iterator = i; 
+  }
+
+  delete [] scan; 
+  return ret; 
+} 
+
+int generate_input_handler(int nsrc_per_rank, int ntar_per_rank, 
+                           hpx_addr_t sources, hpx_addr_t targets, 
+                           char datatype) {
   int rank = hpx_get_my_rank(); 
-  hpx_addr_t curr_src = hpx_addr_add(src, sizeof(Point) * nsrc * rank, 
-                                     sizeof(Point) * nsrc); 
-  hpx_addr_t curr_tar = hpx_addr_add(tar, sizeof(Point) * ntar * rank,
-                                     sizeof(Point) * ntar); 
+  hpx_addr_t curr_s = hpx_addr_add(sources, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_t = hpx_addr_add(targets, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+
+  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr}; 
+  if (!hpx_gas_try_pin(curr_s, (void **)&meta_s) || 
+      !hpx_gas_try_pin(curr_t, (void **)&meta_t)) 
+    return HPX_ERROR; 
+
+  meta_s->size = sizeof(Point); 
+  meta_s->count = nsrc_per_rank; 
+  meta_s->data = new char[sizeof(Point) * nsrc_per_rank]; 
+
+  meta_t->size = sizeof(Point); 
+  meta_t->count = ntar_per_rank; 
+  meta_t->data = new char[sizeof(Point) * ntar_per_rank]; 
+
+  Point *p_s = reinterpret_cast<Point *>(meta_s->data); 
+  Point *p_t = reinterpret_cast<Point *>(meta_t->data); 
+
   srand(rank); 
-  Point *s{nullptr}, *t{nullptr}; 
-  
-  if (!hpx_gas_try_pin(curr_src, (void **)&s) || 
-      !hpx_gas_try_pin(curr_tar, (void **)&t)) 
-    return HPX_ERROR; 
-
   if (datatype == 'c') {
-    for (int i = 0; i < nsrc; ++i) {
-      double x = 1.0 * rand() / RAND_MAX - 0.5; 
-      double y = 1.0 * rand() / RAND_MAX - 0.5; 
-      double z = 1.0 * rand() / RAND_MAX - 0.5; 
-      s[i] = Point{x, y, z}; 
-    }
-
-    for (int i = 0; i < ntargets; ++i) {
-      double x = 1.0 * rand() / RAND_MAX - 0.5; 
-      double y = 1.0 * rand() / RAND_MAX - 0.5; 
-      double z = 1.0 * rand() / RAND_MAX - 0.5; 
-      t[i] = Point{x, y, z}; 
-    }
+    set_points_in_cube(p_s, nsrc_per_rank);
+    set_points_in_cube(p_t, nsrc_per_rank); 
   } else {
-    for (int i = 0; i < nsources; ++i) {
-      double theta = 1.0 * rand() / RAND_MAX * M_PI_2; 
-      double phi = 1.0 * rand() / RAND_MAX * M_PI * 2; 
-      double x = sin(theta) * cos(phi); 
-      double y = sin(theta) * sin(phi); 
-      double z = cos(theta); 
-      s[i] = Point{x, y, z}; 
-    }
-
-    for (int i = 0; i < ntargets; ++i) {
-      double theta = 1.0 * rand() / RAND_MAX * M_PI_2; 
-      double phi = 1.0 * rand() / RAND_MAX * M_PI * 2; 
-      double x = sin(theta) * cos(phi); 
-      double y = sin(theta) * sin(phi); 
-      double z = cos(theta); 
-      t[i] = Point{x, y, z}; 
-    }
+    set_points_on_sphere(p_s, nsrc_per_rank); 
+    set_points_on_sphere(p_t, ntar_per_rank);
   }
 
-  hpx_gas_unpin(curr_src); 
-  hpx_gas_unpin(curr_tar); 
+  hpx_gas_unpin(curr_s); 
+  hpx_gas_unpin(curr_t); 
   return HPX_SUCCESS; 
-}
-HPX_ACTION(HPX_DEFAULT, 0, set_points_action, set_points_handler, 
-           HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT, HPX_CHAR);
-
-int delete_points_handler(hpx_addr_t src, hpx_addr_t tar) { 
-  hpx_gas_free_sync(src); 
-  hpx_gas_free_sync(tar); 
-  hpx_exit(HPX_SUCCESS); 
 } 
-HPX_ACTION(HPX_DEFAULT, 0, delete_points_action, delete_points_handler, 
+HPX_ACTION(HPX_DEFAULT, 0, generate_input_action, generate_input_handler, 
+           HPX_INT, HPX_INT, HPX_ADDR, HPX_ADDR, HPX_CHAR); 
+
+int destroy_input_handler(hpx_addr_t sources, hpx_addr_t targets) {
+  int rank = hpx_get_my_rank(); 
+  hpx_addr_t curr_s = hpx_addr_add(sources, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_t = hpx_addr_add(targets, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+
+  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr}; 
+  if (!hpx_gas_try_pin(curr_s, (void **)&meta_s) || 
+      !hpx_gas_try_pin(curr_t, (void **)&meta_t)) 
+    return HPX_ERROR; 
+
+  delete [] meta_s->data; 
+  delete [] meta_t->data;
+
+  hpx_gas_unpin(curr_s); 
+  hpx_gas_unpin(curr_t); 
+  return HPX_SUCCESS; 
+} 
+HPX_ACTION(HPX_DEFAULT, 0, destroy_input_action, destroy_input_handler, 
            HPX_ADDR, HPX_ADDR); 
-
-
-int partition_points_handler(int nsrc, hpx_addr_t src, 
-                             int ntar, hpx_addr_t tar, int threshold) {
-  int num_ranks = hpx_get_num_ranks(); 
-
-  // Determine domain geometry
-  hpx_addr_t domain_geometry = 
-    hpx_lco_user_new(sizeof(int) + sizeof(double) * 6, 
-                     domain_geometry_init_action, 
-                     domain_geometry_op_action, 
-                     domain_geometry_predicate_action, 
-                     &num_ranks, sizeof(num_ranks)); 
-
-  hpx_bcast_lsync(set_domain_geometry_action, HPX_NULL, 
-                  &nsrc, &src, &ntar, &tar, &domain_geometry); 
-
-  void *temp{nullptr}; 
-  hpx_lco_getref{domain_geometr, 1, &temp); 
-  double *var = reinterpret_cast<double *>(static_cast<char *>(temp) + 
-                                           sizeof(int)); 
-  double size_x = var[1] - var[0]; 
-  double size_y = var[3] - var[2]; 
-  double size_z = var[5] - var[4]; 
-  double size = fmax(size_x, fmax(size_y, size_z)); 
-  double corner_x = (var[1] + var[0] - size) / 2; 
-  double corner_y = (var[3] + var[2] - size) / 2; 
-  double corner_z = (var[5] + var[4] - size) / 2; 
-
-  // Choose uniform partition level such that the number of grids is no less
-  // than the number of ranks 
-  unif_level = ceil(log(num_ranks) / log(8)); 
-  int n_grids = pow(8, unif_level); 
-
-  // Cyclic allocation on rank 0
-  unif_count = hpx_gas_calloc_cyclic(num_ranks, sizeof(hpx_addr_t), 0); 
-  unif_grid = hpx_gas_calloc_cyclic(num_ranks, sizeof(Node) * n_grids * 2, 0);
-  unif_done = hpx_gas_calloc_cyclic(num_ranks, sizeof(hpx_addr_t), 0); 
-  sorted_src = hpx_gas_calloc_cyclic(num_ranks, sizeof(Point *), 0); 
-  sorted_tar = hpx_gas_calloc_cyclic(num_ranks, sizeof(Point *), 0); 
-
-  hpx_bcast_rsync(init_partition_action, &unif_count, &unif_grid, &unif_done, 
-                  &sorted_src, &sorted_tar, &unif_level, &threshold, 
-                  &corner_x, &corner_y, &corner_z, &size); 
-
-  hpx_bcast_rsync(create_dual_tree_action, &src, &nsrc, &tar, &ntar); 
-
-  // Cleanup 
-  // unif_count, unif_grid, unif_done, sorted_src, sorted_tar
-
-  hpx_exit(HPX_SUCCESS); 
-}
-HPX_ACTION(HPX_DEFAULT, 0, partition_points_action, partition_points_handler, 
-           HPX_INT, HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT); 
-
-int init_partition_handler(hpx_addr_t count, hpx_addr_t grid, hpx_addr_t done,
-                           hpx_addr_t src, hpx_addr_t tar, int level, 
-                           int limit, double cx, double cy, double cz, 
-                           double sz) {
-  int rank = hpx_get_my_rank(); 
-  int num_ranks = hpx_get_num_ranks(); 
-  int dim = pow(2, level), dim3 = pow(8, level); 
-
-  if (rank) {
-    unif_count = count; 
-    unif_grid = grid; 
-    unif_done = done; 
-    sorted_src = src; 
-    sorted_tar = tar; 
-    unif_level = level;
-    threshold = limit; 
-    corner_x = cx; 
-    corner_y = cy; 
-    corner_z = cz; 
-    size = sz; 
-  }
-
-  // Setup unif_count LCO 
-  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
-                                            sizeof(hpx_addr_t) * rank, 
-                                            sizeof(hpx_addr_t)); 
-  hpx_addr_t *user_lco{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
-    return HPX_ERROR; 
-
-  int init[2] = {num_ranks, dim3 * 2}; 
-  *user_lco = hpx_lco_user_new(sizeof(int) * (2 + dim3 * 2), 
-                               unif_grid_count_init_action, 
-                               unif_grid_count_op_action, 
-                               unif_grid_count_predicate_action,
-                               &init, sizeof(init)); 
-  hpx_gas_unpin(curr_unif_count); 
- 
-  // Setup unif_grid
-  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
-                                           sizeof(Node) * dim3 * 2 * rank, 
-                                           sizeof(Node) * dim3 * 2); 
-  
-  Node *n{nullptr}, *s{nullptr}, *t{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_grid, (void **)&n))
-    return HPX_ERROR; 
-
-  s = &n[0]; 
-  t = &n[dim3]; 
-
-  int iterator = 0; 
-  for (int iz = 0; iz < num_per_dim; ++iz) {
-    for (int iy = 0; iy < num_per_dim; ++iy) {
-      for (int ix = 0; ix < num_per_dim; ++ix) {
-        // The purpose here is to setup Index and LCOs of the Node 
-        s[iterator] = Node{Index{level, ix, iy, iz}}; 
-        t[iterator] = Node{Index{level, ix, iy, iz}}; 
-        iterator++; 
-      }
-    }
-  }
-
-  hpx_gas_unpin(curr_unif_grid); 
-
-  // Setup unif_done
-  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
-                                           sizeof(hpx_addr_t) * rank, 
-                                           sizeof(hpx_addr_t)); 
-  hpx_addr_t *gate{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate))
-    return HPX_ERROR; 
-
-  *gate = hpx_lco_and_new(1); 
-  hpx_gas_unpin(curr_unif_done); 
-
-  return HPX_SUCCESS; 
-} 
-HPX_ACTION(DEFAULT, 0, init_partition_action, init_partition_handler, 
-           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT, 
-           HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE); 
-
-
-int create_dual_tree_handler(hpx_addr_t src, int nsrc, 
-                             hpx_addr_t tar, int ntar) {
-  int num_ranks = hpx_get_num_ranks(); 
-  int rank = hpx_get_my_rank(); 
-
-  hpx_addr_t curr_src = hpx_addr_add(src, sizeof(Point) * nsrc * rank, 
-                                     sizeof(Point) * nsrc); 
-  hpx_addr_t curr_tar = hpx_addr_add(tar, sizeof(Point) * ntar * rank, 
-                                     sizeof(Point) * ntar); 
-  Point *s{nullptr}, *t{nullptr}; 
-  if (!hpx_gas_try_pin(curr_src, (void **)&s) || 
-      !hpx_gas_try_pin(curr_tar, (void **)&t)) 
-    return HPX_ERROR; 
-
-  // Assign points to grid 
-  int dim = pow(2, unif_level),  dim3 = pow(8, unif_level); 
-  int *gid_of_src = new int[nsrc]; 
-  int *gid_of_tar = new int[ntar]; 
-  int *local_cnt = new int[dim3 * 2]; 
-  int *local_scnt = &local_cnt[0]; 
-  int *local_tcnt = &local_cnt[dim3]; 
-  double scale = 1.0 / size; 
-
-  for (int i = 0; i < nsrc; ++i) {
-    Point *j = &s[i]; 
-    int xid = dim * (j->x() - corner_x) * scale; 
-    int yid = dim * (j->y() - corner_y) * scale; 
-    int zid = dim * (j->z() - corner_z) * scale; 
-    int gid = morton_key(xid, yid, zid); 
-    gid_of_src[i] = gid; 
-    local_scnt[gid]++; 
-  }
-
-  for (int i = 0; i < ntar; ++i) {
-    Point *j = &t[i]; 
-    int xid = dim * (j->x() - corner_x) * scale; 
-    int yid = dim * (j->y() - corner_y) * scale; 
-    int zid = dim * (j->z() - corner_z) * scale; 
-    int gid = morton_key(xid, yid, zid); 
-    gid_of_tar[i] = gid; 
-    local_tcnt[gid]++;
-  }
-
-  // Exchange counts
-  for (int r = 0; i < num_ranks; ++r) {
-    hpx_parcel_t *p = hpx_parcel_acquire(local_cnt, sizeof(int) * dim3 * 2); 
-    hpx_parcel_set_target(p, HPX_THERE(r)); 
-    hpx_parcel_set_action(p, exchange_count_action); 
-    hpx_parcel_send(p, HPX_NULL); 
-  }
-
-  // Put points in the same grid together  
-  int *local_offset_s = new int[dim3]; 
-  int *local_offset_t = new int[dim3]; 
-  Point *temp_s = new Point[nsrc]; 
-  Point *temp_t = new Point[ntar]; 
-  int *assigned = new int[dim3]; 
-
-  for (int i = 1; i < dim3; ++i) {
-    local_offset_s[i] = local_offset_s[i - 1] + local_scnt[i - 1]; 
-    local_offset_t[i] = local_offset_t[i - 1] + local_tcnt[i - 1]; 
-  }
-
-  for (int i = 0; i < nsrc; ++i) {
-    int gid = gid_of_src[i]; 
-    int cursor = local_offset_s[gid] + assigned[gid]; 
-    temp_s[cursor] = s[i]; 
-    assigned[gid]++;
-  }
-
-  memset(assigned, 0, dim3); 
-
-  for (int i = 0; i < ntar; ++i) {
-    int gid = gid_of_tar[i]; 
-    int cursor = local_offset_t[gid] + assigned[gid]; 
-    temp_t[cursor] = t[i]; 
-    assigned[gid]++;
-  }
-
-  delete [] gid_of_src; 
-  delete [] gid_of_tar; 
-  delete [] assigned; 
-    
-  hpx_gas_unpin(curr_src); 
-  hpx_gas_unpin(curr_tar); 
-
-  // Compute point distribution
-  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
-                                            sizeof(hpx_addr_t) * rank, 
-                                            sizeof(hpx_addr_t)); 
-  hpx_addr_t *user_lco{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
-    return HPX_ERROR; 
-  
-  void *user_lco_buffer{nullptr}; 
-  int *global_cnt{nullptr}; 
-  hpx_lco_getref(*user_lco, 1, &user_lco_buffer); 
-  global_cnt = reinterpret_cast<int *>(static_cast<char *>(user_lco_buffer) 
-                                       + sizeof(int) * 2); 
-  int *dist = distribute_points(num_ranks, global_cnt, dim3); 
-
-  // Exchange points
-  hpx_addr_t curr_sorted_src = hpx_addr_add(sorted_src, 
-                                            sizeof(Point *) * rank, 
-                                            sizeof(Point *)); 
-  hpx_addr_t curr_sorted_tar = hpx_addr_add(sorted_tar, 
-                                            sizeof(Point *) * rank, 
-                                            sizeof(Point *)); 
-  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
-                                           sizeof(hpx_addr_t) * rank, 
-                                           sizeof(hpx_addr_t)); 
-  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
-                                           sizeof(Node) * dim3 * 2 * rank, 
-                                           sizeof(Node) * dim3 * 2); 
-
-  Point **ss{nullptr}, **st{nullptr}; 
-  Node *n{nullptr}, *ns{nullptr}, *nt{nullptr}; 
-  hpx_addr_t *gate{nullptr}; 
-
-  if (!hpx_gas_try_pin(curr_sorted_src, (void **)&ss) ||
-      !hpx_gas_try_pin(curr_sorted_tar, (void **)&st) ||
-      !hpx_gas_try_pin(curr_unif_done, (void **)&gate) ||
-      !hpx_gas_try_pin(curr_unif_grid, (void **)&n))
-    return HPX_ERROR; 
-
-  ns = &n[0]; 
-  nt = &n[dim3]; 
-
-  // Range of grids owned by the current rank
-  int start = (rank == 0 ? 0 : dist[rank - 1] + 1); 
-  int end = dist[rank]; 
-  int range = end - start + 1; 
-  int nss = global_cnt[start], nst = global_cnt[start + dim3]; 
-  int *global_offset_s = new int[range]; 
-  int *global_offset_t = new int[range]; 
-
-  for (int i = 1; i < range; ++i) {
-    nss += global_cnt[i + start]; 
-    nst += global_cnt[i + start + dim3]; 
-    global_offset_s[i] = global_offset_s[i - 1] + global_cnt[i + start];
-    global_offset_t[i] = global_offset_t[i - 1] + global_cnt[i + start]; 
-  }
-
-  // Allocate memory to hold points of the assigned grids
-  *ss = new Point[nss]; 
-  *st = new Point[nst]; 
-
-  // And memory for adaptive partitioning 
-  swap_src = new int[nss]; 
-  bin_src = new int[nss]; 
-  map_src = new int[nss]; 
-  swap_tar = new int[nst]; 
-  bin_tar = new int[nst]; 
-  map_tar = new int[nst]; 
-
-  for (int i = 0; i < nss; ++i) 
-    map_src[i] = i; 
-  for (int i = 0; i < nst; ++i) 
-    map_tar[i] = i; 
-
-  for (int i = start; i <= end; ++i) {
-    // Copy local source points
-    memcpy(*ss + global_offset_s[i - start], &temp_s[local_offset_s[i]],
-           sizeof(Point) * local_scnt[i]); 
-
-    // Here, first_ will be used as an iterator to trace the position to 
-    // insert point. When all the points have been inserted, the correct 
-    // value of first_ can be recovered from last_ and global_cnt. 
-    ns[i].set_first(global_offset_s[i - start] + local_scnt[i]); 
-    
-    if (i < end) {
-      ns[i].set_last(global_offset_s[i + 1 - start]); 
-    } else {
-      ns[i].set_last(nss - 1); 
-    }
-
-    // Copy local target points 
-    memcpy(*st + global_offset_t[i - start], &temp_t[local_offset_t[i]], 
-           sizeof(Point) * local_tcnt[i]); 
-
-    nt[i].set_first(global_offset_t[i - start] + local_tcnt[i]); 
-    
-    if (i < end) {
-      nt[i].set_last(global_offset_t[i + 1 - start]); 
-    } else {
-      nt[i].set_last(nst - 1);
-    }
-  }
-
-  // The current rank is ready to receive 
-  hpx_lco_and_set(*gate, HPX_NULL); 
-
-  // Send points to the other ranks 
-  for (int r = 0; r < num_ranks; ++r) {
-    if (r != rank) {
-      // Range of grids assigned to rank r
-      int start = (r == 0 ? 0 : dist[r - 1] + 1); 
-      int end = dist[r]; 
-      int range = end - start + 1; 
-
-      int send_ns = local_offset_s[end] - local_offset_s[start] + 1; 
-      int send_nt = local_offset_t[end] - local_offset_t[start] + 1; 
-
-      // Parcel message size 
-      size_t psize = sizeof(int) * (4 + 2 * range) + 
-        sizeof(Point) * (send_ns + send_nt); 
-      hpx_parcel_t *p = hpx_parcel_acquire(NULL, psize); 
-
-      void *data = hpx_parcel_get_data(p); 
-
-      int *meta = reinterpret_cast<int *>(static_cast<char *>(data)); 
-      meta[0] = start;  
-      meta[1] = end; 
-      meta[2] = send_ns; 
-      meta[3] = send_nt; 
-      int *meta_offset_s = &meta[4]; 
-      int *meta_offset_t = &meta[4 + range]; 
-
-      for (int i = start; i <= end; ++i) {
-        meta_offset_s[i - start] = local_offset_s[i] - local_offset_s[start]; 
-        meta_offset_t[i - start] = local_offset_t[i] - local_offset_t[start]; 
-      }
-
-      char *meta_s = static_cast<char *>(data) + sizeof(int) * (4 + range * 2); 
-      char *meta_t = meta_s + sizeof(Point) * send_ns; 
-
-      memcpy(meta_s, &temp_s[start], send_ns); 
-      memcpy(meta_t, &temp_t[start], send_nt); 
-
-      hpx_parcel_set_target(p, HPX_THERE(r)); 
-      hpx_parcel_set_action(p, exchange_points_action); 
-      hpx_parcel_send(p, HPX_NULL);
-    }
-  }
-
-  // Exchange source and target trees
-  hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
-
-  for (int i = 0; i < start; ++i) {
-    hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                  HPX_NULL, NULL, 0); 
-    hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                  HPX_NULL, NULL, 0); 
-  }
-
-  for (int i = end + 1; i < dim3; ++i) {
-    hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                  HPX_NULL, NULL, 0); 
-    hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                  HPX_NULL, NULL, 0); 
-  }    
-
-  for (int i = start; i <= end; ++i) {
-    int s{0}, t{1}; 
-    hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
-                                    send_node_action, 
-                                    dual_tree_complete, hpx_lco_set_action, 
-                                    &ns, ss, &i, &s); 
-
-    hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
-                                    send_node_action, 
-                                    dual_tree_complete, hpx_lco_set_action, 
-                                    &nt, st, &i, &t); 
-  }
-      
-  hpx_lco_wait(dual_tree_complete); 
-  hpx_lco_delete_sync(dual_tree_complete); 
-
-  hpx_lco_release(*user_lco, user_lco_buffer); 
-  hpx_gas_unpin(curr_unif_count); 
-  hpx_gas_unpin(curr_sorted_src); 
-  hpx_gas_unpin(curr_sorted_tar); 
-  hpx_gas_unpin(curr_unif_done); 
-  hpx_gas_unpin(curr_unif_grid); 
-
-  delete [] local_cnt; 
-  delete [] local_offset_s; 
-  delete [] local_offset_t; 
-  delete [] temp_s; 
-  delete [] temp_t; 
-  delete [] swap_src; 
-  delete [] bin_src; 
-  delete [] map_src; 
-  delete [] swap_tar; 
-  delete [] bin_tar; 
-  delete [] map_tar; 
-
-  return HPX_SUCCESS; 
-}
-HPX_ACTION(HPX_DEFAULT, 0, create_dual_tree_action, create_dual_tree_handler, 
-           HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT, HPX_DOUBLE, HPX_DOUBLE, 
-           HPX_DOUBLE, HPX_DOUBLE); 
-
-int send_node_handler(Node *n, Point *p, int id, int type) {
-  int first = n[id].first(); 
-  int last = n[id].last(); 
-  int range = last - first = 1; 
-
-  // Rearrange points
-  int *map = (type ? map_tar : map_src); 
-  Point *temp = new Point[range]; 
-  for (int i = first; i <= last; ++i) 
-    temp[i - first] = p[map[i]]; 
-  memcpy(p + first, temp, sizeof(Point) * range); 
-  delete [] temp; 
-
-  // Exclude n as it is already allocated on remote localities
-  int n_nodes = n->descendants() - 1; 
-  int *compressed_tree = new int[3 + n_nodes * 2]; 
-
-  compressed_tree[0] = type; // target is 0, source is 1
-  compressed_tree[1] = id; // where to merge the tree 
-  compressed_tree[2] = n_nodes; // # of nodes 
-  int *branch = &compressed_tree[3]; 
-  int *tree = &compressed_tree[3 + n_nodes]; 
-  int curr = 0; 
-  n->compress(branch, tree, -1, curr); 
-  
-  int rank = hpx_get_my_rank(); 
-  int num_ranks = hpx_get_num_ranks(); 
-  hpx_addr_t done = hpx_lco_and_new(num_ranks - 1); 
-
-  for (int r = 0; r < num_ranks; ++r) {
-    if (r != rank) {
-      hpx_parcel_t *p = hpx_parcel_acquire(compressed_tree, 
-                                           sizeof(int) * (3 + n_nodes * 2)); 
-      hpx_parcel_set_target(p, HPX_THERE(r)); 
-      hpx_parcel_set_action(p, recv_node_action); 
-      hpx_parcel_send(p, done); 
-    }
-  }
-
-  // Clear local memory once all parcels are sent 
-  hpx_lco_wait(done); 
-  delete [] compressed_tree; 
-  return HPX_SUCCESS; 
-
-}
-HPX_ACTION(HPX_DEFAULT, 0, send_node_action, send_node_handler, 
-           HPX_POINTER_T, HPX_POINTER_T, HPX_INT, HPX_INT); 
-
-int recv_node(void *args, size_t size) {
-  int *compressed_tree = reinterpret_cast<int *>(static_cast<char *>(args)); 
-
-  int rank = hpx_get_my_rank(); 
-  int dim3 = pow(8, unif_level); 
-  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
-                                           sizeof(Node) * dim3 * 2 * rank, 
-                                           sizeof(Node) * dim3 * 2); 
-  Node *n{nullptr}, *curr{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_grid, (void **)&n))
-    return HPX_ERROR; 
-  
-  int type = compressed_tree[0]; 
-  int id = compressed_tree[1]; 
-  int n_nodes = compressed_tree[2]; 
-  const int *branch = &compressed_tree[3]; 
-  const int *tree = &compressed_tree[3 + n_nodes]; 
-
-  curr = &n[id + type * n_nodes]; 
-  curr->extract(branch, tree, n_nodes); 
-  
-  hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);   
-  hpx_gas_unpin(curr_unif_grid);
-
-  return HPX_SUCCESS; 
-} 
-HPX_ACTION(HPX_DEFAULT, 0, recv_node_action, recv_node_handler, 
-           HPX_POINTER_T, HPX_SIZE_T); 
-
-int exchange_point_handler(void *args, size_t size) {
-  int rank = hpx_get_my_rank(); 
-  hpx_addr_t curr_unif_done = hpx_addr_t(unif_done, 
-                                         sizeof(hpx_addr_t) * rank, 
-                                         sizeof(hpx_addr_t)); 
-  hpx_addr_t *gate{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate)) 
-    return HPX_ERROR; 
-
-  // Wait until the buffer for exchanging points has been allocated 
-  hpx_lco_wait(*gate); 
-  hpx_gas_unpin(curr_unif_done); 
-
-  // Now proceed to merge the incoming points 
-  int dim = pow(2, unif_level), dim3 = pow(8, unif_level); 
-
-  hpx_addr_t curr_unif_count = hpx_addr_t(unif_count, 
-                                          sizeof(hpx_addr_t) * rank, 
-                                          sizeof(hpx_addr_t)); 
-  hpx_addr_t curr_sorted_src = hpx_addr_t(sorted_src, 
-                                          sizeof(Point *) * rank, 
-                                          sizeof(Point *)); 
-  hpx_addr_t curr_sorted_tar = hpx_addr_t(sorted_tar, 
-                                          sizeof(Point *) * rank, 
-                                          sizeof(Point *)); 
-  hpx_addr_t curr_unif_grid = hpx_addr_t(unif_grid, 
-                                         sizeof(Node) * dim3 * 2 * rank, 
-                                         sizeof(Node) * dim3 * 2); 
-  Point **s{nullptr}, **t{nullptr}; 
-  Node *n{nullptr}, *ns{nullptr}, *nt{nullptr}; 
-  hpx_addr_t *user_lco{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco) ||
-      !hpx_gas_try_pin(curr_sorted_src, (void **)&s) ||
-      !hpx_gas_try_pin(curr_sorted_tar, (void **)&t) ||
-      !hpx_gas_try_pin(curr_unif_grid, (void **)&n))
-    return HPX_ERROR; 
-
-  void *user_lco_buffer{nullptr}; 
-  hpx_lco_getref(*user_lco, 1, &user_lco_buffer); 
-  int *count = reinterpret_cast<int *>(static_cast<char *>(user_lco_buffer) 
-                                       + sizeof(int) * 2); 
-  int *count_s = count; 
-  int *count_t = &count[dim3]; 
-
-  // Process incoming message 
-  int *meta = reinterpret_cast<int *>(static_cast<char *>(args)); 
-  int start = meta[0];
-  int end = meta[1];
-  int range = end - start + 1; 
-  int recv_ns = meta[2]; 
-  int recv_nt = meta[3]; 
-  int *offset_s = &meta[4]; 
-  int *offset_t = &meta[4 + range]; 
-  
-  Point *recv_s = reinterpret_cast<Point *>(static_cast<char *>(args) + 
-                                            sizeof(int) * (4 + range * 2)); 
-  Point *recv_t = recv_s + recv_ns; 
-
-  for (int i = start; i <= end; ++i) {
-    Node *curr_s = &ns[i]; 
-    Node *curr_t = &nt[i]; 
-
-    int incoming_first_s = offset_s[i - start]; 
-    int incoming_last_s = (i == end ? recv_ns - 1 : 
-                           offset_s[i + 1 - start] - 1); 
-    int incoming_ns = incoming_last_s - incoming_first_s + 1; 
-
-    hpx_lco_sema_p(curr_s->sema()); 
-    int curr_s_first = curr_s->first(); 
-    memcpy(*s + curr_s_first, &recv_s[incoming_first_s], 
-           sizeof(Point) * incoming_ns); 
-    curr_s->set_first(curr_s_first + incoming_ns); 
-
-    if (curr_s_first + incoming_ns > curr_s->last()) {
-      // This grid is ready for adaptive partition
-      int first = curr_s->last() + 1 - count_s[i]; 
-      curr_s->set_first(first); 
-      
-      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-               &curr_s, s, &swap_src, &bin_src, &map_src); 
-    }
-    hpx_lco_sema_v(curr_s->sema()); 
-  
-    int incoming_first_t = offset_t[i - start]; 
-    int incoming_last_t = (i == end ? recv_nt - 1:
-                           offset_t[i + 1 - start] - 1); 
-    int incoming_nt = incoming_last_t - incoming_first_t + 1; 
-
-    hpx_lco_sema_p(curr_t->sema()); 
-    int curr_t_first = curr_t->first(); 
-    memcpy(*t + curr_t_first, &recv_t[incoming_first_t], 
-           sizeof(Point) * incoming_nt); 
-    curr_t->set_first(curr_t_first + incoming_nt); 
-
-    if (curr_t_first + incoming_nt > curr_t>last()) {
-      // This grid is ready for adaptive partition 
-      int first = curr_t->last() + 1 - count_t[i]; 
-      curr_t->set_first(first); 
-
-      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-               &curr_t, t, &swap_tar, &bin_tar, &map_tar); 
-    }
-    hpx_lco_sema_v(curr_t->sema()); 
-  }
-
-  hpx_lco_release(*user_lco, user_lco_buffer); 
-  hpx_gas_unpin(curr_unif_count); 
-  hpx_gas_unpin(curr_sorted_src); 
-  hpx_gas_unpin(curr_sorted_tar); 
-  hpx_gas_unpin(curr_unif_grid); 
-
-  return HPX_SUCCESS; 
-} 
-HPX_ACTION(HPX_DEFAULT, 0, exchange_point_action, exchange_point_handler, 
-           HPX_POINTER, HPX_SIZE_T); 
-
-int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
-  n->partition(p, swap, bin, map, threshold, corner_x, corner_y, 
-               corner_z, size); 
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler, 
-           HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
-
-void unif_grid_count_init_handler(void *data, const size_t size, 
-                                  int *init, size_t init_size) {
-
-  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
-  
-  input[0] = init[0]; // # of inputs; 
-  input[1] = init[1]; // # of terms 
-
-  for (int i = 0; i < init[1]; ++i) 
-    input[i + 2] = 0; 
-} 
-HPX_ACTION(HPX_FUNCTION, 0, unif_grid_count_init_action, 
-           unif_grid_count_init_handler, HPX_POINTER, HPX_SIZE_T, 
-           HPX_POINTER, HPX_SIZE_T); 
-
-void unif_grid_count_op_handler(void *data, int *rhs, size_t size) {
-  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
-  int *lhs = &input[2]; 
-
-  input[0]--; 
-  int nterms = input[1]; 
-  for (int i = 0; i < nterms; ++i) 
-    lhs[i] += rhs[i]; 
-}
-HPX_ACTION(HPX_FUNCTION, 0, unif_grid_count_op_action, 
-           unif_grid_count_op_handler, HPX_POINTER, HPX_POINTER, HPX_SIZE_T); 
-
-bool unif_grid_count_predicate_handler(void *data, size_t size) {
-  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
-  return (input[0] == 0); 
-}
-HPX_ACTION(HPX_FUNCTION, 0, unif_grid_count_predicate_action, 
-           unif_grid_count_predicate_handler, HPX_POINTER, HPX_SIZE_T); 
-
-int exchange_count_handler(void *args, size_t size) {
-  int rank = hpx_get_my_rank(); 
-  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
-                                            sizeof(hpx_addr_t) * rank, 
-                                            sizeof(hpx_addr_t)); 
-  hpx_addr_t *user_lco{nullptr}; 
-  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
-    return HPX_ERROR; 
-  
-  hpx_lco_set(*user_lco, size, args, HPX_NULL, HPX_NULL); 
-  hpx_gas_unpin(curr_unif_count); 
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0, exchange_count_action, exchange_count_handler, 
-           HPX_POINTER, HPX_SIZE_T); 
-
 
 void domain_geometry_init_handler(void *data, const size_t size, 
                                   int *init, size_t init_size) {
@@ -823,18 +205,24 @@ bool domain_geometry_predicate_handler(void *data, size_t size) {
  HPX_ACTION(HPX_FUNCTION, 0, domain_geometry_predicate_action, 
             domain_geometry_predicate_handler, HPX_POINTER, HPX_SIZE_T); 
  
-int set_domain_geometry_handler(int nsrc, hpx_addr_t src, 
-                                int ntar, hpx_addr_t tar, 
+int set_domain_geometry_handler(hpx_addr_t sources, 
+                                hpx_addr_t targets, 
                                 hpx_addr_t domain_geometry) {
   int rank = hpx_get_my_rank(); 
-  hpx_addr_t curr_src = hpx_addr_add(src, sizeof(Point) * nsrc * rank, 
-                                     sizeof(Point) * nsrc); 
-  hpx_addr_t curr_tar = hpx_addr_add(tar, sizeof(Point) * ntar * rank, 
-                                     sizeof(Point) * ntar); 
-  Point *s{nullptr}, *t{nullptr}; 
-  if (!hpx_gas_try_pin(curr_src, (void **)&s) || 
-      !hpx_gas_try_pin(curr_tar, (void **)&t))
+  hpx_addr_t curr_s = hpx_addr_add(sources, sizeof(ArrayMetaData) * rank,
+                                   sizeof(ArrayMetaData));
+  hpx_addr_t curr_t = hpx_addr_add(targets, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr}; 
+
+  if (!hpx_gas_try_pin(curr_s, (void **)&meta_s) || 
+      !hpx_gas_try_pin(curr_t, (void **)&meta_t))
     return HPX_ERROR; 
+
+  Point *s = reinterpret_cast<Point *>(meta_s->data); 
+  Point *t = reinterpret_cast<Point *>(meta_t->data); 
+  int nsrc = meta_s->count; 
+  int ntar = meta_t->count; 
 
   double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50}; 
 
@@ -848,71 +236,763 @@ int set_domain_geometry_handler(int nsrc, hpx_addr_t src,
   }
 
   for (int i = 0; i < ntar; ++i) {
-    var[0] = fmin(var[0], tar[i].x()); 
-    var[1] = fmax(var[1], tar[i].x()); 
-    var[2] = fmin(var[2], tar[i].y()); 
-    var[3] = fmax(var[3], tar[i].y()); 
-    var[4] = fmin(var[4], tar[i].z()); 
-    var[5] = fmax(var[5], tar[i].z()); 
+    var[0] = fmin(var[0], t[i].x()); 
+    var[1] = fmax(var[1], t[i].x()); 
+    var[2] = fmin(var[2], t[i].y()); 
+    var[3] = fmax(var[3], t[i].y()); 
+    var[4] = fmin(var[4], t[i].z()); 
+    var[5] = fmax(var[5], t[i].z()); 
   }
-  
-  hpx_gas_unpin(curr_src); 
-  hpx_gas_unpin(curr_tar); 
-  
+
+  hpx_gas_unpin(curr_s); 
+  hpx_gas_unpin(curr_t); 
   hpx_lco_set_lsync(domain_geometry, sizeof(double) * 6, var, HPX_NULL);
 
   return HPX_SUCCESS; 
 }
 HPX_ACTION(HPX_DEFAULT, 0, set_domain_geometry_action, 
-           set_domain_geometry_handler, HPX_INT, HPX_ADDR, 
-           HPX_INT, HPX_ADDR, HPX_ADDR); 
+           set_domain_geometry_handler, HPX_ADDR, HPX_ADDR, HPX_ADDR); 
 
+void unif_count_init_handler(void *data, const size_t size, 
+                             int *init, size_t init_size) {
 
-int *distribute_points(int num_ranks, const int *global, int len) {
-  int *ret = new int[num_ranks]; 
+  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
+  
+  input[0] = init[0]; // # of inputs; 
+  input[1] = init[1]; // # of terms 
 
-  int *s = global; // Source counts
-  int *t = &global[len]; // Target counts
+  for (int i = 0; i < init[1]; ++i) 
+    input[i + 2] = 0; 
+} 
+HPX_ACTION(HPX_FUNCTION, 0, unif_count_init_action, 
+           unif_count_init_handler, HPX_POINTER, HPX_SIZE_T, 
+           HPX_POINTER, HPX_SIZE_T); 
 
-  int *scan = new int[len]; 
-  scan[0] = s[0] + t[0]; 
-  for (int i = 1; i < len; ++i) 
-    scan[i] = scan[i - 1] + s[i] + t[i]; 
+void unif_count_op_handler(void *data, int *rhs, size_t size) {
+  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
+  int *lhs = &input[2]; 
 
-  int q = scan[len - 1] / num_ranks; 
-  int r = scan[len - 1] % num_ranks; 
+  input[0]--; 
+  int nterms = input[1]; 
+  for (int i = 0; i < nterms; ++i) 
+    lhs[i] += rhs[i]; 
+}
+HPX_ACTION(HPX_FUNCTION, 0, unif_count_op_action, 
+           unif_count_op_handler, HPX_POINTER, HPX_POINTER, HPX_SIZE_T); 
 
-  int rank = 0; 
-  int iterator = -1; 
-  int bound = q + (r != 0); 
+bool unif_count_predicate_handler(void *data, size_t size) {
+  int *input = reinterpret_cast<int *>(static_cast<char *>(data)); 
+  return (input[0] == 0); 
+}
+HPX_ACTION(HPX_FUNCTION, 0, unif_count_predicate_action, 
+           unif_count_predicate_handler, HPX_POINTER, HPX_SIZE_T); 
 
-  while (rank < num_ranks) {
-    if (rank) 
-      bound = scan[iterator] + q + (rank <= r); 
-    iterator++; 
-    for (int i = iterator; i < len; ++i) {
-      if (scan[i] <= bound && scan[i + 1] > bound)
-        break;
-    }
-    ret[rank++] = i; 
-    iterator = i; 
+int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid, 
+                           hpx_addr_t sources, hpx_addr_t targets, int level, 
+                           int limit, double cx, double cy, double cz, 
+                           double sz) {
+  int rank = hpx_get_my_rank(); 
+  int num_ranks = hpx_get_num_ranks(); 
+  int dim = pow(2, level), dim3 = pow(8, level); 
+
+  if (rank) {
+    unif_count = count; 
+    unif_done = done; 
+    unif_grid = grid; 
+    sorted_src = sources; 
+    sorted_tar = targets; 
+    unif_level = level; 
+    threshold = limit; 
+    corner_x = cx;
+    corner_y = cy; 
+    corner_z = cz; 
+    size = sz; 
   }
 
-  delete [] scan; 
-  return ret; 
-} 
+  // Setup unif_count LCO 
+  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
+                                            sizeof(hpx_addr_t) * rank, 
+                                            sizeof(hpx_addr_t)); 
+  hpx_addr_t *user_lco{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
+    return HPX_ERROR; 
+  
+  int init[2] = {num_ranks, dim3 * 2}; 
+  *user_lco = hpx_lco_user_new(sizeof(int) * (2 + dim3 * 2), 
+                               unif_count_init_action, 
+                               unif_count_op_action, 
+                               unif_count_predicate_action,
+                               &init, sizeof(init)); 
+  hpx_gas_unpin(curr_unif_count); 
 
-void Node::partition(Point *P, int *swap, int *bin, int *map, int threshold, 
-                     double corner_x, double corner_y, double corner_z, 
-                     double size) {
+  // Setup unif_done LCO 
+  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
+                                           sizeof(hpx_addr_t) * rank, 
+                                           sizeof(hpx_addr_t)); 
+  hpx_addr_t *gate{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate))
+    return HPX_ERROR; 
+
+  *gate = hpx_lco_and_new(1); 
+  hpx_gas_unpin(curr_unif_done); 
+
+  // Setup unif_grid 
+  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
+                                           sizeof(ArrayMetaData) * rank, 
+                                           sizeof(ArrayMetaData)); 
+  ArrayMetaData *meta{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_grid, (void **)&meta))
+    return HPX_ERROR; 
+
+  meta->size = sizeof(Node); 
+  meta->count = 2 * dim3; 
+  meta->data = new char[sizeof(Node) * 2 * dim3]; 
+
+  Node *n = reinterpret_cast<Node *>(meta->data); 
+  for (int iz = 0; iz < dim; ++iz) {
+    for (int iy = 0; iy < dim; ++iy) {
+      for (int ix = 0; ix < dim; ++ix) {
+        uint64_t mid = morton_key(ix, iy, iz); 
+        n[mid] = Node{Index{level, ix, iy, iz}}; 
+        n[mid + dim3] = Node{Index{level, ix, iy, iz}}; 
+      }
+    }
+  }
+
+  hpx_gas_unpin(curr_unif_grid); 
+
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, init_partition_action, init_partition_handler, 
+           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT, 
+           HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE); 
+
+int exchange_count_handler(void *args, size_t size) {
+  int rank = hpx_get_my_rank(); 
+  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
+                                            sizeof(hpx_addr_t) * rank, 
+                                            sizeof(hpx_addr_t)); 
+  hpx_addr_t *user_lco{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
+    return HPX_ERROR; 
+
+  hpx_lco_set(*user_lco, size, args, HPX_NULL, HPX_NULL); 
+  hpx_gas_unpin(curr_unif_count); 
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, exchange_count_action, 
+           exchange_count_handler, HPX_POINTER, HPX_SIZE_T); 
+
+void assign_points_to_unif_grid(const Point *P, int npts, int *gid, 
+                                int *count, double scale) {
+  int dim = pow(2, unif_level); 
+  for (int i = 0; i < npts; ++i) {
+    const Point *p = &P[i]; 
+    int xid = std::min(dim - 1, (int)(dim * (p->x() - corner_x) * scale));
+    int yid = std::min(dim - 1, (int)(dim * (p->y() - corner_y) * scale)); 
+    int zid = std::min(dim - 1, (int)(dim * (p->z() - corner_z) * scale)); 
+    int gid = morton_key(xid, yid, zid); 
+    count[gid]++;
+  }    
+}
+
+int *group_points_on_unif_grid(const Point *p_in, int npts, 
+                               const int *gid_of_points, const int *count, 
+                               Point *p_out) {
+  int dim3 = pow(8, unif_level); 
+  int *offset = new int[dim3]; 
+  int *assigned = new int[dim3]; 
+
+  for (int i = 1; i < dim3; ++i) 
+    offset[i] = offset[i - 1] + count[i - 1]; 
+
+  for (int i = 0; i < npts; ++i) {
+    int gid = gid_of_points[i]; 
+    int cursor = offset[gid] + assigned[gid]; 
+    p_out[cursor] = p_in[i];
+    assigned[gid]++;
+  }
+
+  delete [] assigned; 
+  return offset; 
+}
+
+int *init_point_exchange(int rank, const int *count, const Point *temp, 
+                         const int *offset_l, Node *n, ArrayMetaData *meta) {
+  int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
+  int last = distribute[rank]; 
+  int range = last - first + 1; 
+  int num_pts = count[first]; 
+  int *offset = new int[range]; 
+  for (int i = 1; i < range; ++i) {
+    num_pts += count[first + i]; 
+    offset[i] = offset[i - 1] + count[first + i]; 
+  }
+
+  meta->size = sizeof(Point); 
+  meta->count = num_pts; 
+  meta->data = new char[sizeof(Point) * num_pts]; 
+  Point *p = reinterpret_cast<Point *>(meta->data); 
+
+  for (int i = first; i <= last; ++i) {
+    memcpy(p + offset[i - first], &temp[offset_l[i]], sizeof(Point) * count[i]); 
+
+    // first_ is used as an iterator to trace the position to insert points. 
+    n[i].set_first(offset[i - first] + count[i]);
+
+    if (i < last) {
+      n[i].set_last(offset[i + 1 - first]);
+    } else {
+      n[i].set_last(num_pts - 1);
+    }
+  }
+
+  return offset; 
+}
+
+int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
+  n->partition(p, swap, bin, map, threshold, corner_x, corner_y, 
+               corner_z, size); 
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler, 
+           HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
+
+int recv_points_handler(void *args, size_t size) {
+  int rank = hpx_get_my_rank(); 
+  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
+                                           sizeof(hpx_addr_t) * rank, 
+                                           sizeof(hpx_addr_t)); 
+  hpx_addr_t *gate{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate))
+    return HPX_ERROR; 
+
+  // Wait until the buffer is allocated before merging incoming messages
+  hpx_lco_wait(*gate); 
+  hpx_gas_unpin(curr_unif_done); 
+
+  // Now merge incoming message
+  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
+                                            sizeof(hpx_addr_t) * rank, 
+                                            sizeof(hpx_addr_t)); 
+  hpx_addr_t curr_sorted_src = hpx_addr_add(sorted_src, 
+                                            sizeof(ArrayMetaData) * rank, 
+                                            sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_sorted_tar = hpx_addr_add(sorted_tar, 
+                                            sizeof(ArrayMetaData) * rank, 
+                                            sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
+                                           sizeof(ArrayMetaData) * rank, 
+                                           sizeof(ArrayMetaData)); 
+  hpx_addr_t *user_lco{nullptr}; 
+  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr}, *meta_g{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco) ||
+      !hpx_gas_try_pin(curr_sorted_src, (void **)&meta_s) ||
+      !hpx_gas_try_pin(curr_sorted_tar, (void **)&meta_t) ||
+      !hpx_gas_try_pin(curr_unif_grid, (void **)&meta_g)) 
+    return HPX_ERROR; 
+
+  void *user_lco_buffer{nullptr}; 
+  hpx_lco_getref(*user_lco, 1, &user_lco_buffer); 
+  int *count = reinterpret_cast<int *>(static_cast<char *>(user_lco_buffer) 
+                                       + sizeof(int) * 2); 
+
+  Point *s = reinterpret_cast<Point *>(meta_s->data); 
+  Point *t = reinterpret_cast<Point *>(meta_t->data); 
+  Node *n = reinterpret_cast<Node *>(meta_g->data); 
+
+  int dim3 = pow(8, unif_level); 
+  int *count_s = count; 
+  int *count_t = &count[dim3]; 
+
+  int *meta = reinterpret_cast<int *>(static_cast<char *>(args)); 
+  int first = meta[0]; 
+  int last = meta[1]; 
+  int range = last - first + 1; 
+  int recv_ns = meta[2]; 
+  int recv_nt = meta[3]; 
+  int *offset_s = &meta[4]; 
+  int *offset_t = &meta[4 + range]; 
+  Point *recv_s = reinterpret_cast<Point *>(static_cast<char *>(args) + 
+                                            sizeof(int) * (4 + range * 2)); 
+  Point *recv_t = recv_s + recv_ns; 
+
+  for (int i = first; i <= last; ++i) {
+    Node *ns = &n[i]; 
+    Node *nt = &n[i + dim3]; 
+    
+    int incoming_first_s = offset_s[i - first]; 
+    int incoming_last_s = (i == last ? recv_ns - 1 : 
+                           offset_s[i + 1 - first] - 1); 
+    int incoming_ns = incoming_last_s - incoming_first_s + 1; 
+
+    hpx_lco_sema_p(ns->sema()); 
+    int first_s = ns->first(); 
+    memcpy(s + first_s, &recv_s[incoming_first_s], sizeof(Point) * incoming_ns); 
+    ns->set_first(first_s + incoming_ns); 
+
+    if (first_s + incoming_ns > ns->last()) {
+      // Spawn adaptive partitioning 
+      ns->set_first(ns->last() + 1 - count_s[i]); 
+
+      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+               &ns, &s, &swap_src, &bin_src, &map_src); 
+    }
+    hpx_lco_sema_v(ns->sema(), HPX_NULL); 
+
+    int incoming_first_t = offset_t[i - first]; 
+    int incoming_last_t = (i == last ? recv_nt - 1 : 
+                           offset_t[i + 1 - first] - 1); 
+    int incoming_nt = incoming_last_t - incoming_first_t + 1; 
+
+    hpx_lco_sema_p(nt->sema()); 
+    int first_t = nt->first(); 
+    memcpy(t + first_t, &recv_t[incoming_first_t], sizeof(Point) * incoming_nt);
+    nt->set_first(first_t + incoming_nt); 
+    
+    if (first_t + incoming_nt > nt->last()) {
+      // Spawn adaptive partitioning 
+      nt->set_first(nt->last() + 1 - count_t[i]); 
+      
+      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+               &nt, &t, &swap_tar, &bin_tar, &map_tar); 
+    }
+    hpx_lco_sema_v(nt->sema(), HPX_NULL); 
+  }
+ 
+  hpx_lco_release(*user_lco, user_lco_buffer); 
+  hpx_gas_unpin(curr_unif_count); 
+  hpx_gas_unpin(curr_unif_count); 
+  hpx_gas_unpin(curr_sorted_src); 
+  hpx_gas_unpin(curr_sorted_tar); 
+  hpx_gas_unpin(curr_unif_grid); 
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_points_action, 
+           recv_points_handler, HPX_POINTER, HPX_SIZE_T); 
+
+int send_points_handler(int rank, int *offset_s, int *offset_t, 
+                        Point *sources, Point *targets) {
+  // Note: all the pointers are local to the calling rank. 
+  int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
+  int last = distribute[rank]; 
+  int range = last - first + 1; 
+  int send_ns = offset_s[last] - offset_s[first] + 1; 
+  int send_nt = offset_t[last] - offset_t[first] + 1; 
+
+  // Parcel message size 
+  size_t size = sizeof(int) * (4 + 2 * range) + 
+    sizeof(Point) * (send_ns + send_nt); 
+  hpx_parcel_t *p = hpx_parcel_acquire(NULL, size); 
+  void *data = hpx_parcel_get_data(p); 
+  int *meta = reinterpret_cast<int *>(static_cast<char *>(data)); 
+  meta[0] = first; 
+  meta[1] = last; 
+  meta[2] = send_ns; 
+  meta[3] = send_nt; 
+  int *meta_offset_s = &meta[4]; 
+  int *meta_offset_t = &meta[4 + range]; 
+
+  for (int i = first; i <= last; ++i) {
+    meta_offset_s[i - first] = offset_s[i] - offset_s[first]; 
+    meta_offset_t[i - first] = offset_t[i] - offset_t[first]; 
+  }
+
+  char *meta_s = static_cast<char *>(data) + sizeof(int) * (4 + range * 2); 
+  char *meta_t = meta_s + sizeof(Point) * send_ns; 
+
+  memcpy(meta_s, &sources[first], send_ns); 
+  memcpy(meta_t, &targets[first], send_nt); 
+
+  hpx_parcel_set_target(p, HPX_THERE(rank)); 
+  hpx_parcel_set_action(p, recv_points_action); 
+  hpx_parcel_send(p, HPX_NULL);
+
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, send_points_action, send_points_handler, 
+           HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
+
+int recv_node_handler(void *args, size_t size) {
+  int *compressed_tree = reinterpret_cast<int *>(static_cast<char *>(args)); 
+  int rank = hpx_get_my_rank(); 
+  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
+                                           sizeof(ArrayMetaData) * rank, 
+                                           sizeof(ArrayMetaData)); 
+  ArrayMetaData *meta; 
+  if (!hpx_gas_try_pin(curr_unif_grid, (void **)&meta))
+    return HPX_ERROR; 
+
+  int type = compressed_tree[0]; 
+  int id = compressed_tree[1]; 
+  int n_nodes = compressed_tree[2]; 
+  const int *branch = &compressed_tree[3]; 
+  const int *tree = &compressed_tree[3 + n_nodes]; 
+  
+  Node *n = reinterpret_cast<Node *>(meta->data); 
+  int dim3 = pow(8, unif_level); 
+  Node *curr = &n[id + type * dim3]; 
+  curr->extract(branch, tree, n_nodes); 
+
+  hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
+  hpx_gas_unpin(curr_unif_grid); 
+  return HPX_SUCCESS; 
+} 
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler, 
+           HPX_POINTER, HPX_SIZE_T); 
+
+int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
+  int first = n[id].first(); 
+  int last = n[id].last(); 
+  int range = last - first + 1; 
+  Point *p = reinterpret_cast<Point *>(meta->data); 
+
+  // Rearrange points 
+  int *map = (type ? map_tar : map_src); 
+  Point *temp = new Point[range]; 
+  for (int i = first; i <= last; ++i) 
+    temp[i - first] = p[map[i]]; 
+  memcpy(p + first, temp, sizeof(Point) * range); 
+  delete [] temp; 
+
+  // Exclude @p n as it is already allocated on remote localities
+  int n_nodes = n->n_descendants() - 1; 
+  int *compressed_tree = new int[3 + n_nodes * 2]; 
+  
+  compressed_tree[0] = type; // target tree is 0, source tree is 1
+  compressed_tree[1] = id; // where to merge 
+  compressed_tree[2] = n_nodes; // # of nodes
+  int *branch = &compressed_tree[3]; 
+  int *tree = &compressed_tree[3 + n_nodes]; 
+  int curr = 0; 
+  n->compress(branch, tree, -1, curr); 
+
+  int rank = hpx_get_my_rank(); 
+  int num_ranks = hpx_get_num_ranks(); 
+  hpx_addr_t done = hpx_lco_and_new(num_ranks - 1); 
+
+  for (int r = 0; r < num_ranks; ++r) {
+    if (r != rank) {
+      hpx_parcel_t *p = hpx_parcel_acquire(compressed_tree, 
+                                           sizeof(int) * (3 + n_nodes * 2)); 
+      hpx_parcel_set_target(p, HPX_THERE(r)); 
+      hpx_parcel_set_action(p, recv_node_action); 
+      hpx_parcel_send(p, done); 
+    }
+  }
+
+  // Clear local memory once all parcels are sent 
+  hpx_lco_wait(done); 
+  delete [] compressed_tree; 
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, send_node_action, send_node_handler, 
+           HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT); 
+
+int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
+  int rank = hpx_get_my_rank(); 
+  int num_ranks = hpx_get_num_ranks(); 
+
+  hpx_addr_t curr_s = hpx_addr_add(sources, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_t = hpx_addr_add(targets, sizeof(ArrayMetaData) * rank, 
+                                   sizeof(ArrayMetaData)); 
+  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr}; 
+  if (!hpx_gas_try_pin(curr_s, (void **)&meta_s) ||
+      !hpx_gas_try_pin(curr_t, (void **)&meta_t)) 
+    return HPX_ERROR; 
+  hpx_gas_unpin(curr_s); 
+  hpx_gas_unpin(curr_t); 
+
+  int n_sources = meta_s->count; 
+  int n_targets = meta_t->count; 
+  Point *p_s = reinterpret_cast<Point *>(meta_s->data); 
+  Point *p_t = reinterpret_cast<Point *>(meta_t->data); 
+
+  // Assign points to uniform grid
+  int *gid_of_sources = new int[n_sources]; 
+  int *gid_of_targets = new int[n_targets]; 
+  int dim3 = pow(8, unif_level); 
+  int *local_count = new int[dim3 * 2]; 
+  int *local_scount = local_count; 
+  int *local_tcount = &local_count[dim3]; 
+  assign_points_to_unif_grid(p_s, n_sources, gid_of_sources, 
+                             local_scount, 1.0 / size); 
+  assign_points_to_unif_grid(p_t, n_targets, gid_of_targets, 
+                             local_tcount, 1.0 / size); 
+
+  // Exchange counts 
+  for (int r = 0; r < num_ranks; ++r) {
+    hpx_parcel_t *p = hpx_parcel_acquire(local_count, 
+                                         sizeof(int) * dim3 * 2); 
+    hpx_parcel_set_target(p, HPX_THERE(r)); 
+    hpx_parcel_set_action(p, exchange_count_action); 
+    hpx_parcel_send(p, HPX_NULL);
+  }
+
+  // Put points of the same grid together while waiting for
+  // exchange_count_action to compelte  
+  Point *temp_s = new Point[n_sources]; 
+  Point *temp_t = new Point[n_targets]; 
+  int *local_offset_s = group_points_on_unif_grid(p_s, n_sources, 
+                                                  gid_of_sources, local_scount, 
+                                                  temp_s); 
+  int *local_offset_t = group_points_on_unif_grid(p_t, n_targets, 
+                                                  gid_of_targets, local_tcount, 
+                                                  temp_t); 
+  delete [] gid_of_sources; 
+  delete [] gid_of_targets; 
+
+  // Compute point distribution 
+  hpx_addr_t curr_unif_count = hpx_addr_add(unif_count, 
+                                            sizeof(hpx_addr_t) * rank, 
+                                            sizeof(hpx_addr_t)); 
+  hpx_addr_t *user_lco{nullptr}; 
+  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
+    return HPX_ERROR; 
+
+  void *user_lco_buffer{nullptr}; 
+  hpx_lco_getref(*user_lco, 1, &user_lco_buffer); 
+  int *global_count = 
+    reinterpret_cast<int *>(static_cast<char *>(user_lco_buffer)
+                            + sizeof(int) * 2); 
+
+  distribute = distribute_points(num_ranks, global_count, dim3); 
+
+  // Exchange points
+  hpx_addr_t curr_sorted_s = hpx_addr_add(sorted_src, 
+                                          sizeof(ArrayMetaData) * rank, 
+                                          sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_sorted_t = hpx_addr_add(sorted_tar, 
+                                          sizeof(ArrayMetaData) * rank, 
+                                          sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid, 
+                                           sizeof(ArrayMetaData) * rank, 
+                                           sizeof(ArrayMetaData)); 
+  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
+                                           sizeof(hpx_addr_t) * rank, 
+                                           sizeof(hpx_addr_t)); 
+
+  ArrayMetaData *meta_g{nullptr}; 
+  hpx_addr_t *gate{nullptr}; 
+
+  if (!hpx_gas_try_pin(curr_sorted_s, (void **)&meta_s) ||
+      !hpx_gas_try_pin(curr_sorted_t, (void **)&meta_t) ||
+      !hpx_gas_try_pin(curr_unif_grid, (void **)&meta_g) ||
+      !hpx_gas_try_pin(curr_unif_done, (void **)&gate))
+    return HPX_ERROR; 
+
+  Node *ns = reinterpret_cast<Node *>(meta_g->data); 
+  Node *nt = reinterpret_cast<Node *>(meta_g->data + sizeof(Node) * dim3);
+
+  int *global_offset_s = init_point_exchange(rank, global_count, temp_s, 
+                                             local_offset_s, ns, meta_s); 
+  int *global_offset_t = init_point_exchange(rank, global_count + dim3, temp_t, 
+                                             local_offset_t, nt, meta_t); 
+
+  swap_src = new int[meta_s->count]; 
+  bin_src = new int[meta_s->count]; 
+  map_src = new int[meta_s->count]; 
+  swap_tar = new int[meta_t->count]; 
+  bin_tar = new int[meta_t->count]; 
+  map_tar = new int[meta_t->count]; 
+  for (int i = 0; i < meta_s->count; ++i) 
+    map_src[i] = i; 
+  for (int i = 0; i < meta_t->count; ++i) 
+    map_tar[i] = i; 
+
+  for (int r = 0; r < num_ranks; ++r) {
+    if (r != rank) {
+      hpx_call(HPX_HERE, send_points_action, HPX_NULL, &r, &local_offset_s, 
+               &local_offset_t, &temp_s, &temp_t);
+    }
+  }
+
+  // Exchange source and target trees 
+  hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
+
+  for (int i = 0; i < dim3; ++i) {
+    if (distribute[i] == rank) {
+      int s{0}, t{1}; 
+      hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
+                                      send_node_action, dual_tree_complete, 
+                                      hpx_lco_set_action, &ns, &meta_s, 
+                                      &i, &s); 
+      hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
+                                      send_node_action, dual_tree_complete, 
+                                      hpx_lco_set_action, &nt, &meta_t, 
+                                      &i, &t); 
+    } else {
+      hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action, 
+                    HPX_NULL, NULL, 0); 
+      hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
+                    HPX_NULL, NULL, 0); 
+    }
+  }
+
+  hpx_lco_wait(dual_tree_complete); 
+  hpx_lco_delete_sync(dual_tree_complete); 
+
+  delete [] local_count; 
+  delete [] temp_s; 
+  delete [] temp_t; 
+  delete [] local_offset_s; 
+  delete [] local_offset_t; 
+  delete [] distribute; 
+  delete [] global_offset_s; 
+  delete [] global_offset_t; 
+  delete [] swap_src; 
+  delete [] bin_src; 
+  delete [] map_src; 
+  delete [] swap_tar; 
+  delete [] bin_tar; 
+  delete [] map_tar; 
+
+  hpx_lco_release(*user_lco, user_lco_buffer); 
+  hpx_gas_unpin(curr_unif_count); 
+  hpx_gas_unpin(curr_sorted_s); 
+  hpx_gas_unpin(curr_sorted_t); 
+  hpx_gas_unpin(curr_unif_grid); 
+  hpx_gas_unpin(curr_unif_done); 
+
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, create_dual_tree_action, create_dual_tree_handler, 
+           HPX_ADDR, HPX_ADDR); 
+
+int finalize_partition_handler(void *unused, size_t size) {
+  int rank = hpx_get_my_rank(); 
+  hpx_addr_t count = hpx_addr_add(unif_count, sizeof(hpx_addr_t) * rank, 
+                                  sizeof(hpx_addr_t)); 
+  hpx_addr_t done = hpx_addr_add(unif_done, sizeof(hpx_addr_t) * rank, 
+                                 sizeof(hpx_addr_t)); 
+  hpx_addr_t grid = hpx_addr_add(unif_grid, sizeof(ArrayMetaData) * rank, 
+                                 sizeof(ArrayMetaData)); 
+  hpx_addr_t sources = hpx_addr_add(sorted_src, sizeof(ArrayMetaData) * rank, 
+                                    sizeof(ArrayMetaData)); 
+  hpx_addr_t targets = hpx_addr_add(sorted_tar, sizeof(ArrayMetaData) * rank, 
+                                    sizeof(ArrayMetaData)); 
+  
+  hpx_addr_t *user_lco{nullptr}, *gate{nullptr}; 
+  ArrayMetaData *meta_g{nullptr}, *meta_s{nullptr}, *meta_t{nullptr}; 
+
+  if (!hpx_gas_try_pin(count, (void **)&user_lco) ||
+      !hpx_gas_try_pin(done, (void **)&gate) ||
+      !hpx_gas_try_pin(grid, (void **)&meta_g) ||
+      !hpx_gas_try_pin(sources, (void **)&meta_s) ||
+      !hpx_gas_try_pin(targets, (void **)&meta_t)) 
+    return HPX_ERROR; 
+
+  hpx_lco_delete_sync(*user_lco); 
+  hpx_lco_delete_sync(*gate); 
+  delete [] meta_s->data; 
+  delete [] meta_t->data; 
+  
+  int dim3 = pow(8, unif_level); 
+  Node *n = reinterpret_cast<Node *>(meta_g->data); 
+  for (int i = 0; i < dim3; ++i) {
+    if (distribute[i] == rank) {
+      n[i].destroy(); 
+      n[i + dim3].destroy();
+    } else {
+      n[i].destroy(false); 
+      n[i + dim3].destroy();
+    }
+  }
+  
+  hpx_gas_unpin(count); 
+  hpx_gas_unpin(done); 
+  hpx_gas_unpin(grid); 
+  hpx_gas_unpin(sources); 
+  hpx_gas_unpin(targets); 
+
+  return HPX_SUCCESS; 
+} 
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, finalize_partition_action, 
+           finalize_partition_handler, HPX_POINTER, HPX_SIZE_T); 
+
+int main_handler(int nsrc_per_rank, int ntar_per_rank, 
+                 char datatype, int threshold) {
+  int num_ranks = hpx_get_num_ranks(); 
+
+  // Generate input data 
+  hpx_addr_t sources = hpx_gas_calloc_cyclic(num_ranks, 
+                                             sizeof(ArrayMetaData), 0);
+  hpx_addr_t targets = hpx_gas_calloc_cyclic(num_ranks, 
+                                             sizeof(ArrayMetaData), 0); 
+  hpx_bcast_rsync(generate_input_action, &nsrc_per_rank, &ntar_per_rank, 
+                  &sources, &targets, &datatype); 
+
+  // Partition points to create dual tree 
+
+  // Determine domain geometry
+  hpx_addr_t domain_geometry = 
+    hpx_lco_user_new(sizeof(int) + sizeof(double) * 6, 
+                     domain_geometry_init_action, 
+                     domain_geometry_op_action, 
+                     domain_geometry_predicate_action, 
+                     &num_ranks, sizeof(num_ranks)); 
+
+  hpx_bcast_lsync(set_domain_geometry_action, HPX_NULL, 
+                  &sources, &targets, &domain_geometry); 
+  void *temp{nullptr}; 
+  hpx_lco_getref(domain_geometry, 1, &temp); 
+  double *var = reinterpret_cast<double *>(static_cast<char *>(temp) + 
+                                           sizeof(int)); 
+  double size_x = var[1] - var[0]; 
+  double size_y = var[3] - var[2]; 
+  double size_z = var[5] - var[4]; 
+  size = fmax(size_x, fmax(size_y, size_z)); 
+  corner_x = (var[1] + var[0] - size) / 2; 
+  corner_y = (var[3] + var[2] - size) / 2; 
+  corner_z = (var[5] + var[4] - size) / 2; 
+
+  // Choose uniform partition level such that the number of grids is no less
+  // than the number of ranks 
+  unif_level = ceil(log(num_ranks) / log(8)); 
+
+  unif_count = hpx_gas_calloc_cyclic(num_ranks, sizeof(hpx_addr_t), 0); 
+  unif_done = hpx_gas_calloc_cyclic(num_ranks, sizeof(hpx_addr_t), 0); 
+  unif_grid = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0); 
+  sorted_src = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0); 
+  sorted_tar = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0); 
+
+  hpx_bcast_rsync(init_partition_action, &unif_count, &unif_done, &unif_grid, 
+                  &sorted_src, &sorted_tar, &unif_level, &threshold, 
+                  &corner_x, &corner_y, &corner_z, &size); 
+
+  hpx_bcast_rsync(create_dual_tree_action, &sources, &targets); 
+
+  hpx_bcast_rsync(finalize_partition_action, NULL, 0); 
+
+  // Destroy input data
+  hpx_bcast_rsync(destroy_input_action, &sources, &targets); 
+  
+  hpx_lco_release(domain_geometry, temp); 
+  hpx_lco_delete_sync(domain_geometry); 
+  hpx_gas_free_sync(unif_count); 
+  hpx_gas_free_sync(unif_done); 
+  hpx_gas_free_sync(unif_grid); 
+  hpx_gas_free_sync(sorted_src); 
+  hpx_gas_free_sync(sorted_tar); 
+  hpx_gas_free_sync(sources); 
+  hpx_gas_free_sync(targets); 
+
+  hpx_exit(HPX_SUCCESS); 
+}
+HPX_ACTION(HPX_DEFAULT, 0, main_action, main_handler, 
+           HPX_INT, HPX_INT, HPX_CHAR, HPX_INT); 
+
+
+void Node::partition(Point *p, int *swap, int *bin, int *map, 
+                     int threshold, double corner_x, double corner_y, 
+                     double corner_z, double size) {
   int num_points = last_ - first_ + 1; 
   bool is_leaf = (num_points <= threshold ? true : false); 
 
-  // Set complete_ LCO of the parent if the current node is not nullptr
   if (parent_) 
     hpx_call_when(complete_, parent_->complete(), hpx_lco_set_action, 
                   HPX_NULL, NULL, 0); 
-
   if (is_leaf) {
     // Set complete_ LCO of itself
     hpx_lco_and_set_num(complete_, 8, HPX_NULL); 
@@ -928,7 +1008,7 @@ void Node::partition(Point *P, int *swap, int *bin, int *map, int threshold,
     int offset[8] = {0}; 
 
     for (int i = first_; i <= last_; ++i) {
-      Point *j = &P[map[i]]; 
+      Point *j = &p[map[i]]; 
       int temp = 4 * (j->z() > center_z) + 2 * (j->y() > center_y) + 
         (j->x() > center_x); 
       bin[i] = temp; 
@@ -956,7 +1036,7 @@ void Node::partition(Point *P, int *swap, int *bin, int *map, int threshold,
         child_[i] = child; 
         
         hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                 &child, &P, &swap, &bin, &map); 
+                 &child, &p, &swap, &bin, &map); 
       } else {
         hpx_lco_and_set(complete_, HPX_NULL); 
       }
@@ -1019,3 +1099,18 @@ void Node::extract(const int *branch, const int *tree, int n_nodes) {
     parent->set_child(which, curr); 
   }
 }
+
+void Node::destroy(bool recursive) {
+  if (sema_ != HPX_NULL)
+    hpx_lco_delete_sync(sema_); 
+  if (complete_ != HPX_NULL)
+    hpx_lco_delete_sync(sema_); 
+
+  if (recursive) {
+    for (int i = 0; i < 8; ++i) {
+      if (child_[i]) 
+        child_[i]->destroy(recursive);
+    }
+  }
+}
+      
