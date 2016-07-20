@@ -143,28 +143,11 @@ break when fully distributed.
               S->L could very well be remote. So perhaps we just make sure
               that we do not multiple send the sources to the same locality
               for S->T operations?
-   - builtins
-    : laplace_sph.h
-        We want to see if there is a way to obviate the need to explicitly call
-        the table constructor.
-    : laplace_sph_table.h
-        We want to see if there is a way to avoid the explicit construction of
-        the table. Also, having a good elegant mechanism for users to implement
-        similar tables that does not look at all like using HPX-5 would be
-        great.
  * src
   : array.cc
       This whole thing will need an update. We do not yet have the Array
       implementation worked out for the distributed case. There is likely to
       be significant change to how it works internally.
-  : laplace_sph.cc
-      We want to see if there is a way to obviate the need to explicitly call
-      the table constructor.
-  : laplace_sph_table.cc
-      We want to see if there is a way to avoid the explicit construction of
-      the table. Also, having a good elegant mechanism for users to implement
-      similar tables, that does not look at all like using HPX-5 would be
-      great.
 
 
 
@@ -194,12 +177,6 @@ TODO: create standard regression and performance testing script to determine
       quality of a build.
 TODO: Decide if we should move setup_termination_detection, setup_edge_lists
       and destroy_DAG_LCOs into evaluator
-
-TODO: Can we skip the laplace_sph_precompute thing? Or rather, put it into the
-      constructor in some way?
-        (This is related to another step we need to take in the near future.
-         That being said, this might be solved automatically once we implement
-         that feature.)
 
 
 
