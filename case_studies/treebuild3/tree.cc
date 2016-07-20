@@ -65,12 +65,12 @@ uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
 }
 
 int *distribute_points(int num_ranks, const int *global, int len) {
-  int *ret = new int[num_ranks]; 
+  int *ret = new int[num_ranks](); 
 
   const int *s = global; // Source counts
   const int *t = &global[len]; // Target counts
 
-  int *scan = new int[len]; 
+  int *scan = new int[len](); 
   scan[0] = s[0] + t[0]; 
   for (int i = 1; i < len; ++i) 
     scan[i] = scan[i - 1] + s[i] + t[i]; 
@@ -115,11 +115,11 @@ int generate_input_handler(int nsrc_per_rank, int ntar_per_rank,
 
   meta_s->size = sizeof(Point); 
   meta_s->count = nsrc_per_rank; 
-  meta_s->data = new char[sizeof(Point) * nsrc_per_rank]; 
+  meta_s->data = new char[sizeof(Point) * nsrc_per_rank](); 
 
   meta_t->size = sizeof(Point); 
   meta_t->count = ntar_per_rank; 
-  meta_t->data = new char[sizeof(Point) * ntar_per_rank]; 
+  meta_t->data = new char[sizeof(Point) * ntar_per_rank](); 
 
   Point *p_s = reinterpret_cast<Point *>(meta_s->data); 
   Point *p_t = reinterpret_cast<Point *>(meta_t->data); 
@@ -346,7 +346,7 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
 
   meta->size = sizeof(Node); 
   meta->count = 2 * dim3; 
-  meta->data = new char[sizeof(Node) * 2 * dim3]; 
+  meta->data = new char[sizeof(Node) * 2 * dim3](); 
 
   Node *n = reinterpret_cast<Node *>(meta->data); 
   for (int iz = 0; iz < dim; ++iz) {
@@ -400,8 +400,8 @@ int *group_points_on_unif_grid(const Point *p_in, int npts,
                                const int *gid_of_points, const int *count, 
                                Point *p_out) {
   int dim3 = pow(8, unif_level); 
-  int *offset = new int[dim3]; 
-  int *assigned = new int[dim3]; 
+  int *offset = new int[dim3](); 
+  int *assigned = new int[dim3](); 
 
   for (int i = 1; i < dim3; ++i) 
     offset[i] = offset[i - 1] + count[i - 1]; 
@@ -423,7 +423,7 @@ int *init_point_exchange(int rank, const int *count, const Point *temp,
   int last = distribute[rank]; 
   int range = last - first + 1; 
   int num_pts = count[first]; 
-  int *offset = new int[range]; 
+  int *offset = new int[range](); 
   for (int i = 1; i < range; ++i) {
     num_pts += count[first + i]; 
     offset[i] = offset[i - 1] + count[first + i]; 
@@ -431,7 +431,7 @@ int *init_point_exchange(int rank, const int *count, const Point *temp,
 
   meta->size = sizeof(Point); 
   meta->count = num_pts; 
-  meta->data = new char[sizeof(Point) * num_pts]; 
+  meta->data = new char[sizeof(Point) * num_pts](); 
   Point *p = reinterpret_cast<Point *>(meta->data); 
 
   for (int i = first; i <= last; ++i) {
@@ -657,7 +657,7 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
 
   // Exclude @p n as it is already allocated on remote localities
   int n_nodes = n->n_descendants() - 1; 
-  int *compressed_tree = new int[3 + n_nodes * 2]; 
+  int *compressed_tree = new int[3 + n_nodes * 2](); 
   
   compressed_tree[0] = type; // target tree is 0, source tree is 1
   compressed_tree[1] = id; // where to merge 
@@ -710,10 +710,10 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   Point *p_t = reinterpret_cast<Point *>(meta_t->data); 
 
   // Assign points to uniform grid
-  int *gid_of_sources = new int[n_sources]; 
-  int *gid_of_targets = new int[n_targets]; 
+  int *gid_of_sources = new int[n_sources](); 
+  int *gid_of_targets = new int[n_targets](); 
   int dim3 = pow(8, unif_level); 
-  int *local_count = new int[dim3 * 2]; 
+  int *local_count = new int[dim3 * 2](); 
   int *local_scount = local_count; 
   int *local_tcount = &local_count[dim3]; 
   assign_points_to_unif_grid(p_s, n_sources, gid_of_sources, 
@@ -790,12 +790,12 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   int *global_offset_t = init_point_exchange(rank, global_count + dim3, temp_t, 
                                              local_offset_t, nt, meta_t); 
 
-  swap_src = new int[meta_s->count]; 
-  bin_src = new int[meta_s->count]; 
-  map_src = new int[meta_s->count]; 
-  swap_tar = new int[meta_t->count]; 
-  bin_tar = new int[meta_t->count]; 
-  map_tar = new int[meta_t->count]; 
+  swap_src = new int[meta_s->count](); 
+  bin_src = new int[meta_s->count](); 
+  map_src = new int[meta_s->count](); 
+  swap_tar = new int[meta_t->count](); 
+  bin_tar = new int[meta_t->count](); 
+  map_tar = new int[meta_t->count](); 
   for (int i = 0; i < meta_s->count; ++i) 
     map_src[i] = i; 
   for (int i = 0; i < meta_t->count; ++i) 
@@ -812,21 +812,36 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
 
   for (int i = 0; i < dim3; ++i) {
-    if (distribute[i] == rank) {
-      int s{0}, t{1}; 
-      hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
-                                      send_node_action, dual_tree_complete, 
-                                      hpx_lco_set_action, &ns, &meta_s, 
-                                      &i, &s); 
-      hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
-                                      send_node_action, dual_tree_complete, 
-                                      hpx_lco_set_action, &nt, &meta_t, 
-                                      &i, &t); 
+    // Process source tree 
+    if (global_count[i] == 0) {
+      hpx_lco_and_set(dual_tree_complete, HPX_NULL);
     } else {
-      hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                    HPX_NULL, NULL, 0); 
-      hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                    HPX_NULL, NULL, 0); 
+      if (distribute[i] == rank) {
+        int s{0}; 
+        hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
+                                        send_node_action, dual_tree_complete, 
+                                        hpx_lco_set_action, &ns, &meta_s, 
+                                        &i, &s);
+      } else {
+        hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action,
+                      HPX_NULL, NULL, 0);
+      }
+    }
+
+    // Process target tree
+    if (global_count[i + dim3] == 0) {
+      hpx_lco_and_set(dual_tree_complete, HPX_NULL); 
+    } else {
+      if (distribute[i] == rank) {
+        int t{1}; 
+        hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
+                                        send_node_action, dual_tree_complete, 
+                                        hpx_lco_set_action, &nt, &meta_t, 
+                                        &i, &t);
+      } else {
+        hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
+                      HPX_NULL, NULL, 0); 
+      }
     }
   }
 
