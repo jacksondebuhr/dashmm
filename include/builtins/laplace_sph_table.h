@@ -97,6 +97,9 @@ inline double pow_m1(const int m) {
 }
 
 
+LaplaceSPHTableIterator get_or_add_laplace_sph_table(int n_digits);
+
+
 } // namespace dashmm
 
 

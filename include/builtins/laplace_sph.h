@@ -70,8 +70,7 @@ class LaplaceSPH {
   using expansion_t = LaplaceSPH<Source, Target>;
 
   LaplaceSPH(Point center, int n_digits, ExpansionRole role) {
-    LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
-    assert(entry != builtin_laplace_table_.end());
+    LaplaceSPHTableIterator entry = get_or_add_laplace_sph_table(n_digits);
     uLaplaceSPHTable &table = entry->second;
     int p = table->p();
     int n_terms = (p + 1) * (p + 2) / 2;
@@ -752,15 +751,6 @@ class LaplaceSPH {
     }
   }
 };
-
-
-/// Precompute some required data for using the LaplaceSPH expansion
-///
-/// This routine must be called before an object of type LaplaceSPH is
-/// constucted with the given accuracy.
-///
-/// \param n_digits - the accuracy parameter for which to pregenerate values
-void laplace_sph_precompute(int n_digits);
 
 
 } // namespace dashmm

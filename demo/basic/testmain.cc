@@ -378,7 +378,6 @@ void perform_evaluation_test(InputArguments args) {
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm"}) {
-    dashmm::laplace_sph_precompute(args.accuracy);
     dashmm::LaplaceSPH<SourceData, TargetData> expansion{
           dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded};
     dashmm::FMM<SourceData, TargetData, dashmm::LaplaceSPH> method{};

@@ -253,4 +253,19 @@ void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
 }
 
 
+LaplaceSPHTableIterator get_or_add_laplace_sph_table(int n_digits) {
+  // Once we are fully distrib, this must be wrapped up somehow in SharedData
+  // or something similar.
+
+  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
+  if (entry != builtin_laplace_table_.end()) {
+    return entry;
+  }
+
+  builtin_laplace_table_[n_digits] =
+    std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}};
+  return builtin_laplace_table_.find(n_digits);
+}
+
+
 } // namespace dashmm
