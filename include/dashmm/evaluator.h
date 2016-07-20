@@ -132,20 +132,6 @@ class Evaluator {
                         expansionlco_t::spawn_out_edges_from_remote_,
                         expansionlco_t::spawn_out_edges_from_remote_handler,
                         HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_m_,
-                        expansionlco_t::s_to_m_handler,
-                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
-                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_l_,
-                        expansionlco_t::s_to_l_handler,
-                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
-                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_t_,
-                        expansionlco_t::s_to_t_handler,
-                        HPX_POINTER, HPX_INT, HPX_ADDR, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::create_from_expansion_,
                         expansionlco_t::create_from_expansion_handler,
@@ -195,6 +181,10 @@ class Evaluator {
                         tree_t::instigate_dag_eval_,
                         tree_t::instigate_dag_eval_handler,
                         HPX_POINTER, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        tree_t::instigate_dag_eval_remote_,
+                        tree_t::instigate_dag_eval_remote_handler,
+                        HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::termination_detection_,
                         tree_t::termination_detection_handler,

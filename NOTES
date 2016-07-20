@@ -129,10 +129,20 @@ break when fully distributed.
         * So yeah, this is likely to change significantly. I think I should
           first work out how the interface will want to look. And then go from
           there.
-        * For the spawn of the S->?, we want to sort the out edges by locality
+      D * For the spawn of the S->?, we want to sort the out edges by locality
           and send to each locality only once, and then do the set of edges
           on the far side. Further, the ->T operations should be performed last
               Okay - sorting is done
+
+              This one is not as clean. This can be rearranged so that the
+              sources are sent to each locality only once, but is that a win
+              compared to setting the expansion? If there are lots of edges
+              then this is a win. But otherwise, it might not be.
+
+              S->M should never be remote, so that is not really a concern
+              S->L could very well be remote. So perhaps we just make sure
+              that we do not multiple send the sources to the same locality
+              for S->T operations?
    - builtins
     : laplace_sph.h
         We want to see if there is a way to obviate the need to explicitly call
@@ -228,19 +238,10 @@ Overall Plan to 1.0
 
 
 
-NOTE: Big problem with the tree construction. We want to build the tree in
-      one locality. And so to do that in the old style, this means we need to
-      have all the particles in that locality as well. Eventually, we want to
-      migrate the particle data to the locations where it is most advantageous.
-      So the question is, do we assume that the data is local, or do we instead
-      build the tree from distributed particle data.
-
-      Sure, initially we are still doing this for SMP mode, but we want to
-      get to where we can do distributed easily. So I want to think about this
-      kind of thing along the way.
-
-
 OPEN QUESTIONS and TODO
+TODO: What is it about HPX-5 that is absolutely needed by DASHMM? Would
+      something more specific be better? Can we introduce some abstraction to
+      insulate ourselves from the HPX-5 risk?
 TODO: Make the Array type work from inside HPX-5 threads also
         (We have no use case for this just yet. Delay)
 TODO: Should we explicitly enforce the singleton nature of Evaluator?

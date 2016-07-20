@@ -153,6 +153,8 @@ class ExpansionLCO {
   /// Accuracy of expansion
   int accuracy() const {return n_digits_;}
 
+  // TODO: make this more direct. There is no reason to send a parcel since
+  // we are going to be local.
   /// Set this expansion with the multipole expansion of the given sources
   ///
   /// This will set the expansion with the multipole expansion computed for
@@ -164,18 +166,17 @@ class ExpansionLCO {
   /// expansion represented by this object.
   ///
   /// \param center - the center of the computed expansion
-  /// \param sources - a reference to the sources from which to compute the
-  ///                  multipole expansion
+  /// \param sources - the source data
+  /// \param n_src - the number of sources
   /// \param scale - scaling factor
-  void S_to_M(Point center, sourceref_t sources, double scale) const {
-    int nsrc = sources.n();
-    double cx = center.x();
-    double cy = center.y();
-    double cz = center.z();
-    hpx_call(sources.data(), s_to_m_, HPX_NULL, &nsrc, &cx, &cy, &cz,
-             &scale, &data_, &n_digits_);
+  void S_to_M(Point center, Source *sources, size_t n_src, double scale) {
+    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded}};
+    auto multi = local.S_to_M(center, sources, &sources[n_src], scale);
+    contribute(std::move(multi));
   }
 
+  // TODO: make this more direct. There is no reason to send a parcel since
+  // we are going to be local.
   /// Set this expansion with the local expansion of the given sources
   ///
   /// This will set the expansion with the local expansion computed for
@@ -188,31 +189,28 @@ class ExpansionLCO {
   /// current contents of the expansion.
   ///
   /// \param center - the center of the computed expansion
-  /// \param sources - a reference to the sources from which to compute the
-  ///                  local expansion
+  /// \param sources - the source data
+  /// \param n_src - the number of sources
   /// \param scale - scaling factor
-  void S_to_L(Point center, sourceref_t sources, double scale) const {
-    int nsrc = sources.n();
-    double cx = center.x();
-    double cy = center.y();
-    double cz = center.z();
-    hpx_call(sources.data(), s_to_l_, HPX_NULL, &nsrc, &cx, &cy, &cz, &scale,
-             &data_, &n_digits_);
+  void S_to_L(Point center, Source *sources, size_t n_src, double scale) {
+    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded}};
+    auto multi = local.S_to_L(center, sources, &sources[n_src], scale);
+    contribute(std::move(multi));
   }
 
+  // TODO: make this more direct. There is no reason to send a parcel since
+  // we are going to be local.
   /// Apply effect of sources to targets
   ///
   /// This will compute the effect of the given @p sources on the given
   /// @p targets. Note that this is an asynchronous operation. This may
   /// return before the contribution to the targets has been computed.
   ///
-  /// \param sources - a reference to the source points
+  /// \param sources - the source data
+  /// \param n_sources - the number of sources
   /// \param targets - a reference to the target points
-  void S_to_T(sourceref_t sources, targetlco_t targets) const {
-    int n_src = sources.n();
-    hpx_addr_t tsend = targets.lco();
-    size_t n_trg = targets.n();
-    hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend, &n_trg);
+  void S_to_T(Source *sources, size_t n_sources, targetlco_t targets) const {
+    targets.contribute_S_to_T(n_sources, sources);
   }
 
   /// Contribute to the referred expansion
@@ -456,7 +454,7 @@ class ExpansionLCO {
 
       // Find end of current locality's edges
       OutEdgeRecord *curr = begin;
-      while (curr->locality == curr_rank && curr != end) {
+      while (curr != end && curr->locality == curr_rank) {
         curr += 1;    // look at next record
       }
 
@@ -567,32 +565,6 @@ class ExpansionLCO {
     }
   }
 
-  static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
-                            double cz, double scale, hpx_addr_t expand,
-                            int n_digits) {
-    expansion_t local{ViewSet{n_digits, kNoRoleNeeded}};
-    auto multi = local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src],
-                              scale);
-
-    expansionlco_t total{expand, n_digits};
-    total.contribute(std::move(multi));
-
-    return HPX_SUCCESS;
-  }
-
-  static int s_to_l_handler(Source *sources, int n_src, double cx, double cy,
-                            double cz, double scale, hpx_addr_t expand,
-                            int n_digits) {
-    expansion_t local{ViewSet{n_digits, kNoRoleNeeded}};
-    auto multi = local.S_to_L(Point{cx, cy, cz}, sources, &sources[n_src],
-                              scale);
-
-    expansionlco_t total{expand, n_digits};
-    total.contribute(std::move(multi));
-
-    return HPX_SUCCESS;
-  }
-
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
@@ -687,13 +659,6 @@ class ExpansionLCO {
     lco.contribute(std::move(translated));
   }
 
-  static int s_to_t_handler(Source *sources, int n_sources,
-                            hpx_addr_t target, size_t n_trg) {
-    targetlco_t targets{target, n_trg};
-    targets.contribute_S_to_T(n_sources, sources);
-    return HPX_SUCCESS;
-  }
-
   static int create_from_expansion_handler(Header *payload, size_t bytes) {
     size_t total = bytes + sizeof(OutEdgeRecord) * payload->out_edge_count;
     hpx_addr_t gdata = hpx_lco_user_new(total, init_, operation_,
@@ -711,9 +676,6 @@ class ExpansionLCO {
   // The actions for the various operations
   static hpx_action_t spawn_out_edges_;
   static hpx_action_t spawn_out_edges_from_remote_;
-  static hpx_action_t s_to_m_;
-  static hpx_action_t s_to_l_;
-  static hpx_action_t s_to_t_;
   static hpx_action_t create_from_expansion_;
 
   hpx_addr_t data_;     // this is the LCO
@@ -760,30 +722,6 @@ template <typename S, typename T,
           typename D>
 hpx_action_t ExpansionLCO<S, T, E, M, D>::spawn_out_edges_from_remote_ =
     HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_m_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t ExpansionLCO<S, T, E, M, D>::s_to_t_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

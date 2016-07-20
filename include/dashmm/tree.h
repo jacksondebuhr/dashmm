@@ -524,6 +524,14 @@ class Tree {
     std::vector<sourcenode_t *> *consider;
   };
 
+  /// Edge record for DAG instigation
+  struct DAGInstigationRecord {
+    Operation op;
+    hpx_addr_t target;
+    size_t other_member;
+    Index idx;
+  };
+
   static int source_bounds_handler(hpx_addr_t data, size_t count) {
     source_t *user{nullptr};
     assert(hpx_gas_try_pin(data, (void **)&user));
@@ -1004,62 +1012,158 @@ class Tree {
       std::sort(parts->out_edges.begin(), parts->out_edges.end(),
                 DAG::compare_edge_locality);
 
-      // loop over edges
-      for (size_t i = 0; i < parts->out_edges.size(); ++i) {
-        switch (parts->out_edges[i].op) {
-          case Operation::Nop:
-            assert(0 && "Trouble handling DAG instigation");
-            break;
-          case Operation::StoM:
-            {
-              const DAGNode *normal = node->dag.normal();
-              assert(normal);
-              expansionlco_t expand{normal->global_addx,
-                                    (int)normal->other_member};
-              auto domain = tree->domain_.value();
-              double scale = 1.0 / domain->size_from_level(normal->idx.level());
-              Point center = domain->center_from_index(normal->idx);
-              expand.S_to_M(center, sources, scale);
-            }
-            break;
-          case Operation::StoL:
-            {
-              // Get target DAGNode
-              const DAGNode *normal = parts->out_edges[i].target;
-              assert(normal);
-              expansionlco_t expand{normal->global_addx,
-                                    (int)normal->other_member};
-              auto domain = tree->domain_.value();
-              double scale = 1.0 / domain->size_from_level(normal->idx.level());
-              Point center = domain->center_from_index(normal->idx);
-              expand.S_to_L(center, sources, scale);
-            }
-            break;
-          case Operation::MtoM:   // NOTE: Fall-through
-          case Operation::MtoL:   //   |
-          case Operation::LtoL:   //   |
-          case Operation::MtoT:   //   |
-          case Operation::LtoT:   //   v
-            assert(0 && "Trouble handling DAG instigation");
-            break;
-          case Operation::StoT:
-            {
-              // S_to_T on expansion LCOs do not need any of the
-              // expansionlco_t's state, so we create a default object.
-              expansionlco_t expand{HPX_NULL, 0};
-              targetlco_t targets{parts->out_edges[i].target->global_addx,
-                                  parts->out_edges[i].target->other_member};
-              expand.S_to_T(sources, targets);
-            }
-            break;
-          default:
-            assert(0 && "Trouble handling DAG instigation");
-            break;
-        }
+      // Make scratch space for the sends
+      // TODO: this will change if we have the return message about the
+      // target addresses
+      size_t source_size = sizeof(Source) * sources.n();
+      size_t header_size = source_size + sizeof(size_t)
+          + sizeof(hpx_addr_t);
+      size_t total_size = header_size + sizeof(size_t)
+          + parts->out_edges.size() * sizeof(DAGInstigationRecord);
+      char *scratch = new char [total_size];
+      assert(scratch != nullptr);
+
+      // Copy source data
+      auto sref = sources.pin();
+      {
+        WriteBuffer headdata(scratch, header_size);
+        assert(headdata.write(sources.n()));
+
+        ReadBuffer sourcedata((char *)sref.value(), source_size);
+        assert(headdata.write(sourcedata));
+
+        assert(headdata.write(tree->domain_.data()));
       }
+
+      // loop over the sorted edges
+      //  send parcel or do work
+      // advance
+      int my_rank = hpx_get_my_rank();
+      auto begin = parts->out_edges.begin();
+      auto end = parts->out_edges.end();
+      while (begin != end) {
+        int curr_rank = begin->target->locality;
+        auto curr = begin;
+        while (curr != end && curr->target->locality == curr_rank) {
+          ++curr;
+        }
+
+        //copy in edge data
+        char *edgedata = scratch + header_size;
+        size_t *edgecount = reinterpret_cast<size_t *>(edgedata);
+        *edgecount = curr - begin;
+
+        DAGInstigationRecord *edgerecords
+            = reinterpret_cast<DAGInstigationRecord *>(edgedata
+                                                        + sizeof(size_t));
+        int i = 0;
+        for (auto loop = begin; loop != curr; ++loop) {
+          edgerecords[i].op = loop->op;
+          edgerecords[i].target = loop->target->global_addx;
+          edgerecords[i].other_member = loop->target->other_member;
+          edgerecords[i].idx = loop->target->idx;
+          ++i;
+        }
+
+        // Send parcel or do the work
+        if (curr_rank == my_rank) {
+          instigate_dag_eval_work(sources.n(), sref.value(), tree->domain_,
+                                  *edgecount, edgerecords);
+        } else {
+          hpx_parcel_t *parc = hpx_parcel_acquire(scratch, total_size);
+          hpx_parcel_set_action(parc, instigate_dag_eval_remote_);
+          hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
+          // The eventual continuation action and target
+
+          hpx_parcel_send_sync(parc);
+        }
+
+        begin = curr;
+      }
+
+      delete [] scratch;
     }
 
     return HPX_SUCCESS;
+  }
+
+  static int instigate_dag_eval_remote_handler(char *message, size_t bytes) {
+    // Detect if the edges have unknown target addresses and lookup the
+    // correct stuff.
+    // TODO: eventually
+
+    // TODO: the local work
+    // unpack message into arguments to the local work function
+    auto input = ReadBuffer(message, bytes);
+    size_t n_src{};
+    input.read(&n_src);
+    Source *sources = input.interpret_array<Source>(n_src);
+    hpx_addr_t dom_addx{};
+    input.read(&dom_addx);
+    SharedData<DomainGeometry> geo{dom_addx};
+    size_t n_edges{};
+    input.read(&n_edges);
+    DAGInstigationRecord *edges
+        = input.interpret_array<DAGInstigationRecord>(n_edges);
+    instigate_dag_eval_work(n_src, sources, geo, n_edges, edges);
+
+    // TODO continue the looked up data
+
+    return HPX_SUCCESS;
+  }
+
+  static void instigate_dag_eval_work(size_t n_src, Source *sources,
+                                      SharedData<DomainGeometry> &domain,
+                                      size_t n_edges,
+                                      DAGInstigationRecord *edge) {
+    // loop over edges
+    for (size_t i = 0; i < n_edges; ++i) {
+      switch (edge[i].op) {
+        case Operation::Nop:
+          assert(0 && "Trouble handling DAG instigation");
+          break;
+        case Operation::StoM:
+          {
+            expansionlco_t expand{edge[i].target,
+                                  (int)edge[i].other_member};
+            auto geo = domain.value();
+            double scale = 1.0 / geo->size_from_level(edge[i].idx.level());
+            Point center = geo->center_from_index(edge[i].idx);
+            expand.S_to_M(center, sources, n_src, scale);
+          }
+          break;
+        case Operation::StoL:
+          {
+            expansionlco_t expand{edge[i].target,
+                                  (int)edge[i].other_member};
+            auto geo = domain.value();
+            double scale = 1.0 / geo->size_from_level(edge[i].idx.level());
+            Point center = geo->center_from_index(edge[i].idx);
+            expand.S_to_L(center, sources, n_src, scale);
+          }
+          break;
+        case Operation::MtoM:   // NOTE: Fall-through
+        case Operation::MtoL:   //   |
+        case Operation::LtoL:   //   |
+        case Operation::MtoT:   //   |
+        case Operation::LtoT:   //   v
+          assert(0 && "Trouble handling DAG instigation");
+          break;
+        case Operation::StoT:
+          {
+            // S_to_T on expansion LCOs do not need any of the
+            // expansionlco_t's state, so we create a default object.
+            expansionlco_t expand{HPX_NULL, 0};
+            targetlco_t targets{edge[i].target,
+                                edge[i].other_member};
+            expand.S_to_T(sources, n_src, targets);
+          }
+          break;
+        default:
+          assert(0 && "Trouble handling DAG instigation");
+          break;
+      }
+    }
   }
 
   static int termination_detection_handler(hpx_addr_t done,
@@ -1139,6 +1243,7 @@ class Tree {
   static hpx_action_t create_T_expansions_from_DAG_;
   static hpx_action_t edge_lists_;
   static hpx_action_t instigate_dag_eval_;
+  static hpx_action_t instigate_dag_eval_remote_;
   static hpx_action_t termination_detection_;
   static hpx_action_t destroy_DAG_LCOs_;
 };
@@ -1234,6 +1339,14 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t Tree<S, T, E, M, D>::instigate_dag_eval_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, E, M, D>::instigate_dag_eval_remote_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

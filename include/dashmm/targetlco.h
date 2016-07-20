@@ -106,7 +106,7 @@ class TargetLCO {
   ///
   /// \param n - the number of sources
   /// \param sources - the sources themselves
-  void contribute_S_to_T(int n, source_t *sources) const {
+  void contribute_S_to_T(size_t n, source_t *sources) const {
     size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);
@@ -172,7 +172,7 @@ class TargetLCO {
   /// S->T parameters type
   struct StoT {
     int code;
-    int count;
+    size_t count;
     source_t sources[];
   };
 

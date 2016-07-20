@@ -115,7 +115,7 @@ class DAG {
   void toJSON(std::string fname);
 
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
-    return a.target->locality < b.target->locality;
+    return (a.target->locality < b.target->locality);
   }
 
   static bool operation_to_target(Operation op) {

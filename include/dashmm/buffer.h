@@ -132,6 +132,15 @@ class ReadBuffer : public Buffer {
     }
     return retval;
   }
+
+  template <typename T>
+  T *interpret_array(size_t n) {
+    T *retval = reinterpret_cast<T *>(cursor());
+    if (!advance(sizeof(T) * n)) {
+      retval = nullptr;
+    }
+    return retval;
+  }
 };
 
 
@@ -176,7 +185,7 @@ class WriteBuffer : public Buffer {
   /// \returns - true on successful exhaustion of input; false otherwise
   bool write(ReadBuffer &input) {
     //write either all of input, or until this is used up
-    // return true only id all of input was written into this
+    // return true only if all of input was written into this
     if (complete()) return false;
 
     size_t inputleft = input.remain();
