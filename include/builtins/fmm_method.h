@@ -159,15 +159,10 @@ class FMM {
     Index l_mod_top{l_mod.x() + shift, l_mod.y() + shift, l_mod.z() + shift,
           l_mod.level()};
 
-    // in the asymmetric case, we need to check both sides of the larger box
-    // to make sure there is a gap of one of the smaller boxes
-    if (abs(smaller.x() - l_mod.x()) > 1
-        && abs(smaller.x() - l_mod_top.x()) > 1) return true;
-    if (abs(smaller.y() - l_mod.y()) > 1
-        && abs(smaller.y() - l_mod_top.y()) > 1) return true;
-    if (abs(smaller.z() - l_mod.z()) > 1
-        && abs(smaller.z() - l_mod_top.z()) > 1) return true;
-    return false;
+    // NOTE: shortcut evaluation
+    return (l_mod.x() - smaller.x() > 1) || (smaller.x() - l_mod_top.x() > 1)
+        || (l_mod.y() - smaller.y() > 1) || (smaller.y() - l_mod_top.y() > 1)
+        || (l_mod.z() - smaller.z() > 1) || (smaller.z() - l_mod_top.z() > 1);
   }
 
   bool well_sep_test(Index source, Index target) const {
