@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint> 
 #include <cstring>
+#include <cassert>
 #include <iostream>
 #include <algorithm>
 #include "tree.h"
@@ -82,21 +83,27 @@ int *distribute_points(int num_ranks, const int *global, int len) {
   int iterator = -1; 
   int bound = q + (r != 0); 
 
-  while (rank < num_ranks) {
+  while (rank < num_ranks && iterator < len) {
     if (rank) 
       bound = scan[iterator] + q + (rank <= r); 
     iterator++; 
     int i; 
-    for (i = iterator; i < len; ++i) {
+    for (i = iterator; i <= len - 2; ++i) {
       if (scan[i] <= bound && scan[i + 1] > bound)
         break;
     }
-    ret[rank++] = i; 
-    iterator = i; 
+    ret[rank++] = i; // i is at most len - 1
+    iterator = i;
   }
 
   delete [] scan; 
-  return ret; 
+  
+  if (rank < num_ranks) {
+    delete [] ret; 
+    return nullptr;
+  } else {
+    return ret;
+  }
 } 
 
 int generate_input_handler(int nsrc_per_rank, int ntar_per_rank, 
@@ -124,7 +131,10 @@ int generate_input_handler(int nsrc_per_rank, int ntar_per_rank,
   Point *p_s = reinterpret_cast<Point *>(meta_s->data); 
   Point *p_t = reinterpret_cast<Point *>(meta_t->data); 
 
-  srand(rank); 
+  // Set the seed of the random number generator. Note that if the seed is set
+  // to 1, the generator is reinitialized to its initial value. For this reason,
+  // the seed is chosen to be 2 + rank here. 
+  srand(rank + 2); 
   if (datatype == 'c') {
     set_points_in_cube(p_s, nsrc_per_rank);
     set_points_in_cube(p_t, nsrc_per_rank); 
@@ -435,7 +445,8 @@ int *init_point_exchange(int rank, const int *count, const Point *temp,
   Point *p = reinterpret_cast<Point *>(meta->data); 
 
   for (int i = first; i <= last; ++i) {
-    memcpy(p + offset[i - first], &temp[offset_l[i]], sizeof(Point) * count[i]); 
+    memcpy(p + offset[i - first], &temp[offset_l[i]], 
+           sizeof(Point) * count[i]); 
 
     // first_ is used as an iterator to trace the position to insert points. 
     n[i].set_first(offset[i - first] + count[i]);
@@ -502,8 +513,8 @@ int recv_points_handler(void *args, size_t size) {
   Node *n = reinterpret_cast<Node *>(meta_g->data); 
 
   int dim3 = pow(8, unif_level); 
-  int *count_s = count; 
-  int *count_t = &count[dim3]; 
+  //int *count_s = count; 
+  //int *count_t = &count[dim3]; 
 
   int *meta = reinterpret_cast<int *>(static_cast<char *>(args)); 
   int first = meta[0]; 
@@ -511,55 +522,54 @@ int recv_points_handler(void *args, size_t size) {
   int range = last - first + 1; 
   int recv_ns = meta[2]; 
   int recv_nt = meta[3]; 
-  int *offset_s = &meta[4]; 
-  int *offset_t = &meta[4 + range]; 
-  Point *recv_s = reinterpret_cast<Point *>(static_cast<char *>(args) + 
-                                            sizeof(int) * (4 + range * 2)); 
+  int *count_s = &meta[4]; 
+  int *count_t = count_s + range * (recv_ns > 0);   
+  Point *recv_s = 
+    reinterpret_cast<Point *>(static_cast<char *>(args) + sizeof(int) * 4 + 
+                              sizeof(int) * range * (recv_ns > 0) + 
+                              sizeof(int) * range * (recv_nt > 0)); 
   Point *recv_t = recv_s + recv_ns; 
 
   for (int i = first; i <= last; ++i) {
     Node *ns = &n[i]; 
     Node *nt = &n[i + dim3]; 
-    
-    int incoming_first_s = offset_s[i - first]; 
-    int incoming_last_s = (i == last ? recv_ns - 1 : 
-                           offset_s[i + 1 - first] - 1); 
-    int incoming_ns = incoming_last_s - incoming_first_s + 1; 
 
-    hpx_lco_sema_p(ns->sema()); 
-    int first_s = ns->first(); 
-    memcpy(s + first_s, &recv_s[incoming_first_s], sizeof(Point) * incoming_ns); 
-    ns->set_first(first_s + incoming_ns); 
-
-    if (first_s + incoming_ns > ns->last()) {
-      // Spawn adaptive partitioning 
-      ns->set_first(ns->last() + 1 - count_s[i]); 
-
-      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-               &ns, &s, &swap_src, &bin_src, &map_src); 
-    }
-    hpx_lco_sema_v(ns->sema(), HPX_NULL); 
-
-    int incoming_first_t = offset_t[i - first]; 
-    int incoming_last_t = (i == last ? recv_nt - 1 : 
-                           offset_t[i + 1 - first] - 1); 
-    int incoming_nt = incoming_last_t - incoming_first_t + 1; 
-
-    hpx_lco_sema_p(nt->sema()); 
-    int first_t = nt->first(); 
-    memcpy(t + first_t, &recv_t[incoming_first_t], sizeof(Point) * incoming_nt);
-    nt->set_first(first_t + incoming_nt); 
-    
-    if (first_t + incoming_nt > nt->last()) {
-      // Spawn adaptive partitioning 
-      nt->set_first(nt->last() + 1 - count_t[i]); 
+    int incoming_ns = count_s[i - first]; 
+    if (incoming_ns) {
+      hpx_lco_sema_p(ns->sema()); 
+      int first_s = ns->first(); 
+      memcpy(s + first_s, recv_s, sizeof(Point) * incoming_ns); 
+      ns->set_first(first_s + incoming_ns); 
+      recv_s += incoming_ns; 
       
-      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-               &nt, &t, &swap_tar, &bin_tar, &map_tar); 
+      if (first_s + incoming_ns > ns->last()) {
+        // Spawn adaptive partitioning
+        ns->set_first(ns->last() + 1 - count[i]); 
+        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                 &ns, &s, &swap_src, &bin_src, &map_src); 
+      }
+      hpx_lco_sema_v(ns->sema(), HPX_NULL); 
     }
-    hpx_lco_sema_v(nt->sema(), HPX_NULL); 
+
+    int incoming_nt = count_t[i - first]; 
+    if (incoming_nt) {
+      hpx_lco_sema_p(nt->sema()); 
+      int first_t = nt->first(); 
+      memcpy(t + first_t, recv_t, sizeof(Point) * incoming_nt); 
+      nt->set_first(first_t + incoming_nt); 
+      recv_t += incoming_nt; 
+      
+      if (first_t + incoming_nt > nt->last()) {
+        // Spawn adaptive partitioning 
+        nt->set_first(nt->last() + 1 - count[i + dim3]); 
+        
+        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                 &nt, &t, &swap_tar, &bin_tar, &map_tar); 
+      }
+      hpx_lco_sema_v(nt->sema(), HPX_NULL); 
+    }
   }
- 
+
   hpx_lco_release(*user_lco, user_lco_buffer); 
   hpx_gas_unpin(curr_unif_count); 
   hpx_gas_unpin(curr_unif_count); 
@@ -571,18 +581,26 @@ int recv_points_handler(void *args, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_points_action, 
            recv_points_handler, HPX_POINTER, HPX_SIZE_T); 
 
-int send_points_handler(int rank, int *offset_s, int *offset_t, 
+int send_points_handler(int rank, int *count_s, int *count_t, 
                         Point *sources, Point *targets) {
   // Note: all the pointers are local to the calling rank. 
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
   int last = distribute[rank]; 
   int range = last - first + 1; 
-  int send_ns = offset_s[last] - offset_s[first] + 1; 
-  int send_nt = offset_t[last] - offset_t[first] + 1; 
+  int send_ns = 0, send_nt = 0; 
+  for (int i = first; i <= last; ++i) {
+    send_ns += count_s[i]; 
+    send_nt += count_t[i];
+  }
 
-  // Parcel message size 
-  size_t size = sizeof(int) * (4 + 2 * range) + 
-    sizeof(Point) * (send_ns + send_nt); 
+  // Parcel message size
+  size_t size = sizeof(int) * 4; 
+  if (send_ns) 
+    size += sizeof(int) * range + sizeof(Point) * send_ns; 
+  if (send_nt) 
+    size += sizeof(int) * range + sizeof(Point) * send_nt; 
+  
+  // Acquire parcel 
   hpx_parcel_t *p = hpx_parcel_acquire(NULL, size); 
   void *data = hpx_parcel_get_data(p); 
   int *meta = reinterpret_cast<int *>(static_cast<char *>(data)); 
@@ -590,19 +608,24 @@ int send_points_handler(int rank, int *offset_s, int *offset_t,
   meta[1] = last; 
   meta[2] = send_ns; 
   meta[3] = send_nt; 
-  int *meta_offset_s = &meta[4]; 
-  int *meta_offset_t = &meta[4 + range]; 
 
-  for (int i = first; i <= last; ++i) {
-    meta_offset_s[i - first] = offset_s[i] - offset_s[first]; 
-    meta_offset_t[i - first] = offset_t[i] - offset_t[first]; 
+  int *count = &meta[4]; 
+  if (send_ns) {
+    memcpy(count, &count_s[first], sizeof(int) * range); 
+    count += range;
   }
 
-  char *meta_s = static_cast<char *>(data) + sizeof(int) * (4 + range * 2); 
-  char *meta_t = meta_s + sizeof(Point) * send_ns; 
+  if (send_nt) 
+    memcpy(count, &count_t[first], sizeof(int) * range); 
 
-  memcpy(meta_s, &sources[first], send_ns); 
-  memcpy(meta_t, &targets[first], send_nt); 
+  char *meta_s = static_cast<char *>(data) + 
+    sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0)); 
+  if (send_ns) 
+    memcpy(meta_s, &sources[first], sizeof(Point) * send_ns); 
+  
+  char *meta_t = meta_s + send_ns; 
+  if (send_nt) 
+    memcpy(meta_t, &targets[first], sizeof(Point) * send_nt); 
 
   hpx_parcel_set_target(p, HPX_THERE(rank)); 
   hpx_parcel_set_action(p, recv_points_action); 
@@ -611,7 +634,7 @@ int send_points_handler(int rank, int *offset_s, int *offset_t,
   return HPX_SUCCESS; 
 }
 HPX_ACTION(HPX_DEFAULT, 0, send_points_action, send_points_handler, 
-           HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
+           HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER);
 
 int recv_node_handler(void *args, size_t size) {
   int *compressed_tree = reinterpret_cast<int *>(static_cast<char *>(args)); 
@@ -635,6 +658,13 @@ int recv_node_handler(void *args, size_t size) {
   curr->extract(branch, tree, n_nodes); 
 
   hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
+  
+  if (type == 0) {
+    std::cout << "rank " << rank << "set s " << id << "\n";
+  } else {
+    std::cout << "rank " << rank << "set t " << id << "\n";
+  }
+
   hpx_gas_unpin(curr_unif_grid); 
   return HPX_SUCCESS; 
 } 
@@ -758,6 +788,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
                             + sizeof(int) * 2); 
 
   distribute = distribute_points(num_ranks, global_count, dim3); 
+  assert(distribute != nullptr); 
 
   // Exchange points
   hpx_addr_t curr_sorted_s = hpx_addr_add(sorted_src, 
@@ -803,44 +834,54 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
 
   for (int r = 0; r < num_ranks; ++r) {
     if (r != rank) {
-      hpx_call(HPX_HERE, send_points_action, HPX_NULL, &r, &local_offset_s, 
-               &local_offset_t, &temp_s, &temp_t);
+      hpx_call(HPX_HERE, send_points_action, HPX_NULL, &r, &local_scount, 
+               &local_tcount, &temp_s, &temp_t);
     }
   }
 
   // Exchange source and target trees 
   hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
 
-  for (int i = 0; i < dim3; ++i) {
-    // Process source tree 
-    if (global_count[i] == 0) {
-      hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-    } else {
-      if (distribute[i] == rank) {
-        int s{0}; 
-        hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
-                                        send_node_action, dual_tree_complete, 
-                                        hpx_lco_set_action, &ns, &meta_s, 
-                                        &i, &s);
-      } else {
-        hpx_call_when(ns[i].complete(), dual_tree_complete, hpx_lco_set_action,
-                      HPX_NULL, NULL, 0);
-      }
-    }
+  for (int r = 0; r < num_ranks; ++r) {
+    int first = (r == 0 ? 0 : distribute[rank - 1] + 1); 
+    int last = distribute[rank - 1]; 
+    int s{0}, t{1}; 
 
-    // Process target tree
-    if (global_count[i + dim3] == 0) {
-      hpx_lco_and_set(dual_tree_complete, HPX_NULL); 
+    if (r == rank) {
+      for (int i = first; i <= last; ++i) {
+        if (global_count[i] == 0) {
+          hpx_lco_and_set(dual_tree_complete, HPX_NULL); 
+        } else {
+          hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
+                                          send_node_action, dual_tree_complete, 
+                                          hpx_lco_set_action, &ns, &meta_s, 
+                                          &i, &s);
+        }
+
+        if (global_count[i + dim3] == 0) {
+          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+        } else {
+          hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
+                                          send_node_action, dual_tree_complete, 
+                                          hpx_lco_set_action, &nt, &meta_t, 
+                                          &i, &t);
+        }
+      }
     } else {
-      if (distribute[i] == rank) {
-        int t{1}; 
-        hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
-                                        send_node_action, dual_tree_complete, 
-                                        hpx_lco_set_action, &nt, &meta_t, 
-                                        &i, &t);
-      } else {
-        hpx_call_when(nt[i].complete(), dual_tree_complete, hpx_lco_set_action, 
-                      HPX_NULL, NULL, 0); 
+      for (int i = first; i <= last; ++i) {
+        if (global_count[i] == 0) {
+          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+        } else {
+          hpx_call_when(ns[i].complete(), dual_tree_complete, 
+                        hpx_lco_set_action, HPX_NULL, NULL, 0);
+        } 
+
+        if (global_count[i + dim3] == 0) {
+          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+        } else {
+          hpx_call_when(nt[i].complete(), dual_tree_complete, 
+                        hpx_lco_set_action, HPX_NULL, NULL, 0); 
+        }
       }
     }
   }
