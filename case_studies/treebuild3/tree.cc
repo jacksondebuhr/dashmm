@@ -427,13 +427,25 @@ int *group_points_on_unif_grid(const Point *p_in, int npts,
   return offset; 
 }
 
+int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
+  n->partition(p, swap, bin, map, threshold, corner_x, corner_y, 
+               corner_z, size); 
+  return HPX_SUCCESS; 
+}
+HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler, 
+           HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
+
 int *init_point_exchange(int rank, const int *global_count, 
                          const int *local_count, const int *local_offset, 
-                         const Point *temp, Node *n, ArrayMetaData *meta) {
+                         const Point *temp, Node *n, ArrayMetaData *meta, 
+                         char type) {
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
   int last = distribute[rank]; 
-  int range = last - first + 1; 
-  
+  int range = last - first + 1;   
+  int *swap = (type == 's' ? swap_src : swap_tar); 
+  int *bin = (type == 's' ? bin_src : bin_tar); 
+  int *map = (type == 's' ? map_src : map_tar); 
+
   // Compute global_offset
   int *global_offset = new int[range](); 
   int num_points = global_count[first]; 
@@ -460,23 +472,21 @@ int *init_point_exchange(int rank, const int *global_count,
       } else {
         n[i].set_last(num_points - 1);
       }
+
+      if (local_count[i] == global_count[i]) {
+        // This grid does not expect remote points. 
+        // Spawn adaptive partitioning
+        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                 &n[i], &p, &swap, &bin, &map); 
+      }
     }
   }
 
   return global_offset; 
 }
 
-int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
-  n->partition(p, swap, bin, map, threshold, corner_x, corner_y, 
-               corner_z, size); 
-  return HPX_SUCCESS; 
-}
-HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler, 
-           HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER); 
-
 int recv_points_handler(void *args, size_t size) {
   int rank = hpx_get_my_rank(); 
-  std::cout << rank << "\n"; 
   hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
                                            sizeof(hpx_addr_t) * rank, 
                                            sizeof(hpx_addr_t)); 
@@ -526,51 +536,56 @@ int recv_points_handler(void *args, size_t size) {
   int range = last - first + 1; 
   int recv_ns = meta[2]; 
   int recv_nt = meta[3]; 
-  int *count_s = &meta[4]; 
-  int *count_t = count_s + range * (recv_ns > 0);   
+  int *count_s = &meta[4]; // Used only if recv_ns > 0 
+  int *count_t = count_s + range * (recv_ns > 0); // Used only if recv_nt > 0
   Point *recv_s = 
     reinterpret_cast<Point *>(static_cast<char *>(args) + sizeof(int) * 4 + 
                               sizeof(int) * range * (recv_ns > 0) + 
                               sizeof(int) * range * (recv_nt > 0)); 
   Point *recv_t = recv_s + recv_ns; 
 
-  for (int i = first; i <= last; ++i) {
-    Node *ns = &n[i]; 
-    Node *nt = &n[i + dim3]; 
-
-    int incoming_ns = count_s[i - first]; 
-    if (incoming_ns) {
-      hpx_lco_sema_p(ns->sema()); 
-      int first_s = ns->first(); 
-      memcpy(s + first_s, recv_s, sizeof(Point) * incoming_ns); 
-      ns->set_first(first_s + incoming_ns); 
-      recv_s += incoming_ns; 
-      
-      if (first_s + incoming_ns > ns->last()) {
-        // Spawn adaptive partitioning
-        ns->set_first(ns->last() + 1 - count[i]); 
-        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                 &ns, &s, &swap_src, &bin_src, &map_src); 
-      }
-      hpx_lco_sema_v(ns->sema(), HPX_NULL); 
-    }
-
-    int incoming_nt = count_t[i - first]; 
-    if (incoming_nt) {
-      hpx_lco_sema_p(nt->sema()); 
-      int first_t = nt->first(); 
-      memcpy(t + first_t, recv_t, sizeof(Point) * incoming_nt); 
-      nt->set_first(first_t + incoming_nt); 
-      recv_t += incoming_nt; 
-      
-      if (first_t + incoming_nt > nt->last()) {
-        // Spawn adaptive partitioning 
-        nt->set_first(nt->last() + 1 - count[i + dim3]); 
+  if (recv_ns) {
+    for (int i = first; i <= last; ++i) {
+      Node *ns = &n[i]; 
+      int incoming_ns = count_s[i - first]; 
+      if (incoming_ns) {
+        hpx_lco_sema_p(ns->sema()); 
+        int first_s = ns->first(); 
+        memcpy(s + first_s, recv_s, sizeof(Point) * incoming_ns); 
+        ns->set_first(first_s + incoming_ns); 
+        recv_s += incoming_ns; 
         
-        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                 &nt, &t, &swap_tar, &bin_tar, &map_tar); 
+        if (first_s + incoming_ns > ns->last()) {
+          // Spawn adaptive partitioning
+          ns->set_first(ns->last() + 1 - count[i]); 
+          hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                   &ns, &s, &swap_src, &bin_src, &map_src); 
+        }
+        hpx_lco_sema_v(ns->sema(), HPX_NULL); 
+      }      
+    }
+  }
+
+  if (recv_nt) {
+    for (int i = first; i <= last; ++i) {
+      Node *nt = &n[i + dim3]; 
+      int incoming_nt = count_t[i - first]; 
+      if (incoming_nt) {
+        hpx_lco_sema_p(nt->sema()); 
+        int first_t = nt->first(); 
+        memcpy(t + first_t, recv_t, sizeof(Point) * incoming_nt); 
+        nt->set_first(first_t + incoming_nt); 
+        recv_t += incoming_nt; 
+      
+        if (first_t + incoming_nt > nt->last()) {
+          // Spawn adaptive partitioning 
+          nt->set_first(nt->last() + 1 - count[i + dim3]); 
+          
+          hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                   &nt, &t, &swap_tar, &bin_tar, &map_tar); 
+        }
+        hpx_lco_sema_v(nt->sema(), HPX_NULL); 
       }
-      hpx_lco_sema_v(nt->sema(), HPX_NULL); 
     }
   }
 
@@ -822,14 +837,6 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   Node *ns = reinterpret_cast<Node *>(meta_g->data); 
   Node *nt = reinterpret_cast<Node *>(meta_g->data + sizeof(Node) * dim3);
 
-  int *global_offset_s = init_point_exchange(rank, global_count, local_scount, 
-                                             local_offset_s, temp_s, 
-                                             ns, meta_s); 
-  int *global_offset_t = init_point_exchange(rank, global_count + dim3, 
-                                             local_tcount, local_offset_t, 
-                                             temp_t, nt, meta_t); 
-  hpx_lco_and_set(*gate, HPX_NULL); 
-
   swap_src = new int[meta_s->count](); 
   bin_src = new int[meta_s->count](); 
   map_src = new int[meta_s->count](); 
@@ -840,6 +847,14 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
     map_src[i] = i; 
   for (int i = 0; i < meta_t->count; ++i) 
     map_tar[i] = i; 
+
+  int *global_offset_s = init_point_exchange(rank, global_count, local_scount, 
+                                             local_offset_s, temp_s, 
+                                             ns, meta_s, 's'); 
+  int *global_offset_t = init_point_exchange(rank, global_count + dim3, 
+                                             local_tcount, local_offset_t, 
+                                             temp_t, nt, meta_t, 't'); 
+  hpx_lco_and_set(*gate, HPX_NULL); 
 
   for (int r = 0; r < num_ranks; ++r) {
     if (r != rank) {
