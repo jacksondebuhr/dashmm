@@ -427,38 +427,43 @@ int *group_points_on_unif_grid(const Point *p_in, int npts,
   return offset; 
 }
 
-int *init_point_exchange(int rank, const int *count, const Point *temp, 
-                         const int *offset_l, Node *n, ArrayMetaData *meta) {
+int *init_point_exchange(int rank, const int *global_count, 
+                         const int *local_count, const int *local_offset, 
+                         const Point *temp, Node *n, ArrayMetaData *meta) {
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
   int last = distribute[rank]; 
   int range = last - first + 1; 
-  int num_pts = count[first]; 
-  int *offset = new int[range](); 
-  for (int i = 1; i < range; ++i) {
-    num_pts += count[first + i]; 
-    offset[i] = offset[i - 1] + count[first + i]; 
+  
+  // Compute global_offset
+  int *global_offset = new int[range](); 
+  int num_points = global_count[first]; 
+  for (int i = first + 1; i <= last; ++i) {
+    num_points += global_count[i]; 
+    global_offset[i - first] = global_offset[i - first - 1] + global_count[i];
   }
 
   meta->size = sizeof(Point); 
-  meta->count = num_pts; 
-  meta->data = new char[sizeof(Point) * num_pts](); 
+  meta->count = num_points; 
+  meta->data = new char[sizeof(Point) * num_points](); 
   Point *p = reinterpret_cast<Point *>(meta->data); 
 
   for (int i = first; i <= last; ++i) {
-    memcpy(p + offset[i - first], &temp[offset_l[i]], 
-           sizeof(Point) * count[i]); 
+    if (local_count[i]) {
+      memcpy(p + global_offset[i - first], &temp[local_offset[i]], 
+             sizeof(Point) * local_count[i]); 
 
-    // first_ is used as an iterator to trace the position to insert points. 
-    n[i].set_first(offset[i - first] + count[i]);
+      // first_ is used as an iterator to trace the position to insert points
+      n[i].set_first(global_offset[i - first] + local_count[i]); 
 
-    if (i < last) {
-      n[i].set_last(offset[i + 1 - first]);
-    } else {
-      n[i].set_last(num_pts - 1);
+      if (i < last) {
+        n[i].set_last(global_offset[i + 1 - first]); 
+      } else {
+        n[i].set_last(num_points - 1);
+      }
     }
   }
 
-  return offset; 
+  return global_offset; 
 }
 
 int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
@@ -471,6 +476,7 @@ HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler,
 
 int recv_points_handler(void *args, size_t size) {
   int rank = hpx_get_my_rank(); 
+  std::cout << rank << "\n"; 
   hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
                                            sizeof(hpx_addr_t) * rank, 
                                            sizeof(hpx_addr_t)); 
@@ -513,8 +519,6 @@ int recv_points_handler(void *args, size_t size) {
   Node *n = reinterpret_cast<Node *>(meta_g->data); 
 
   int dim3 = pow(8, unif_level); 
-  //int *count_s = count; 
-  //int *count_t = &count[dim3]; 
 
   int *meta = reinterpret_cast<int *>(static_cast<char *>(args)); 
   int first = meta[0]; 
@@ -582,6 +586,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_points_action,
            recv_points_handler, HPX_POINTER, HPX_SIZE_T); 
 
 int send_points_handler(int rank, int *count_s, int *count_t, 
+                        int *offset_s, int *offset_t, 
                         Point *sources, Point *targets) {
   // Note: all the pointers are local to the calling rank. 
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
@@ -621,11 +626,11 @@ int send_points_handler(int rank, int *count_s, int *count_t,
   char *meta_s = static_cast<char *>(data) + 
     sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0)); 
   if (send_ns) 
-    memcpy(meta_s, &sources[first], sizeof(Point) * send_ns); 
+    memcpy(meta_s, &sources[offset_s[first]], sizeof(Point) * send_ns); 
   
   char *meta_t = meta_s + send_ns; 
   if (send_nt) 
-    memcpy(meta_t, &targets[first], sizeof(Point) * send_nt); 
+    memcpy(meta_t, &targets[offset_t[first]], sizeof(Point) * send_nt); 
 
   hpx_parcel_set_target(p, HPX_THERE(rank)); 
   hpx_parcel_set_action(p, recv_points_action); 
@@ -634,7 +639,8 @@ int send_points_handler(int rank, int *count_s, int *count_t,
   return HPX_SUCCESS; 
 }
 HPX_ACTION(HPX_DEFAULT, 0, send_points_action, send_points_handler, 
-           HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER);
+           HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, 
+           HPX_POINTER, HPX_POINTER);
 
 int recv_node_handler(void *args, size_t size) {
   int *compressed_tree = reinterpret_cast<int *>(static_cast<char *>(args)); 
@@ -816,10 +822,13 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   Node *ns = reinterpret_cast<Node *>(meta_g->data); 
   Node *nt = reinterpret_cast<Node *>(meta_g->data + sizeof(Node) * dim3);
 
-  int *global_offset_s = init_point_exchange(rank, global_count, temp_s, 
-                                             local_offset_s, ns, meta_s); 
-  int *global_offset_t = init_point_exchange(rank, global_count + dim3, temp_t, 
-                                             local_offset_t, nt, meta_t); 
+  int *global_offset_s = init_point_exchange(rank, global_count, local_scount, 
+                                             local_offset_s, temp_s, 
+                                             ns, meta_s); 
+  int *global_offset_t = init_point_exchange(rank, global_count + dim3, 
+                                             local_tcount, local_offset_t, 
+                                             temp_t, nt, meta_t); 
+  hpx_lco_and_set(*gate, HPX_NULL); 
 
   swap_src = new int[meta_s->count](); 
   bin_src = new int[meta_s->count](); 
@@ -835,7 +844,8 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   for (int r = 0; r < num_ranks; ++r) {
     if (r != rank) {
       hpx_call(HPX_HERE, send_points_action, HPX_NULL, &r, &local_scount, 
-               &local_tcount, &temp_s, &temp_t);
+               &local_tcount, &local_offset_s, &local_offset_t, 
+               &temp_s, &temp_t);
     }
   }
 
