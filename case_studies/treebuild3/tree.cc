@@ -673,22 +673,18 @@ int recv_node_handler(void *args, size_t size) {
   int type = compressed_tree[0]; 
   int id = compressed_tree[1]; 
   int n_nodes = compressed_tree[2]; 
-  const int *branch = &compressed_tree[3]; 
-  const int *tree = &compressed_tree[3 + n_nodes]; 
-  
-  Node *n = reinterpret_cast<Node *>(meta->data); 
   int dim3 = pow(8, unif_level); 
+  Node *n = reinterpret_cast<Node *>(meta->data); 
   Node *curr = &n[id + type * dim3]; 
-  curr->extract(branch, tree, n_nodes); 
+
+  if (n_nodes) {
+    const int *branch = &compressed_tree[3]; 
+    const int *tree = &compressed_tree[3 + n_nodes]; 
+    curr->extract(branch, tree, n_nodes); 
+  }
 
   hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
   
-  if (type == 0) {
-    std::cout << "rank " << rank << "set s " << id << "\n";
-  } else {
-    std::cout << "rank " << rank << "set t " << id << "\n";
-  }
-
   hpx_gas_unpin(curr_unif_grid); 
   return HPX_SUCCESS; 
 } 
@@ -716,10 +712,12 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
   compressed_tree[0] = type; // target tree is 0, source tree is 1
   compressed_tree[1] = id; // where to merge 
   compressed_tree[2] = n_nodes; // # of nodes
-  int *branch = &compressed_tree[3]; 
-  int *tree = &compressed_tree[3 + n_nodes]; 
-  int curr = 0; 
-  n->compress(branch, tree, -1, curr); 
+  if (n_nodes) {
+    int *branch = &compressed_tree[3]; 
+    int *tree = &compressed_tree[3 + n_nodes]; 
+    int curr = 0; 
+    n->compress(branch, tree, -1, curr); 
+  }
 
   int rank = hpx_get_my_rank(); 
   int num_ranks = hpx_get_num_ranks(); 
@@ -871,8 +869,8 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
 
   for (int r = 0; r < num_ranks; ++r) {
-    int first = (r == 0 ? 0 : distribute[rank - 1] + 1); 
-    int last = distribute[rank - 1]; 
+    int first = (r == 0 ? 0 : distribute[r - 1] + 1); 
+    int last = distribute[r]; 
     int s{0}, t{1}; 
 
     if (r == rank) {
