@@ -171,13 +171,15 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   //print out summary
-  fprintf(stdout, "Testing DASHMM:\n");
-  fprintf(stdout, "%d sources in a %s distribution\n",
-          retval.source_count, retval.source_type.c_str());
-  fprintf(stdout, "%d targets in a %s distribution\n",
-          retval.target_count, retval.target_type.c_str());
-  fprintf(stdout, "method: %s \nthreshold: %d\n\n",
-          retval.test_case.c_str(), retval.refinement_limit);
+  if (hpx_get_my_rank() == 0) {
+    fprintf(stdout, "Testing DASHMM:\n");
+    fprintf(stdout, "%d sources in a %s distribution\n",
+            retval.source_count, retval.source_type.c_str());
+    fprintf(stdout, "%d targets in a %s distribution\n",
+            retval.target_count, retval.target_type.c_str());
+    fprintf(stdout, "method: %s \nthreshold: %d\n\n",
+            retval.test_case.c_str(), retval.refinement_limit);
+  }
 
   return 0;
 }
@@ -299,6 +301,8 @@ void set_targets(TargetData *targets, int target_count,
 
 void compare_results(TargetData *targets, int target_count,
                      TargetData *exacts, int exact_count) {
+  if (hpx_get_my_rank()) return;
+
   //create a map from index into offset fort targets
   std::map<int, int> offsets{};
   for (int i = 0; i < target_count; ++i) {

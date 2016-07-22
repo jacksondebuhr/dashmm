@@ -90,6 +90,11 @@ class LaplaceSPH {
     n_digits_ = views.n_digits();
     role_ = views.role();
 
+    // TODO: this is inelegant. But this is to test something quickly
+    if (n_digits_ != -1) {
+      get_or_add_laplace_sph_table(n_digits_);
+    }
+
     if (views.count()) {
       data_ = reinterpret_cast<LaplaceSPHData *>(views.view_data(0));
       bytes_ = views.view_bytes(0);

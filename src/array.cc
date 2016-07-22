@@ -27,6 +27,29 @@
 namespace dashmm {
 
 
+// TODO: Is there a better solution here? This is quite inelegant
+namespace {
+  hpx_addr_t allocate_save_space;
+
+  int allocate_save_handler(hpx_addr_t save) {
+    allocate_save_space = save;
+    return HPX_SUCCESS;
+  }
+  HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+             allocate_save_action, allocate_save_handler, HPX_ADDR);
+}
+
+
+int allocate_setup_handler(hpx_addr_t *location) {
+  *location = allocate_save_space;
+  allocate_save_space = HPX_NULL;
+  int thisisdumb = HPX_SUCCESS;
+  return HPX_THREAD_CONTINUE(thisisdumb);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           allocate_setup_action, allocate_setup_handler, HPX_POINTER);
+
+
 /// Action to allocate an array.
 ///
 /// This will allocate both the ArrayMetaData object and the array storage
@@ -38,14 +61,12 @@ namespace dashmm {
 /// \param err [out] - the address of an integer in which to report errors
 ///
 /// \returns - HPX_SUCCESS
-int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
-                           int *err) {
+int allocate_array_handler(size_t count, size_t size, int *err) {
   *err = kSuccess;
 
   // create the metadata object
   hpx_addr_t retval = hpx_gas_alloc_local_at_sync(1, sizeof(ArrayMetaData), 0,
                                                   HPX_HERE);
-  *obj = retval;
   if (retval == HPX_NULL) {
     *err = kAllocationError;
     hpx_exit(HPX_ERROR);
@@ -56,7 +77,7 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
   if (!hpx_gas_try_pin(retval, (void **)&meta)) {
     *err = kRuntimeError;
     hpx_gas_free_sync(retval);
-    *obj = HPX_NULL;
+    retval = HPX_NULL;
     hpx_exit(HPX_ERROR);
   }
   meta->count = count;
@@ -67,15 +88,20 @@ int allocate_array_handler(size_t count, size_t size, hpx_addr_t *obj,
     *err = kAllocationError;
     hpx_gas_unpin(retval);
     hpx_gas_free_sync(retval);
-    *obj = HPX_NULL;
+    retval = HPX_NULL;
     hpx_exit(HPX_ERROR);
   }
 
   hpx_gas_unpin(retval);
+
+  // Now share the metadata address
+  hpx_bcast_rsync(allocate_save_action, &retval);
+
   hpx_exit(HPX_SUCCESS);
 }
-HPX_ACTION(HPX_DEFAULT, 0, allocate_array_action, allocate_array_handler,
-           HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           allocate_array_action, allocate_array_handler,
+           HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
 /// Action that deallocates an array object

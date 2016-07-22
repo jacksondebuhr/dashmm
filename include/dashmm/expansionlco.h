@@ -443,7 +443,7 @@ class ExpansionLCO {
 
     // make a local copy of the edge count, and set the n_digits for remotes
     int save_count = scratch->out_edge_count;
-    head->yet_to_arrive = n_digits;
+    scratch->yet_to_arrive = n_digits;
 
     // loop over the sorted edges
     int my_rank = hpx_get_my_rank();
@@ -459,8 +459,8 @@ class ExpansionLCO {
       }
 
       //move into start of range
-      head->out_edge_count = curr - begin;
-      size_t send_edges_size = sizeof(OutEdgeRecord) * head->out_edge_count;
+      scratch->out_edge_count = curr - begin;
+      size_t send_edges_size = sizeof(OutEdgeRecord) * scratch->out_edge_count;
       if (begin != out_edges) {
         std::move(begin, curr, out_edges);
       }
@@ -469,7 +469,7 @@ class ExpansionLCO {
       if (curr_rank == my_rank) {
         spawn_out_edges_work(scratch, n_digits);
       } else {
-        size_t message_size = sizeof(Header) + head->expansion_size
+        size_t message_size = sizeof(Header) + scratch->expansion_size
                                            + send_edges_size;
                                     // TODO + (1/2) x hpx_addr_t eventually
 

@@ -780,6 +780,7 @@ class Tree {
       auto domain = tree->domain_.value();
       tree->method_.generate(node, domain.value());
       node->dag.set_parts_locality(hpx_get_my_rank());
+      node->dag.set_normal_locality(hpx_get_my_rank());
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
       return HPX_SUCCESS;
     }
@@ -813,6 +814,7 @@ class Tree {
     tree->method_.inherit(node, domain.value(), !refine);
     tree->method_.process(node, *consider, !refine, domain.value());
     node->dag.set_parts_locality(hpx_get_my_rank());
+    node->dag.set_normal_locality(hpx_get_my_rank());
 
     if (refine) {
       int n_children = node->n_children();

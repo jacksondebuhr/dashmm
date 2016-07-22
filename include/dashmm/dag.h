@@ -75,7 +75,7 @@ struct DAGNode {
                                  /// n_targets for a target lco
 
   DAGNode(Index i)
-      : out_edges{}, in_edges{}, idx{i}, locality{0}, global_addx{HPX_NULL},
+      : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
         other_member{0} { }
   void add_out_edge(DAGNode *end, Operation op) {
     out_edges.push_back(DAGEdge{this, end, op});
@@ -300,6 +300,13 @@ class DAGInfo {
   void set_parts_locality(int loc) {
     if (parts_ != nullptr) {
       parts_->locality = loc;
+    }
+  }
+
+  /// Sets locality on the normal node
+  void set_normal_locality(int loc) {
+    if (parts_ != nullptr && normal_ != nullptr) {
+      normal_->locality = loc;
     }
   }
 

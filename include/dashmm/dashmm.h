@@ -35,6 +35,7 @@
 
 // The built in distribution policies
 #include "builtins/singlelocdistro.h"
+#include "builtins/randomdistro.h"
 
 
 #endif // __DASHMM_USER_INTERFACE_H__

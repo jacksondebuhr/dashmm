@@ -48,17 +48,6 @@ update the line in the out edge table inside the LCO.
 
 
 
-(OKAY, STUFF I CAN DO NOW IS HERE)
-The point of this branch is to implement the stuff at the end. To really test
-it, we shall need to have the repeat use interface ready. We shall need to have
-the interface to the tree construction specified (even if we fake it for the
-time being by having copies of the data everywhere and by constructing the
-full tree everywhere).
-DONE - The application of the Method to the tree now must occur after the tree
-   is constructed. There are multiple phases to construction, and we cannot
-   do this as we go. <---- start with this
- - This means we shall have to have the evaluation broken into pieces with the
-   relevant API exposed to perform piecemeal evaluation.
 
 
 
@@ -105,7 +94,7 @@ break when fully distributed.
           we will have access to the indices and so on.
             This has to wait on the new style of tree creation, the simple
             early distribution will know all addresses from the start.
-        * We also want to send the expansion data across the network only a
+      D * We also want to send the expansion data across the network only a
           single time for each locality. So we want to first sort the out edges
           by the target locality. Then the expansion data is sent across the
           network. At the far side it will go ahead and perform the translations

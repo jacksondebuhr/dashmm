@@ -21,6 +21,7 @@
 
 
 #include "builtins/singlelocdistro.h"
+#include "builtins/randomdistro.h"
 
 
 namespace dashmm {
@@ -31,7 +32,8 @@ namespace dashmm {
 ///
 /// Currently, DASHMM is specialized to SMP, so the defauly policy assigns all
 /// nodes to the same locality.
-using DefaultDistributionPolicy = SingleLocality;
+//using DefaultDistributionPolicy = SingleLocality;
+using DefaultDistributionPolicy = RandomDistro;
 
 
 } // namespace dashmm

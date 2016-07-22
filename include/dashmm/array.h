@@ -33,6 +33,8 @@
 namespace dashmm {
 
 
+extern hpx_action_t allocate_setup_action;
+
 /// Action for Array allocation
 extern hpx_action_t allocate_array_action;
 
@@ -97,17 +99,20 @@ class Array {
       // If the object already has data, do not allocate new data.
       return kDomainError;
     }
-    hpx_addr_t *dataout = &data_; //YIKES!
+
     int runcode;
     int *arg = &runcode;
     size_t size = sizeof(T);
-    int err = hpx_run(&allocate_array_action, &record_count,
-                      &size, &dataout, &arg);
-    if (HPX_SUCCESS == err) {
-      return kSuccess;
-    } else {
+    int err = hpx_run(&allocate_array_action, &record_count, &size, &arg);
+    if (HPX_SUCCESS != err) {
       return static_cast<ReturnCode>(runcode);
     }
+
+    // First set up some sharing - each locality stores a pointer temporarily
+    hpx_addr_t *dataout = &data_; //YIKES!
+    hpx_run_spmd(&allocate_setup_action, &dataout);
+
+    return kSuccess;
   }
 
   /// Destroy the Array
@@ -118,9 +123,6 @@ class Array {
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
-    if (data_ == HPX_NULL) {
-      return kSuccess;
-    }
     if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
       data_ = HPX_NULL;
       return kSuccess;
@@ -144,7 +146,7 @@ class Array {
   ///            the runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
-    int runcode;
+    int runcode = kSuccess;
     int *arg = &runcode;
     hpx_run(&array_get_action, &data_, &first, &last, &arg, &out_data);
     return static_cast<ReturnCode>(runcode);
@@ -165,7 +167,7 @@ class Array {
   ///            runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
-    int runcode;
+    int runcode = kSuccess;
     int *arg = &runcode;
     hpx_run(&array_put_action, &data_, &first, &last, &arg, &in_data);
     return static_cast<ReturnCode>(runcode);

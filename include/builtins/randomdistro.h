@@ -12,8 +12,8 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_SINGLE_LOC_DISTRO_H__
-#define __DASHMM_SINGLE_LOC_DISTRO_H__
+#ifndef __DASHMM_RANDOM_DISTRO_H__
+#define __DASHMM_RANDOM_DISTRO_H__
 
 
 #include "dashmm/dag.h"
@@ -22,23 +22,17 @@
 namespace dashmm {
 
 
-/// This distribution policy places all content on the root locality
-///
-/// This is intended to be the simplest possibly distribution policy. It is
-/// unlikely to be a good choice, unless one is using only one locality to
-/// begin with.
-class SingleLocality {
+class RandomDistro {
  public:
-  SingleLocality(int loc = 0) : locality_{loc} { }
-
+  RandomDistro(int seed = 137) : seed_{seed} { }
   void compute_distribution(DAG &dag);
 
  private:
-  int locality_;
+  int seed_;
 };
 
 
 } // dashmm
 
 
-#endif // __DASHMM_SINGLE_LOC_DISTRO_H__
+#endif // __DASHMM_RANDOM_DISTRO_H__
