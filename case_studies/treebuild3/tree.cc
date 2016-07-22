@@ -304,6 +304,7 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
   int rank = hpx_get_my_rank(); 
   int num_ranks = hpx_get_num_ranks(); 
   int dim = pow(2, level), dim3 = pow(8, level); 
+  threshold = limit; 
 
   if (rank) {
     unif_count = count; 
@@ -312,7 +313,6 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
     sorted_src = sources; 
     sorted_tar = targets; 
     unif_level = level; 
-    threshold = limit; 
     corner_x = cx;
     corner_y = cy; 
     corner_z = cz; 
@@ -451,7 +451,8 @@ int *init_point_exchange(int rank, const int *global_count,
   int num_points = global_count[first]; 
   for (int i = first + 1; i <= last; ++i) {
     num_points += global_count[i]; 
-    global_offset[i - first] = global_offset[i - first - 1] + global_count[i];
+    global_offset[i - first] = global_offset[i - first - 1] + 
+      global_count[i - 1];
   }
 
   meta->size = sizeof(Point); 
@@ -461,23 +462,24 @@ int *init_point_exchange(int rank, const int *global_count,
 
   for (int i = first; i <= last; ++i) {
     if (local_count[i]) {
+      Node *curr = &n[i]; 
       memcpy(p + global_offset[i - first], &temp[local_offset[i]], 
              sizeof(Point) * local_count[i]); 
 
       // first_ is used as an iterator to trace the position to insert points
-      n[i].set_first(global_offset[i - first] + local_count[i]); 
+      curr->set_first(global_offset[i - first] + local_count[i]); 
 
       if (i < last) {
-        n[i].set_last(global_offset[i + 1 - first]); 
+        curr->set_last(global_offset[i + 1 - first]); 
       } else {
-        n[i].set_last(num_points - 1);
+        curr->set_last(num_points - 1);
       }
 
       if (local_count[i] == global_count[i]) {
         // This grid does not expect remote points. 
         // Spawn adaptive partitioning
         hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                 &n[i], &p, &swap, &bin, &map); 
+                 &curr, &p, &swap, &bin, &map); 
       }
     }
   }
@@ -558,6 +560,7 @@ int recv_points_handler(void *args, size_t size) {
         if (first_s + incoming_ns > ns->last()) {
           // Spawn adaptive partitioning
           ns->set_first(ns->last() + 1 - count[i]); 
+
           hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
                    &ns, &s, &swap_src, &bin_src, &map_src); 
         }

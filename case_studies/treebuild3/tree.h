@@ -106,7 +106,6 @@ private:
   int last_; 
   Node *parent_; 
   Node *child_[8]; 
-  bool within_array_; 
   hpx_addr_t sema_;
   hpx_addr_t complete_; 
 };
