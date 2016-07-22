@@ -27,7 +27,8 @@
 namespace dashmm {
 
 
-// TODO: Is there a better solution here? This is quite inelegant
+// TODO: This will likely be obviated by some developments in hpx itself.
+// For now, this will be left as the solution.
 namespace {
   hpx_addr_t allocate_save_space;
 
@@ -39,7 +40,7 @@ namespace {
              allocate_save_action, allocate_save_handler, HPX_ADDR);
 }
 
-
+// TODO: This too may evaporate.
 int allocate_setup_handler(hpx_addr_t *location) {
   *location = allocate_save_space;
   allocate_save_space = HPX_NULL;
@@ -57,7 +58,6 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 ///
 /// \param count - the number of records to allocate
 /// \param size - the size in bytes of each record
-/// \param obj [out] - the address of the global address of the meta data
 /// \param err [out] - the address of an integer in which to report errors
 ///
 /// \returns - HPX_SUCCESS
