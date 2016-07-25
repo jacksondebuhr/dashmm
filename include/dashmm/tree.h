@@ -1077,7 +1077,6 @@ class Tree {
     // correct stuff.
     // TODO: eventually
 
-    // TODO: the local work
     // unpack message into arguments to the local work function
     auto input = ReadBuffer(message, bytes);
     size_t n_src{};

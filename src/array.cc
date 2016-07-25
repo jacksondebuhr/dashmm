@@ -309,4 +309,39 @@ HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
 
 
+int array_local_count_handler(hpx_addr_t data, size_t *retval) {
+  hpx_addr_t global = hpx_addr_add(data,
+                                   sizeof(ArrayMetaData) * hpx_get_my_rank(),
+                                   sizeof(ArrayMetaData));
+  ArrayMetaData *local{nullptr};
+  assert(hpx_gas_try_pin(global, (void **)&local));
+
+  *retval = local->local_count;
+
+  hpx_gas_unpin(global);
+  int cval = HPX_SUCCESS;
+  return HPX_THREAD_CONTINUE(cval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_local_count_action, array_local_count_handler,
+           HPX_ADDR, HPX_POINTER);
+
+
+int array_total_count_handler(hpx_addr_t data, size_t *retval) {
+  hpx_addr_t global = hpx_addr_add(data,
+                                   sizeof(ArrayMetaData) * hpx_get_my_rank(),
+                                   sizeof(ArrayMetaData));
+  ArrayMetaData *local{nullptr};
+  assert(hpx_gas_try_pin(global, (void **)&local));
+
+  *retval = local->total_count;
+
+  hpx_gas_unpin(global);
+  int cval = HPX_SUCCESS;
+  return HPX_THREAD_CONTINUE(cval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_total_count_action, array_total_count_handler,
+           HPX_ADDR, HPX_POINTER);
+
 } // namespace dashmm

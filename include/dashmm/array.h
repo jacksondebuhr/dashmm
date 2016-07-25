@@ -33,8 +33,13 @@
 namespace dashmm {
 
 
+/// Action for Array meta data allocation
 extern hpx_action_t allocate_array_meta_action;
+
+/// Action for local portions of Array allocation
 extern hpx_action_t allocate_local_work_action;
+
+/// Action to delete organizational stucture for Array allocation
 extern hpx_action_t allocate_array_destroy_reducer_action;
 
 /// Action for Array deallocation
@@ -45,6 +50,12 @@ extern hpx_action_t array_put_action;
 
 /// Action for getting data from an Array
 extern hpx_action_t array_get_action;
+
+/// Action for getting local counts
+extern hpx_action_t array_local_count_action;
+
+/// Action for getting total count
+extern hpx_action_t array_total_count_action;
 
 
 /// Array class
@@ -85,8 +96,31 @@ class Array {
   /// \returns - the global address of the Array meta data.
   hpx_addr_t data() const {return data_;}
 
-  // TODO: a routine to get the local distribution size. This is needed after
-  //   distributed sorts and so on.
+  /// Return the number of records in the local portion of this object
+  ///
+  /// This is a SPMD style operation; it is collective, but each rank will
+  /// receive a different value giving the local portion on the calling rank.
+  ///
+  /// \returns - the number of records owned by this rank,
+  size_t count() const {
+    size_t retval{0};
+    size_t *arg = &retval;
+    hpx_run_spmd(&array_local_count_action, &data_, &arg);
+    return retval;
+  }
+
+  /// Return the number of records in the entire array
+  ///
+  /// This is a SPMD style operation; it is collective, and all ranks will
+  /// receive the same result.
+  ///
+  /// \returns - the total number of records in all ranks.
+  size_t length() const {
+    size_t retval{0};
+    size_t *arg = &retval;
+    hpx_run_spmd(&array_total_count_action, &data_, &arg);
+    return retval;
+  }
 
   /// This creates an array object
   ///
