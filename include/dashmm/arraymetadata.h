@@ -36,9 +36,11 @@ namespace dashmm {
 /// the array meta data from the array itself, as the required metadata may
 /// need to change as the data layout becomes more flexible.
 struct ArrayMetaData {
-  hpx_addr_t data;    /// global address of the array data
-  size_t count;       /// the number of records in the array
-  size_t size;        /// the size (bytes) of each record
+  hpx_addr_t data;      /// global address of the array data
+  size_t local_count;   /// the number of records in the local portion
+  size_t total_count;   /// the total number of records in all portions
+  size_t offset;        /// starting 'index' of the local portion
+  size_t size;          /// the size (bytes) of each record
 };
 
 

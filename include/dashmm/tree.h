@@ -281,14 +281,10 @@ class Tree {
   /// \param targets - the reference to the target particles
   /// \param same_sources_and_targets - true if the sources and targets are
   ///                  identical.
-  /// \param consider - a list of nodes to pass into the method::process
-  ///                  function. Typically, this is just the source root.
   ///
   /// \returns - an LCO to indicate the completion of the partitioning
-  // TODO remove consider from this
   hpx_addr_t partition_target_tree(targetref_t targets,
-                                   bool same_sources_and_targets,
-                                   std::vector<sourcenode_t *> *consider) {
+                                   bool same_sources_and_targets) {
     hpx_addr_t partdone = hpx_lco_future_new(0);
     assert(partdone != HPX_NULL);
 
@@ -300,7 +296,6 @@ class Tree {
     input.partdone = partdone;
     input.same_sources_and_targets = same_sources_and_targets;
     input.targets = targets;
-    input.consider = consider;
 
     hpx_call(HPX_THERE(0), target_partition_, HPX_NULL, &input, sizeof(input));
 
@@ -321,10 +316,7 @@ class Tree {
     hpx_lco_wait(sourcedone);
     hpx_lco_delete_sync(sourcedone);
 
-    std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
-    consider->push_back(source_root_);
-    hpx_addr_t targetpartdone = partition_target_tree(targets, same_sandt,
-                                                      consider);
+    hpx_addr_t targetpartdone = partition_target_tree(targets, same_sandt);
     hpx_lco_wait(targetpartdone);
     hpx_lco_delete_sync(targetpartdone);
   }
@@ -518,10 +510,6 @@ class Tree {
     hpx_addr_t partdone;
     bool same_sources_and_targets;
     targetref_t targets;
-    // We are always working on one locality for the tree construction, so we
-    // can get away with passing these pointers around. If we ever build the
-    // tree across localities, this will need to change.
-    std::vector<sourcenode_t *> *consider;
   };
 
   /// Edge record for DAG instigation
@@ -744,8 +732,6 @@ class Tree {
 
         args.node = node->child[i];
         args.targets = cparts[i];
-        args.consider = new std::vector<sourcenode_t *>{};
-        *args.consider = *parms->consider; // TODO consider not needed
 
         hpx_call(HPX_HERE, target_partition_, HPX_NULL, &args, argssize);
       }
@@ -757,9 +743,6 @@ class Tree {
     } else {
       hpx_lco_set_lsync(parms->partdone, 0, nullptr, HPX_NULL);
     }
-
-    // Now we clear out the consider vector's memory
-    delete parms->consider;
 
     return HPX_SUCCESS;
   }

@@ -42,4 +42,24 @@ HPX_ACTION(HPX_FUNCTION, 0, int_sum_op, int_sum_op_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
 
+void size_sum_ident_handler(size_t *input, const size_t bytes) {
+  int count = bytes / sizeof(size_t);
+  for (int i = 0; i < count; ++i) {
+    input[i] = 0;
+  }
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, size_sum_ident, size_sum_ident_handler,
+           HPX_POINTER, HPX_SIZE_T);
+
+
+void size_sum_op_handler(size_t *lhs, const size_t *rhs, size_t bytes) {
+  int count = bytes / sizeof(size_t);
+  for (int i = 0; i < count; ++i) {
+    lhs[i] += rhs[i];
+  }
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, size_sum_op, size_sum_op_handler,
+           HPX_POINTER, HPX_SIZE_T);
+
+
 } // namespace dashmm

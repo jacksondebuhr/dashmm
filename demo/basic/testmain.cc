@@ -179,6 +179,10 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
             retval.target_count, retval.target_type.c_str());
     fprintf(stdout, "method: %s \nthreshold: %d\n\n",
             retval.test_case.c_str(), retval.refinement_limit);
+  } else {
+    // Only have rank 0 create data
+    retval.source_count = 0;
+    retval.target_count = 0;
   }
 
   return 0;
@@ -333,13 +337,18 @@ void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
   //create some arrays
-  SourceData *sources = reinterpret_cast<SourceData *>(
+  SourceData *sources{nullptr};
+  TargetData *targets{nullptr};
+  if (args.source_count) {
+    sources = reinterpret_cast<SourceData *>(
         new char [sizeof(SourceData) * args.source_count]);
-  TargetData *targets = reinterpret_cast<TargetData *>(
+    set_sources(sources, args.source_count, args.source_type, args.test_case);
+  }
+  if (args.target_count) {
+    targets = reinterpret_cast<TargetData *>(
         new char [sizeof(TargetData) * args.target_count]);
-
-  set_sources(sources, args.source_count, args.source_type, args.test_case);
-  set_targets(targets, args.target_count, args.target_type);
+    set_targets(targets, args.target_count, args.target_type);
+  }
 
   //prep sources
   dashmm::Array<SourceData> source_handle{};
@@ -356,16 +365,23 @@ void perform_evaluation_test(InputArguments args) {
   assert(err == dashmm::kSuccess);
 
   //save a few targets in case of direct comparison
-  int test_count = 400;
+  int test_count{0};
+  if (hpx_get_my_rank() == 0) {
+    test_count = 400;
+  }
   if (test_count > args.target_count) {
     test_count = args.target_count;
   }
-  TargetData *test_targets = reinterpret_cast<TargetData *>(
-        new char [sizeof(TargetData) * test_count]);
-  for (int i = 0; i < test_count; ++i) {
-    int idx = i * (args.target_count / test_count);
-    assert(idx < args.target_count);
-    test_targets[i] = targets[idx];
+  TargetData *test_targets{nullptr};
+  if (test_count) {
+    test_targets = reinterpret_cast<TargetData *>(
+          new char [sizeof(TargetData) * test_count]);
+
+    for (int i = 0; i < test_count; ++i) {
+      int idx = i * (args.target_count / test_count);
+      assert(idx < args.target_count);
+      test_targets[i] = targets[idx];
+    }
   }
 
   //Perform the evaluation

@@ -105,11 +105,19 @@ class ArrayMapAction {
 
   static int root_handler(hpx_action_t leaf, const E *env,
                           hpx_addr_t meta_data) {
-    ArrayMetaData *meta{nullptr};
-    assert(hpx_gas_try_pin(meta_data, (void **)&meta));
-    hpx_addr_t data = meta->data;
-    size_t total_count = meta->count;
-    hpx_gas_unpin(meta_data);
+    hpx_addr_t global = hpx_addr_add(meta_data,
+                                     sizeof(ArrayMetaData) * hpx_get_my_rank(),
+                                     sizeof(ArrayMetaData));
+    ArrayMetaData *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+    hpx_addr_t data = local->data;
+    size_t total_count = local->local_count;
+    hpx_gas_unpin(global);
+
+    if (total_count == 0) {
+      int retval = HPX_SUCCESS;
+      return HPX_THREAD_CONTINUE(retval);
+    }
 
     // NOTE: Initially, for maximal "easiness" the library should pick the
     // decomposition factor. In the future, this should be extended and refined
@@ -144,7 +152,8 @@ class ArrayMapAction {
     hpx_lco_wait(alldone);
     hpx_lco_delete_sync(alldone);
 
-    hpx_exit(HPX_SUCCESS);
+    int retval = HPX_SUCCESS;
+    return HPX_THREAD_CONTINUE(retval);
   }
 
   static int spawn_handler(size_t count, size_t total_count, size_t offset,

@@ -48,31 +48,65 @@ update the line in the out edge table inside the LCO.
 
 
 
+THE NEW ARRAY
+
+The new layout for Array is going to be through a cyclic allocation of
+meta data, and then each local segment implemented as a single block in GAS.
+
+Each record in the cyclic meta data will have the GAS address of the local
+part of the data, the number of local records, the number of records, and
+the size of the record in bytes. Two of these are constant over the localities,
+but to keep extra copies is not a terrible burden.
+
+The array should support the same main operations, but the get and put should
+perhaps get and put on a rank by rank basis. That is how the user will use the
+thing in any event, so why not bake it into the interface. And then, if the
+user wishes, they can go ahead and only load on one rank or so on.
+  Though, this will complicate the error comparison thing...
+
+The array should also get a new method that will perform a sort over the local
+data blocks according to some criterion. Not sure how we should specify it, but
+basically it is a map from the record to an integer that gives the ordering.
+Having multiple records with the same sort order is fine.
+  Perhaps this first runs by and labels the records, and then orders them
+  after that. Knowing the bin in that way I think allows for a pretty okay
+  sort to happen. Especially given that this is not a comparison sort. Really
+  this is a grouping operation.
+
+  This would mutate the array in place.
+
+Then there would be a second operation that creates a new distributed sort of
+  the data. This would create a new array. Even if only internally before
+  returning the new thing to the user.
+
+
+I think array ref does not need to change. It can only refer to data in a local
+chunk. So an array ref that spans localities is not possible.
 
 
 
 
-FIRST TASK
-
-Go over all the code and look for places that have SMP assumptions that will
-break when fully distributed.
+DO THESE THINGS
  * include
    - dashmm
-    : array.h
+  D : array.h
         Largely speaking, the interface should not change too much for this.
         The existing things will still be needed when fully distributed, but
         their implementation should likely change. Further, we shall need to
         extend the interface with some new things, even if only for internal
         user.
-    : arraymapaction.h
+  D : arraymapaction.h
         Once again, to the extent possible, this should keep its interface.
         Once again, the implementation will need to be updated.
-    : arraymetadata.h
+  D : arraymetadata.h
         This will need to change, but those are tied in with the overall change
         to how the Array works internally.
-    : arrayref.h
+  D : arrayref.h
         This too will need to change. The distribution of the data will mean
         that this will have to become more complicated.
+            This is actually just as it was, but the reference now can only
+            apply to the data at a single locality. Revisit if more is needed.
+            But I don't think it will be.
     : evaluator.h
         There is some work needed for dealing with the source references that
         will need to wait on working out Array, but mostly this is written
@@ -108,6 +142,11 @@ break when fully distributed.
         The change in Array and ArrayRef will impact here also.
         Otherwise, this should be fine provided the LCO is always colocated
         with the Target data it is representing.
+
+        Actually, this might not change that much, if at all. I think the
+        same interface on the reference means this does not need any update.
+        It is only in things that create ArrayRef from an Array that needs to
+        worry about the change.
     : tree.h
         * The array reference type will impact this.
       D * The tree will no longer partition at the same time as it generates
@@ -133,10 +172,10 @@ break when fully distributed.
               that we do not multiple send the sources to the same locality
               for S->T operations?
  * src
-  : array.cc
-      This whole thing will need an update. We do not yet have the Array
-      implementation worked out for the distributed case. There is likely to
-      be significant change to how it works internally.
+  D : array.cc
+        This whole thing will need an update. We do not yet have the Array
+        implementation worked out for the distributed case. There is likely to
+        be significant change to how it works internally.
 
 
 
@@ -193,6 +232,8 @@ Overall Plan to 1.0
  * Finish interface
     - Make it so that an advanced user could call all the needed stuff directly
       from an HPX thread.
+    - As a corollary to that, add assertions to routines that have
+      inside / outside HPX restrictions
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.

@@ -262,10 +262,6 @@ class Evaluator {
  private:
   /// Action for evalutation
   static hpx_action_t evaluate_;
-  /// Action for finding the source bounds
-  static hpx_action_t source_bounds_;
-  /// Action for finding the target bounds
-  static hpx_action_t target_bounds_;
 
   /// Parameters to evaluations
   struct EvaluateParams {
@@ -278,14 +274,18 @@ class Evaluator {
   };
 
   /// The evaluation action implementation
+  // TODO: Recheck this - I think this should all work as is when the array is
+  // all on one locality; the root locality.
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    // NOTE: These may need to be updated once we change the way array works
-    // for distributed operation.
+    // TODO: These need an update. We should decide if the tree creation
+    // is called in a SPMD way, or in a diffusive way. This will make the
+    // same source and target thing harder to work out correctly.
     sourceref_t sources = parms->sources.ref();
     targetref_t targets = parms->targets.ref();
     bool same_sandt = (sources.data() == targets.data()
                         && sources.n() == targets.n());;
 
+    // TODO: The interface to tree will likely change.
     tree_t *tree = new tree_t{parms->method, parms->refinement_limit,
                               parms->n_digits};
     tree->partition(sources, targets, same_sandt);
@@ -293,6 +293,8 @@ class Evaluator {
     // NOTE: around here is where we can perform the table creation work,
     // (Future feature)
 
+    // TODO: Here, each locality should do the DAG creation, so perhaps this
+    // is SPMD, or should one thread launch the others?
     DAG dag = tree->create_DAG(same_sandt);
     parms->distro.compute_distribution(dag);
 

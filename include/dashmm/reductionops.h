@@ -32,6 +32,12 @@ extern hpx_action_t int_sum_ident_op;
 /// Operation for integer summation
 extern hpx_action_t int_sum_op;
 
+/// Identity operation for size_t summation
+extern hpx_action_t size_sum_ident;
+
+/// Operation for size_t summation
+extern hpx_action_t size_sum_op;
+
 
 } // namespace dashmm
 

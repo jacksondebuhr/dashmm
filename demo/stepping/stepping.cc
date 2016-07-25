@@ -119,11 +119,15 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   // print out summary
-  fprintf(stdout, "Testing DASHMM:\n");
-  fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
-  fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
-  if (!retval.output.empty()) {
-    fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+  if (hpx_get_my_rank() == 0) {
+    fprintf(stdout, "Testing DASHMM:\n");
+    fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
+    fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
+    if (!retval.output.empty()) {
+      fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+    }
+  } else {
+    retval.count = 0;
   }
 
   return 0;
@@ -180,6 +184,8 @@ double set_sources(Particle *sources, int count) {
 
 void output_results(const std::string &fname, const Particle *sources,
                     int count) {
+  if (hpx_get_my_rank()) return;
+
   FILE *ofd = fopen(fname.c_str(), "w");
   assert(ofd != nullptr);
 
@@ -219,9 +225,13 @@ void perform_time_stepping(InputArguments args) {
   srand(123456);
 
   // create some arrays
-  Particle *sources = reinterpret_cast<Particle *>(
-    new char [sizeof(Particle) * args.count]);
-  double m_tot = set_sources(sources, args.count);
+  Particle *sources{nullptr};
+  double m_tot{1.0}; // This is given a value to avoid divbyzero below
+  if (args.count) {
+    sources = reinterpret_cast<Particle *>(
+      new char [sizeof(Particle) * args.count]);
+    m_tot = set_sources(sources, args.count);
+  }
 
   // prep source Array
   dashmm::Array<Particle> source_handle{ };
@@ -232,6 +242,8 @@ void perform_time_stepping(InputArguments args) {
 
   // Compute a reasonable dt:
   // This is chosen so that one dynamical time is roughly 200 steps.
+  // NOTE: this will only be correct on rank 0, but it will also only be used
+  // by rank zero.
   double dt{sqrt(1.0 / m_tot) / 200.0};
 
   // Clear timing information
