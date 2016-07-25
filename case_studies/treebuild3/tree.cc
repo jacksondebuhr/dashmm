@@ -477,7 +477,8 @@ int *init_point_exchange(int rank, const int *global_count,
 
       if (local_count[i] == global_count[i]) {
         // This grid does not expect remote points. 
-        // Spawn adaptive partitioning
+        // Correct the value of first_ and spawn adaptive partitioning.
+        curr->set_first(curr->last() + 1- global_count[i]); 
         hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
                  &curr, &p, &swap, &bin, &map); 
       }
@@ -676,6 +677,12 @@ int recv_node_handler(void *args, size_t size) {
   int dim3 = pow(8, unif_level); 
   Node *n = reinterpret_cast<Node *>(meta->data); 
   Node *curr = &n[id + type * dim3]; 
+
+  if (type == 's') {
+    std::cout << "rank " << rank << " set s " << id << "\n";
+  } else {
+    std::cout << "rank " << rank << " set t " << id << "\n";
+  }
 
   if (n_nodes) {
     const int *branch = &compressed_tree[3]; 
