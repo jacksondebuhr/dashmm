@@ -405,8 +405,8 @@ void assign_points_to_unif_grid(const Point *P, int npts, int *gid,
     int xid = std::min(dim - 1, (int)(dim * (p->x() - corner_x) * scale));
     int yid = std::min(dim - 1, (int)(dim * (p->y() - corner_y) * scale)); 
     int zid = std::min(dim - 1, (int)(dim * (p->z() - corner_z) * scale)); 
-    int gid = morton_key(xid, yid, zid); 
-    count[gid]++;
+    gid[i] = morton_key(xid, yid, zid); 
+    count[gid[i]]++; 
   }    
 }
 
