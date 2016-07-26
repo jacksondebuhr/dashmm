@@ -931,7 +931,6 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   delete [] temp_t; 
   delete [] local_offset_s; 
   delete [] local_offset_t; 
-  delete [] distribute; 
   delete [] global_offset_s; 
   delete [] global_offset_t; 
   delete [] swap_src; 
@@ -1040,6 +1039,7 @@ int finalize_partition_handler(void *unused, size_t size) {
   }
 
   delete [] meta_g->data; 
+  delete [] distribute; 
 
   hpx_gas_unpin(count); 
   hpx_gas_unpin(done); 
@@ -1065,6 +1065,8 @@ int main_handler(int nsrc_per_rank, int ntar_per_rank,
                   &sources, &targets, &datatype); 
 
   // Partition points to create dual tree 
+
+  hpx_time_t timer = hpx_time_now(); 
 
   // Determine domain geometry
   hpx_addr_t domain_geometry = 
@@ -1103,6 +1105,9 @@ int main_handler(int nsrc_per_rank, int ntar_per_rank,
                   &corner_x, &corner_y, &corner_z, &size); 
 
   hpx_bcast_rsync(create_dual_tree_action, &sources, &targets); 
+
+  double elapsed = hpx_time_elapsed_ms(timer) / 1e3; 
+  std::cout << "Dual tree creation time: " << elapsed << "\n"; 
 
   hpx_bcast_rsync(finalize_partition_action, NULL, 0); 
 
