@@ -99,9 +99,13 @@ int *distribute_points(int num_ranks, const int *global, int len) {
   delete [] scan; 
   
   if (rank < num_ranks) {
+    // The current uniform partition level does not have enough grids to
+    // distribute among all the ranks 
     delete [] ret; 
-    return nullptr;
+    return nullptr; 
   } else {
+    // Make sure all the grids are selected
+    ret[num_ranks - 1] = len - 1; 
     return ret;
   }
 } 
@@ -662,7 +666,7 @@ int send_points_handler(int rank, int *count_s, int *count_t,
   if (send_ns) 
     memcpy(meta_s, &sources[offset_s[first]], sizeof(Point) * send_ns); 
   
-  char *meta_t = meta_s + send_ns; 
+  char *meta_t = meta_s + send_ns * sizeof(Point); 
   if (send_nt) 
     memcpy(meta_t, &targets[offset_t[first]], sizeof(Point) * send_nt); 
 
