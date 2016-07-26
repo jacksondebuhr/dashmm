@@ -53,12 +53,14 @@ private:
 
 class Node {
 public:
-  Node() : idx_{}, first_{0}, last_{0}, parent_{nullptr} {
+  Node() : idx_{}, first_{-1}, last_{-1}, parent_{nullptr} {
     for (int i = 0; i < 8; ++i) 
       child_[i] = nullptr; 
+    sema_ = HPX_NULL; 
+    complete_ = HPX_NULL; 
   }
 
-  Node(Index idx): idx_{idx}, first_{0}, last_{0}, parent_{nullptr} {
+  Node(Index idx): idx_{idx}, first_{-1}, last_{-1}, parent_{nullptr} {
     for (int i = 0; i < 8; ++i) 
       child_[i] = nullptr; 
     sema_ = hpx_lco_sema_new(1); 

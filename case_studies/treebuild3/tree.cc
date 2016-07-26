@@ -137,7 +137,7 @@ int generate_input_handler(int nsrc_per_rank, int ntar_per_rank,
   srand(rank + 2); 
   if (datatype == 'c') {
     set_points_in_cube(p_s, nsrc_per_rank);
-    set_points_in_cube(p_t, nsrc_per_rank); 
+    set_points_in_cube(p_t, ntar_per_rank); 
   } else {
     set_points_on_sphere(p_s, nsrc_per_rank); 
     set_points_on_sphere(p_t, ntar_per_rank);
@@ -442,9 +442,9 @@ int *init_point_exchange(int rank, const int *global_count,
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
   int last = distribute[rank]; 
   int range = last - first + 1;   
-  int *swap = (type == 's' ? swap_src : swap_tar); 
-  int *bin = (type == 's' ? bin_src : bin_tar); 
-  int *map = (type == 's' ? map_src : map_tar); 
+  int **swap = (type == 's' ? &swap_src : &swap_tar); 
+  int **map = (type == 's' ? &map_src : &map_tar); 
+  int **bin = (type == 's' ? &bin_src : &bin_tar); 
 
   // Compute global_offset
   int *global_offset = new int[range](); 
@@ -457,32 +457,47 @@ int *init_point_exchange(int rank, const int *global_count,
 
   meta->size = sizeof(Point); 
   meta->count = num_points; 
-  meta->data = new char[sizeof(Point) * num_points](); 
-  Point *p = reinterpret_cast<Point *>(meta->data); 
 
-  for (int i = first; i <= last; ++i) {
-    if (local_count[i]) {
+  if (num_points > 0) {
+    meta->data = new char[sizeof(Point) * num_points](); 
+    Point *p = reinterpret_cast<Point *>(meta->data); 
+
+    *swap = new int[num_points](); 
+    *map = new int[num_points](); 
+    *bin = new int[num_points](); 
+    for (int i = 0; i < num_points; ++i) 
+      (*map)[i] = i; 
+
+    for (int i = first; i <= last; ++i) {
       Node *curr = &n[i]; 
-      memcpy(p + global_offset[i - first], &temp[local_offset[i]], 
-             sizeof(Point) * local_count[i]); 
-
-      // first_ is used as an iterator to trace the position to insert points
-      curr->set_first(global_offset[i - first] + local_count[i]); 
-
-      if (i < last) {
-        curr->set_last(global_offset[i + 1 - first]); 
-      } else {
-        curr->set_last(num_points - 1);
+      if (global_count[i]) {
+        curr->set_first(global_offset[i - first]); 
+        if (i < last) {
+          curr->set_last(global_offset[i + 1 - first] - 1); 
+        } else {
+          curr->set_last(num_points - 1);
+        }
+      } 
+      
+      if (local_count[i]) {
+        // Copy local points before merging remote points
+        memcpy(p + global_offset[i - first], &temp[local_offset[i]], 
+               sizeof(Point) * local_count[i]); 
+        
+        if (local_count[i] == global_count[i]) {
+          // This grid does not expect remote points. 
+          // Spawn adaptive partitioning 
+          hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+                   &curr, &p, swap, bin, map);
+        } else {
+          // Now use first_ as an iterator to trace the position to merge 
+          // remote points 
+          curr->set_first(global_offset[i - first] + local_count[i]); 
+        }
       }
-
-      if (local_count[i] == global_count[i]) {
-        // This grid does not expect remote points. 
-        // Correct the value of first_ and spawn adaptive partitioning.
-        curr->set_first(curr->last() + 1- global_count[i]); 
-        hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                 &curr, &p, &swap, &bin, &map); 
-      }
-    }
+    }    
+  } else {
+    meta->data = nullptr;
   }
 
   return global_offset; 
@@ -678,12 +693,6 @@ int recv_node_handler(void *args, size_t size) {
   Node *n = reinterpret_cast<Node *>(meta->data); 
   Node *curr = &n[id + type * dim3]; 
 
-  if (type == 's') {
-    std::cout << "rank " << rank << " set s " << id << "\n";
-  } else {
-    std::cout << "rank " << rank << " set t " << id << "\n";
-  }
-
   if (n_nodes) {
     const int *branch = &compressed_tree[3]; 
     const int *tree = &compressed_tree[3 + n_nodes]; 
@@ -699,8 +708,9 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler,
            HPX_POINTER, HPX_SIZE_T); 
 
 int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
-  int first = n[id].first(); 
-  int last = n[id].last(); 
+  Node *curr = &n[id]; 
+  int first = curr->first(); 
+  int last = curr->last(); 
   int range = last - first + 1; 
   Point *p = reinterpret_cast<Point *>(meta->data); 
 
@@ -712,18 +722,18 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
   memcpy(p + first, temp, sizeof(Point) * range); 
   delete [] temp; 
 
-  // Exclude @p n as it is already allocated on remote localities
-  int n_nodes = n->n_descendants() - 1; 
-  int *compressed_tree = new int[3 + n_nodes * 2](); 
-  
-  compressed_tree[0] = type; // target tree is 0, source tree is 1
+  // Exclude curr as it is already allocated on remote localities
+  int n_nodes = curr->n_descendants() - 1; 
+  int *compressed_tree = new int[3 + n_nodes * 2]();
+   
+  compressed_tree[0] = type; // source tree is 0, target tree is 1
   compressed_tree[1] = id; // where to merge 
   compressed_tree[2] = n_nodes; // # of nodes
   if (n_nodes) {
     int *branch = &compressed_tree[3]; 
-    int *tree = &compressed_tree[3 + n_nodes]; 
-    int curr = 0; 
-    n->compress(branch, tree, -1, curr); 
+    int *tree = &compressed_tree[3 + n_nodes];
+    int pos = 0; 
+    curr->compress(branch, tree, -1, pos); 
   }
 
   int rank = hpx_get_my_rank(); 
@@ -742,6 +752,7 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
 
   // Clear local memory once all parcels are sent 
   hpx_lco_wait(done); 
+
   delete [] compressed_tree; 
   return HPX_SUCCESS; 
 }
@@ -844,18 +855,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
 
   Node *ns = reinterpret_cast<Node *>(meta_g->data); 
   Node *nt = reinterpret_cast<Node *>(meta_g->data + sizeof(Node) * dim3);
-
-  swap_src = new int[meta_s->count](); 
-  bin_src = new int[meta_s->count](); 
-  map_src = new int[meta_s->count](); 
-  swap_tar = new int[meta_t->count](); 
-  bin_tar = new int[meta_t->count](); 
-  map_tar = new int[meta_t->count](); 
-  for (int i = 0; i < meta_s->count; ++i) 
-    map_src[i] = i; 
-  for (int i = 0; i < meta_t->count; ++i) 
-    map_tar[i] = i; 
-
+  
   int *global_offset_s = init_point_exchange(rank, global_count, local_scount, 
                                              local_offset_s, temp_s, 
                                              ns, meta_s, 's'); 
@@ -980,30 +980,57 @@ int finalize_partition_handler(void *unused, size_t size) {
   int dim3 = pow(8, unif_level); 
   Node *n = reinterpret_cast<Node *>(meta_g->data); 
 
-  for (int i = 0; i < dim3; ++i) {
+  int first = (rank == 0 ? 0 : distribute[rank - 1] + 1); 
+  int last = distribute[rank]; 
+
+  for (int i = 0; i < first; ++i) {
     Node *curr = &n[i]; 
     hpx_lco_delete_sync(curr->sema()); 
     hpx_lco_delete_sync(curr->complete()); 
 
-    if (distribute[i] == rank) {
-      for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child(j); 
-        if (child) 
-          child->destroy(false);
-      }
-    } else {
-      for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child(j); 
-        if (child) 
-          child->destroy(true); 
-      }
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j); 
+      if (child) 
+        child->destroy(true);
+    }
 
-      for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child(j); 
-        if (child) {
-          delete [] child;
-          break;
-        }
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j); 
+      if (child) {
+        delete [] child; 
+        break;
+      }
+    }
+  }
+
+  for (int i = first; i <= last; ++i) {
+    Node *curr = &n[i]; 
+    hpx_lco_delete_sync(curr->sema()); 
+    hpx_lco_delete_sync(curr->complete()); 
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j); 
+      if (child) 
+        child->destroy(false);
+    }
+  }
+
+  for (int i = last + 1; i < dim3; ++i) {
+    Node *curr = &n[i]; 
+    hpx_lco_delete_sync(curr->sema()); 
+    hpx_lco_delete_sync(curr->complete()); 
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j); 
+      if (child) 
+        child->destroy(true);
+    }
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j); 
+      if (child) {
+        delete [] child; 
+        break;
       }
     }
   }
@@ -1098,6 +1125,7 @@ void Node::partition(Point *p, int *swap, int *bin, int *map,
                      int threshold, double corner_x, double corner_y, 
                      double corner_z, double size) {
   int num_points = last_ - first_ + 1; 
+  assert(first_ >= 0 && last_ >= 0 && num_points >= 1); 
   bool is_leaf = (num_points <= threshold ? true : false); 
 
   if (parent_) 
