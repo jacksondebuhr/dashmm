@@ -124,11 +124,11 @@ class Evaluator {
                         expansionlco_t::predicate_,
                         expansionlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         expansionlco_t::spawn_out_edges_,
                         expansionlco_t::spawn_out_edges_handler,
                         HPX_INT);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_MARSHALLED,
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::spawn_out_edges_from_remote_,
                         expansionlco_t::spawn_out_edges_from_remote_handler,
                         HPX_POINTER, HPX_SIZE_T);

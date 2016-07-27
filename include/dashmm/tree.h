@@ -636,6 +636,7 @@ class Tree {
       hpx_call(HPX_HERE, source_partition_, HPX_NULL, &args, sizeof(args));
     }
 
+    assert(childpartdone != HPX_NULL);
     hpx_call_when(childpartdone, childpartdone, hpx_lco_delete_action,
                   parms->partdone, nullptr, 0);
 
@@ -738,6 +739,7 @@ class Tree {
 
       // This propagates the fact that these partition actions are done back
       // up the tree.
+      assert(partdone != HPX_NULL);
       hpx_call_when(partdone, partdone, hpx_lco_delete_action,
                     parms->partdone, nullptr, 0);
     } else {
@@ -779,6 +781,7 @@ class Tree {
 
     // Once the children are done, call aggregate here, continuing a set to
     // done once that has happened.
+    assert(cdone != HPX_NULL);
     hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, done,
                   &tree, &node, &cdone);
 
@@ -813,6 +816,7 @@ class Tree {
                  &tree, &node->child[i], &ccons, &same_sandt, &cdone);
       }
 
+      assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     } else {
@@ -891,6 +895,7 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
+      assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     } else {
@@ -955,6 +960,7 @@ class Tree {
       }
 
       // This will set the parent's LCO as well as delete cdone
+      assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     }

@@ -132,7 +132,10 @@ class ExpansionLCO {
     n_digits_ = n_digits;
 
     // setup the out edge action
-    hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &n_digits);
+    assert(data_ != HPX_NULL);
+    if (n_out != 0) {
+      hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &n_digits);
+    }
   }
 
   /// Destroy the GAS data referred by the object.

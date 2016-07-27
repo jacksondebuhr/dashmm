@@ -138,7 +138,7 @@ DO THESE THINGS
               This is implemented, but is not tested. Currently, there is no
               distribution possible. Perhaps I will get everything ready,
               and then run with some nonsense distribution just to test it.
-    : targetlco.h
+  D : targetlco.h
         The change in Array and ArrayRef will impact here also.
         Otherwise, this should be fine provided the LCO is always colocated
         with the Target data it is representing.
@@ -221,7 +221,7 @@ Overall Plan to 1.0
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those
       particles as needed)
-    - Array needs to be updated accordingly
+    - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
 
  * Kernel Parameters and Table generation
