@@ -855,7 +855,8 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
 HPX_ACTION(HPX_DEFAULT, 0, send_node_action, send_node_handler, 
            HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT); 
 
-int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
+int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets, 
+                             char exchange) {
   int rank = hpx_get_my_rank(); 
   int num_ranks = hpx_get_num_ranks(); 
 
@@ -968,53 +969,80 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
     }
   }
 
-  // Exchange source and target trees 
   hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3); 
 
-  for (int r = 0; r < num_ranks; ++r) {
-    int first = (r == 0 ? 0 : distribute[r - 1] + 1); 
-    int last = distribute[r]; 
-    int s{0}, t{1}; 
-
-    if (r == rank) {
-      for (int i = first; i <= last; ++i) {
-        if (global_count[i] == 0) {
-          hpx_lco_and_set(dual_tree_complete, HPX_NULL); 
-        } else {
-          hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
-                                          send_node_action, dual_tree_complete, 
-                                          hpx_lco_set_action, &ns, &meta_s, 
-                                          &i, &s);
+  if (exchange) {  
+    for (int r = 0; r < num_ranks; ++r) {
+      int first = (r == 0 ? 0 : distribute[r - 1] + 1); 
+      int last = distribute[r]; 
+      int s{0}, t{1}; 
+      
+      if (r == rank) {
+        for (int i = first; i <= last; ++i) {
+          if (global_count[i] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL); 
+          } else {
+            hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE, 
+                                            send_node_action, dual_tree_complete, 
+                                            hpx_lco_set_action, &ns, &meta_s, 
+                                            &i, &s);
+          }
+        
+          if (global_count[i + dim3] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
+                                            send_node_action, dual_tree_complete, 
+                                            hpx_lco_set_action, &nt, &meta_t, 
+                                            &i, &t);
+          }
         }
-
-        if (global_count[i + dim3] == 0) {
-          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-        } else {
-          hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE, 
-                                          send_node_action, dual_tree_complete, 
-                                          hpx_lco_set_action, &nt, &meta_t, 
-                                          &i, &t);
-        }
-      }
-    } else {
-      for (int i = first; i <= last; ++i) {
-        if (global_count[i] == 0) {
-          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-        } else {
-          hpx_call_when(ns[i].complete(), dual_tree_complete, 
-                        hpx_lco_set_action, HPX_NULL, NULL, 0);
-        } 
-
-        if (global_count[i + dim3] == 0) {
-          hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-        } else {
-          hpx_call_when(nt[i].complete(), dual_tree_complete, 
-                        hpx_lco_set_action, HPX_NULL, NULL, 0); 
+      } else {
+        for (int i = first; i <= last; ++i) {
+          if (global_count[i] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            hpx_call_when(ns[i].complete(), dual_tree_complete, 
+                          hpx_lco_set_action, HPX_NULL, NULL, 0);
+          } 
+          
+          if (global_count[i + dim3] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            hpx_call_when(nt[i].complete(), dual_tree_complete, 
+                          hpx_lco_set_action, HPX_NULL, NULL, 0); 
+          }
         }
       }
     }
-  }
+  } else {
+    for (int r = 0; r < num_ranks; ++r) {
+      int first = (r == 0 ? 0 : distribute[r - 1] + 1); 
+      int last = distribute[r]; 
+      
+      if (r == rank) {
+        for (int i = first; i <= last; ++i) {
+          if (global_count[i] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            hpx_call_when(ns[i].complete(), dual_tree_complete, 
+                          hpx_lco_set_action, HPX_NULL); 
+          }
 
+          if (global_count[i + dim3] == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            hpx_call_when(nt[i].complete(), dual_tree_complete, 
+                          hpx_lco_set_action, HPX_NULL);
+          }
+        }
+      } else {
+        for (int i = first; i <= last; ++i) 
+          hpx_lco_and_set_num(dual_tree_complete, 2, HPX_NULL);
+      }
+    }
+  }
+  
   hpx_lco_wait(dual_tree_complete); 
   hpx_lco_delete_sync(dual_tree_complete); 
 
@@ -1042,7 +1070,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets) {
   return HPX_SUCCESS; 
 }
 HPX_ACTION(HPX_DEFAULT, 0, create_dual_tree_action, create_dual_tree_handler, 
-           HPX_ADDR, HPX_ADDR); 
+           HPX_ADDR, HPX_ADDR, HPX_CHAR); 
 
 int finalize_partition_handler(void *unused, size_t size) {
   int rank = hpx_get_my_rank(); 
@@ -1144,8 +1172,8 @@ int finalize_partition_handler(void *unused, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, finalize_partition_action, 
            finalize_partition_handler, HPX_POINTER, HPX_SIZE_T); 
 
-int main_handler(char scaling, char datatype, int nsrc, int ntar, 
-                 int threshold, int nseed) {
+int main_handler(char scaling, char datatype, char exchange, 
+                 int nsrc, int ntar, int threshold, int nseed) {
   int num_ranks = hpx_get_num_ranks(); 
 
   // Generate input data
@@ -1197,7 +1225,7 @@ int main_handler(char scaling, char datatype, int nsrc, int ntar,
                   &sorted_src, &sorted_tar, &unif_level, &threshold, 
                   &corner_x, &corner_y, &corner_z, &size); 
 
-  hpx_bcast_rsync(create_dual_tree_action, &sources, &targets); 
+  hpx_bcast_rsync(create_dual_tree_action, &sources, &targets, &exchange); 
 
   double elapsed = hpx_time_elapsed_ms(timer) / 1e3; 
   std::cout << "Dual tree creation time: " << elapsed << "\n"; 
@@ -1220,14 +1248,7 @@ int main_handler(char scaling, char datatype, int nsrc, int ntar,
   hpx_exit(HPX_SUCCESS); 
 }
 HPX_ACTION(HPX_DEFAULT, 0, main_action, main_handler, 
-           HPX_CHAR, HPX_CHAR, HPX_INT, HPX_INT, HPX_INT, HPX_INT); 
-
-
-
-
-
-
-
+           HPX_CHAR, HPX_CHAR, HPX_CHAR, HPX_INT, HPX_INT, HPX_INT, HPX_INT); 
 
 void Node::partition(Point *p, int *swap, int *bin, int *map, 
                      int threshold, double corner_x, double corner_y, 
