@@ -68,43 +68,51 @@ int *distribute_points(int num_ranks, const int *global, int len) {
   const int *s = global; // Source counts
   const int *t = &global[len]; // Target counts
 
-  int *scan = new int[len](); 
-  scan[0] = s[0] + t[0]; 
-  for (int i = 1; i < len; ++i) 
-    scan[i] = scan[i - 1] + s[i] + t[i]; 
-
-  int q = scan[len - 1] / num_ranks; 
-  int r = scan[len - 1] % num_ranks; 
+  int total = 0; 
+  for (int i = 0; i < len; ++i) 
+    total += s[i] + t[i]; 
 
   int rank = 0; 
-  int iterator = -1; 
-  int bound = q + (r != 0); 
+  int iterator = 0; 
 
-  while (rank < num_ranks && iterator < len) {
-    if (rank) 
-      bound = scan[iterator] + q + (rank <= r); 
-    iterator++; 
-    int i; 
-    for (i = iterator; i <= len - 2; ++i) {
-      if (scan[i] <= bound && scan[i + 1] > bound)
-        break;
+  while (rank < num_ranks && total > 0) {
+    if (rank == num_ranks - 1) {
+      // Take the remaining grids 
+      ret[rank++] = len - 1; 
+    } else {
+      int avg = total / (num_ranks - rank); 
+      int sum = 0; 
+      int sum1 = 0; 
+
+      for (int i = iterator; i < len; ++i) {
+        sum += s[i] + t[i]; 
+        if (i == len - 1) {
+          // There will be ranks left without grids assigned. 
+          delete [] ret; 
+          return nullptr;
+        } else {
+          sum1 = sum + s[i + 1] + t[i + 1];
+        }
+
+        if (sum <= avg && avg <= sum1) {
+          // Check which is closer to avg 
+          if (avg - sum <= sum1 - avg) {
+            iterator = i; 
+          } else {
+            iterator = i + 1; 
+            sum = sum1;
+          }
+          break;
+        }
+      }
+
+      ret[rank++] = iterator; 
+      total -= sum;
+      iterator++;
     }
-    ret[rank++] = i; // i is at most len - 1
-    iterator = i;
   }
 
-  delete [] scan; 
-  
-  if (rank < num_ranks) {
-    // The current uniform partition level does not have enough grids to
-    // distribute among all the ranks 
-    delete [] ret; 
-    return nullptr; 
-  } else {
-    // Make sure all the grids are selected
-    ret[num_ranks - 1] = len - 1; 
-    return ret;
-  }
+  return ret; 
 } 
 
 void generate_weak_scaling_input(ArrayMetaData *meta_s, int nsrc_per_rank,
@@ -599,6 +607,33 @@ int *init_point_exchange(int rank, const int *global_count,
   return global_offset; 
 }
 
+int merge_points_handler(Point *p, Point *temp, Node *n, 
+                         int n_arrived, int n_total, char type) {
+  // Note: all the pointers are local to the calling rank. 
+  hpx_lco_sema_p(n->sema()); 
+  int first = n->first(); 
+  memcpy(p + first, temp, sizeof(Point) * n_arrived); 
+  n->set_first(first + n_arrived); 
+  
+  if (first + n_arrived > n->last()) {
+    // Spawn adaptive partitioning 
+    n->set_first(n->last() + 1 - n_total); 
+    
+    if (type == 's') {
+      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+               &n, &p, &swap_src, &bin_src, &map_src);
+    } else {
+      hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
+               &n, &p, &swap_tar, &bin_tar, &map_tar);
+    }
+  }
+  hpx_lco_sema_v(n->sema(), HPX_NULL); 
+
+  return HPX_SUCCESS; 
+} 
+HPX_ACTION(HPX_DEFAULT, 0, merge_points_action, merge_points_handler,
+           HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT, HPX_CHAR); 
+
 int recv_points_handler(void *args, size_t size) {
   int rank = hpx_get_my_rank(); 
   hpx_addr_t curr_unif_done = hpx_addr_add(unif_done, 
@@ -658,52 +693,45 @@ int recv_points_handler(void *args, size_t size) {
                               sizeof(int) * range * (recv_nt > 0)); 
   Point *recv_t = recv_s + recv_ns; 
 
+  hpx_addr_t done = hpx_lco_and_new(range * 2); 
+
   if (recv_ns) {
+    char type = 's'; 
     for (int i = first; i <= last; ++i) {
       Node *ns = &n[i]; 
       int incoming_ns = count_s[i - first]; 
       if (incoming_ns) {
-        hpx_lco_sema_p(ns->sema()); 
-        int first_s = ns->first(); 
-        memcpy(s + first_s, recv_s, sizeof(Point) * incoming_ns); 
-        ns->set_first(first_s + incoming_ns); 
-        recv_s += incoming_ns; 
-        
-        if (first_s + incoming_ns > ns->last()) {
-          // Spawn adaptive partitioning
-          ns->set_first(ns->last() + 1 - count[i]); 
-
-          hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                   &ns, &s, &swap_src, &bin_src, &map_src); 
-        }
-        hpx_lco_sema_v(ns->sema(), HPX_NULL); 
-      }      
+        hpx_call(HPX_HERE, merge_points_action, done, 
+                 &s, &recv_s, &ns, &incoming_ns, &count[i], &type);
+        recv_s += incoming_ns;
+      } else {
+        hpx_lco_and_set(done, HPX_NULL); 
+      }
     }
+  } else {
+    hpx_lco_and_set_num(done, range, HPX_NULL);
   }
 
   if (recv_nt) {
+    char type = 't'; 
     for (int i = first; i <= last; ++i) {
       Node *nt = &n[i + dim3]; 
       int incoming_nt = count_t[i - first]; 
       if (incoming_nt) {
-        hpx_lco_sema_p(nt->sema()); 
-        int first_t = nt->first(); 
-        memcpy(t + first_t, recv_t, sizeof(Point) * incoming_nt); 
-        nt->set_first(first_t + incoming_nt); 
-        recv_t += incoming_nt; 
-      
-        if (first_t + incoming_nt > nt->last()) {
-          // Spawn adaptive partitioning 
-          nt->set_first(nt->last() + 1 - count[i + dim3]); 
-          
-          hpx_call(HPX_HERE, partition_node_action, HPX_NULL, 
-                   &nt, &t, &swap_tar, &bin_tar, &map_tar); 
-        }
-        hpx_lco_sema_v(nt->sema(), HPX_NULL); 
+        hpx_call(HPX_HERE, merge_points_action, done, 
+                 &t, &recv_t, &nt, &incoming_nt, &count[i + dim3], &type); 
+        recv_t += incoming_nt;
+      } else {
+        hpx_lco_and_set(done, HPX_NULL);
       }
     }
+  } else {
+    hpx_lco_and_set_num(done, range, HPX_NULL);
   }
 
+  // Wait until the data has been merged before releasing the parcel
+  hpx_lco_wait(done); 
+  hpx_lco_delete_sync(done); 
   hpx_lco_release(*user_lco, user_lco_buffer); 
   hpx_gas_unpin(curr_unif_count); 
   hpx_gas_unpin(curr_unif_count); 
@@ -761,6 +789,11 @@ int send_points_handler(int rank, int *count_s, int *count_t,
   char *meta_t = meta_s + send_ns * sizeof(Point); 
   if (send_nt) 
     memcpy(meta_t, &targets[offset_t[first]], sizeof(Point) * send_nt); 
+
+#if 0
+  std::cout << send_ns << "\n" << std::flush;
+#endif 
+
 
   hpx_parcel_set_target(p, HPX_THERE(rank)); 
   hpx_parcel_set_action(p, recv_points_action); 
@@ -926,6 +959,18 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
 
   distribute = distribute_points(num_ranks, global_count, dim3); 
   assert(distribute != nullptr); 
+
+#if 0
+  if (rank == 0) {
+    //for (int i = 0; i < dim3; ++i) 
+    //  std::cout << global_count[i] << "\n"; 
+
+    for (int i = 0; i < num_ranks; ++i) 
+      std::cout << distribute[i] << "\n"; 
+  }
+
+#endif 
+
 
   // Exchange points
   hpx_addr_t curr_sorted_s = hpx_addr_add(sorted_src, 

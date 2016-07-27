@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
   // default values 
   char scaling = 'w'; // strong scale, 'w' for weak scaling
   char datatype = 'c'; // cubic point distribution, 's' for sphere distrbution
-  char exchange = 'y'; // exchange trees
+  char exchange = 'n'; // exchange trees
   int nsrc = 20; // total number of sources for strong scaling 
                  // number of sources per rank for weak scaling 
   int ntar = 20; 
