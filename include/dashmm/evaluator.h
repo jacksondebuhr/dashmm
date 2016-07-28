@@ -252,7 +252,7 @@ class Evaluator {
     args.n_digits = expansion.accuracy();
     args.distro = distro;
 
-    if (HPX_SUCCESS != hpx_run(&evaluate_, &args, sizeof(args))) {
+    if (HPX_SUCCESS != hpx_run(&evaluate_, nullptr, &args, sizeof(args))) {
       return kRuntimeError;
     }
 
@@ -319,7 +319,7 @@ class Evaluator {
     delete tree;
 
     // return
-    hpx_exit(HPX_SUCCESS);
+    hpx_exit(0, nullptr);
   }
 };
 

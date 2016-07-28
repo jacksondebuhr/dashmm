@@ -52,10 +52,12 @@ namespace {
 int allocate_array_meta_handler(int *err) {
   int ranks = hpx_get_num_ranks();
 
+  *err = kSuccess;
+
   hpx_addr_t meta = hpx_gas_alloc_cyclic(ranks, sizeof(ArrayMetaData), 0);
   if (meta == HPX_NULL) {
     *err = kAllocationError;
-    hpx_exit(HPX_ERROR);
+    hpx_exit(0, nullptr);
   }
 
   hpx_addr_t reducer = hpx_lco_reduce_new(ranks, sizeof(size_t) * ranks,
@@ -63,12 +65,12 @@ int allocate_array_meta_handler(int *err) {
   if (reducer == HPX_NULL) {
     hpx_gas_free_sync(meta);
     *err = kAllocationError;
-    hpx_exit(HPX_ERROR);
+    hpx_exit(0, nullptr);
   }
 
   hpx_bcast_rsync(allocate_save_some_data, &meta, &reducer);
 
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_array_meta_action, allocate_array_meta_handler,
@@ -116,15 +118,13 @@ int allocate_local_work_handler(hpx_addr_t *data, size_t record_size,
     local->data = hpx_gas_alloc_local(1, record_count * record_size, 0);
     if (local->data == HPX_NULL) {
       *err = kAllocationError;
-      int value = HPX_ERROR;
-      return HPX_THREAD_CONTINUE(value);
+      hpx_exit(0, nullptr);
     }
   }
 
   hpx_gas_unpin(global);
-
-  int value = HPX_SUCCESS;
-  return HPX_THREAD_CONTINUE(value);
+  *err = kSuccess;
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_local_work_action, allocate_local_work_handler,
@@ -140,7 +140,7 @@ int allocate_array_destroy_reducer_handler(void *UNUSED, size_t UNWANTED) {
   hpx_addr_t null = HPX_NULL;
   hpx_bcast_rsync(allocate_save_some_data, &null, &null);
 
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            allocate_array_destroy_reducer_action,
@@ -179,7 +179,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 int deallocate_array_handler(hpx_addr_t obj) {
   hpx_bcast_rsync(deallocate_array_local_action, &obj);
   hpx_gas_free_sync(obj);
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, 0, deallocate_array_action, deallocate_array_handler,
            HPX_ADDR);
@@ -207,21 +207,18 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
     *err = kRuntimeError;
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   char *data{nullptr};
   if (local->data == HPX_NULL) {
     hpx_gas_unpin(global);
-    int retval = HPX_SUCCESS;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
   if (!hpx_gas_try_pin(local->data, (void **)&data)) {
     hpx_gas_unpin(global);
     *err = kRuntimeError;
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   // Do some simple bounds checking
@@ -229,8 +226,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
     *err = kDomainError;
     hpx_gas_unpin(local->data);
     hpx_gas_unpin(global);
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   char *beginning = data + first * local->size;
@@ -240,8 +236,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   hpx_gas_unpin(local->data);
   hpx_gas_unpin(global);
 
-  int retval = HPX_SUCCESS;
-  return HPX_THREAD_CONTINUE(retval);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
@@ -269,21 +264,18 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
     *err = kRuntimeError;
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   char *data{nullptr};
   if (local->data == HPX_NULL) {
     hpx_gas_unpin(global);
-    int retval = HPX_SUCCESS;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
   if (!hpx_gas_try_pin(local->data, (void **)&data)) {
     *err = kRuntimeError;
     hpx_gas_unpin(global);
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   // Do some simple bounds checking
@@ -291,8 +283,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
     *err = kDomainError;
     hpx_gas_unpin(local->data);
     hpx_gas_unpin(global);
-    int retval = HPX_ERROR;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   char *beginning = data + first * local->size;
@@ -302,8 +293,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   hpx_gas_unpin(local->data);
   hpx_gas_unpin(global);
 
-  int retval = HPX_SUCCESS;
-  return HPX_THREAD_CONTINUE(retval);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
@@ -319,8 +309,7 @@ int array_local_count_handler(hpx_addr_t data, size_t *retval) {
   *retval = local->local_count;
 
   hpx_gas_unpin(global);
-  int cval = HPX_SUCCESS;
-  return HPX_THREAD_CONTINUE(cval);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_local_count_action, array_local_count_handler,
@@ -337,8 +326,7 @@ int array_total_count_handler(hpx_addr_t data, size_t *retval) {
   *retval = local->total_count;
 
   hpx_gas_unpin(global);
-  int cval = HPX_SUCCESS;
-  return HPX_THREAD_CONTINUE(cval);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_total_count_action, array_total_count_handler,

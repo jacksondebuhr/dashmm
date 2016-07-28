@@ -170,7 +170,7 @@ class SharedData {
     } else {
       hpx_addr_t *argaddr = &data_;
       size_t bytes = sizeof(T);
-      hpx_run(&shared_data_construct_action, &bytes, &argaddr);
+      hpx_run(&shared_data_construct_action, nullptr, &bytes, &argaddr);
     }
     assert(data_ != HPX_NULL);
     if (value != nullptr) {
@@ -207,7 +207,7 @@ class SharedData {
     if (hpx_is_active()) {
       hpx_gas_free_sync(data_);
     } else {
-      hpx_run(&shared_data_destroy_action, &data_);
+      hpx_run(&shared_data_destroy_action, nullptr, &data_);
     }
     data_ = HPX_NULL;
   }
@@ -232,7 +232,7 @@ class SharedData {
       parms->base = data_;
       parms->bytes = sizeof(T);
       memcpy(parms->data, value, sizeof(T));
-      hpx_run(&shared_data_external_reset_action, parms, argsize);
+      hpx_run(&shared_data_external_reset_action, nullptr, parms, argsize);
       delete [] parms;
     }
   }

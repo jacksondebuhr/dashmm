@@ -115,8 +115,7 @@ class ArrayMapAction {
     hpx_gas_unpin(global);
 
     if (total_count == 0) {
-      int retval = HPX_SUCCESS;
-      return HPX_THREAD_CONTINUE(retval);
+      hpx_exit(0, nullptr);
     }
 
     // NOTE: Initially, for maximal "easiness" the library should pick the
@@ -152,8 +151,7 @@ class ArrayMapAction {
     hpx_lco_wait(alldone);
     hpx_lco_delete_sync(alldone);
 
-    int retval = HPX_SUCCESS;
-    return HPX_THREAD_CONTINUE(retval);
+    hpx_exit(0, nullptr);
   }
 
   static int spawn_handler(size_t count, size_t total_count, size_t offset,

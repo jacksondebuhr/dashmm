@@ -105,7 +105,7 @@ class Array {
   size_t count() const {
     size_t retval{0};
     size_t *arg = &retval;
-    hpx_run_spmd(&array_local_count_action, &data_, &arg);
+    hpx_run_spmd(&array_local_count_action, nullptr, &data_, &arg);
     return retval;
   }
 
@@ -118,7 +118,7 @@ class Array {
   size_t length() const {
     size_t retval{0};
     size_t *arg = &retval;
-    hpx_run_spmd(&array_total_count_action, &data_, &arg);
+    hpx_run_spmd(&array_total_count_action, nullptr, &data_, &arg);
     return retval;
   }
 
@@ -143,10 +143,10 @@ class Array {
       return kDomainError;
     }
 
-    int runcode;
+    int runcode{0};
     int *arg = &runcode;
-    int err = hpx_run(&allocate_array_meta_action, &arg);
-    if (HPX_SUCCESS != err) {
+    hpx_run(&allocate_array_meta_action, nullptr, &arg);
+    if (runcode != kSuccess) {
       return static_cast<ReturnCode>(runcode);
     }
 
@@ -154,14 +154,14 @@ class Array {
 
     hpx_addr_t *dataout = &data_;
     size_t size = sizeof(T);
-    err = hpx_run_spmd(&allocate_local_work_action, &dataout,
+    hpx_run_spmd(&allocate_local_work_action, nullptr, &dataout,
                        &size, &record_count, &arg);
-    if (err != HPX_SUCCESS) {
-      hpx_run(&deallocate_array_action, &data_);
+    if (runcode != HPX_SUCCESS) {
+      hpx_run(&deallocate_array_action, nullptr, &data_);
       retval = kAllocationError;
     }
 
-    hpx_run(&allocate_array_destroy_reducer_action, nullptr, 0);
+    hpx_run(&allocate_array_destroy_reducer_action, nullptr, nullptr, 0);
 
     return retval;
   }
@@ -174,7 +174,7 @@ class Array {
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
-    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
+    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, nullptr, &data_)) {
       data_ = HPX_NULL;
       return kSuccess;
     } else {
@@ -204,7 +204,8 @@ class Array {
   ReturnCode get(size_t first, size_t last, T *out_data) {
     int runcode = kSuccess;
     int *arg = &runcode;
-    hpx_run_spmd(&array_get_action, &data_, &first, &last, &arg, &out_data);
+    hpx_run_spmd(&array_get_action, nullptr,
+                 &data_, &first, &last, &arg, &out_data);
     return static_cast<ReturnCode>(runcode);
   }
 
@@ -230,7 +231,8 @@ class Array {
   ReturnCode put(size_t first, size_t last, T *in_data) {
     int runcode = kSuccess;
     int *arg = &runcode;
-    hpx_run_spmd(&array_put_action, &data_, &first, &last, &arg, &in_data);
+    hpx_run_spmd(&array_put_action, nullptr,
+                 &data_, &first, &last, &arg, &in_data);
     return static_cast<ReturnCode>(runcode);
   }
 
@@ -277,7 +279,7 @@ class Array {
   /// \return - kSuccess
   template <typename E>
   ReturnCode map(const ArrayMapAction<T, E> &act, const E *env) {
-    hpx_run_spmd(&act.root_, &act.leaf_, &env, &data_);
+    hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
   }
 

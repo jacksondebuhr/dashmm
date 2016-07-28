@@ -49,7 +49,7 @@ namespace {
 
 int shared_data_construct_handler(size_t bytes, hpx_addr_t *retval) {
   *retval = hpx_gas_alloc_cyclic(hpx_get_num_ranks(), bytes, 0);
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            shared_data_construct_action, shared_data_construct_handler,
@@ -58,7 +58,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 
 int shared_data_destroy_handler(hpx_addr_t data) {
   hpx_gas_free_sync(data);
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            shared_data_destroy_action, shared_data_destroy_handler,
@@ -67,7 +67,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 
 int shared_data_external_reset_handler(reset_args_t *data, size_t UNUSED) {
   perform_reset(data->base, data->data, data->bytes, data->sync);
-  hpx_exit(HPX_SUCCESS);
+  hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            shared_data_external_reset_action,
