@@ -47,13 +47,13 @@ namespace {
 }
 
 
-int shared_data_construct_handler(size_t bytes, hpx_addr_t *retval) {
-  *retval = hpx_gas_alloc_cyclic(hpx_get_num_ranks(), bytes, 0);
-  hpx_exit(0, nullptr);
+int shared_data_construct_handler(size_t bytes) {
+  hpx_addr_t data = hpx_gas_alloc_cyclic(hpx_get_num_ranks(), bytes, 0);
+  hpx_exit(sizeof(data), &data);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            shared_data_construct_action, shared_data_construct_handler,
-           HPX_SIZE_T, HPX_POINTER);
+           HPX_SIZE_T);
 
 
 int shared_data_destroy_handler(hpx_addr_t data) {

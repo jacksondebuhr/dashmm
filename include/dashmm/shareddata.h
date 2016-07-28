@@ -168,9 +168,8 @@ class SharedData {
     if (hpx_is_active()) {
       data_ = hpx_gas_alloc_cyclic(hpx_get_num_ranks(), sizeof(T), 0);
     } else {
-      hpx_addr_t *argaddr = &data_;
       size_t bytes = sizeof(T);
-      hpx_run(&shared_data_construct_action, nullptr, &bytes, &argaddr);
+      hpx_run(&shared_data_construct_action, &data_, &bytes);
     }
     assert(data_ != HPX_NULL);
     if (value != nullptr) {

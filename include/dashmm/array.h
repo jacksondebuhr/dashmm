@@ -58,6 +58,13 @@ extern hpx_action_t array_local_count_action;
 extern hpx_action_t array_total_count_action;
 
 
+struct ArrayMetaAllocRunReturn {
+  hpx_addr_t meta;
+  hpx_addr_t reducer;
+  int code;
+};
+
+
 /// Array class
 ///
 /// Arrays are template classes parameterized over the data type of the
@@ -104,8 +111,7 @@ class Array {
   /// \returns - the number of records owned by this rank,
   size_t count() const {
     size_t retval{0};
-    size_t *arg = &retval;
-    hpx_run_spmd(&array_local_count_action, nullptr, &data_, &arg);
+    hpx_run_spmd(&array_local_count_action, &retval, &data_);
     return retval;
   }
 
@@ -117,8 +123,7 @@ class Array {
   /// \returns - the total number of records in all ranks.
   size_t length() const {
     size_t retval{0};
-    size_t *arg = &retval;
-    hpx_run_spmd(&array_total_count_action, nullptr, &data_, &arg);
+    hpx_run_spmd(&array_total_count_action, &retval, &data_);
     return retval;
   }
 
@@ -143,25 +148,31 @@ class Array {
       return kDomainError;
     }
 
-    int runcode{0};
-    int *arg = &runcode;
-    hpx_run(&allocate_array_meta_action, nullptr, &arg);
-    if (runcode != kSuccess) {
-      return static_cast<ReturnCode>(runcode);
+    ArrayMetaAllocRunReturn metadata{HPX_NULL, HPX_NULL, 0};
+    hpx_run(&allocate_array_meta_action, &metadata, nullptr, 0);
+    if (metadata.code != kSuccess) {
+      return static_cast<ReturnCode>(metadata.code);
     }
+    data_ = metadata.meta;
 
     ReturnCode retval{kSuccess};
 
-    hpx_addr_t *dataout = &data_;
     size_t size = sizeof(T);
-    hpx_run_spmd(&allocate_local_work_action, nullptr, &dataout,
-                       &size, &record_count, &arg);
-    if (runcode != HPX_SUCCESS) {
-      hpx_run(&deallocate_array_action, nullptr, &data_);
+    int runcode{0};
+    hpx_run_spmd(&allocate_local_work_action, &runcode,
+                 &metadata.meta, &metadata.reducer, &size, &record_count);
+    if (runcode != kSuccess) {
+      // NOTE: If this branch is triggered, only some ranks will do this.
+      //  so there is an issue to sort out about cleaning up the resulting
+      //  mess.
+      // We can likely just get another reduction, and send it back, and
+      //  reduce on it before we leave the local work action. Then everyone
+      //  would agree on the result.
+      // TODO; probably do that...
       retval = kAllocationError;
     }
 
-    hpx_run(&allocate_array_destroy_reducer_action, nullptr, nullptr, 0);
+    hpx_run(&allocate_array_destroy_reducer_action, nullptr, &metadata.reducer);
 
     return retval;
   }
@@ -203,9 +214,9 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
     int runcode = kSuccess;
-    int *arg = &runcode;
-    hpx_run_spmd(&array_get_action, nullptr,
-                 &data_, &first, &last, &arg, &out_data);
+    // TODO: the error handling with this is now strange. Each rank can
+    // have a different runcode here...
+    hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data);
     return static_cast<ReturnCode>(runcode);
   }
 
@@ -230,9 +241,9 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
     int runcode = kSuccess;
-    int *arg = &runcode;
-    hpx_run_spmd(&array_put_action, nullptr,
-                 &data_, &first, &last, &arg, &in_data);
+    // TODO: the error handling with this is now strange. Each rank can
+    // have a different runcode here...
+    hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data);
     return static_cast<ReturnCode>(runcode);
   }
 

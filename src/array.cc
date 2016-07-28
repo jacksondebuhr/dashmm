@@ -28,60 +28,35 @@
 namespace dashmm {
 
 
-// TODO: This will likely be obviated by some developments in hpx itself.
-// For now, this will be left as the solution.
-//
-// NOTE: This means only one Array operation at a time.
-namespace {
-  hpx_addr_t allocate_save_reducer = HPX_NULL;
-  hpx_addr_t allocate_save_meta = HPX_NULL;
-
-  // set these local values. This is a junk workaround
-  int allocate_save_some_data_handler(hpx_addr_t meta, hpx_addr_t reducer) {
-    allocate_save_meta = meta;
-    allocate_save_reducer = reducer;
-    return HPX_SUCCESS;
-  }
-  HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-             allocate_save_some_data, allocate_save_some_data_handler,
-             HPX_ADDR, HPX_ADDR);
-}
-
-
 // allocate the array meta data
-int allocate_array_meta_handler(int *err) {
+int allocate_array_meta_handler(void *UNUSED, size_t UNWANTED) {
+  ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
+
   int ranks = hpx_get_num_ranks();
-
-  *err = kSuccess;
-
-  hpx_addr_t meta = hpx_gas_alloc_cyclic(ranks, sizeof(ArrayMetaData), 0);
-  if (meta == HPX_NULL) {
-    *err = kAllocationError;
-    hpx_exit(0, nullptr);
+  retval.meta = hpx_gas_alloc_cyclic(ranks, sizeof(ArrayMetaData), 0);
+  if (retval.meta == HPX_NULL) {
+    retval.code = kAllocationError;
+    hpx_exit(sizeof(retval), &retval);
   }
 
-  hpx_addr_t reducer = hpx_lco_reduce_new(ranks, sizeof(size_t) * ranks,
+  retval.reducer = hpx_lco_reduce_new(ranks, sizeof(size_t) * ranks,
                                           size_sum_ident, size_sum_op);
-  if (reducer == HPX_NULL) {
-    hpx_gas_free_sync(meta);
-    *err = kAllocationError;
-    hpx_exit(0, nullptr);
+  if (retval.reducer == HPX_NULL) {
+    hpx_gas_free_sync(retval.meta);
+    retval.meta = HPX_NULL;
+    retval.code = kAllocationError;
   }
 
-  hpx_bcast_rsync(allocate_save_some_data, &meta, &reducer);
-
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            allocate_array_meta_action, allocate_array_meta_handler,
-           HPX_POINTER);
+           HPX_POINTER, HPX_SIZE_T);
 
 
 // the local part of the allocation work
-int allocate_local_work_handler(hpx_addr_t *data, size_t record_size,
-                                size_t record_count, int *err) {
-  *data = allocate_save_meta;
-
+int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
+                                size_t record_size, size_t record_count) {
   int ranks = hpx_get_num_ranks();
   int my_rank = hpx_get_my_rank();
   size_t *contrib = new size_t [ranks];
@@ -94,12 +69,11 @@ int allocate_local_work_handler(hpx_addr_t *data, size_t record_size,
     }
   }
 
-  hpx_lco_set(allocate_save_reducer, sizeof(size_t) * ranks, contrib,
-              HPX_NULL, HPX_NULL);
-  hpx_lco_get(allocate_save_reducer, sizeof(size_t) * ranks, contrib);
+  hpx_lco_set(reducer, sizeof(size_t) * ranks, contrib, HPX_NULL, HPX_NULL);
+  hpx_lco_get(reducer, sizeof(size_t) * ranks, contrib);
 
   // Pin local part of the meta data
-  hpx_addr_t global = hpx_addr_add(allocate_save_meta,
+  hpx_addr_t global = hpx_addr_add(data,
                                    hpx_get_my_rank() * sizeof(ArrayMetaData),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
@@ -114,38 +88,31 @@ int allocate_local_work_handler(hpx_addr_t *data, size_t record_size,
   local->size = record_size;
   local->data = HPX_NULL;
 
+  int retval{0};
   if (record_count) {
     local->data = hpx_gas_alloc_local(1, record_count * record_size, 0);
     if (local->data == HPX_NULL) {
-      *err = kAllocationError;
-      hpx_exit(0, nullptr);
+      retval = kAllocationError;
     }
   }
 
   hpx_gas_unpin(global);
-  *err = kSuccess;
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_local_work_action, allocate_local_work_handler,
-           HPX_POINTER, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
+           HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T);
 
 
-// delete the reducer and clear out the references to said reducer
-int allocate_array_destroy_reducer_handler(void *UNUSED, size_t UNWANTED) {
-  // delete the reducer
-  hpx_lco_delete_sync(allocate_save_reducer);
-
-  // then go ahead and clear out the values saved at each locality for safety
-  hpx_addr_t null = HPX_NULL;
-  hpx_bcast_rsync(allocate_save_some_data, &null, &null);
-
+// delete the reducer
+int allocate_array_destroy_reducer_handler(hpx_addr_t reducer) {
+  hpx_lco_delete_sync(reducer);
   hpx_exit(0, nullptr);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_array_destroy_reducer_action,
            allocate_array_destroy_reducer_handler,
-           HPX_POINTER, HPX_SIZE_T);
+           HPX_ADDR);
 
 
 // Delete the local portion of the array
@@ -197,36 +164,36 @@ HPX_ACTION(HPX_DEFAULT, 0, deallocate_array_action, deallocate_array_handler,
 /// \param in_data - the data to copy into the records
 ///
 /// \returns - HPX_SUCCESS
-int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
+int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
                       void *in_data) {
-  *err = kSuccess;
+  int retval = kSuccess;
 
   hpx_addr_t global = hpx_addr_add(obj,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
-    *err = kRuntimeError;
-    hpx_exit(0, nullptr);
+    retval = kRuntimeError;
+    hpx_exit(sizeof(retval), &retval);
   }
 
   char *data{nullptr};
   if (local->data == HPX_NULL) {
     hpx_gas_unpin(global);
-    hpx_exit(0, nullptr);
+    hpx_exit(sizeof(retval), &retval);
   }
   if (!hpx_gas_try_pin(local->data, (void **)&data)) {
     hpx_gas_unpin(global);
-    *err = kRuntimeError;
-    hpx_exit(0, nullptr);
+    retval = kRuntimeError;
+    hpx_exit(sizeof(retval), &retval);
   }
 
   // Do some simple bounds checking
   if (last > local->local_count || last < first) {
-    *err = kDomainError;
+    retval = kDomainError;
     hpx_gas_unpin(local->data);
     hpx_gas_unpin(global);
-    hpx_exit(0, nullptr);
+    hpx_exit(sizeof(retval), &retval);
   }
 
   char *beginning = data + first * local->size;
@@ -236,10 +203,10 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   hpx_gas_unpin(local->data);
   hpx_gas_unpin(global);
 
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
 /// Get data from an array object
@@ -254,36 +221,36 @@ HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
 /// \param out_data - a buffer into which the read data is stored
 ///
 /// \returns - HPX_SUCCESS
-int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
+int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
                       void *out_data) {
-  *err = kSuccess;
+  int retval = kSuccess;
 
   hpx_addr_t global = hpx_addr_add(obj,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
-    *err = kRuntimeError;
-    hpx_exit(0, nullptr);
+    retval = kRuntimeError;
+    hpx_exit(sizeof(retval), &retval);;
   }
 
   char *data{nullptr};
   if (local->data == HPX_NULL) {
     hpx_gas_unpin(global);
-    hpx_exit(0, nullptr);
+    hpx_exit(sizeof(retval), &retval);;
   }
   if (!hpx_gas_try_pin(local->data, (void **)&data)) {
-    *err = kRuntimeError;
+    retval = kRuntimeError;
     hpx_gas_unpin(global);
-    hpx_exit(0, nullptr);
+    hpx_exit(sizeof(retval), &retval);;
   }
 
   // Do some simple bounds checking
   if (last > local->local_count || last < first) {
-    *err = kDomainError;
+    retval = kDomainError;
     hpx_gas_unpin(local->data);
     hpx_gas_unpin(global);
-    hpx_exit(0, nullptr);
+    hpx_exit(sizeof(retval), &retval);;
   }
 
   char *beginning = data + first * local->size;
@@ -293,43 +260,43 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last, int *err,
   hpx_gas_unpin(local->data);
   hpx_gas_unpin(global);
 
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);;
 }
 HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
-int array_local_count_handler(hpx_addr_t data, size_t *retval) {
+int array_local_count_handler(hpx_addr_t data) {
   hpx_addr_t global = hpx_addr_add(data,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
   assert(hpx_gas_try_pin(global, (void **)&local));
 
-  *retval = local->local_count;
+  size_t retval = local->local_count;
 
   hpx_gas_unpin(global);
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_local_count_action, array_local_count_handler,
-           HPX_ADDR, HPX_POINTER);
+           HPX_ADDR);
 
 
-int array_total_count_handler(hpx_addr_t data, size_t *retval) {
+int array_total_count_handler(hpx_addr_t data) {
   hpx_addr_t global = hpx_addr_add(data,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
   assert(hpx_gas_try_pin(global, (void **)&local));
 
-  *retval = local->total_count;
+  size_t retval = local->total_count;
 
   hpx_gas_unpin(global);
-  hpx_exit(0, nullptr);
+  hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_total_count_action, array_total_count_handler,
-           HPX_ADDR, HPX_POINTER);
+           HPX_ADDR);
 
 } // namespace dashmm
