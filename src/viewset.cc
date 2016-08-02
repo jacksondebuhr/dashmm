@@ -28,6 +28,7 @@ size_t ViewSet::bytes() const {
   }
 
   retval += 3 * sizeof(int);  // for count and n_digits and role
+  retval += 3 * sizeof(double); // for the center
   retval += views_.size() * sizeof(int);
   retval += views_.size() * sizeof(size_t);
 
@@ -41,6 +42,15 @@ void ViewSet::serialize(WriteBuffer &buffer) {
   e = buffer.write((char *)&role_, sizeof(role_));
   assert(e);
   e = buffer.write(count());
+  assert(e);
+  double oval = center_.x();
+  e = buffer.write(oval);
+  assert(e);
+  oval = center_.y();
+  e = buffer.write(oval);
+  assert(e);
+  oval = center_.z();
+  e = buffer.write(oval);
   assert(e);
 
   // then the view index and size for each
@@ -72,6 +82,17 @@ void ViewSet::interpret(ReadBuffer &buffer) {
   int ct{0};
   e = buffer.read((char *)&ct, sizeof(ct));
   assert(e);
+
+  double ival[3];
+  e = buffer.read(&ival[0]);
+  assert(e);
+  e = buffer.read(&ival[1]);
+  assert(e);
+  e = buffer.read(&ival[2]);
+  assert(e);
+
+  center_ = Point{ival[0], ival[1], ival[2]};
+
 
   for (int i = 0; i < ct; ++i) {
     int idx{};

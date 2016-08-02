@@ -173,7 +173,7 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param scale - scaling factor
   void S_to_M(Point center, Source *sources, size_t n_src, double scale) {
-    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded}};
+    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}}};
     auto multi = local.S_to_M(center, sources, &sources[n_src], scale);
     contribute(std::move(multi));
   }
@@ -196,7 +196,7 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param scale - scaling factor
   void S_to_L(Point center, Source *sources, size_t n_src, double scale) {
-    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded}};
+    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}}};
     auto multi = local.S_to_L(center, sources, &sources[n_src], scale);
     contribute(std::move(multi));
   }
