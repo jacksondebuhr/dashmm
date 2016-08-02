@@ -181,6 +181,8 @@ DO THESE THINGS
 
 THIS BRANCH TODO
 
+TODO: be more clear about when an expansion needs to own data and when not.
+TODO: remove the suggested third constructor; it seems to be confusing
 TODO: clean up code where possible
 TODO: create test case for new ViewSet stuff? Or just do the real thing and
       have done with it.

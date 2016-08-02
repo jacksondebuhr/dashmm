@@ -8,18 +8,21 @@
 #include <functional>
 #include "tree.h"
 
-double corner_x;        /// The corner of the overall domain
-double corner_y;        ///
-double corner_z;        ///
+double corner_x;        /// The corner of the overall domain in x
+double corner_y;        /// -in y
+double corner_z;        /// -in z
 double size;            /// The size of the overall domain
 
 int unif_level;         /// The level of uniform partition
-hpx_addr_t unif_count;
-hpx_addr_t unif_grid;
-hpx_addr_t unif_done;
+hpx_addr_t unif_count;  /// A cyclic array for counting uniform parition
+                        /// occupation
+hpx_addr_t unif_grid;   /// The uniform grid; that is, a cyclic array of
+                        /// MetaData pointing to local arrays of Nodes.
+hpx_addr_t unif_done;   /// A cyclic array for detecting completion of the
+                        /// uniform portion of tree creation
 
-hpx_addr_t sorted_src;
-hpx_addr_t sorted_tar;
+hpx_addr_t sorted_src;  /// Array meta data for the sorted sources
+hpx_addr_t sorted_tar;  /// Array meta data for the sorted targets
 int *distribute;
 
 int threshold;
@@ -258,6 +261,7 @@ HPX_ACTION(HPX_DEFAULT, 0, generate_input_action, generate_input_handler,
 
 
 
+/// Pretty simple really, just gets rid of the sources and targets
 int destroy_input_handler(hpx_addr_t sources, hpx_addr_t targets) {
   int rank = hpx_get_my_rank();
   hpx_addr_t curr_s = hpx_addr_add(sources, sizeof(ArrayMetaData) * rank,
@@ -417,6 +421,7 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
   int dim = pow(2, level), dim3 = pow(8, level);
   threshold = limit;
 
+  // Here we save the addresses of these object at the other ranks.
   if (rank) {
     unif_count = count;
     unif_done = done;
@@ -429,6 +434,14 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
     corner_z = cz;
     size = sz;
   }
+
+  // TODO: currently, this unif_count is an array of such LCOs. Is there
+  // some reason to think that this is better than just a single LCO that
+  // everyone knows the address of? Perhaps there is slightly more asynchrony
+  // with this. But there is more information to send around.
+  //
+  // TODO: Also, there is no need for this to be a user LCO; the built in
+  // reduction LCO would be just fine here.
 
   // Setup unif_count LCO
   hpx_addr_t curr_unif_count = hpx_addr_add(unif_count,
@@ -446,6 +459,9 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
                                &init, sizeof(init));
   hpx_gas_unpin(curr_unif_count);
 
+  // NOTE: Unlike the previous, this one should be on a rank-by-rank basis,
+  // so that future stuff can begin asap.
+
   // Setup unif_done LCO
   hpx_addr_t curr_unif_done = hpx_addr_add(unif_done,
                                            sizeof(hpx_addr_t) * rank,
@@ -456,6 +472,11 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
 
   *gate = hpx_lco_and_new(1);
   hpx_gas_unpin(curr_unif_done);
+
+  // NOTE: The uniform grid means an array of the nodes that give the
+  // uniform partition. Each rank will have the same nodes in the array.
+  // NOTE: Is there a good reason for these to be part of an array in GAS?
+  // Is that important in some way?
 
   // Setup unif_grid
   hpx_addr_t curr_unif_grid = hpx_addr_add(unif_grid,
@@ -474,6 +495,7 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
     for (int iy = 0; iy < dim; ++iy) {
       for (int ix = 0; ix < dim; ++ix) {
         uint64_t mid = morton_key(ix, iy, iz);
+        // TODO: Are these copies needed? Why not just set the index?
         n[mid] = Node{Index{level, ix, iy, iz}};
         n[mid + dim3] = Node{Index{level, ix, iy, iz}};
       }
@@ -1146,8 +1168,9 @@ int finalize_partition_handler(void *unused, size_t size) {
       !hpx_gas_try_pin(done, (void **)&gate) ||
       !hpx_gas_try_pin(grid, (void **)&meta_g) ||
       !hpx_gas_try_pin(sources, (void **)&meta_s) ||
-      !hpx_gas_try_pin(targets, (void **)&meta_t))
+      !hpx_gas_try_pin(targets, (void **)&meta_t)) {
     return HPX_ERROR;
+  }
 
   hpx_lco_delete_sync(*user_lco);
   hpx_lco_delete_sync(*gate);
@@ -1287,7 +1310,8 @@ int main_handler(char scaling, char datatype, char exchange,
                   &sorted_src, &sorted_tar, &unif_level, &threshold,
                   &corner_x, &corner_y, &corner_z, &size);
 
-  // Measure the first bit of the paritioning (Clarify this one I read more)
+  // Measure the partitioning setup. This is all just getting this and that
+  // ready to do. No real work is done in the above.
   hpx_time_t timer_middle = hpx_time_now();
 
   hpx_bcast_rsync(create_dual_tree_action, &sources, &targets, &exchange);
@@ -1301,9 +1325,10 @@ int main_handler(char scaling, char datatype, char exchange,
   double elapsed_second = hpx_time_diff_ms(timer_middle, timer_end) / 1e3;
   std::cout << "Dual tree creation time: " << elapsed_total << "\n";
   std::cout << "  Reduction: " << elapsed_reduction << "\n";
-  std::cout << "  First: " << elapsed_first << "\n";
-  std::cout << "  Second: " << elapsed_second << "\n";
+  std::cout << "  Setup: " << elapsed_first << "\n";
+  std::cout << "  Partition: " << elapsed_second << "\n";
 
+  /// YOU ARE HERE - but you still also have to look at the previous broadcast
   hpx_bcast_rsync(finalize_partition_action, NULL, 0);
 
   // Destroy input data
