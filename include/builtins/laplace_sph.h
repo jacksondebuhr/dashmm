@@ -26,6 +26,8 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <utility>
+#include <initializer_list>
 
 #include "dashmm/index.h"
 #include "builtins/laplace_sph_table.h"
@@ -72,8 +74,16 @@ class LaplaceSPH {
   LaplaceSPH(Point center, int n_digits, ExpansionRole role) {
     LaplaceSPHTableIterator entry = get_or_add_laplace_sph_table(n_digits);
     uLaplaceSPHTable &table = entry->second;
-    int p = table->p();
-    int n_terms = (p + 1) * (p + 2) / 2;
+    int p = table->p(); 
+    int nexp = table->nexp(); 
+    int n_terms = 0; 
+    if (role == kSourcePrimary || role == kTargetPrimary) {
+      n_terms = (p + 1) * (p + 2) / 2; 
+    } else if (role == kSourceIntermediate) {
+      n_terms = 6 * nexp; 
+    } else if (role == kTargetIntermediate) {
+      n_terms = 28 * nexp;
+    }
     bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
     data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -104,6 +114,32 @@ class LaplaceSPH {
       bytes_ = 0;
       data_ = nullptr;
     }
+  }
+
+  LaplaceSPH(Point center, int n_digits, ExpansionRole role, ViewSet &views) {
+    /* TODO
+    LaplaceSPHTableIterator entry = get_or_add_laplace_sph_table(n_digits);
+    uLaplaceSPHTable &table = entry->second;
+    int p = table->p(); 
+    int nexp = table->nexp(); 
+    int n_terms = 0; 
+    if (role == kSourcePrimary || role == kTargetPrimary) {
+      n_terms = (p + 1) * (p + 2) / 2; 
+    } else if (role == kSourceIntermediate) {
+      n_terms = 6 * nexp; 
+    } else if (role == kTargetIntermediate) {
+      n_terms = 28 * nexp;
+    }
+    bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
+    data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
+    assert(valid(ViewSet{}));
+    data_->n_digits = n_digits;
+    data_->center = center;
+    n_digits_ = n_digits;
+    role_ = role;
+    for (int i = 0; i < n_terms; ++i)
+      data_->expansion[i] = 0;
+    */
   }
 
   ~LaplaceSPH() {
@@ -154,6 +190,7 @@ class LaplaceSPH {
   }
 
   size_t view_size(int view) const {
+    // FIXME: the size is wrong
     assert(view == 0);
     uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
     int p = table->p();
@@ -433,8 +470,8 @@ class LaplaceSPH {
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, n_digits_,
-                                        kTargetPrimary}};
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
+          n_digits_, kTargetPrimary}};
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
     int p = table->p();
@@ -643,15 +680,457 @@ class LaplaceSPH {
   }
 
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
-    return std::unique_ptr<expansion_t>{nullptr};
+    expansion_t *retval{new expansion_t{data_->center, n_digits_, 
+          kSourceIntermediate}}; 
+    dcomplex_t *M = &data_->expansion[0]; 
+    dcomplex_t *E = &retval->data_->expansion[0]; 
+
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    int p = table->p(); 
+    int s = table->s(); 
+    int nsh = (p + 1) * (p + 2) / 2; 
+    int nexp = table->nexp(); 
+    const double *weight = table->weight(); 
+    const int *m_ = table->m(); 
+    const int *f_ = table->f(); 
+    const int *smf_ = table->smf(); 
+    const double *d1 = table->dmat_plus(0.0); 
+    const double *d2 = table->dmat_minus(0.0); 
+    const double *lambdaknm = table->lambdaknm(); 
+    const dcomplex_t *ealphaj = table->ealphaj(); 
+
+    // Allocate scratch space to handle x- and y-direction exponential expansions
+    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2]; 
+    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2]; 
+
+    // Addresses of exponential expansions in the positive axis direction
+    dcomplex_t *EP[3] = {E, E + 2 * nexp, E + 4 * nexp}; 
+    // Addresses of exponential expansions in the negative axis direction
+    dcomplex_t *EM[3] = {E + nexp, E + 3 * nexp, E + 5 * nexp}; 
+
+    // Setup y-direction. Rotate the multipole expansion M about z-axis by -pi /
+    // 2, making (x, y, z) frame (-y, x, z). Next, rotate it again about the new
+    // y axis by -pi / 2. The (-y, x, z) in the first rotated frame becomes (z,
+    // x, y) in the final frame. 
+    retval->rotate_sph_z(M, -M_PI / 2, W1); 
+    retval->rotate_sph_y(W1, d2, W2); 
+    
+    // Setup x-direction. Rotate the multipole expansion M about y axis by pi /
+    // 2. This makes (x, y, z) frame into (-z, y, x). 
+    retval->rotate_sph_y(M, d1, W1); 
+
+    // Addresses of the spherical harmonic expansions 
+    const dcomplex_t *SH[3] = {&W1[0], &W2[0], M}; 
+
+    for (int dir = 0; dir <= 2; ++dir) {
+      int offset = 0; 
+      for (int k = 0; k < s ; ++k) {
+        double weight = weight[k] / m_[k]; 
+                
+        // Compute sum_{n = m}^p M_n^m * lambda_k^n / sqrt((n+m)! * (n - m)!)
+        // z1 handles M_n^m where n is even 
+        dcomplex_t *z1 = new dcomplex_t[f_[k] + 1]; 
+        // z2 handles M_n^m where n is odd 
+        dcomplex_t *z2 = new dcomplex_t[f_[k] + 1]; 
+        
+        // Process M_n^0 terms
+        z1[0] = 0; 
+        z2[0] = 0; 
+        for (int n = 0; n <= p; n += 2) 
+          z1[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)]; 
+        for (int n = 1; n <= p; n += 2) 
+          z2[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)]; 
+      
+        // Process M_n^m terms for nonzero m
+        for (int m = 1; m <= f_[k]; m += 2) {
+          z1[m] = 0; 
+          z2[m] = 0; 
+          for (int n = m; n <= p; n += 2) 
+            z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
+          for (int n = m + 1; n <= p_; n += 2) 
+            z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
+        }
+
+        for (int m = 2; m <= f_[k]; m += 2) {
+          z1[m] = 0;
+          z2[m] = 0;
+          for (int n = m; n <= p; n += 2) 
+            z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
+          for (int n = m + 1; n <= p_; n += 2) 
+            z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
+        }
+        
+        // Compute W(k, j) 
+        for (int j = 1; j <= m_[k] / 2; ++j) {
+          dcomplex_t up = z1[0] + z2[0]; // accumulate +dir
+          dcomplex_t dn = z1[0] - z2[0]; // accumulate -dir
+          dcomplex_t power_I {0.0, 1.0}; 
+          for (int m = 1; m <= f_[k]; ++m) {
+            int idx = smf_[k] + (j - 1) * f_[k] + (m - 1); 
+            up += 2 * real(ealphaj[idx]) * (z1[m] + z2[m]) * power_I; 
+            dn += 2 * real(ealphaj[idx]) * (z1[m] - z2[m]) * power_I; 
+            power_I *= dcomplex_t{0.0, 1.0};
+          }
+          EP[dir][offset] = weight * up;
+          EM[dir][offset] = weight * dn;
+          offset++; 
+        }
+        
+        delete [] z1; 
+        delete [] z2; 
+      }
+    }
+
+    delete [] W1; 
+    delete [] W2; 
+
+    return std::unique_ptr<expansion_t>(retval); 
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
-    return std::unique_ptr<expansion_t>{nullptr};
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size, 
+                                      Index t_index) const {
+    // t_index is the index of the parent node on the target side
+
+    // Compute index offsets between the current source node and the 1st child
+    // of the parent node 
+    int dx = s_index.x() - t_index.x() * 2; 
+    int dy = s_index.y() - t_index.y() * 2; 
+    int dz = s_index.z() - t_index.z() * 2; 
+    
+    // Compute center of the parent node 
+    double px = data_->center.x() + (dx + 0.5) * s_size; 
+    double py = data_->center.y() + (dy + 0.5) * s_size; 
+    double pz = data_->center.z() + (dz + 0.5) * s_size; 
+
+    // Exponential expansions on the source side   
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    int nexp = table->nexp(); 
+    const dcomplex_t *S = &data_->expansion[0]; 
+    const dcomplex_t *S_px = S; // +x direction
+    const dcomplex_t *S_mx = S + nexp; // -x direction
+    const dcomplex_t *S_py = S + nexp * 2; // +y direction
+    const dcomplex_t *S_my = S + nexp * 3; // -y direction
+    const dcomplex_t *S_pz = S + nexp * 4; // +z direction
+    const dcomplex_t *S_mz = S + nexp * 5; // -z direction
+
+    ViewSet views{n_digits_, kTargetIntermediate}; 
+
+    // Each S is at most going to contribute 3 views to the exponential
+    // expansions on the target side. 
+    dcomplex_t *work = new dcomplex_t[nexp * 3](); 
+    dcomplex_t *T1 = work; 
+    dcomplex_t *T2 = work + nexp; 
+    dcomplex_t *T3 = work + nexp * 2; 
+
+    // Produce views needed on the target side 
+    if (dz == 3) {
+      this->e2e(T1, {std::make_pair(S_mz, Index{dx, dy, 0})}); 
+      views.add_view(uall, nexp, T1); 
+    } else if (dz == -2) {
+      this->e2e(T1, {std::make_pair(S_pz, Index{-dx, -dy, 0})}); 
+      views.add_view(dall, nexp, T1); 
+    } else if (dy == 3) {
+      this->e2e(T1, {std::make_pair(S_my, Index{dz, dx, 0})}); 
+      views.add_view(nall, nexp, T1);
+    } else if (dy == -2) {
+      this->e2e(T1, {std::make_pair(S_py, Index{-dz, -dx, 0})}); 
+      views.add_view(sall, nexp, T1); 
+    } else if (dx == 3) {
+      this->e2e(T1, {std::make_pair(S_mx, Index{-dz, dy, 0})}); 
+      views.add_view(eall, nexp, T1); 
+    } else if (dx == -2) {
+      this->e2e(T1, {std::make_pair(S_px, Index{dz, -dy, 0})}); 
+      views.add_view(wall, nexp, T1); 
+    } else {
+      if (dz == 2) {
+        this->e2e(T1, {std::make_pair(S_mz, Index{dx, dy, 0})});
+        views.add_view(u1234, nexp, T1); 
+
+        if (dy == -1) {
+          this->e2e(T2, {std::make_pair(S_py, Index{-dz, -dx, 0})}); 
+          views.add_view(s78, nexp, T2); 
+        
+          if (dx == -1) {
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})}); 
+            views.add_view(w6, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})}); 
+            views.add_view(e5, nexp, T3); 
+          }
+        } else if (dy == 2) {
+          this->e2e(T2, {std::make_pair(S_my, Index{dz, dx, 0})});
+          views.add_view(n56, nexp, T2); 
+        
+          if (dx == -1) {
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w8, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e7, nexp, T3); 
+          } 
+        } else {
+          if (dx == -1) {            
+            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w68, nexp, T2); 
+          } else if (dx == 2) {
+            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e57, nexp, T2); 
+          }
+        }
+      } else if (dz == -1) {
+        this->e2e(T1, {std::make_pair(S_pz, Index{-dx, -dy, 0})});
+        views.add_view(d5678, nexp, T1);
+
+        if (dy == -1) {
+          this->e2e(T2, {std::make_pair(S_py, Index{-dz, -dx, 0})});
+          views.add_view(s34, nexp, T2); 
+
+          if (dx == -1) {
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w2, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e1, nexp, T3); 
+          } 
+        } else if (dy == 2) {
+          this->e2e(T2, {std::make_pair(S_my, Index{dz, dx, 0})});
+          views.add_view(n12, nexp, T2); 
+
+          if (dx == -1) {
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w4, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e3, nexp, T3); 
+          } 
+        } else {
+          if (dx == -1) {
+            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w24, nexp, T2); 
+          } else if (dx == 2) {
+            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e13, nexp, T2); 
+          }
+        }
+      } else { 
+        if (dy == -1) {
+          this->e2e(T1, {std::make_pair(S_py, Index{-dz, -dx, 0})});
+          views.add_view(s3478, nexp, T1); 
+
+          if (dx == -1) {
+            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w2, nexp, T2); 
+            views.add_view(w6, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e1, nexp, T2); 
+            views.add_view(e5, nexp, T3); 
+          } 
+        } else if (dy == 2) {
+          this->e2e(T1, {std::make_pair(S_my, Index{dz, dx, 0})});
+          views.add_view(n1256, nexp, T1); 
+
+          if (dx == -1) {
+            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w4, nexp, T2); 
+            views.add_view(w8, nexp, T3); 
+          } else if (dx == 2) {
+            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e3, nexp, T2); 
+            views.add_view(e7, nexp, T3); 
+          }
+        } else { 
+          if (dx == -1) {
+            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
+            views.add_view(w2468, nexp, T2); 
+          } else if (dx == 2) {
+            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
+            views.add_view(e1357, nexp, T2); 
+          }
+        }
+      }
+    }
+  
+    expansion_t *retval{new expansion_t{Point{px, py, pz}, 
+          n_digits_, kTargetIntermediate, views}}; 
+
+    
+      
+    return std::unique_ptr<expansion_t>{retval}; 
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
-    return std::unique_ptr<expansion_t>{nullptr};
+  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+    // t_index and t_size is the index and size of the child 
+    // Compute child's center    
+    double h = t_size / 2; 
+    double cx = data_->center.x() + (t_index.x() % 2 == 0 ? -h : h); 
+    double cy = data_->center.y() + (t_index.y() % 2 == 0 ? -h : h); 
+    double cz = data_->center.z() + (t_index.z() % 2 == 0 ? -h : h); 
+    int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) + 
+      (t_index.x() % 2); 
+
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
+          n_digits_, kTargetPrimary}}; 
+    
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int nexp = table->nexp(); 
+
+    dcomplex_t *E = &data_->expansion[0]; 
+    dcomplex_t *L = &retval->data_->expansion[0]; 
+    dcomplex_t *S = new dcomplex[nexp * 6](); 
+    dcomplex_t *S_mz = S; 
+    dcomplex_t *S_pz = S + nexp; 
+    dcomplex_t *S_my = S + 2 * nexp; 
+    dcomplex_t *S_py = S + 3 * nexp; 
+    dcomplex_t *S_mx = S + 4 * nexp; 
+    dcomplex_t *S_px = S + 5 * nexp; 
+
+    int to_child = (t_index.x() % 2) + 2 * (t_index.y() % 2) + 
+      4 * (t_index.z() % 2); 
+
+    switch (to_child) {
+    case 0: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, 0, 3}), 
+            std::make_pair(&M[u1234 * nexp], Index{0, 0, 2})});
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 0, 2})});
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, 0, 3}),
+            std::make_pair(&M[n1256 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[n12 * nexp], Index{0, 0, 2})});
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 0, 2})});
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, 0, 3}), 
+            std::make_pair(&M[e1357 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[e13 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[e1 * nexp], Index{0, 0, 2})});
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 0, 2})});
+      break; 
+    case 1: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, 0, 3}), 
+            std::make_pair(&M[u1234 * nexp], Index{-1, 0, 2})}); 
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 0, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, -1, 3}), 
+            std::make_pair(&M[n1256 * nexp], Index{0, -1, 2}), 
+            std::make_pair(&M[n12 * nexp], Index{0, -1, 2})}); 
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 1, 2})});
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, 0, 2})});
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 0, 3}), 
+            std::make_pair(&M[w2468 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[w24 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[w2 * nexp], Index{0, 0, 2})});
+      break;
+    case 2: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, -1, 3}), 
+            std::make_pair(&M[u1234 * nexp], Index{0, -1, 2})});
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 1, 2})});
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, 0, 2})});
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 0, 3}), 
+            std::make_pair(&M[s3478 * nexp], Index{0, 0, 2}), 
+            std::make_pair(&M[s34 * nexp], Index{0, 0, 2})}); 
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, -1, 3}), 
+            std::make_pair(&M[e1357 * nexp], Index{0, -1, 2}), 
+            std::make_pair(&M[e13 * nexp], Index{0, -1, 2}), 
+            std::make_pair(&M[e3 * nexp], Index{0, -1, 2})}); 
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 1, 2})}); 
+      break; 
+    case 3: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, -1, 3}), 
+            std::make_pair(&M[u1234 * nexp], Index{-1, -1, 2})});
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 1, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, -1, 2})}); 
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 1, 3}), 
+            std::make_pair(&M[s3478 * nexp], Index{0, 1, 2}), 
+            std::make_pair(&M[s34 * nexp], Index{0, 1, 2})}); 
+
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, -1, 2})}); 
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 1, 3}), 
+            std::make_pair(&M[w2468 * nexp], Index{0, 1, 2}), 
+            std::make_pair(&M[w24 * nexp], Index{0, 1, 2}), 
+            std::make_pair(&M[w4 * nexp], Index{0, 1, 2})}); 
+      break; 
+    case 4: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, 0, 2})}); 
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 0, 3}), 
+            std::make_pair(&M[d5678 * nexp], Index{0, 0, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, 0, 3}), 
+            std::make_pair(&M[n1256 * nexp], Index{-1, 0, 2}), 
+            std::make_pair(&M[n56 * nexp], Index{-1, 0, 2})}); 
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 0, 2})}); 
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, 0, 3}), 
+            std::make_pair(&M[e1357 * nexp], Index{1, 0, 2}), 
+            std::make_pair(&M[e57 * nexp], Index{1, 0, 2}), 
+            std::make_pair(&M[e5 * nexp], Index{1, 0, 2})}); 
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 0, 2})}); 
+      break; 
+    case 5: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, 0, 2})}); 
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 0, 3}), 
+            std::make_pair(&M[d5678 * nexp], Index{1, 0, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, -1, 3}), 
+            std::make_pair(&M[n1256 * nexp], Index{-1, -1, 2}), 
+            std::make_pair(&M[n56 * nexp], Index{-1, -1, 2})}); 
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 1, 2})}); 
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, 0, 2})});  
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 0, 3}), 
+            std::make_pair(&M[w2468 * nexp], Index{-1, 0, 2}), 
+            std::make_pair(&M[w68 * nexp], Index{-1, 0, 2}), 
+            std::make_pair(&M[w6 * nexp], Index{-1, 0, 2})}); 
+      break;
+    case 6: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, -1, 2})});
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 1, 3}), 
+            std::make_pair(&M[d5678 * nexp], Index{0, 1, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, 0, 2})});  
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 0, 3}), 
+            std::make_pair(&M[s3478 * nexp], Index{1, 0, 2}), 
+            std::make_pair(&M[s78 * nexp], Index{1, 0, 2})}); 
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, -1, 3}), 
+            std::make_pair(&M[e1357 * nexp], Index{1, -1, 2}), 
+            std::make_pair(&M[e57 * nexp], Index{1, -1, 2}), 
+            std::make_pair(&M[e7 * nexp], Index{1, -1, 2})}); 
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 1, 2})}); 
+      break; 
+    case 7: 
+      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, -1, 2})}); 
+      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 1, 3}), 
+            std::make_pair(&M[d5678 * nexp], Index{1, 1, 2})}); 
+      
+      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, -1, 2})});  
+      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 1, 3}), 
+            std::make_pair(&M[s3478 * nexp], Index{1, 1, 2}), 
+            std::make_pair(&M[s78 * nexp], Index{1, 1, 2})}); 
+      
+      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, -1, 2})}); 
+      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 1, 3}), 
+            std::make_pair(&M[w2468 * nexp], Index{-1, 1, 2}), 
+            std::make_pair(&M[w68 * nexp], Index{-1, 1, 2}), 
+            std::make_pair(&M[w8 * nexp], Index{-1, 1, 2})}); 
+      break;
+    }
+
+    this->e2l(S_mz, 'z', false, L); 
+    this->e2l(S_pz, 'z', true, L); 
+    this->e2l(S_my, 'y', false, L); 
+    this->e2l(S_py, 'y', true, L); 
+    this->e2l(S_mx, 'x', false, L); 
+    this->e2l(S_px, 'x', true, L); 
+
+    return std::unique_ptr<expansion_t>(retval); 
   }
 
   void add_expansion(const expansion_t *temp1) {
@@ -754,6 +1233,144 @@ class LaplaceSPH {
         offset++;
       }
     }
+  }
+
+  void e2e(dcomplex_t *M, std::initializer_list<e2e_t> inputs) {  
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    const dcomplex_t *xs = table->xs(); 
+    const dcomplex_t *ys = table->ys(); 
+    const double *zs = table->zs(); 
+    int s = table->s(); 
+    const int *m = table->m(); 
+    const int *sm = table->sm(); 
+
+    for (auto it = inputs.begin(); it != inputs.end(); ++it) {
+      const dcomplex_t *W = std::get<0>(*it); 
+      Index I = std::get<1>(*it); 
+      
+      int offset = 0; 
+      for (int k = 0; k < s; ++k) {
+      // Shifting factor in z direction
+        double factor_z = zs[4 * k + I.z()]; 
+        for (int j = 0; j < m[k] / 2; ++j) {
+          int sidx = (sm[j] + j) * 7 + 3; 
+          // Shifting factor in x direction
+          dcomplex_t factor_x = xs[sidx + I.x()]; 
+          // Shifting factor in y direction
+          dcomplex_t factor_y = ys[sidx + I.y()]; 
+          M[offset] += W[offset] * factor_z * factor_y * factor_x; 
+          offset++; 
+        }
+      }
+    }
+  }
+
+  void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) {
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    const double *sqf = table->sqf(); 
+    const dcomplex_t *ealphaj = table->ealphaj(); 
+    const int *m_ = table->m(); 
+    const int *sm_ = table->sm(); 
+    const int *f_ = table->f(); 
+    const int *smf_ = table->smf(); 
+    int p = table->p(); 
+    int s = table->s(); 
+
+    dcomplex_t *contrib = nullptr; 
+    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2]; 
+    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
+
+    for (int k = 0; k < s; ++k) {
+      int Mk2 = m_[k] / 2; 
+
+      // Compute sum_{j = 1}^{M(k)} W(k, j) exp(-i * m * alpha_j) 
+      dcomplex_t *z = new dcomplex_t[f_[k] + 1]; 
+
+      // m = 0 
+      z[0] = 0.0; 
+      for (int j = 1; j <= Mk2; ++j) {
+        int idx = sm_[k] + j - 1; 
+        z[0] += (E[idx] + conj(E[idx]));
+      }
+
+      // m = 1, ..., F(k), where m is odd 
+      for (int m = 1; m <= f_[k]; m += 2) {
+        z[m] = 0.0; 
+        for (int j = 1; j <= Mk2; ++j) {
+          int idx1 = sm_[k] + j - 1; 
+          int idx2 = smf_[k] + (j - 1) * f_[k] + m - 1; 
+          z[m] += (E[idx1] - conj(E[idx1])) * conj(ealphaj[idx2]);          
+        }
+      }
+        
+      // m = 2, ..., F(k), where m is even 
+      for (int m = 2; m <= f_[k]; m += 2) {
+        z[m] = 0.0; 
+        for (int j = 1; j <= Mk2; ++j) {
+          int idx1 = sm_[k] + j - 1; 
+          int idx2 = smf_[k] + (j - 1) * f_[k] + m - 1; 
+          z[m] += (E[idx1] + conj(E[idx1])) * conj(ealphaj[idx2]);
+        }
+      }
+
+      // Compute lambda_k's contribution 
+      double power_lambdak = 1.0; // (-lambda_k)^n 
+      for (int n = 0; n <= p; ++n) {
+        int mmax = fmin(n, f_[k]); 
+        for (int m = 0; m <= mmax; ++m) 
+          W1[midx(n, m)] += power_lambdak * z[m]; 
+        power_lambdak *= -lambda_[k];
+      }
+      delete [] z; 
+    }
+
+    if (!sgn) {
+      // If the exponential expansion is not along the positive direction of the
+      // axis with respect to the source, flip the sign of the converted L_n^m
+      // terms where n is odd. 
+      int offset = 1; // address of L_1^0 
+      for (int n = 1; n <= p; n += 2) {
+        for (int m = 0; m <= n; ++m) {
+          W1[offset++] *= -1; 
+        }
+        offset += (n + 2); // skip the storage for the even value of n 
+      }
+    }
+
+    // Scale the local expansion by i^m / sqrt((n - m)!(n + m)!)
+    int offset = 0; 
+    for (int n = 0; n <= p; ++n) {
+      dcomplex_t power_I{1.0, 0.0}; 
+      for (int m = 0; m <= n; ++m) {
+        W1[offset++] *= power_I / sqf[n - m] / sqf[n + m]; 
+        power_I *= dcomplex_t{0.0, 1.0}; 
+      }
+    }
+
+    if (dir == 'z') {
+      contrib = W1; 
+    } else if (dir == 'y') {
+      const double *d = table->dmat_plus(0.0); 
+      this->rotate_sph_y(W1, d, W2); 
+      this->rotate_sph_z(W2, M_PI / 2, W1); 
+      contrib = W1; 
+    } else if (dir == 'x') {
+      const double *d = table->dmat_minus(0.0); 
+      this->rotate_sph_y(W1, d, W2); 
+      contrib = W2; 
+    }
+
+    // Merge converted local expansion with the stored one
+    offset = 0; 
+    for (int n = 0; n <= p; ++n) {
+      for (int m = 0; m <= n; ++m) {
+        L[offset] += contrib[offset]; 
+        offset++;
+      }
+    }
+    
+    delete [] W1; 
+    delete [] W2; 
   }
 };
 
