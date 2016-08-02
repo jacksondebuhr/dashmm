@@ -45,14 +45,15 @@ struct View {
 class ViewSet {
  public:
   /// Create an empty ViewSet
-  ViewSet() : views_{}, n_digits_{-1}, role_{kNoRoleNeeded} { }
+  ViewSet()
+    : views_{}, n_digits_{-1}, role_{kNoRoleNeeded}, center_{0.0, 0.0, 0.0} { }
 
   /// Create an empty ViewSet, while setting some vitals
   ///
   /// \param ndig - the number of digits in the represented views
   /// \param role - the role of the represented views
-  ViewSet(int ndig, ExpansionRole role)
-      : views_{}, n_digits_{ndig}, role_{role} { }
+  ViewSet(int ndig, ExpansionRole role, const Point &center)
+      : views_{}, n_digits_{ndig}, role_{role}, center_{center} { }
 
   /// Clear the ViewSet, including the n_digits and role.
   void clear();
@@ -88,6 +89,9 @@ class ViewSet {
   /// Set the role of the view set
   void set_role(ExpansionRole role) {role_ = role;}
 
+  /// Set the center of the view set
+  void set_center(const Point &center) {center_ = center;}
+
   /// Get the index of a given view
   int view_index(int view) const {return views_[view].index;}
 
@@ -102,6 +106,9 @@ class ViewSet {
 
   /// Get the role for the ViewSet
   ExpansionRole role() const {return role_;}
+
+  /// Get the center for the ViewSet
+  Point center() const {return center_;}
 
   /// Get the number of views in this ViewSet
   int count() const {return views_.size();}
@@ -131,6 +138,7 @@ class ViewSet {
   std::vector<View> views_;
   int n_digits_;
   ExpansionRole role_;
+  Point center_;
 };
 
 
