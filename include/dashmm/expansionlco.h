@@ -558,7 +558,7 @@ class ExpansionLCO {
                           n_digits);
           break;
         case Operation::ItoL:
-          i_to_l_out_edge(views, out_edges[i].target, out_edges[i].tidx,
+          i_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
                           n_digits);
           break;
         default:
@@ -655,13 +655,13 @@ class ExpansionLCO {
     lco.contribute(std::move(translated));
   }
 
-  static void i_to_l_out_edge(const ViewSet &views, hpx_addr_t target,
-                              Index tidx, int n_digits) {
+  static void i_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx, int n_digits) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double t_size = geo->size_from_level(tidx.level());
 
     expansion_t lexp{views};
-    auto translated = lexp.I_to_L(tidx);
+    auto translated = lexp.I_to_L(tidx, t_size);
     lexp.release();
 
     expansionlco_t lco{target, n_digits};

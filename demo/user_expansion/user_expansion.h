@@ -295,12 +295,13 @@ class User {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index,
+  std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index, double s_size,
                                       dashmm::Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index,
+                                      double t_size) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
