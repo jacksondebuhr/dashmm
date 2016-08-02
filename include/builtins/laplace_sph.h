@@ -38,15 +38,6 @@
 
 namespace dashmm {
 
-
-struct LaplaceSPHData {
-  int reserved;
-  int n_digits;
-  Point center;
-  dcomplex_t expansion[];
-};
-
-
 /// Laplace kernel Spherical Harmonic expansion
 ///
 /// This expansion is of the Laplace Kernel about the center of the node
@@ -71,99 +62,72 @@ class LaplaceSPH {
   using target_t = Target;
   using expansion_t = LaplaceSPH<Source, Target>;
 
-  LaplaceSPH(Point center, int n_digits, ExpansionRole role) {
+  LaplaceSPH(Point center, int n_digits, ExpansionRole role) 
+    : views_{ViewSet{n_digits, role, center}} 
+  {
     LaplaceSPHTableIterator entry = get_or_add_laplace_sph_table(n_digits);
     uLaplaceSPHTable &table = entry->second;
+
+    // View size for each spherical harmonic expansion
     int p = table->p(); 
+    int nsh = (p + 1) * (p + 2) / 2; 
+    
+    // View size for each exponential expansion 
     int nexp = table->nexp(); 
-    int n_terms = 0; 
+
     if (role == kSourcePrimary || role == kTargetPrimary) {
-      n_terms = (p + 1) * (p + 2) / 2; 
+      size_t bytes = sizeof(dcomplex_t) * nsh; 
+      char *data = new char[bytes](); 
+      views_.add_view(0, bytes, data); 
     } else if (role == kSourceIntermediate) {
-      n_terms = 6 * nexp; 
+      size_t bytes = sizeof(dcomplex_t) * nexp; 
+      char *data = new char[bytes * 6](); 
+      for (int i = 0; i < 6; ++i) 
+        views_.add_view(i, bytes, data + bytes * i); 
     } else if (role == kTargetIntermediate) {
-      n_terms = 28 * nexp;
-    }
-    bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
-    data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
-    assert(valid(ViewSet{}));
-    data_->n_digits = n_digits;
-    data_->center = center;
-    n_digits_ = n_digits;
-    role_ = role;
-    for (int i = 0; i < n_terms; ++i)
-      data_->expansion[i] = 0;
-  }
-
-  LaplaceSPH(const ViewSet &views) {
-    assert(views.count() < 2);
-    n_digits_ = views.n_digits();
-    role_ = views.role();
-
-    // TODO: this is inelegant. But this is to test something quickly
-    if (n_digits_ != -1) {
-      get_or_add_laplace_sph_table(n_digits_);
-    }
-
-    if (views.count()) {
-      data_ = reinterpret_cast<LaplaceSPHData *>(views.view_data(0));
-      bytes_ = views.view_bytes(0);
-      if (data_)
-        data_->n_digits = n_digits_;
-    } else {
-      bytes_ = 0;
-      data_ = nullptr;
+      size_t bytes = sizeof(dcomplex_t) * nexp; 
+      char *data = new char[bytes * 28](); 
+      for (int i = 0; i < 28; ++i) 
+        views_.add_view(i, bytes, data + bytes * i);
     }
   }
 
-  LaplaceSPH(Point center, int n_digits, ExpansionRole role, ViewSet &views) {
-    /* TODO
-    LaplaceSPHTableIterator entry = get_or_add_laplace_sph_table(n_digits);
-    uLaplaceSPHTable &table = entry->second;
-    int p = table->p(); 
-    int nexp = table->nexp(); 
-    int n_terms = 0; 
-    if (role == kSourcePrimary || role == kTargetPrimary) {
-      n_terms = (p + 1) * (p + 2) / 2; 
-    } else if (role == kSourceIntermediate) {
-      n_terms = 6 * nexp; 
-    } else if (role == kTargetIntermediate) {
-      n_terms = 28 * nexp;
+  LaplaceSPH(const ViewSet &views) : views_{views} {
+    int n_digits = views.n_digits(); 
+    if (n_digits != -1) {
+      get_or_add_laplace_sph_table(n_digits); 
     }
-    bytes_ = sizeof(LaplaceSPHData) + sizeof(dcomplex_t) * n_terms;
-    data_ = reinterpret_cast<LaplaceSPHData *>(new char [bytes_]);
-    assert(valid(ViewSet{}));
-    data_->n_digits = n_digits;
-    data_->center = center;
-    n_digits_ = n_digits;
-    role_ = role;
-    for (int i = 0; i < n_terms; ++i)
-      data_->expansion[i] = 0;
-    */
   }
 
   ~LaplaceSPH() {
-    if (valid(ViewSet{})) {
-      delete [] data_;
-      data_ = nullptr;
+    if (!views_.empty()) {
+      for (auto it = views_.begin(); it != views_.end(); ++it) {
+        delete [] (*it).data;
+      }
     }
   }
 
-  void release() {
-    data_ = nullptr;
-  }
+  void release() {views_.clear();}
 
   bool valid(const ViewSet &view) const {
-    assert(view.count() < 2);
-    return data_ != nullptr;
+    // \p view is assumed to be a subset of \p views_ (no range checking
+    // performed). The function returns true if and only if each entry in the
+    // required subset is associated with some data. 
+    bool is_valid = true; 
+    for (auto it = view.begin(); it != view.end(); ++it) {
+      int idx = (*it).index; 
+      if (views_.view_data(idx) == nullptr) {
+        is_valid = false; 
+        break;
+      }
+    }
+    return is_valid; 
   }
 
-  int view_count() const {
-    if (data_) return 1;
-    return 0;
-  }
+  int view_count() const { return views_.count(); }
 
   void get_views(ViewSet &view) const {
+    // FIXME
     assert(view.count() < 2);
     if (view.count() > 0) {
       view.set_bytes(0, bytes_);
@@ -174,39 +138,34 @@ class LaplaceSPH {
   }
 
   ViewSet get_all_views() const {
+    // FIXME
     ViewSet retval{};
     retval.add_view(0);
     get_views(retval);
     return retval;
   }
 
-  int accuracy() const {return n_digits_;}
+  int accuracy() const {return views_.n_digits();}
 
-  ExpansionRole role() const {return role_;}
+  ExpansionRole role() const {return views_.role();}
 
-  Point center() const {
-    assert(valid(ViewSet{}));
-    return data_->center;
-  }
+  Point center() const {return views_.center();}
 
   size_t view_size(int view) const {
-    // FIXME: the size is wrong
-    assert(view == 0);
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(data_->n_digits);
-    int p = table->p();
-    return (p + 1) * (p + 2) / 2;
+    return views_.view_bytes(view) / sizeof(dcomplex_t);
   }
 
   dcomplex_t view_term(int view, size_t i) const {
-    assert(view == 0);
-    return data_->expansion[i];
+    dcomplex_t *data = reinterpret_cast<dcomplex_t *>(views_.view_data(view));
+    return data[i]; 
   }
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last, double scale) const {
-    expansion_t *retval{new expansion_t{center, n_digits_, kSourcePrimary}};
-    dcomplex_t *expansion = &retval->data_->expansion[0];
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    expansion_t *retval{new expansion_t{center, n_digits, kSourcePrimary}};
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqf = table->sqf();
 
@@ -243,9 +202,8 @@ class LaplaceSPH {
       legendre_Plm(p, ctheta, legendre);
       for (int m = 0; m <= p; ++m) {
         for (int n = m; n <= p; ++n) {
-          expansion[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-                                   legendre[midx(n, m)] *
-                                   sqf[n - m] / sqf[n + m];
+          M[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
+            legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
         }
       }
     }
@@ -259,9 +217,10 @@ class LaplaceSPH {
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last, double scale) const {
-    expansion_t *retval{new expansion_t{center, n_digits_, kTargetPrimary}};
-    dcomplex_t *expansion = &retval->data_->expansion[0];
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    expansion_t *retval{new expansion_t{center, n_digits, kTargetPrimary}};
+    dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqf = table->sqf();
 
@@ -299,9 +258,8 @@ class LaplaceSPH {
       legendre_Plm(p, ctheta, legendre);
       for (int m = 0; m <= p; ++m) {
         for (int n = m; n <= p; ++n) {
-          expansion[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-                                   legendre[midx(n, m)] *
-                                   sqf[n - m] / sqf[n + m];
+          L[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
+            legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
         }
       }
     }
@@ -318,14 +276,16 @@ class LaplaceSPH {
     // The function is called on th expansion of the child box and
     // s_size is the child box's size.
     double h = s_size / 2;
-    double px = data_->center.x() + (from_child % 2 == 0 ? h : -h);
-    double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
-    double pz = data_->center.z() + (from_child < 4 ? h : -h);
+    Point center = views_.center(); 
+    double px = center.x() + (from_child % 2 == 0 ? h : -h);
+    double py = center.y() + (from_child % 4 <= 1 ? h : -h);
+    double pz = center.z() + (from_child < 4 ? h : -h);
 
-    expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits_,
+    int n_digits = views_.n_digits(); 
+    expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits,
                                         kSourcePrimary}};
 
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqbinom = table->sqbinom();
 
@@ -347,7 +307,8 @@ class LaplaceSPH {
       powers_rho[i] = powers_rho[i - 1] * rho;
     }
 
-    dcomplex_t *W1 = &retval->data_->expansion[0];
+    dcomplex_t *W1 = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
 
     // Table of rotation angle about the z-axis, as an integer multiple of pi/4
@@ -356,7 +317,7 @@ class LaplaceSPH {
     double alpha = tab_alpha[from_child] * M_PI_4;
 
     // Rotate the multipole expansion of the child box about z-axis
-    dcomplex_t *M = &data_->expansion[0];
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     retval->rotate_sph_z(M, alpha, W1);
 
     // Rotate the previous result further about the y-axis
@@ -406,11 +367,11 @@ class LaplaceSPH {
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
 
-    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits_,
+    int n_digits = views_.n_digits(); 
+    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits,
                                         kTargetPrimary}};
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
-
 
     // Shifting distance
     double rho = sqrt(t2s_x * t2s_x + t2s_y * t2s_y + t2s_z * t2s_z);
@@ -426,14 +387,15 @@ class LaplaceSPH {
     double scale = 1.0 / s_size;
 
     // Temporary space to hold rotated spherical harmonic
-    dcomplex_t *W1 = &retval->data_->expansion[0];
+    dcomplex_t *W1 = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
 
     // Compute the projection of t2s on the x-y plane
     const double proj = sqrt(t2s_x * t2s_x + t2s_y * t2s_y);
 
     // Handle of the multipole expansion
-    dcomplex_t *M = &data_->expansion[0];
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     if (proj < 1e-14) {
       if (t2s_z > 0) {
@@ -465,15 +427,17 @@ class LaplaceSPH {
 
   std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
     // The function is called on the parent box and t_size is its child size
+    Point center = views_.center(); 
     double h = t_size / 2;
-    double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = data_->center.z() + (to_child < 4 ? -h : h);
+    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
+    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
+    double cz = center.z() + (to_child < 4 ? -h : h);
 
+    int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
-          n_digits_, kTargetPrimary}};
+          n_digits, kTargetPrimary}};
 
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqbinom = table->sqbinom();
 
@@ -494,8 +458,9 @@ class LaplaceSPH {
     for (int i = 1; i <= p; ++i) {
       powers_rho[i] = powers_rho[i - 1] * rho;
     }
-
-    dcomplex_t *W1 = &retval->data_->expansion[0];
+    
+    dcomplex_t *W1 = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
 
     // Table of rotation angle about the z-axis as an integer multiple of pi / 4
@@ -504,7 +469,7 @@ class LaplaceSPH {
     double alpha = tab_alpha[to_child] * M_PI_4;
 
     // Rotate the local expansion of the parent box about z-axis
-    dcomplex_t *L = &data_->expansion[0];
+    dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
     retval->rotate_sph_z(L, alpha, W1);
 
     // Rotate the previous result further about the y-axis
@@ -547,7 +512,8 @@ class LaplaceSPH {
   }
 
   void M_to_T(Target *first, Target *last, double scale) const {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqf = table->sqf();
 
@@ -555,7 +521,7 @@ class LaplaceSPH {
     double *powers_r = new double[p + 1];
     dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
     powers_ephi[0] = dcomplex_t{1.0, 0.0};
-    dcomplex_t *M = &data_->expansion[0];
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, data_->center);
@@ -606,7 +572,8 @@ class LaplaceSPH {
   }
 
   void L_to_T(Target *first, Target *last, double scale) const {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqf = table->sqf();
 
@@ -616,7 +583,7 @@ class LaplaceSPH {
     powers_r[0] = 1.0;
     powers_ephi[0] = dcomplex_t{1.0, 0.0};
 
-    dcomplex_t *L = &data_->expansion[0];
+    dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, data_->center);
@@ -679,13 +646,15 @@ class LaplaceSPH {
     }
   }
 
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
-    expansion_t *retval{new expansion_t{data_->center, n_digits_, 
-          kSourceIntermediate}}; 
-    dcomplex_t *M = &data_->expansion[0]; 
-    dcomplex_t *E = &retval->data_->expansion[0]; 
+  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {   
+    int n_digits = views_.n_digits(); 
+    expansion_t *retval{new expansion_t{views_.center(), 
+          n_digits, kSourceIntermediate}}; 
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
+    dcomplex_t *E = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
 
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     int p = table->p(); 
     int s = table->s(); 
     int nsh = (p + 1) * (p + 2) / 2; 
@@ -798,14 +767,17 @@ class LaplaceSPH {
     int dz = s_index.z() - t_index.z() * 2; 
     
     // Compute center of the parent node 
-    double px = data_->center.x() + (dx + 0.5) * s_size; 
-    double py = data_->center.y() + (dy + 0.5) * s_size; 
-    double pz = data_->center.z() + (dz + 0.5) * s_size; 
+    Point center = views_.center(); 
+    double px = center.x() + (dx + 0.5) * s_size; 
+    double py = center.y() + (dy + 0.5) * s_size; 
+    double pz = center.z() + (dz + 0.5) * s_size; 
 
     // Exponential expansions on the source side   
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     int nexp = table->nexp(); 
-    const dcomplex_t *S = &data_->expansion[0]; 
+    const dcomplex_t *S = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
     const dcomplex_t *S_px = S; // +x direction
     const dcomplex_t *S_mx = S + nexp; // -x direction
     const dcomplex_t *S_py = S + nexp * 2; // +y direction
@@ -813,7 +785,7 @@ class LaplaceSPH {
     const dcomplex_t *S_pz = S + nexp * 4; // +z direction
     const dcomplex_t *S_mz = S + nexp * 5; // -z direction
 
-    ViewSet views{n_digits_, kTargetIntermediate}; 
+    ViewSet views{n_digits, kTargetIntermediate, Point{px, py, pz}}; 
 
     // Each S is at most going to contribute 3 views to the exponential
     // expansions on the target side. 
@@ -955,32 +927,31 @@ class LaplaceSPH {
       }
     }
   
-    expansion_t *retval{new expansion_t{Point{px, py, pz}, 
-          n_digits_, kTargetIntermediate, views}}; 
-
-    
-      
-    return std::unique_ptr<expansion_t>{retval}; 
+    expansion_t retval{views};       
+    return std::unique_ptr<expansion_t>{&retval}; 
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
     // t_index and t_size is the index and size of the child 
     // Compute child's center    
-    double h = t_size / 2; 
-    double cx = data_->center.x() + (t_index.x() % 2 == 0 ? -h : h); 
-    double cy = data_->center.y() + (t_index.y() % 2 == 0 ? -h : h); 
-    double cz = data_->center.z() + (t_index.z() % 2 == 0 ? -h : h); 
+    double h = t_size / 2;
+    Point center = views_.center(); 
+    double cx = center.x() + (t_index.x() % 2 == 0 ? -h : h); 
+    double cy = center.y() + (t_index.y() % 2 == 0 ? -h : h); 
+    double cz = center.z() + (t_index.z() % 2 == 0 ? -h : h); 
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) + 
       (t_index.x() % 2); 
 
+    int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
           n_digits_, kTargetPrimary}}; 
     
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int nexp = table->nexp(); 
 
-    dcomplex_t *E = &data_->expansion[0]; 
-    dcomplex_t *L = &retval->data_->expansion[0]; 
+    dcomplex_t *E = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
+    dcomplex_t *L = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
     dcomplex_t *S = new dcomplex[nexp * 6](); 
     dcomplex_t *S_mz = S; 
     dcomplex_t *S_pz = S + nexp; 
@@ -1134,19 +1105,27 @@ class LaplaceSPH {
   }
 
   void add_expansion(const expansion_t *temp1) {
-    dcomplex_t *expansion = &data_->expansion[0];
-    for (size_t i = 0; i < temp1->view_size(0); ++i)
-      expansion[i] += temp1->view_term(0, i);
+    // This operation assumes that the views included in \p temp1 is a subset of
+    // \p views_. No range checking performed. 
+    int count = temp1->views_.count(); 
+    for (int i = 0; i < count; ++i) {
+      int idx = temp1->views_.view_index(i); 
+      int size = temp1->views_.view_size(i); 
+      dcomplex_t *lhs = reinterpret_cast<dcomplex_t *>(views_.view_data(idx));
+      dcomplex_t *rhs = 
+        reinterpret_cast<dcomplex_t *>(temp1->views_.view_data(i));
+
+      for (int j = 0; j < size; ++j) 
+        lhs[j] += rhs[j];
+    }
   }
 
  private:
-  LaplaceSPHData *data_;
-  size_t bytes_;
-  int n_digits_;
-  ExpansionRole role_;
+  ViewSet views_; 
 
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
 
     // Compute exp(i * alpha)
@@ -1171,7 +1150,8 @@ class LaplaceSPH {
   }
 
   void rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR) {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
 
     int offset = 0;
@@ -1197,7 +1177,8 @@ class LaplaceSPH {
 
   void M_to_L_zp(const dcomplex_t *M, const double *rho, double scale,
                  dcomplex_t *L) {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqbinom = table->sqbinom();
 
@@ -1217,7 +1198,8 @@ class LaplaceSPH {
 
   void M_to_L_zm(const dcomplex_t *M, const double *rho, double scale,
                  dcomplex_t *L) {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_);
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
     const double *sqbinom = table->sqbinom();
 
@@ -1235,8 +1217,9 @@ class LaplaceSPH {
     }
   }
 
-  void e2e(dcomplex_t *M, std::initializer_list<e2e_t> inputs) {  
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+  void e2e(dcomplex_t *M, std::initializer_list<e2e_t> inputs) {
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     const dcomplex_t *xs = table->xs(); 
     const dcomplex_t *ys = table->ys(); 
     const double *zs = table->zs(); 
@@ -1266,7 +1249,8 @@ class LaplaceSPH {
   }
 
   void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) {
-    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits_); 
+    int n_digits = views_.n_digits(); 
+    uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     const double *sqf = table->sqf(); 
     const dcomplex_t *ealphaj = table->ealphaj(); 
     const int *m_ = table->m(); 
