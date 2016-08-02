@@ -1,4 +1,4 @@
-CXX = mpicc
+CXX = mpicxx
 CXXFLAGS = -std=c++11 -Wall -g -O0 
 
 INCLUDE = $(shell pkg-config --cflags hpx)
