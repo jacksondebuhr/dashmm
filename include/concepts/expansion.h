@@ -283,19 +283,24 @@ class Expansion {
   ///
   /// \param s_index - the index of the tree node for which this expansion
   ///                  applies
+  /// \param s_size - the size of the tree node for which this expansion
+  ///                 applies
   /// \param t_index - the index of the tree node for which the resulting
   ///                  expansion should apply.
   ///
   /// \returns - the resulting intermediate expansion.
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const;
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
+                                      Index t_index) const;
 
   /// Compute a local expansion from an intermediate expansion.
   ///
   /// \param t_index - the index of the tree node for which this expansion
   ///                  applies
+  /// \param t_size - the size of the tree node for which this expansion
+  ///                 applies.
   ///
   /// \returns - the resulting local expansion.
-  std::unique_ptr<expansion_t> I_to_L(Index t_index) const;
+  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const;
 
   /// Add an expansion to this expansion
   ///

@@ -644,8 +644,11 @@ class ExpansionLCO {
 
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx, int n_digits) {
+    LocalData<DomainGeometry> geo = head->domain.value();
+    double s_size = geo->size_from_level(head->index.level());
+
     expansion_t lexp{views};
-    auto translated = lexp.I_to_I(head->index, tidx);
+    auto translated = lexp.I_to_I(head->index, s_size, tidx);
     lexp.release();
 
     expansionlco_t lco{target, n_digits};
@@ -654,6 +657,9 @@ class ExpansionLCO {
 
   static void i_to_l_out_edge(const ViewSet &views, hpx_addr_t target,
                               Index tidx, int n_digits) {
+    LocalData<DomainGeometry> geo = head->domain.value();
+    double t_size = geo->size_from_level(tidx.level());
+
     expansion_t lexp{views};
     auto translated = lexp.I_to_L(tidx);
     lexp.release();

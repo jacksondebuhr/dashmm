@@ -184,6 +184,7 @@ THIS BRANCH TODO
 TODO: clean up code where possible
 TODO: create test case for new ViewSet stuff? Or just do the real thing and
       have done with it.
+TODO: We need to update the comments in the dag.h file.
 
 TODO: decide if I want to add assertions around the calls to the Expansion
       operations to make sure the Expansion Role is correct.
@@ -224,7 +225,9 @@ Overall Plan to 1.0
     - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
 
- * Kernel Parameters and Table generation
+ * Kernel Parameters and Table generation - this is perhaps via another
+     method added to the expansion concept. This will be called at a certain
+     point during the evaluation (once the domain is available)
  * Split Evaluate into pieces and expose more interface to users
     - Enable repeat use of a DAG
     - Potentially provide objects representing the tree and so on to the user
