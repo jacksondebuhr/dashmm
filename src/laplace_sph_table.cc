@@ -252,6 +252,88 @@ void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
   }
 }
 
+dcomplex_t *LaplaceSPHTable::generate_xs() {
+  dcomplex_t *xs = new dcomplex_t[7 * nexp_]; 
+  int offset = 0; 
+  for (int k = 0; k < s_; ++k) {
+    double alpha = 2 * M_PI / m_[k]; 
+    for (int j = 1; j <= m_[k] / 2; ++j) {
+      double alphaj = j * alpha; 
+      double calphaj = cos(alphaj); 
+      for (int m = -3; m <= 3; ++m) {
+        double arg = lambda_[k] * m * calphaj; 
+        xs[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+      }
+    }
+  }
+  return xs; 
+}
+
+dcomplex_t *LaplaceSPHTable::generate_ys() {
+  dcomplex_t *ys = new dcomplex_t[7 * nexp_]; 
+  int offset = 0; 
+  for (int k = 0; k < s_; ++k) {
+    double alpha = 2 * M_PI / m_[k]; 
+    for (int j = 1; j <= m_[k] / 2; ++j) {
+      double alphaj = j * alpha; 
+      double salphaj = sin(alphaj); 
+      for (int m = -3; m <= 3; ++m) {
+        double arg = lambda_[k] * m * salphaj; 
+        ys[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+      }
+    }
+  }
+  return ys; 
+}
+
+double *LaplaceSPHTable::generate_zs() {
+  double *zs = new double[4 * s_]; 
+  int offset = 0; 
+  for (int k = 0; k < s_; ++k) {
+    for (int m = 0; m <= 3; ++m) {
+      zs[offset++] = exp(-lambda_[k] * m); 
+    }
+  }
+  return zs; 
+}
+
+double *LaplaceSPHTable::generate_lambaknm() {
+  double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2]; 
+  double *temp = new double[2 * p_ + 1]; 
+  temp[0] = 1.0; 
+  for (int i = 1; i <= p_ * 2; ++i) 
+    temp[i] = temp[i - 1] * sqrt(i); 
+
+  int offset = 0; 
+  for (int k = 0; k < s_; ++k) {
+    for (int n = 0; n <= p_; ++n) {
+      double lambdakn = pow(lambda_[k], n); 
+      for (int m = 0; m <= n; ++m) {
+        lambdaknm[offset++] = lambdakn / temp[n - m] / temp[n + m]; 
+      }
+    }
+  }  
+
+  delete [] temp; 
+  return lambdaknm; 
+}
+
+dcomplex_t *LaplaceSPHTable::generate_ealphaj() {
+  dcomplex_t *ealphaj = new dcomplex_t[smf_[s_]]; 
+  int offset = 0; 
+  for (int k = 0; k < s_; ++k) {
+    double alpha = 2 * M_PI / m_[k]; 
+    for (int j = 1; j <= m_[k] / 2; ++j) {
+      double alpha_j = j * alpha; 
+      for (int m = 1; m <= f_[k]; ++m) {
+        double arg = m * alpha_j; 
+        ealphaj[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+      }
+    }
+  }               
+  
+  return ealphaj; 
+}
 
 LaplaceSPHTableIterator get_or_add_laplace_sph_table(int n_digits) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
