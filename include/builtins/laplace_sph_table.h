@@ -25,7 +25,7 @@
 #include <map>
 #include <memory>
 #include <vector>
-
+#include "dashmm/types.h"
 
 namespace dashmm {
 

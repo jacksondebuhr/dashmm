@@ -297,7 +297,7 @@ double *LaplaceSPHTable::generate_zs() {
   return zs; 
 }
 
-double *LaplaceSPHTable::generate_lambaknm() {
+double *LaplaceSPHTable::generate_lambdaknm() {
   double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2]; 
   double *temp = new double[2 * p_ + 1]; 
   temp[0] = 1.0; 
