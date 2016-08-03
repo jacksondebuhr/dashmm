@@ -13,6 +13,12 @@ double corner_y;        /// -in y
 double corner_z;        /// -in z
 double size;            /// The size of the overall domain
 
+// TODO: Many of these are implemented as cyclic arrays that point to the local
+// data. But is there any reason to do this? We never make use of the fact that
+// these are in the global address space. All the action is local. There may be
+// exceptions on this, but it is worth looking at. Unless we actually go ahead
+// and use the GAS nature of this, we are just making some things harder on
+// ourselves.
 int unif_level;         /// The level of uniform partition
 hpx_addr_t unif_count;  /// A cyclic array for counting uniform parition
                         /// occupation
@@ -23,7 +29,7 @@ hpx_addr_t unif_done;   /// A cyclic array for detecting completion of the
 
 hpx_addr_t sorted_src;  /// Array meta data for the sorted sources
 hpx_addr_t sorted_tar;  /// Array meta data for the sorted targets
-int *distribute;
+int *distribute;        /// Array giving the distribution of the uniform grid
 
 int threshold;
 int *swap_src;
@@ -65,6 +71,14 @@ uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
   return key;
 }
 
+// Given the global counts, this will partition the uniform grid among the
+// available localities. There is perhaps some room for simplification here.
+// I would rather shoot for fixed targets instead of aiming to take a fair
+// fraction of whatever is left. But there might not be any real performance
+// impact either way.
+//
+// TODO: Note that this would be a target for a second member of the
+// Distribution Policy
 int *distribute_points(int num_ranks, const int *global, int len) {
   int *ret = new int[num_ranks]();
 
@@ -72,8 +86,9 @@ int *distribute_points(int num_ranks, const int *global, int len) {
   const int *t = &global[len]; // Target counts
 
   int total = 0;
-  for (int i = 0; i < len; ++i)
+  for (int i = 0; i < len; ++i) {
     total += s[i] + t[i];
+  }
 
   int rank = 0;
   int iterator = 0;
@@ -510,14 +525,17 @@ HPX_ACTION(HPX_DEFAULT, 0, init_partition_action, init_partition_handler,
            HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT,
            HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE);
 
+// This is the target action of the count exchange. This is called n-ranks
+// times, resulting in n-ranks - 1 network messages for each.
 int exchange_count_handler(void *args, size_t size) {
   int rank = hpx_get_my_rank();
   hpx_addr_t curr_unif_count = hpx_addr_add(unif_count,
                                             sizeof(hpx_addr_t) * rank,
                                             sizeof(hpx_addr_t));
   hpx_addr_t *user_lco{nullptr};
-  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
+  if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco)) {
     return HPX_ERROR;
+  }
 
   hpx_lco_set(*user_lco, size, args, HPX_NULL, HPX_NULL);
   hpx_gas_unpin(curr_unif_count);
@@ -526,8 +544,13 @@ int exchange_count_handler(void *args, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, exchange_count_action,
            exchange_count_handler, HPX_POINTER, HPX_SIZE_T);
 
+// This will assign the points to the uniform grid. This gives the points
+// the id (in the Morton Key sense) of the box to which they are assigned,
+// and it will count the numbers in each box.
 void assign_points_to_unif_grid(const Point *P, int npts, int *gid,
                                 int *count, double scale) {
+  // TODO: This is serial processing; is there some way to parallelize this?
+  //   This would perhaps be worth timing.
   int dim = pow(2, unif_level);
   for (int i = 0; i < npts; ++i) {
     const Point *p = &P[i];
@@ -539,6 +562,16 @@ void assign_points_to_unif_grid(const Point *P, int npts, int *gid,
   }
 }
 
+// This will rearrange the particles into their bin order. This is a stable
+// reordering.
+//
+// TODO: This is a sort of operation that occurs multiple times here. We should
+// abstract the notion of the bin-sort (or perhaps this is bucket-sort, but
+// whatever) so that we can improve the performance of that more easily as
+// needed.
+//
+// TODO: Note that this too is a serial operation. Could we do some on-rank
+// parallelism here?
 int *group_points_on_unif_grid(const Point *p_in, int npts,
                                const int *gid_of_points, const int *count,
                                Point *p_out) {
@@ -546,9 +579,12 @@ int *group_points_on_unif_grid(const Point *p_in, int npts,
   int *offset = new int[dim3]();
   int *assigned = new int[dim3]();
 
-  for (int i = 1; i < dim3; ++i)
+  for (int i = 1; i < dim3; ++i) {
     offset[i] = offset[i - 1] + count[i - 1];
+  }
 
+  // TODO: I think we can do away with assigned here. We can just update the
+  // offset for the given bin.
   for (int i = 0; i < npts; ++i) {
     int gid = gid_of_points[i];
     int cursor = offset[gid] + assigned[gid];
@@ -570,6 +606,13 @@ int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
 HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler,
            HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER);
 
+// This sets up some orgnaizational structures. The return value is an
+// array of offsets in the final set of points for each part of the uniform
+// grid. This is basically just setup. There is a chance that some work occurs
+// in one branch. Before leaving, this will bring the points that do not have
+// to change rank into their correct location. If it is detected that all of
+// the points for that part of the tree have arrived, then the partitioning
+// work will begin.
 int *init_point_exchange(int rank, const int *global_count,
                          const int *local_count, const int *local_offset,
                          const Point *temp, Node *n, ArrayMetaData *meta,
@@ -600,8 +643,9 @@ int *init_point_exchange(int rank, const int *global_count,
     *swap = new int[num_points]();
     *map = new int[num_points]();
     *bin = new int[num_points]();
-    for (int i = 0; i < num_points; ++i)
+    for (int i = 0; i < num_points; ++i) {
       (*map)[i] = i;
+    }
 
     for (int i = first; i <= last; ++i) {
       Node *curr = &n[i];
@@ -638,6 +682,9 @@ int *init_point_exchange(int rank, const int *global_count,
   return global_offset;
 }
 
+// This action merges particular points with the sorted list. Also, if this
+// is the last set of points that are merged, this will go ahead and start
+// the adaptive partitioning of that part of the local tree.
 int merge_points_handler(Point *p, Point *temp, Node *n,
                          int n_arrived, int n_total, char type) {
   // Note: all the pointers are local to the calling rank.
@@ -665,6 +712,9 @@ int merge_points_handler(Point *p, Point *temp, Node *n,
 HPX_ACTION(HPX_DEFAULT, 0, merge_points_action, merge_points_handler,
            HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT, HPX_CHAR);
 
+// This is the 'far-side' of the send points message. This action merges the
+// incoming points into the sorted list and will then spawn the adaptive
+// partition if this happens to be the last block for a given uniform grid.
 int recv_points_handler(void *args, size_t size) {
   int rank = hpx_get_my_rank();
   hpx_addr_t curr_unif_done = hpx_addr_add(unif_done,
@@ -675,6 +725,7 @@ int recv_points_handler(void *args, size_t size) {
     return HPX_ERROR;
 
   // Wait until the buffer is allocated before merging incoming messages
+  // TODO: Is there perhaps a way to do this action as a call-when on this gate?
   hpx_lco_wait(*gate);
   hpx_gas_unpin(curr_unif_done);
 
@@ -710,6 +761,8 @@ int recv_points_handler(void *args, size_t size) {
 
   int dim3 = pow(8, unif_level);
 
+  // TODO: This bit where the message is interpreted might be made easier with
+  // ReadBuffer
   int *meta = reinterpret_cast<int *>(static_cast<char *>(args));
   int first = meta[0];
   int last = meta[1];
@@ -761,6 +814,8 @@ int recv_points_handler(void *args, size_t size) {
   }
 
   // Wait until the data has been merged before releasing the parcel
+  // NOTE: This 'done' will trigger once points are merged. The action that
+  // triggers this will spawn more work, but not in a synchronous way.
   hpx_lco_wait(done);
   hpx_lco_delete_sync(done);
   hpx_lco_release(*user_lco, user_lco_buffer);
@@ -774,6 +829,11 @@ int recv_points_handler(void *args, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_points_action,
            recv_points_handler, HPX_POINTER, HPX_SIZE_T);
 
+// This is pretty straightforward. This rank will send to the given rank all
+// those particles that are to be shipped out. There is nothing too complicated
+// in this, just some indexing and so forth.
+//
+// NOTE: This would be a bit nicer looking using the Buffer types.
 int send_points_handler(int rank, int *count_s, int *count_t,
                         int *offset_s, int *offset_t,
                         Point *sources, Point *targets) {
@@ -789,10 +849,12 @@ int send_points_handler(int rank, int *count_s, int *count_t,
 
   // Parcel message size
   size_t size = sizeof(int) * 4;
-  if (send_ns)
+  if (send_ns) {
     size += sizeof(int) * range + sizeof(Point) * send_ns;
-  if (send_nt)
+  }
+  if (send_nt) {
     size += sizeof(int) * range + sizeof(Point) * send_nt;
+  }
 
   // Acquire parcel
   hpx_parcel_t *p = hpx_parcel_acquire(NULL, size);
@@ -809,17 +871,20 @@ int send_points_handler(int rank, int *count_s, int *count_t,
     count += range;
   }
 
-  if (send_nt)
+  if (send_nt) {
     memcpy(count, &count_t[first], sizeof(int) * range);
+  }
 
   char *meta_s = static_cast<char *>(data) +
     sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
-  if (send_ns)
+  if (send_ns) {
     memcpy(meta_s, &sources[offset_s[first]], sizeof(Point) * send_ns);
+  }
 
   char *meta_t = meta_s + send_ns * sizeof(Point);
-  if (send_nt)
+  if (send_nt) {
     memcpy(meta_t, &targets[offset_t[first]], sizeof(Point) * send_nt);
+  }
 
 #if 0
   std::cout << send_ns << "\n" << std::flush;
@@ -867,6 +932,7 @@ int recv_node_handler(void *args, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler,
            HPX_POINTER, HPX_SIZE_T);
 
+// This action is called once the
 int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
   Node *curr = &n[id];
   int first = curr->first();
@@ -919,6 +985,10 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
 HPX_ACTION(HPX_DEFAULT, 0, send_node_action, send_node_handler,
            HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT);
 
+
+// This appears to be the main action that creates the trees. This will
+// organize and call out to the other actions.
+// NOTE: One thing is sure, this ought to be factored
 int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
                              char exchange) {
   int rank = hpx_get_my_rank();
@@ -930,8 +1000,9 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
                                    sizeof(ArrayMetaData));
   ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr};
   if (!hpx_gas_try_pin(curr_s, (void **)&meta_s) ||
-      !hpx_gas_try_pin(curr_t, (void **)&meta_t))
+      !hpx_gas_try_pin(curr_t, (void **)&meta_t)) {
     return HPX_ERROR;
+  }
   hpx_gas_unpin(curr_s);
   hpx_gas_unpin(curr_t);
 
@@ -947,12 +1018,19 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
   int *local_count = new int[dim3 * 2]();
   int *local_scount = local_count;
   int *local_tcount = &local_count[dim3];
+  // TODO: perhaps these are actions? That is a coarse parallelism - then
+  // perhaps more might be added inside these functions
   assign_points_to_unif_grid(p_s, n_sources, gid_of_sources,
                              local_scount, 1.0 / size);
   assign_points_to_unif_grid(p_t, n_targets, gid_of_targets,
                              local_tcount, 1.0 / size);
 
   // Exchange counts
+  //
+  // TODO: Decide if it is better to just do a single reduction here. The
+  // difference is between the current ~N^2 remote messages vs
+  // ~2N remote messages. The only tradeoff is that the N^2 version might allow
+  // lucky early ranks to start sooner.
   for (int r = 0; r < num_ranks; ++r) {
     hpx_parcel_t *p = hpx_parcel_acquire(local_count,
                                          sizeof(int) * dim3 * 2);
@@ -962,9 +1040,11 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
   }
 
   // Put points of the same grid together while waiting for
-  // exchange_count_action to compelte
+  // exchange_count_action to complete
   Point *temp_s = new Point[n_sources];
   Point *temp_t = new Point[n_targets];
+  // TODO: Perhaps start these as actions to get at least that coarse
+  // parallelism.
   int *local_offset_s = group_points_on_unif_grid(p_s, n_sources,
                                                   gid_of_sources, local_scount,
                                                   temp_s);
@@ -975,6 +1055,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
   delete [] gid_of_targets;
 
   // Compute point distribution
+  // First by getting this ranks LCO address
   hpx_addr_t curr_unif_count = hpx_addr_add(unif_count,
                                             sizeof(hpx_addr_t) * rank,
                                             sizeof(hpx_addr_t));
@@ -982,25 +1063,17 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
   if (!hpx_gas_try_pin(curr_unif_count, (void **)&user_lco))
     return HPX_ERROR;
 
+  // Second by getting a reference to the LCO data - if there is just the
+  // one LCO, this would instead be a get probably.
   void *user_lco_buffer{nullptr};
   hpx_lco_getref(*user_lco, 1, &user_lco_buffer);
   int *global_count =
     reinterpret_cast<int *>(static_cast<char *>(user_lco_buffer)
                             + sizeof(int) * 2);
 
+  // NOTE: inside this call is where the distribute array is allocated
   distribute = distribute_points(num_ranks, global_count, dim3);
   assert(distribute != nullptr);
-
-#if 0
-  if (rank == 0) {
-    //for (int i = 0; i < dim3; ++i)
-    //  std::cout << global_count[i] << "\n";
-
-    for (int i = 0; i < num_ranks; ++i)
-      std::cout << distribute[i] << "\n";
-  }
-
-#endif
 
 
   // Exchange points
@@ -1029,6 +1102,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
   Node *ns = reinterpret_cast<Node *>(meta_g->data);
   Node *nt = reinterpret_cast<Node *>(meta_g->data + sizeof(Node) * dim3);
 
+  // ?
   int *global_offset_s = init_point_exchange(rank, global_count, local_scount,
                                              local_offset_s, temp_s,
                                              ns, meta_s, 's');
@@ -1037,6 +1111,8 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
                                              temp_t, nt, meta_t, 't');
   hpx_lco_and_set(*gate, HPX_NULL);
 
+  // So this one is pretty simple. It sends those points from this rank
+  // going to the other rank in a parcel.
   for (int r = 0; r < num_ranks; ++r) {
     if (r != rank) {
       hpx_call(HPX_HERE, send_points_action, HPX_NULL, &r, &local_scount,
@@ -1047,7 +1123,7 @@ int create_dual_tree_handler(hpx_addr_t sources, hpx_addr_t targets,
 
   hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * dim3);
 
-  if (exchange) {
+  if (exchange == 'y') {
     for (int r = 0; r < num_ranks; ++r) {
       int first = (r == 0 ? 0 : distribute[r - 1] + 1);
       int last = distribute[r];
@@ -1328,7 +1404,7 @@ int main_handler(char scaling, char datatype, char exchange,
   std::cout << "  Setup: " << elapsed_first << "\n";
   std::cout << "  Partition: " << elapsed_second << "\n";
 
-  /// YOU ARE HERE - but you still also have to look at the previous broadcast
+  // This is just deleting the allocated resources. Nothing too special here.
   hpx_bcast_rsync(finalize_partition_action, NULL, 0);
 
   // Destroy input data
