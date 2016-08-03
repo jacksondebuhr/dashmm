@@ -26,8 +26,6 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <utility>
-#include <initializer_list>
 
 #include "dashmm/index.h"
 #include "builtins/laplace_sph_table.h"
@@ -61,7 +59,7 @@ class LaplaceSPH {
   using source_t = Source;
   using target_t = Target;
   using expansion_t = LaplaceSPH<Source, Target>;
-
+  
   LaplaceSPH(Point center, int n_digits, ExpansionRole role) 
     : views_{ViewSet{n_digits, role, center}} 
   {
@@ -100,9 +98,10 @@ class LaplaceSPH {
   }
 
   ~LaplaceSPH() {
-    if (!views_.empty()) {
-      for (auto it = views_.begin(); it != views_.end(); ++it) {
-        delete [] (*it).data;
+    int count = views_.count(); 
+    if (count) {
+      for (int i = 0; i < count; ++i) {
+        delete [] views_.view_data(i); 
       }
     }
   }
@@ -114,10 +113,11 @@ class LaplaceSPH {
     // performed). The function returns true if and only if each entry in the
     // required subset is associated with some data. 
     bool is_valid = true; 
-    for (auto it = view.begin(); it != view.end(); ++it) {
-      int idx = (*it).index; 
+    int count = view.count(); 
+    for (int i = 0; i < count; ++i) {
+      int idx = view.view_index(i); 
       if (views_.view_data(idx) == nullptr) {
-        is_valid = false; 
+        is_valid = false;
         break;
       }
     }
@@ -127,7 +127,7 @@ class LaplaceSPH {
   int view_count() const { return views_.count(); }
 
   void get_views(ViewSet &view) const {
-    // FIXME
+    /* This is likely to be removed from the interface
     assert(view.count() < 2);
     if (view.count() > 0) {
       view.set_bytes(0, bytes_);
@@ -135,15 +135,10 @@ class LaplaceSPH {
     }
     view.set_n_digits(n_digits_);
     view.set_role(role_);
+    */
   }
 
-  ViewSet get_all_views() const {
-    // FIXME
-    ViewSet retval{};
-    retval.add_view(0);
-    get_views(retval);
-    return retval;
-  }
+  ViewSet get_all_views() const {return views_;}
 
   int accuracy() const {return views_.n_digits();}
 
@@ -318,10 +313,10 @@ class LaplaceSPH {
 
     // Rotate the multipole expansion of the child box about z-axis
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    retval->rotate_sph_z(M, alpha, W1);
+    rotate_sph_z(M, alpha, W1);
 
     // Rotate the previous result further about the y-axis
-    retval->rotate_sph_y(W1, d1, W2);
+    rotate_sph_y(W1, d1, W2);
 
     // Offset to operate multipole expansion
     int offset = 0;
@@ -332,17 +327,17 @@ class LaplaceSPH {
         W1[offset] = W2[offset];
         for (int k = 1; k <= n - m; ++k) {
           W1[offset] += W2[midx(n - k, m)] * powers_rho[k] *
-                        sqbinom[midx(n - m, k)] * sqbinom[midx(n + m, k)];
+            sqbinom[midx(n - m, k)] * sqbinom[midx(n + m, k)];
         }
         offset++;
       }
     }
 
     // Reverse rotate the shifted harmonic expansion about the y-axis
-    retval->rotate_sph_y(W1, d2, W2);
+    rotate_sph_y(W1, d2, W2);
 
     // Reverse rotate the previous result further about the z-axis
-    retval->rotate_sph_z(W2, -alpha, W1);
+    rotate_sph_z(W2, -alpha, W1);
 
     double scale = 1;
     offset = 0;
@@ -363,9 +358,10 @@ class LaplaceSPH {
     int t2s_x = s_index.x() - t_index.x();
     int t2s_y = s_index.y() - t_index.y();
     int t2s_z = s_index.z() - t_index.z();
-    double tx = data_->center.x() - t2s_x * s_size;
-    double ty = data_->center.y() - t2s_y * s_size;
-    double tz = data_->center.z() - t2s_z * s_size;
+    Point center = views_.center(); 
+    double tx = center.x() - t2s_x * s_size;
+    double ty = center.y() - t2s_y * s_size;
+    double tz = center.z() - t2s_z * s_size;
 
     int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits,
@@ -413,11 +409,11 @@ class LaplaceSPH {
       // Get precomputed Wigner d-matrix for rotation about y-axis
       const double *d1 = table->dmat_plus(t2s_z / rho);
       const double *d2 = table->dmat_minus(t2s_z / rho);
-      retval->rotate_sph_z(M, beta, W1);
-      retval->rotate_sph_y(W1, d1, W2);
-      retval->M_to_L_zp(W2, powers_rho, scale, W1);
-      retval->rotate_sph_y(W1, d2, W2);
-      retval->rotate_sph_z(W2, -beta, W1);
+      rotate_sph_z(M, beta, W1);
+      rotate_sph_y(W1, d1, W2);
+      M_to_L_zp(W2, powers_rho, scale, W1);
+      rotate_sph_y(W1, d2, W2);
+      rotate_sph_z(W2, -beta, W1);
     }
 
     delete [] W2;
@@ -470,10 +466,10 @@ class LaplaceSPH {
 
     // Rotate the local expansion of the parent box about z-axis
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
-    retval->rotate_sph_z(L, alpha, W1);
+    rotate_sph_z(L, alpha, W1);
 
     // Rotate the previous result further about the y-axis
-    retval->rotate_sph_y(W1, d1, W2);
+    rotate_sph_y(W1, d1, W2);
 
     // Offset to operate local expansion
     int offset = 0;
@@ -492,10 +488,10 @@ class LaplaceSPH {
     }
 
     // Reverse rotate the shifted harmonic expansion about the y-axis
-    retval->rotate_sph_y(W1, d2, W2);
+    rotate_sph_y(W1, d2, W2);
 
     // Reverse rotate the previous result further about the z-axis
-    retval->rotate_sph_z(W2, -alpha, W1);
+    rotate_sph_z(W2, -alpha, W1);
 
     double scale = 1;
     offset = 0;
@@ -524,7 +520,7 @@ class LaplaceSPH {
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, data_->center);
+      Point dist = point_sub(i->position, views_.center()); 
       dcomplex_t potential{0.0, 0.0};
       double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
       double r = dist.norm();
@@ -558,8 +554,7 @@ class LaplaceSPH {
       for (int m = 1; m <= p; ++m) {
         for (int n = m; n <= p; ++n) {
           potential += 2.0 * real(M[midx(n, m)] * powers_ephi[m]) *
-                       powers_r[n] * legendre[midx(n, m)] *
-                       sqf[n - m] / sqf[n + m];
+            powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
         }
       }
 
@@ -586,7 +581,7 @@ class LaplaceSPH {
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, data_->center);
+      Point dist = point_sub(i->position, views_.center()); 
       dcomplex_t potential{0.0, 0.0};
       double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
       double r = dist.norm();
@@ -619,8 +614,7 @@ class LaplaceSPH {
       for (int m = 1; m <= p; ++m) {
         for (int n = m; n <= p; ++n) {
           potential += 2.0 * real(L[midx(n, m)] * powers_ephi[m]) *
-                       powers_r[n] * legendre[midx(n, m)] *
-                       sqf[n - m] / sqf[n + m];
+            powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
         }
       }
 
@@ -659,7 +653,7 @@ class LaplaceSPH {
     int s = table->s(); 
     int nsh = (p + 1) * (p + 2) / 2; 
     int nexp = table->nexp(); 
-    const double *weight = table->weight(); 
+    const double *weight_ = table->weight(); 
     const int *m_ = table->m(); 
     const int *f_ = table->f(); 
     const int *smf_ = table->smf(); 
@@ -681,12 +675,12 @@ class LaplaceSPH {
     // 2, making (x, y, z) frame (-y, x, z). Next, rotate it again about the new
     // y axis by -pi / 2. The (-y, x, z) in the first rotated frame becomes (z,
     // x, y) in the final frame. 
-    retval->rotate_sph_z(M, -M_PI / 2, W1); 
-    retval->rotate_sph_y(W1, d2, W2); 
+    rotate_sph_z(M, -M_PI / 2, W1); 
+    rotate_sph_y(W1, d2, W2); 
     
     // Setup x-direction. Rotate the multipole expansion M about y axis by pi /
     // 2. This makes (x, y, z) frame into (-z, y, x). 
-    retval->rotate_sph_y(M, d1, W1); 
+    rotate_sph_y(M, d1, W1); 
 
     // Addresses of the spherical harmonic expansions 
     const dcomplex_t *SH[3] = {&W1[0], &W2[0], M}; 
@@ -694,7 +688,7 @@ class LaplaceSPH {
     for (int dir = 0; dir <= 2; ++dir) {
       int offset = 0; 
       for (int k = 0; k < s ; ++k) {
-        double weight = weight[k] / m_[k]; 
+        double weight = weight_[k] / m_[k]; 
                 
         // Compute sum_{n = m}^p M_n^m * lambda_k^n / sqrt((n+m)! * (n - m)!)
         // z1 handles M_n^m where n is even 
@@ -716,7 +710,7 @@ class LaplaceSPH {
           z2[m] = 0; 
           for (int n = m; n <= p; n += 2) 
             z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
-          for (int n = m + 1; n <= p_; n += 2) 
+          for (int n = m + 1; n <= p; n += 2) 
             z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
         }
 
@@ -725,7 +719,7 @@ class LaplaceSPH {
           z2[m] = 0;
           for (int n = m; n <= p; n += 2) 
             z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
-          for (int n = m + 1; n <= p_; n += 2) 
+          for (int n = m + 1; n <= p; n += 2) 
             z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)]; 
         }
         
@@ -793,140 +787,144 @@ class LaplaceSPH {
     dcomplex_t *T1 = work; 
     dcomplex_t *T2 = work + nexp; 
     dcomplex_t *T3 = work + nexp * 2; 
+    char *C1 = reinterpret_cast<char *>(T1); 
+    char *C2 = reinterpret_cast<char *>(T2); 
+    char *C3 = reinterpret_cast<char *>(T3); 
 
-    // Produce views needed on the target side 
+    // Produce views needed on the target side. 
+    // Due to normalization, the level of the index is relevant in the following
+    // operations. Value 0 is chosen for the constructor of the Index class. 
     if (dz == 3) {
-      this->e2e(T1, {std::make_pair(S_mz, Index{dx, dy, 0})}); 
-      views.add_view(uall, nexp, T1); 
+      e2e(T1, S_mz, dx, dy, 0); 
+      views.add_view(uall, nexp, C1); 
     } else if (dz == -2) {
-      this->e2e(T1, {std::make_pair(S_pz, Index{-dx, -dy, 0})}); 
-      views.add_view(dall, nexp, T1); 
+      e2e(T1, S_pz, -dx, -dy, 0); 
+      views.add_view(dall, nexp, C1); 
     } else if (dy == 3) {
-      this->e2e(T1, {std::make_pair(S_my, Index{dz, dx, 0})}); 
-      views.add_view(nall, nexp, T1);
+      e2e(T1, S_my, dz, dx, 0); 
+      views.add_view(nall, nexp, C1);
     } else if (dy == -2) {
-      this->e2e(T1, {std::make_pair(S_py, Index{-dz, -dx, 0})}); 
-      views.add_view(sall, nexp, T1); 
+      e2e(T1, S_py, -dz, -dx, 0); 
+      views.add_view(sall, nexp, C1); 
     } else if (dx == 3) {
-      this->e2e(T1, {std::make_pair(S_mx, Index{-dz, dy, 0})}); 
-      views.add_view(eall, nexp, T1); 
+      e2e(T1, S_mx, -dz, dy, 0); 
+      views.add_view(eall, nexp, C1); 
     } else if (dx == -2) {
-      this->e2e(T1, {std::make_pair(S_px, Index{dz, -dy, 0})}); 
-      views.add_view(wall, nexp, T1); 
+      e2e(T1, S_px, dz, -dy, 0); 
+      views.add_view(wall, nexp, C1); 
     } else {
       if (dz == 2) {
-        this->e2e(T1, {std::make_pair(S_mz, Index{dx, dy, 0})});
-        views.add_view(u1234, nexp, T1); 
+        e2e(T1, S_mz, dx, dy, 0); 
+        views.add_view(u1234, nexp, C1); 
 
         if (dy == -1) {
-          this->e2e(T2, {std::make_pair(S_py, Index{-dz, -dx, 0})}); 
-          views.add_view(s78, nexp, T2); 
+          e2e(T2, S_py, -dz, -dx, 0); 
+          views.add_view(s78, nexp, C2); 
         
           if (dx == -1) {
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})}); 
-            views.add_view(w6, nexp, T3); 
+            e2e(T3, S_px, dz, -dy, 0); 
+            views.add_view(w6, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})}); 
-            views.add_view(e5, nexp, T3); 
+            e2e(T3, S_mx, -dz, dy, 0); 
+            views.add_view(e5, nexp, C3); 
           }
         } else if (dy == 2) {
-          this->e2e(T2, {std::make_pair(S_my, Index{dz, dx, 0})});
-          views.add_view(n56, nexp, T2); 
+          e2e(T2, S_my, dz, dx, 0); 
+          views.add_view(n56, nexp, C2); 
         
           if (dx == -1) {
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w8, nexp, T3); 
+            e2e(T3, S_px, dz, -dy, 0); 
+            views.add_view(w8, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e7, nexp, T3); 
+            e2e(T3, S_mx, -dz, dy, 0); 
+            views.add_view(e7, nexp, C3); 
           } 
         } else {
           if (dx == -1) {            
-            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w68, nexp, T2); 
+            e2e(T2, S_px, dz, -dy, 0); 
+            views.add_view(w68, nexp, C2); 
           } else if (dx == 2) {
-            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e57, nexp, T2); 
+            e2e(T2, S_mx, -dz, dy, 0); 
+            views.add_view(e57, nexp, C2); 
           }
         }
       } else if (dz == -1) {
-        this->e2e(T1, {std::make_pair(S_pz, Index{-dx, -dy, 0})});
-        views.add_view(d5678, nexp, T1);
+        e2e(T1, S_pz, -dx, -dy, 0); 
+        views.add_view(d5678, nexp, C1);
 
         if (dy == -1) {
-          this->e2e(T2, {std::make_pair(S_py, Index{-dz, -dx, 0})});
-          views.add_view(s34, nexp, T2); 
+          e2e(T2, S_py, -dz, -dx, 0); 
+          views.add_view(s34, nexp, C2); 
 
           if (dx == -1) {
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w2, nexp, T3); 
+            e2e(T3, S_px, dz, -dy, 0); 
+            views.add_view(w2, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e1, nexp, T3); 
+            e2e(T3, S_mx, -dz, dy, 0); 
+            views.add_view(e1, nexp, C3); 
           } 
         } else if (dy == 2) {
-          this->e2e(T2, {std::make_pair(S_my, Index{dz, dx, 0})});
-          views.add_view(n12, nexp, T2); 
+          e2e(T2, S_my, dz, dx, 0);
+          views.add_view(n12, nexp, C2); 
 
           if (dx == -1) {
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w4, nexp, T3); 
+            e2e(T3, S_px, dz, -dy, 0);
+            views.add_view(w4, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e3, nexp, T3); 
+            e2e(T3, S_mx, -dz, dy, 0);
+            views.add_view(e3, nexp, C3); 
           } 
         } else {
           if (dx == -1) {
-            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w24, nexp, T2); 
+            e2e(T2, S_px, dz, -dy, 0);
+            views.add_view(w24, nexp, C2); 
           } else if (dx == 2) {
-            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e13, nexp, T2); 
+            e2e(T2, S_mx, -dz, dy, 0);
+            views.add_view(e13, nexp, C2); 
           }
         }
       } else { 
         if (dy == -1) {
-          this->e2e(T1, {std::make_pair(S_py, Index{-dz, -dx, 0})});
-          views.add_view(s3478, nexp, T1); 
+          e2e(T1, S_py, -dz, -dx, 0);
+          views.add_view(s3478, nexp, C1); 
 
           if (dx == -1) {
-            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w2, nexp, T2); 
-            views.add_view(w6, nexp, T3); 
+            e2e(T2, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0);
+            views.add_view(w2, nexp, C2); 
+            views.add_view(w6, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e1, nexp, T2); 
-            views.add_view(e5, nexp, T3); 
+            e2e(T2, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0);
+            views.add_view(e1, nexp, C2); 
+            views.add_view(e5, nexp, C3); 
           } 
         } else if (dy == 2) {
-          this->e2e(T1, {std::make_pair(S_my, Index{dz, dx, 0})});
-          views.add_view(n1256, nexp, T1); 
+          e2e(T1, S_my, dz, dx, 0);
+          views.add_view(n1256, nexp, C1); 
 
           if (dx == -1) {
-            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            this->e2e(T3, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w4, nexp, T2); 
-            views.add_view(w8, nexp, T3); 
+            e2e(T2, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0);
+            views.add_view(w4, nexp, C2); 
+            views.add_view(w8, nexp, C3); 
           } else if (dx == 2) {
-            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            this->e2e(T3, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e3, nexp, T2); 
-            views.add_view(e7, nexp, T3); 
+            e2e(T2, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0);
+            views.add_view(e3, nexp, C2); 
+            views.add_view(e7, nexp, C3); 
           }
         } else { 
           if (dx == -1) {
-            this->e2e(T2, {std::make_pair(S_px, Index{dz, -dy, 0})});
-            views.add_view(w2468, nexp, T2); 
+            e2e(T2, S_px, dz, -dy, 0);
+            views.add_view(w2468, nexp, C2); 
           } else if (dx == 2) {
-            this->e2e(T2, {std::make_pair(S_mx, Index{-dz, dy, 0})});
-            views.add_view(e1357, nexp, T2); 
+            e2e(T2, S_mx, -dz, dy, 0);
+            views.add_view(e1357, nexp, C2); 
           }
         }
       }
     }
-  
     expansion_t retval{views};       
     return std::unique_ptr<expansion_t>{&retval}; 
   }
@@ -944,7 +942,7 @@ class LaplaceSPH {
 
     int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
-          n_digits_, kTargetPrimary}}; 
+          views_.n_digits(), kTargetPrimary}}; 
     
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int nexp = table->nexp(); 
@@ -952,7 +950,7 @@ class LaplaceSPH {
     dcomplex_t *E = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     dcomplex_t *L = 
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
-    dcomplex_t *S = new dcomplex[nexp * 6](); 
+    dcomplex_t *S = new dcomplex_t[nexp * 6](); 
     dcomplex_t *S_mz = S; 
     dcomplex_t *S_pz = S + nexp; 
     dcomplex_t *S_my = S + 2 * nexp; 
@@ -960,146 +958,143 @@ class LaplaceSPH {
     dcomplex_t *S_mx = S + 4 * nexp; 
     dcomplex_t *S_px = S + 5 * nexp; 
 
-    int to_child = (t_index.x() % 2) + 2 * (t_index.y() % 2) + 
-      4 * (t_index.z() % 2); 
-
     switch (to_child) {
     case 0: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, 0, 3}), 
-            std::make_pair(&M[u1234 * nexp], Index{0, 0, 2})});
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 0, 2})});
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, 0, 3}),
-            std::make_pair(&M[n1256 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[n12 * nexp], Index{0, 0, 2})});
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 0, 2})});
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, 0, 3}), 
-            std::make_pair(&M[e1357 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[e13 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[e1 * nexp], Index{0, 0, 2})});
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 0, 2})});
+      e2e(S_mz, &E[uall * nexp], 0, 0, 3); 
+      e2e(S_mz, &E[u1234 * nexp], 0, 0, 2); 
+      e2e(S_pz, &E[dall * nexp], 0, 0, 2); 
+
+      e2e(S_my, &E[nall * nexp], 0, 0, 3); 
+      e2e(S_my, &E[n1256 * nexp], 0, 0, 2); 
+      e2e(S_my, &E[n12 * nexp], 0, 0, 2); 
+      e2e(S_py, &E[sall * nexp], 0, 0, 2); 
+
+      e2e(S_mx, &E[eall * nexp], 0, 0, 3); 
+      e2e(S_mx, &E[e1357 * nexp], 0, 0, 2); 
+      e2e(S_mx, &E[e13 * nexp], 0, 0, 2); 
+      e2e(S_mx, &E[e1 * nexp], 0, 0, 2); 
+      e2e(S_px, &E[wall * nexp], 0, 0, 2); 
       break; 
     case 1: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, 0, 3}), 
-            std::make_pair(&M[u1234 * nexp], Index{-1, 0, 2})}); 
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 0, 2})}); 
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, -1, 3}), 
-            std::make_pair(&M[n1256 * nexp], Index{0, -1, 2}), 
-            std::make_pair(&M[n12 * nexp], Index{0, -1, 2})}); 
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 1, 2})});
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, 0, 2})});
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 0, 3}), 
-            std::make_pair(&M[w2468 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[w24 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[w2 * nexp], Index{0, 0, 2})});
+      e2e(S_mz, &E[uall * nexp], -1, 0, 3); 
+      e2e(S_mz, &E[u1234 * nexp], -1, 0, 2); 
+      e2e(S_pz, &E[dall * nexp], 1, 0, 2); 
+
+      e2e(S_my, &E[nall * nexp], 0, -1, 3); 
+      e2e(S_my, &E[n1256 * nexp], 0, -1, 2); 
+      e2e(S_my, &E[n12 * nexp], 0, -1, 2); 
+      e2e(S_py, &E[sall * nexp], 0, 1, 2); 
+
+      e2e(S_mx, &E[eall * nexp], 0, 0, 2); 
+      e2e(S_px, &E[wall * nexp], 0, 0, 3); 
+      e2e(S_px, &E[w2468 * nexp], 0, 0, 2); 
+      e2e(S_px, &E[w24 * nexp], 0, 0, 2); 
+      e2e(S_px, &E[w2 * nexp], 0, 0, 2); 
       break;
     case 2: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, -1, 3}), 
-            std::make_pair(&M[u1234 * nexp], Index{0, -1, 2})});
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 1, 2})});
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, 0, 2})});
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 0, 3}), 
-            std::make_pair(&M[s3478 * nexp], Index{0, 0, 2}), 
-            std::make_pair(&M[s34 * nexp], Index{0, 0, 2})}); 
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, -1, 3}), 
-            std::make_pair(&M[e1357 * nexp], Index{0, -1, 2}), 
-            std::make_pair(&M[e13 * nexp], Index{0, -1, 2}), 
-            std::make_pair(&M[e3 * nexp], Index{0, -1, 2})}); 
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 1, 2})}); 
+      e2e(S_mz, &E[uall * nexp], 0, -1, 3); 
+      e2e(S_mz, &E[u1234 * nexp], 0, -1, 2); 
+      e2e(S_pz, &E[dall * nexp], 0, 1, 2); 
+
+      e2e(S_my, &E[nall * nexp], 0, 0, 2); 
+      e2e(S_py, &E[sall * nexp], 0, 0, 3); 
+      e2e(S_py, &E[s3478 * nexp], 0, 0, 2); 
+      e2e(S_py, &E[s34 * nexp], 0, 0, 2); 
+
+      e2e(S_mx, &E[eall * nexp], 0, -1, 3); 
+      e2e(S_mx, &E[e1357 * nexp], 0, -1, 2); 
+      e2e(S_mx, &E[e13 * nexp], 0, -1, 2); 
+      e2e(S_mx, &E[e3 * nexp], 0, -1, 2); 
+      e2e(S_px, &E[wall * nexp], 0, 1, 2); 
       break; 
     case 3: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, -1, 3}), 
-            std::make_pair(&M[u1234 * nexp], Index{-1, -1, 2})});
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 1, 2})}); 
+      e2e(S_mz, &E[uall * nexp], -1, -1, 3); 
+      e2e(S_mz, &E[u1234 * nexp], -1, -1, 2); 
+      e2e(S_pz, &E[dall * nexp], 1, 1, 2); 
       
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{0, -1, 2})}); 
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{0, 1, 3}), 
-            std::make_pair(&M[s3478 * nexp], Index{0, 1, 2}), 
-            std::make_pair(&M[s34 * nexp], Index{0, 1, 2})}); 
-
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{0, -1, 2})}); 
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{0, 1, 3}), 
-            std::make_pair(&M[w2468 * nexp], Index{0, 1, 2}), 
-            std::make_pair(&M[w24 * nexp], Index{0, 1, 2}), 
-            std::make_pair(&M[w4 * nexp], Index{0, 1, 2})}); 
+      e2e(S_my, &E[nall * nexp], 0, -1, 2); 
+      e2e(S_py, &E[sall * nexp], 0, 1, 3); 
+      e2e(S_py, &E[s3478 * nexp], 0, 1, 2); 
+      e2e(S_py, &E[s34 * nexp], 0, 1, 2); 
+      
+      e2e(S_mx, &E[eall * nexp], 0, -1, 2); 
+      e2e(S_px, &E[wall * nexp], 0, 1, 3); 
+      e2e(S_px, &E[w2468 * nexp], 0, 1, 2); 
+      e2e(S_px, &E[w24 * nexp], 0, 1, 2); 
+      e2e(S_px, &E[w4 * nexp], 0, 1, 2); 
       break; 
     case 4: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, 0, 2})}); 
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 0, 3}), 
-            std::make_pair(&M[d5678 * nexp], Index{0, 0, 2})}); 
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, 0, 3}), 
-            std::make_pair(&M[n1256 * nexp], Index{-1, 0, 2}), 
-            std::make_pair(&M[n56 * nexp], Index{-1, 0, 2})}); 
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 0, 2})}); 
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, 0, 3}), 
-            std::make_pair(&M[e1357 * nexp], Index{1, 0, 2}), 
-            std::make_pair(&M[e57 * nexp], Index{1, 0, 2}), 
-            std::make_pair(&M[e5 * nexp], Index{1, 0, 2})}); 
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 0, 2})}); 
+      e2e(S_mz, &E[uall * nexp], 0, 0, 2); 
+      e2e(S_pz, &E[dall * nexp], 0, 0, 3); 
+      e2e(S_pz, &E[d5678 * nexp], 0, 0, 2); 
+
+      e2e(S_my, &E[nall * nexp], -1, 0, 3); 
+      e2e(S_my, &E[n1256 * nexp], -1, 0, 2); 
+      e2e(S_my, &E[n56 * nexp], -1, 0, 2); 
+      e2e(S_py, &E[sall * nexp], 1, 0, 2); 
+ 
+      e2e(S_mx, &E[eall * nexp], 1, 0, 3); 
+      e2e(S_mx, &E[1357 * nexp], 1, 0, 2); 
+      e2e(S_mx, &E[57 * nexp], 1, 0, 2); 
+      e2e(S_mx, &E[e5 * nexp], 1, 0, 2); 
+      e2e(S_px, &E[wall * nexp], -1, 0, 2); 
       break; 
     case 5: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, 0, 2})}); 
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 0, 3}), 
-            std::make_pair(&M[d5678 * nexp], Index{1, 0, 2})}); 
+      e2e(S_mz, &E[uall * nexp], -1, 0, 2); 
+      e2e(S_pz, &E[dall * nexp], 1, 0, 3); 
+      e2e(S_pz, &E[d5678 * nexp], 1, 0, 2); 
+
+      e2e(S_my, &E[nall * nexp], -1, -1, 3); 
+      e2e(S_my, &E[n1256 * nexp], -1, -1, 2); 
+      e2e(S_my, &E[n56 * nexp], -1, -1, 2); 
+      e2e(S_py, &E[sall * nexp], 1, 1, 2); 
       
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, -1, 3}), 
-            std::make_pair(&M[n1256 * nexp], Index{-1, -1, 2}), 
-            std::make_pair(&M[n56 * nexp], Index{-1, -1, 2})}); 
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 1, 2})}); 
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, 0, 2})});  
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 0, 3}), 
-            std::make_pair(&M[w2468 * nexp], Index{-1, 0, 2}), 
-            std::make_pair(&M[w68 * nexp], Index{-1, 0, 2}), 
-            std::make_pair(&M[w6 * nexp], Index{-1, 0, 2})}); 
+      e2e(S_mx, &E[eall * nexp], 1, 0, 2); 
+      e2e(S_px, &E[wall * nexp], -1, 0, 3); 
+      e2e(S_px, &E[w2468 * nexp], -1, 0, 2); 
+      e2e(S_px, &E[w68 * nexp], -1, 0, 2); 
+      e2e(S_px, &E[w6 * nexp], -1, 0, 2); 
       break;
     case 6: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{0, -1, 2})});
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{0, 1, 3}), 
-            std::make_pair(&M[d5678 * nexp], Index{0, 1, 2})}); 
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, 0, 2})});  
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 0, 3}), 
-            std::make_pair(&M[s3478 * nexp], Index{1, 0, 2}), 
-            std::make_pair(&M[s78 * nexp], Index{1, 0, 2})}); 
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, -1, 3}), 
-            std::make_pair(&M[e1357 * nexp], Index{1, -1, 2}), 
-            std::make_pair(&M[e57 * nexp], Index{1, -1, 2}), 
-            std::make_pair(&M[e7 * nexp], Index{1, -1, 2})}); 
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 1, 2})}); 
+      e2e(S_mz, &E[uall * nexp], 0, -1, 2); 
+      e2e(S_pz, &E[dall * nexp], 0, 1, 3); 
+      e2e(S_pz, &E[d5678 * nexp], 0, 1, 2); 
+
+      e2e(S_my, &E[nall * nexp], -1, 0, 2); 
+      e2e(S_py, &E[sall * nexp], 1, 0, 3); 
+      e2e(S_py, &E[s3478 * nexp], 1, 0, 2); 
+      e2e(S_py, &E[s78 * nexp], 1, 0, 2); 
+
+      e2e(S_mx, &E[eall * nexp], 1, -1, 3); 
+      e2e(S_mx, &E[e1357 * nexp], 1, -1, 2); 
+      e2e(S_mx, &E[e57 * nexp], 1, -1, 2); 
+      e2e(S_mx, &E[e7 * nexp], 1, -1, 2); 
+      e2e(S_px, &E[wall * nexp], -1, 1, 2); 
       break; 
     case 7: 
-      this->e2e(S_mz, {std::make_pair(&M[uall * nexp], Index{-1, -1, 2})}); 
-      this->e2e(S_pz, {std::make_pair(&M[dall * nexp], Index{1, 1, 3}), 
-            std::make_pair(&M[d5678 * nexp], Index{1, 1, 2})}); 
-      
-      this->e2e(S_my, {std::make_pair(&M[nall * nexp], Index{-1, -1, 2})});  
-      this->e2e(S_py, {std::make_pair(&M[sall * nexp], Index{1, 1, 3}), 
-            std::make_pair(&M[s3478 * nexp], Index{1, 1, 2}), 
-            std::make_pair(&M[s78 * nexp], Index{1, 1, 2})}); 
-      
-      this->e2e(S_mx, {std::make_pair(&M[eall * nexp], Index{1, -1, 2})}); 
-      this->e2e(S_px, {std::make_pair(&M[wall * nexp], Index{-1, 1, 3}), 
-            std::make_pair(&M[w2468 * nexp], Index{-1, 1, 2}), 
-            std::make_pair(&M[w68 * nexp], Index{-1, 1, 2}), 
-            std::make_pair(&M[w8 * nexp], Index{-1, 1, 2})}); 
+      e2e(S_mz, &E[uall * nexp], -1, -1, 2); 
+      e2e(S_pz, &E[dall * nexp], 1, 1, 3); 
+      e2e(S_pz, &E[d5678 * nexp], 1, 1, 2); 
+
+      e2e(S_my, &E[nall * nexp], -1, -1, 2); 
+      e2e(S_py, &E[sall * nexp], 1, 1, 3); 
+      e2e(S_py, &E[s3478 * nexp], 1, 1, 2); 
+      e2e(S_py, &E[s78 * nexp], 1, 1, 2); 
+
+      e2e(S_mx, &E[eall * nexp], 1, -1, 2); 
+      e2e(S_px, &E[wall * nexp], -1, 1, 3); 
+      e2e(S_px, &E[w2468 * nexp], -1, 1, 2); 
+      e2e(S_px, &E[w68 * nexp], -1, 1, 2); 
+      e2e(S_px, &E[w8 * nexp], -1, 1, 2); 
       break;
     }
 
-    this->e2l(S_mz, 'z', false, L); 
-    this->e2l(S_pz, 'z', true, L); 
-    this->e2l(S_my, 'y', false, L); 
-    this->e2l(S_py, 'y', true, L); 
-    this->e2l(S_mx, 'x', false, L); 
-    this->e2l(S_px, 'x', true, L); 
+    e2l(S_mz, 'z', false, L); 
+    e2l(S_pz, 'z', true, L); 
+    e2l(S_my, 'y', false, L); 
+    e2l(S_py, 'y', true, L); 
+    e2l(S_mx, 'x', false, L); 
+    e2l(S_px, 'x', true, L); 
 
     return std::unique_ptr<expansion_t>(retval); 
   }
@@ -1110,7 +1105,7 @@ class LaplaceSPH {
     int count = temp1->views_.count(); 
     for (int i = 0; i < count; ++i) {
       int idx = temp1->views_.view_index(i); 
-      int size = temp1->views_.view_size(i); 
+      int size = temp1->views_.view_bytes(i) / sizeof(dcomplex_t); 
       dcomplex_t *lhs = reinterpret_cast<dcomplex_t *>(views_.view_data(idx));
       dcomplex_t *rhs = 
         reinterpret_cast<dcomplex_t *>(temp1->views_.view_data(i));
@@ -1123,7 +1118,7 @@ class LaplaceSPH {
  private:
   ViewSet views_; 
 
-  void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) {
+  void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
@@ -1149,7 +1144,8 @@ class LaplaceSPH {
     delete [] powers_ealpha;
   }
 
-  void rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR) {
+  void rotate_sph_y(const dcomplex_t *M, const double *d, 
+                    dcomplex_t *MR) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
@@ -1176,7 +1172,7 @@ class LaplaceSPH {
   }
 
   void M_to_L_zp(const dcomplex_t *M, const double *rho, double scale,
-                 dcomplex_t *L) {
+                 dcomplex_t *L) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
@@ -1188,7 +1184,7 @@ class LaplaceSPH {
         L[offset] = 0;
         for (int n = k; n <= p; ++n) {
           L[offset] += M[midx(n, k)] * pow_m1(n + k) * rho[j + n] *
-                       sqbinom[midx(n + j, n - k)] * sqbinom[midx(n + j, n + k)];
+            sqbinom[midx(n + j, n - k)] * sqbinom[midx(n + j, n + k)];
         }
         L[offset] *= scale;
         offset++;
@@ -1197,7 +1193,7 @@ class LaplaceSPH {
   }
 
   void M_to_L_zm(const dcomplex_t *M, const double *rho, double scale,
-                 dcomplex_t *L) {
+                 dcomplex_t *L) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int p = table->p();
@@ -1209,7 +1205,7 @@ class LaplaceSPH {
         L[offset] = 0;
         for (int n = k; n <= p; ++n) {
           L[offset] += M[midx(n, k)] * pow_m1(k + j) * rho[j + n] *
-                       sqbinom[midx(n + j, n - k)] * sqbinom[midx(n + j, n + k)];
+            sqbinom[midx(n + j, n - k)] * sqbinom[midx(n + j, n + k)];
         }
         L[offset] *= scale;
         offset++;
@@ -1217,7 +1213,7 @@ class LaplaceSPH {
     }
   }
 
-  void e2e(dcomplex_t *M, std::initializer_list<e2e_t> inputs) {
+  void e2e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     const dcomplex_t *xs = table->xs(); 
@@ -1227,32 +1223,28 @@ class LaplaceSPH {
     const int *m = table->m(); 
     const int *sm = table->sm(); 
 
-    for (auto it = inputs.begin(); it != inputs.end(); ++it) {
-      const dcomplex_t *W = std::get<0>(*it); 
-      Index I = std::get<1>(*it); 
-      
-      int offset = 0; 
-      for (int k = 0; k < s; ++k) {
+    int offset = 0; 
+    for (int k = 0; k < s; ++k) {
       // Shifting factor in z direction
-        double factor_z = zs[4 * k + I.z()]; 
-        for (int j = 0; j < m[k] / 2; ++j) {
-          int sidx = (sm[j] + j) * 7 + 3; 
-          // Shifting factor in x direction
-          dcomplex_t factor_x = xs[sidx + I.x()]; 
-          // Shifting factor in y direction
-          dcomplex_t factor_y = ys[sidx + I.y()]; 
-          M[offset] += W[offset] * factor_z * factor_y * factor_x; 
-          offset++; 
-        }
+      double factor_z = zs[4 * k + z]; 
+      for (int j = 0; j < m[k] / 2; ++j) {
+        int sidx = (sm[j] + j) * 7 + 3; 
+        // Shifting factor in x direction
+        dcomplex_t factor_x = xs[sidx + x]; 
+        // Shifting factor in y direction
+        dcomplex_t factor_y = ys[sidx + y]; 
+        M[offset] += W[offset] * factor_z * factor_y * factor_x; 
+        offset++; 
       }
     }
   }
 
-  void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) {
+  void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) const {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     const double *sqf = table->sqf(); 
     const dcomplex_t *ealphaj = table->ealphaj(); 
+    const double *lambda = table->lambda(); 
     const int *m_ = table->m(); 
     const int *sm_ = table->sm(); 
     const int *f_ = table->f(); 
@@ -1303,7 +1295,7 @@ class LaplaceSPH {
         int mmax = fmin(n, f_[k]); 
         for (int m = 0; m <= mmax; ++m) 
           W1[midx(n, m)] += power_lambdak * z[m]; 
-        power_lambdak *= -lambda_[k];
+        power_lambdak *= -lambda[k];
       }
       delete [] z; 
     }
@@ -1335,12 +1327,12 @@ class LaplaceSPH {
       contrib = W1; 
     } else if (dir == 'y') {
       const double *d = table->dmat_plus(0.0); 
-      this->rotate_sph_y(W1, d, W2); 
-      this->rotate_sph_z(W2, M_PI / 2, W1); 
+      rotate_sph_y(W1, d, W2); 
+      rotate_sph_z(W2, M_PI / 2, W1); 
       contrib = W1; 
     } else if (dir == 'x') {
       const double *d = table->dmat_minus(0.0); 
-      this->rotate_sph_y(W1, d, W2); 
+      rotate_sph_y(W1, d, W2); 
       contrib = W2; 
     }
 

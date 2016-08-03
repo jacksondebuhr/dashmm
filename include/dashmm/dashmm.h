@@ -27,6 +27,7 @@
 #include "builtins/bh_method.h"
 #include "builtins/direct_method.h"
 #include "builtins/fmm_method.h"
+#include "builtins/fmm97_method.h"
 
 // The built in expansions
 #include "builtins/laplace_com.h"
