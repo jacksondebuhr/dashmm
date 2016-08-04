@@ -72,23 +72,24 @@ class LaplaceSPHTable {
 
  private:
   int p_;
-  int s_; 
-  int nexp_; 
   double *sqf_;
   double *sqbinom_;
   laplace_map_t *dmat_plus_;
   laplace_map_t *dmat_minus_;
+
+  int s_; 
+  int nexp_; 
   double *lambda_; 
   double *weight_; 
+  int *m_; 
+  int *sm_; 
+  int *f_; 
+  int *smf_; 
   dcomplex_t *xs_; 
   dcomplex_t *ys_; 
   double *zs_; 
   double *lambdaknm_; 
   dcomplex_t *ealphaj_; 
-  int *m_; 
-  int *sm_; 
-  int *f_; 
-  int *smf_; 
 
   double *generate_sqf();
   double *generate_sqbinom();
