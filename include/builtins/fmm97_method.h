@@ -46,42 +46,52 @@ class FMM97 {
                                 DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM97, DistroPolicy>;
 
+  FMM97() {} 
+
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
-    curr->dag.add_normal();
-    curr->dag.add_interm(); 
-    curr->dag.StoM(&curr->dag);
-    curr->dag.MtoI(&curr->dag); 
+    if (curr->idx.level() >= 2) {
+      // If \p curr is of level 0 or 1, \p curr is not well separated
+      // from any target node. As a result, there is no need to create
+      // the normal or intermediate expansion 
+      curr->dag.add_normal();
+      curr->dag.add_interm(); 
+      curr->dag.StoM(&curr->dag);
+      curr->dag.MtoI(&curr->dag); 
+    }
   }
 
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_normal();
-    curr->dag.add_interm(); 
-    curr->dag.MtoI(&curr->dag); 
-    for (size_t i = 0; i < 8; ++i) {
-      sourcenode_t *kid = curr->child[i];
-      if (kid != nullptr) {
-        curr->dag.MtoM(&kid->dag);
+    if (curr->idx.level() >= 2) {
+      curr->dag.add_normal();
+      curr->dag.add_interm(); 
+      curr->dag.MtoI(&curr->dag); 
+      for (size_t i = 0; i < 8; ++i) {
+        sourcenode_t *kid = curr->child[i];
+        if (kid != nullptr) {
+          curr->dag.MtoM(&kid->dag);
+        }
       }
     }
   }
 
   void inherit(targetnode_t *curr, DomainGeometry *domain,
                bool curr_is_leaf) const {
-    if (curr_is_leaf) {
-      curr->dag.add_parts();
-    }
-    curr->dag.add_normal();
-    if (curr->parent != nullptr) {
-      curr->dag.LtoL(&curr->parent->dag);
+    if (curr_is_leaf) 
+      curr->dag.add_parts(); 
+
+    if (curr->idx.level() >= 2) {
+      curr->dag.add_normal(); 
       curr->dag.ItoL(&curr->parent->dag); 
+      
+      if (curr->idx.level() >= 3) 
+        curr->dag.LtoL(&curr->parent->dag); 
     }
   }
 
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const {
     Index t_index = curr->idx;
-    curr->dag.add_interm(); 
 
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
@@ -100,9 +110,14 @@ class FMM97 {
         }
       }
 
-      curr->dag.LtoT(&curr->dag);
+      if (curr->idx.level() >= 2) 
+        curr->dag.LtoT(&curr->dag);
     } else {
-      std::vector<sourcenode_t *> newcons{ };
+      bool do_I2I = curr->idx.level() >= 1; 
+      if (do_I2I) 
+        curr->dag.add_interm();
+
+      std::vector<sourcenode_t *> newcons{};
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -112,18 +127,20 @@ class FMM97 {
             newcons.push_back(*S);
           }
         } else {
-          // If S is at the same level as \p curr and well separated from 
-          // \p curr, skip S as its contribution to \p curr has been processed
-          // by the parent of \p curr. 
+          // If S is at the same level as \p curr and is well
+          // separated from \p curr, skip S as its contribution to \p
+          // curr has been processed by the parent of \p curr.          
+          
           if (!well_sep_test((*S)->idx, t_index)) {
             bool S_is_leaf = true; 
-
+              
             for (size_t i = 0; i < 8; ++i) {
               sourcenode_t *child = (*S)->child[i]; 
               if (child != nullptr) {
                 newcons.push_back(child); 
                 S_is_leaf = false; 
-                curr->dag.ItoI(&child->dag); 
+                if (do_I2I) 
+                  curr->dag.ItoI(&child->dag); 
               }
             }
 
@@ -131,9 +148,9 @@ class FMM97 {
               newcons.push_back(*S); 
           }
         }
-      }
+      } // endfor
 
-      consider = std::move(newcons);
+      consider = std::move(newcons);              
     }
   }
 
