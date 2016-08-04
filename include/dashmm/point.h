@@ -31,7 +31,7 @@ namespace dashmm {
 class Point {
  public:
   /// Construct a point from x, y, z positions.
-  Point(double x, double y, double z) : pos_{x, y, z} { }
+  Point(double x = 0, double y = 0, double z = 0) : pos_{x, y, z} { }
 
   /// Construct a point from a C-style array.
   Point(double *arr) : pos_{arr[0], arr[1], arr[2]} { }
