@@ -34,37 +34,22 @@ uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
   return key;
 }
 
-void generate_weak_scaling_input(ArrayMetaData *meta_s, int nsrc_per_rank,
-                                 ArrayMetaData *meta_t, int ntar_per_rank,
-                                 char datatype, int seed) {
-  meta_s->size = sizeof(Point);
-  meta_s->count = nsrc_per_rank;
-  meta_s->data = new char[sizeof(Point) * nsrc_per_rank]();
-
-  meta_t->size = sizeof(Point);
-  meta_t->count = ntar_per_rank;
-  meta_t->data = new char[sizeof(Point) * ntar_per_rank]();
-
-  Point *p_s = reinterpret_cast<Point *>(meta_s->data);
-  Point *p_t = reinterpret_cast<Point *>(meta_t->data);
+Point *generate_weak_scaling_input(int n, char datatype, int seed) {
+  Point *retval = new Point[nsrc_per_rank]();
 
   srand(seed);
   std::function<void(Point &)> set_point =
     (datatype == 'c' ? set_point_in_cube : set_point_on_sphere);
 
   for (int i = 0; i < nsrc_per_rank; ++i) {
-    set_point(p_s[i]);
+    set_point(retval[i]);
   }
 
-  for (int i = 0; i < ntar_per_rank; ++i) {
-    set_point(p_t[i]);
-  }
+  return retval;
 }
 
-void generate_strong_scaling_input(ArrayMetaData *meta_s, int nsrc,
-                                   ArrayMetaData *meta_t, int ntar,
-                                   char datatype, int rank, int num_ranks,
-                                   int nseed) {
+Point *generate_strong_scaling_input(int n, char datatype, int rank,
+                                     int num_ranks, int nseed, int shift) {
   // Divide nsrc and ntar into nseed chunks. Use seed (2 + r) to populate
   // the points in each chunk, where 0 <= r < nseed
 
@@ -83,10 +68,7 @@ void generate_strong_scaling_input(ArrayMetaData *meta_s, int nsrc,
   s1 = (rank < r1 ? (q1 + 1) * rank : (q1 + 1) * r1 + q1 * (rank - r1));
   s2 = s1 + nsrc_curr_rank - 1;
 
-  meta_s->size = sizeof(Point);
-  meta_s->count = nsrc_curr_rank;
-  meta_s->data = new char[sizeof(Point) * nsrc_curr_rank]();
-  Point *p_s = reinterpret_cast<Point *>(meta_s->data);
+  Point *retval = new Point[nsrc_curr_rank]();
 
   for (int r = 0; r < nseed; ++r) {
     int nsrc_curr_seed = (r < r2 ? q2 + 1 : q2);
@@ -97,43 +79,49 @@ void generate_strong_scaling_input(ArrayMetaData *meta_s, int nsrc,
     } else if (s3 > s2) {
       break;
     } else {
-      srand(r + 2);
+      srand(r + 2 + shift);
       for (int s = s3; s <= s4; ++s) {
-        if (s >= s1 && s <= s2)
-          set_point(p_s[s - s1]);
+        if (s >= s1 && s <= s2) {
+          set_point(retval[s - s1]);
+        }
       }
     }
   }
 
-  // Generate target points
-  // ntar = q1 * num_ranks + r1 = q2 * nseed + r2
-  q1 = ntar / num_ranks;
-  r1 = ntar % num_ranks;
-  q2 = ntar / nseed;
-  r2 = ntar % nseed;
-  ntar_curr_rank = (rank < r1 ? q1 + 1 : q1);
-  t1 = (rank < r1 ? (q1 + 1) * rank : (q1 + 1) * r1 + q1 * (rank - r1));
-  t2 = t1 + ntar_curr_rank - 1;
+  return retval;
+}
 
-  meta_t->size = sizeof(Point);
-  meta_t->count = ntar_curr_rank;
-  meta_t->data = new char[sizeof(Point) * ntar_curr_rank]();
-  Point *p_t = reinterpret_cast<Point *>(meta_t->data);
-
-  for (int r = 0; r < nseed; ++r) {
-    int ntar_curr_seed = (r < r2 ? q2 + 1 : q2);
-    int t3 = (r < r2 ? (q2 + 1) * r : (q2 + 1) * r2 + q2 * (r - r2));
-    int t4 = t3 + ntar_curr_seed - 1;
-    if (t4 < t1) {
-      continue;
-    } else if (t3 > t2) {
-      break;
-    } else {
-      srand(r + 2);
-      for (int t = t3; t <= t4; ++t) {
-        if (t >= t1 && t <= t2)
-          set_point(p_t[t - t1]);
-      }
-    }
+int point_count(char scaling, int n) {
+  if (scaling == 'w') {
+    return n;
+  } else {
+    int my_rank = hpx_get_my_rank();
+    int num_ranks = hpx_get_num_ranks();
+    int nper = n / num_ranks;
+    int remain = n % num_ranks;
+    return (rank < r1 ? nper + 1 : nper);
   }
+}
+
+dashmm::Array<Point> generate_points(char scaling, char datatype, int nsrc,
+                                      int nseed, int shift) {
+  size_t my_nsrc = point_count(scaling, nsrc);
+
+  dashmm::Array<Point> retval{};
+  retval.allocate(my_nsrc);
+
+  Point *data{nullptr};
+  if (scaling == 'w') {
+    data = generate_weak_scaling_input(my_nsrc, datatype,
+                                       hpx_get_my_rank() + 2);
+  } else {
+    data = generate_strong_scaling_input(nsrc, datatype, hpx_get_my_rank(),
+                                         hpx_get_num_ranks(), nseed, shift);
+  }
+
+  retval.put(0, my_nsrc, data);
+
+  delete [] data;
+
+  return retval;
 }

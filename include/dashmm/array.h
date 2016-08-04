@@ -177,6 +177,15 @@ class Array {
     return retval;
   }
 
+
+  // TODO: Do we want an allocate method that also takes an action and an
+  // environment, which will allocate, and then call the action on each
+  // segment. This would avoid the generate and then copy into GAS thing.
+  //
+  // Or perhaps what this means is we need to make map more flexible. It could
+  // be one action per rank, or it could be otherwise.
+
+
   /// Destroy the Array
   ///
   /// This will destroy all global allocations associated with the Array.
