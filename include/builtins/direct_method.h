@@ -58,6 +58,8 @@ class Direct {
                                 DistroPolicy>;
   using sourceref_t = ArrayRef<Source>;
 
+  Direct() { }
+
   /// In generate, Direct does nothing.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();

@@ -35,7 +35,7 @@ namespace dashmm {
 class Index {
  public:
   /// Construct the index from components and level
-  Index(int ix, int iy, int iz, int level)
+  Index(int ix = 0, int iy = 0, int iz = 0, int level = 0)
       : idx_{ix, iy, iz}, level_{level} { }
 
   /// Return the x index.

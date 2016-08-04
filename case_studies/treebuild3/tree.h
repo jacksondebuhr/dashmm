@@ -4,61 +4,35 @@
 #include <vector>
 #include "hpx/hpx.h"
 
-/// The main action
-extern hpx_action_t main_action;
+#include "utils.h"
 
-/// Meta data for the array.
-///
-/// The array is a cyclic allocation of ArrayMetaData objects, one per locality
-/// that inside point to the local data (data). This gives the size and the
-/// count of the records as well as the pointer to local memory.
-struct ArrayMetaData {
-  size_t size;
-  int count;
-  char *data;
-};
+#include "dashmm/reductionops.h"
+using dashmm::int_sum_ident_op;
+using dashmm::int_sum_op;
 
-/// Serves as index to indentify nodes without having to worry over floating
-/// point artihmetic.
-class Index {
- public:
-  Index(): level_{0}, idx_{0, 0, 0} {}
-  Index(int level, int x, int y, int z) : level_{level}, idx_{x, y, z} {}
 
-  int level() const {return level_;}
-  int x() const {return idx_[0];}
-  int y() const {return idx_[1];}
-  int z() const {return idx_[2];}
+// TODO: Gradually remove these dependences
+// Actions that people need to know about
+extern hpx_action_t domain_geometry_init_action;
+extern hpx_action_t domain_geometry_op_action;
+extern hpx_action_t set_domain_geometry_action;
+extern hpx_action_t init_partition_action;
+extern hpx_action_t create_dual_tree_action;
+extern hpx_action_t finalize_partition_action;
 
-  Index parent(int num = 1) const {
-    return Index{level_ - 1, idx_[0] >> num, idx_[1] >> num, idx_[2] >> num};
-  }
+// TODO: Gradually remove these dependences
+// Some globals that need to be exposed
+extern double corner_x;
+extern double corner_y;
+extern double corner_z;
+extern double size;
+extern int unif_level;
+extern hpx_addr_t unif_count;
+extern hpx_addr_t unif_done;
+extern hpx_addr_t unif_grid;
+extern hpx_addr_t sorted_src;
+extern hpx_addr_t sorted_tar;
 
-  Index child(int which) const {
-    return Index{level_ + 1, (idx_[0] << 1) + ((170 >> which) & 1),
-        (idx_[1] << 1) + ((204 >> which) & 1),
-        (idx_[2] << 1) + ((240 >> which) & 1)};
-  }
-
- private:
-  int level_;
-  int idx_[3];
-};
-
-/// Convenience point class to represent a location
-class Point {
- public:
-  Point(): pos_{0.0, 0.0, 0.0} {}
-  Point(double x, double y, double z): pos_{x, y, z} {}
-  Point(const Point &pt) : pos_{pt.x(), pt.y(), pt.z()} {}
-
-  double x() const {return pos_[0];}
-  double y() const {return pos_[1];}
-  double z() const {return pos_[2];}
-
- private:
-  double pos_[3];
-};
 
 /// A node of the tree.
 class Node {
@@ -123,7 +97,8 @@ class Node {
                  double corner_x, double corner_y, double corner_z,
                  double size);
 
-  /// Return the number of children of this node
+  /// Return the number of descendants of this node - this is recursive, and
+  /// collects all of them
   int n_descendants() const;
 
 
