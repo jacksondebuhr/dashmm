@@ -318,7 +318,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the source node in question
   void StoM(DAGInfo *source) {
     assert(source->has_parts());
-    assert(source->has_normal());
+    assert(has_normal());
     link_nodes(source, source->parts_, this, normal_, Operation::StoM);
   }
 
@@ -330,7 +330,7 @@ class DAGInfo {
   /// \param source - the DAGInfo object containing the source node in question
   void StoL(DAGInfo *source) {
     assert(source->has_parts());
-    assert(source->has_normal());
+    assert(has_normal()); 
     link_nodes(source, source->parts_, this, normal_, Operation::StoL);
   }
 

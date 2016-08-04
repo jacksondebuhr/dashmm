@@ -82,8 +82,10 @@ class FMM97 {
 
     if (curr->idx.level() >= 2) {
       curr->dag.add_normal(); 
-      curr->dag.LtoL(&curr->parent->dag); 
       curr->dag.ItoL(&curr->parent->dag); 
+      
+      if (curr->idx.level() >= 3) 
+        curr->dag.LtoL(&curr->parent->dag); 
     }
   }
 
@@ -108,7 +110,8 @@ class FMM97 {
         }
       }
 
-      curr->dag.LtoT(&curr->dag);
+      if (curr->idx.level() >= 2) 
+        curr->dag.LtoT(&curr->dag);
     } else {
       bool do_I2I = curr->idx.level() >= 1; 
       if (do_I2I) 
