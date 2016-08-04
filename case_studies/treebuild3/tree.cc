@@ -510,7 +510,6 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done, hpx_addr_t grid,
     for (int iy = 0; iy < dim; ++iy) {
       for (int ix = 0; ix < dim; ++ix) {
         uint64_t mid = morton_key(ix, iy, iz);
-        // TODO: Are these copies needed? Why not just set the index?
         n[mid] = Node{Index{level, ix, iy, iz}};
         n[mid + dim3] = Node{Index{level, ix, iy, iz}};
       }
@@ -901,6 +900,7 @@ HPX_ACTION(HPX_DEFAULT, 0, send_points_action, send_points_handler,
            HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_POINTER,
            HPX_POINTER, HPX_POINTER);
 
+// This is the action on the other side that receives the partitioned tree.
 int recv_node_handler(void *args, size_t size) {
   int *compressed_tree = reinterpret_cast<int *>(static_cast<char *>(args));
   int rank = hpx_get_my_rank();
@@ -932,7 +932,13 @@ int recv_node_handler(void *args, size_t size) {
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler,
            HPX_POINTER, HPX_SIZE_T);
 
-// This action is called once the
+// This action is called once the individual grids are done.
+// Also, this is where the points are finally rearranged. All other work has
+// been to set up their eventual index in the sorted situation. Here is the
+// actual shuffling.
+//
+// This will send one message for each grid box to all other localities.
+// This does allow for maximum parallelism. It is likely the right approach.
 int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
   Node *curr = &n[id];
   int first = curr->first();
@@ -943,8 +949,9 @@ int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
   // Rearrange points
   int *map = (type ? map_tar : map_src);
   Point *temp = new Point[range];
-  for (int i = first; i <= last; ++i)
+  for (int i = first; i <= last; ++i) {
     temp[i - first] = p[map[i]];
+  }
   memcpy(p + first, temp, sizeof(Point) * range);
   delete [] temp;
 
@@ -1393,7 +1400,6 @@ int main_handler(char scaling, char datatype, char exchange,
   hpx_bcast_rsync(create_dual_tree_action, &sources, &targets, &exchange);
 
   // All done, spit out some timing information before cleaning up and halting
-  // TODO: improve the description once I read stuff
   hpx_time_t timer_end = hpx_time_now();
   double elapsed_total = hpx_time_diff_ms(timer_start, timer_end) / 1e3;
   double elapsed_reduction = hpx_time_diff_ms(timer_start, timer_domain) / 1e3;
@@ -1504,6 +1510,8 @@ int Node::n_descendants() const {
   return count;
 }
 
+// I likely would implement this as returning the new current value,
+// rather than passing a reference, but whatever.
 void Node::compress(int *branch, int *tree, int parent, int &curr) const {
   for (int i = 0; i < 8; ++i) {
     if (child_[i] != nullptr) {

@@ -51,6 +51,8 @@ class FMM {
                                 DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM, DistroPolicy>;
 
+  FMM() { }
+
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
     curr->dag.add_normal();

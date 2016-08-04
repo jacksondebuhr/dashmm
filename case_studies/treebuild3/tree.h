@@ -123,7 +123,8 @@ class Node {
                  double corner_x, double corner_y, double corner_z,
                  double size);
 
-  /// Return the number of children of this node
+  /// Return the number of descendants of this node - this is recursive, and
+  /// collects all of them
   int n_descendants() const;
 
 

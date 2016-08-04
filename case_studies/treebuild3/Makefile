@@ -1,14 +1,14 @@
 CXX = mpicxx
-CXXFLAGS = -std=c++11 -Wall -g -O0 
+CXXFLAGS = -std=c++11 -Wall -g -O0
 
-INCLUDE = $(shell pkg-config --cflags hpx)
-LIBS = $(shell pkg-config --libs hpx) 
+INCLUDE = -I../../include $(shell pkg-config --cflags hpx)
+LIBS = -I../../lib -ldashmm $(shell pkg-config --libs hpx)
 
-SRC = $(shell ls *.cc) 
+SRC = $(shell ls *.cc)
 OBJ = $(SRC:.cc=.o)
 EXEC = test
 
-all: $(EXEC) 
+all: $(EXEC)
 
 $(EXEC): $(OBJ)
 	$(CXX) -o $(EXEC) $(OBJ) $(LIBS)
