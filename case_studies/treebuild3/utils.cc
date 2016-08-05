@@ -35,13 +35,13 @@ uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
 }
 
 Point *generate_weak_scaling_input(int n, char datatype, int seed) {
-  Point *retval = new Point[nsrc_per_rank]();
+  Point *retval = new Point[n]();
 
   srand(seed);
   std::function<void(Point &)> set_point =
     (datatype == 'c' ? set_point_in_cube : set_point_on_sphere);
 
-  for (int i = 0; i < nsrc_per_rank; ++i) {
+  for (int i = 0; i < n; ++i) {
     set_point(retval[i]);
   }
 
@@ -56,14 +56,14 @@ Point *generate_strong_scaling_input(int n, char datatype, int rank,
   std::function<void(Point &)> set_point =
     (datatype == 'c' ? set_point_in_cube : set_point_on_sphere);
 
-  int q1, r1, q2, r2, nsrc_curr_rank, s1, s2, ntar_curr_rank, t1, t2;
+  int q1, r1, q2, r2, nsrc_curr_rank, s1, s2;
 
   // Generate source points
   // nsrc = q1 * num_ranks + r1 = q2 * nseed + r2
-  q1 = nsrc / num_ranks;
-  r1 = nsrc % num_ranks;
-  q2 = nsrc / nseed;
-  r2 = nsrc % nseed;
+  q1 = n / num_ranks;
+  r1 = n % num_ranks;
+  q2 = n / nseed;
+  r2 = n % nseed;
   nsrc_curr_rank = (rank < r1 ? q1 + 1 : q1);
   s1 = (rank < r1 ? (q1 + 1) * rank : (q1 + 1) * r1 + q1 * (rank - r1));
   s2 = s1 + nsrc_curr_rank - 1;
@@ -99,7 +99,7 @@ int point_count(char scaling, int n) {
     int num_ranks = hpx_get_num_ranks();
     int nper = n / num_ranks;
     int remain = n % num_ranks;
-    return (rank < r1 ? nper + 1 : nper);
+    return (my_rank < remain ? nper + 1 : nper);
   }
 }
 

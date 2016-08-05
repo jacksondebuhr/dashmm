@@ -28,10 +28,6 @@ extern double corner_z;
 extern double size;
 extern int unif_level;
 extern hpx_addr_t unif_count;
-extern hpx_addr_t unif_done;
-extern hpx_addr_t unif_grid;
-extern hpx_addr_t sorted_src;
-extern hpx_addr_t sorted_tar;
 
 
 /// A node of the tree.

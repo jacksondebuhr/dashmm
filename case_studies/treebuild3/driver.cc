@@ -55,13 +55,8 @@ int main_handler(char scaling, char datatype,
   unif_count = hpx_lco_reduce_new(num_ranks, sizeof(int) * (dim3 * 2),
                                   int_sum_ident_op,
                                   int_sum_op);
-  unif_done = hpx_gas_calloc_cyclic(num_ranks, sizeof(hpx_addr_t), 0);
-  unif_grid = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0);
-  sorted_src = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0);
-  sorted_tar = hpx_gas_calloc_cyclic(num_ranks, sizeof(ArrayMetaData), 0);
 
-  hpx_bcast_rsync(init_partition_action, &unif_count, &unif_done, &unif_grid,
-                  &sorted_src, &sorted_tar, &unif_level, &threshold,
+  hpx_bcast_rsync(init_partition_action, &unif_count, &unif_level, &threshold,
                   &corner_x, &corner_y, &corner_z, &size);
 
   // Measure the partitioning setup. This is all just getting this and that
@@ -85,10 +80,6 @@ int main_handler(char scaling, char datatype,
   hpx_bcast_rsync(finalize_partition_action, NULL, 0);
 
   hpx_lco_delete_sync(unif_count);
-  hpx_gas_free_sync(unif_done);
-  hpx_gas_free_sync(unif_grid);
-  hpx_gas_free_sync(sorted_src);
-  hpx_gas_free_sync(sorted_tar);
 
   hpx_exit(0, nullptr);
 }
@@ -159,9 +150,12 @@ int main(int argc, char *argv[]) {
     if (nseed <= 0) {
       valid_arguments = false;
       usage(std::string{argv[0]});
-      hpx_finalize();
-      return -1;
     }
+  }
+
+  if (!valid_arguments) {
+    hpx_finalize();
+    return -1;
   }
 
   // First get the data setup

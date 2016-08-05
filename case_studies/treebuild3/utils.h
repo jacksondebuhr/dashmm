@@ -12,6 +12,8 @@ using dashmm::Point;
 #include "dashmm/index.h"
 using dashmm::Index;
 
+#include "dashmm/array.h"
+
 
 void set_point_in_cube(Point &p);
 void set_point_on_sphere(Point &p);

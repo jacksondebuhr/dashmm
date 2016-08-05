@@ -23,13 +23,13 @@ int unif_level;         /// The level of uniform partition
 hpx_addr_t unif_count;  /// The address of a reduction LCO used to perform the
                         /// counting of the source and target points
 int *unif_count_value;  /// A local array holding the results
-Note *unif_grid;        /// A rankwise global holding the uniform grid
+Node *unif_grid;        /// A rankwise global holding the uniform grid
+hpx_addr_t unif_done;   /// A rankwise global holding an LCO
 
-hpx_addr_t unif_done;   /// A cyclic array for detecting completion of the
-                        /// uniform portion of tree creation
-
-hpx_addr_t sorted_src;  /// Array meta data for the sorted sources
-hpx_addr_t sorted_tar;  /// Array meta data for the sorted targets
+size_t sorted_src_count; /// How many sources this rank has
+Point *sorted_src;       /// The sorted sources
+size_t sorted_tar_count; /// How many targets this rank has
+Point *sorted_tar;       /// The sorted targets
 int *distribute;        /// Array giving the distribution of the uniform grid
 
 int threshold;
@@ -43,14 +43,14 @@ int *map_tar;
 int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                 hpx_addr_t targets_gas,
                                 hpx_addr_t domain_geometry) {
-  Array<Point> sources{sources_gas};
-  ArrayRef<Point> src_ref = sources.ref();
-  ArrayData<Point> src_data = src_ref.pin();
+  dashmm::Array<Point> sources{sources_gas};
+  dashmm::ArrayRef<Point> src_ref = sources.ref();
+  dashmm::ArrayData<Point> src_data = src_ref.pin();
   Point *s = src_data.value();
 
-  Array<Point> targets{targets_gas};
-  ArrayRef<Point> trg_ref = targets.ref();
-  ArrayData<Point> trg_data = trg_ref.pin();
+  dashmm::Array<Point> targets{targets_gas};
+  dashmm::ArrayRef<Point> trg_ref = targets.ref();
+  dashmm::ArrayData<Point> trg_data = trg_ref.pin();
   Point *t = trg_data.value();
 
   double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50};
@@ -58,7 +58,7 @@ int set_domain_geometry_handler(hpx_addr_t sources_gas,
   // NOTE: Here is an opportunity to do even more parallelism. This will be
   // a single thread per locality. Why not do the on locality reduction in
   // parallel.
-  for (int i = 0; i < src_ref.n(); ++i) {
+  for (size_t i = 0; i < src_ref.n(); ++i) {
     var[0] = fmin(var[0], s[i].x());
     var[1] = fmax(var[1], s[i].x());
     var[2] = fmin(var[2], s[i].y());
@@ -67,7 +67,7 @@ int set_domain_geometry_handler(hpx_addr_t sources_gas,
     var[5] = fmax(var[5], s[i].z());
   }
 
-  for (int i = 0; i < trg_ref.n(); ++i) {
+  for (size_t i = 0; i < trg_ref.n(); ++i) {
     var[0] = fmin(var[0], t[i].x());
     var[1] = fmax(var[1], t[i].x());
     var[2] = fmin(var[2], t[i].y());
@@ -167,8 +167,7 @@ void domain_geometry_op_handler(double *lhs, double *rhs, size_t size) {
 HPX_ACTION(HPX_FUNCTION, 0, domain_geometry_op_action,
            domain_geometry_op_handler, HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-int init_partition_handler(hpx_addr_t count, hpx_addr_t done,
-                           hpx_addr_t sources, hpx_addr_t targets, int level,
+int init_partition_handler(hpx_addr_t count, int level,
                            int limit, double cx, double cy, double cz,
                            double sz) {
   int rank = hpx_get_my_rank();
@@ -178,9 +177,6 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done,
   // Here we save the addresses of these object at the other ranks.
   if (rank) {
     unif_count = count;
-    unif_done = done;
-    sorted_src = sources;
-    sorted_tar = targets;
     unif_level = level;
     corner_x = cx;
     corner_y = cy;
@@ -191,24 +187,11 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done,
   // We here allocate space for the result of the counting
   unif_count_value = new int[dim3 * 2]();
 
-  // NOTE: Unlike the previous, this one should be on a rank-by-rank basis,
-  // so that future stuff can begin asap.
-
   // Setup unif_done LCO
-  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done,
-                                           sizeof(hpx_addr_t) * rank,
-                                           sizeof(hpx_addr_t));
-  hpx_addr_t *gate{nullptr};
-  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate))
-    return HPX_ERROR;
-
-  *gate = hpx_lco_and_new(1);
-  hpx_gas_unpin(curr_unif_done);
+  unif_done = hpx_lco_and_new(1);
 
   // NOTE: The uniform grid means an array of the nodes that give the
   // uniform partition. Each rank will have the same nodes in the array.
-  // NOTE: Is there a good reason for these to be part of an array in GAS?
-  // Is that important in some way?
 
   // Setup unif_grid
   unif_grid = new Node[2 * dim3];
@@ -225,7 +208,7 @@ int init_partition_handler(hpx_addr_t count, hpx_addr_t done,
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0, init_partition_action, init_partition_handler,
-           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT, HPX_INT,
+           HPX_ADDR, HPX_INT, HPX_INT,
            HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE);
 
 // This will assign the points to the uniform grid. This gives the points
@@ -299,7 +282,8 @@ HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler,
 // work will begin.
 int *init_point_exchange(int rank, const int *global_count,
                          const int *local_count, const int *local_offset,
-                         const Point *temp, Node *n, ArrayMetaData *meta,
+                         const Point *temp, Node *n,
+                         size_t sorted_count, Point **sorted,
                          char type) {
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1);
   int last = distribute[rank];
@@ -317,12 +301,10 @@ int *init_point_exchange(int rank, const int *global_count,
       global_count[i - 1];
   }
 
-  meta->size = sizeof(Point);
-  meta->count = num_points;
+  sorted_count = num_points;
 
   if (num_points > 0) {
-    meta->data = new char[sizeof(Point) * num_points]();
-    Point *p = reinterpret_cast<Point *>(meta->data);
+    *sorted = new Point[num_points]();
 
     *swap = new int[num_points]();
     *map = new int[num_points]();
@@ -344,14 +326,14 @@ int *init_point_exchange(int rank, const int *global_count,
 
       if (local_count[i]) {
         // Copy local points before merging remote points
-        memcpy(p + global_offset[i - first], &temp[local_offset[i]],
+        memcpy(*sorted + global_offset[i - first], &temp[local_offset[i]],
                sizeof(Point) * local_count[i]);
 
         if (local_count[i] == global_count[i]) {
           // This grid does not expect remote points.
           // Spawn adaptive partitioning
           hpx_call(HPX_HERE, partition_node_action, HPX_NULL,
-                   &curr, &p, swap, bin, map);
+                   &curr, sorted, swap, bin, map);
         } else {
           // Now use first_ as an iterator to trace the position to merge
           // remote points
@@ -360,7 +342,7 @@ int *init_point_exchange(int rank, const int *global_count,
       }
     }
   } else {
-    meta->data = nullptr;
+    *sorted = nullptr;
   }
 
   return global_offset;
@@ -400,35 +382,12 @@ HPX_ACTION(HPX_DEFAULT, 0, merge_points_action, merge_points_handler,
 // incoming points into the sorted list and will then spawn the adaptive
 // partition if this happens to be the last block for a given uniform grid.
 int recv_points_handler(void *args, size_t size) {
-  int rank = hpx_get_my_rank();
-  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done,
-                                           sizeof(hpx_addr_t) * rank,
-                                           sizeof(hpx_addr_t));
-  hpx_addr_t *gate{nullptr};
-  if (!hpx_gas_try_pin(curr_unif_done, (void **)&gate))
-    return HPX_ERROR;
-
   // Wait until the buffer is allocated before merging incoming messages
-  // TODO: Is there perhaps a way to do this action as a call-when on this gate?
-  hpx_lco_wait(*gate);
-  hpx_gas_unpin(curr_unif_done);
+  // We could do this as a call when, but then we need to be aware of the
+  // addresses for every rank's LCO. For now, we do this, as it is simpler.
+  hpx_lco_wait(unif_done);
 
   // Now merge incoming message
-  hpx_addr_t curr_sorted_src = hpx_addr_add(sorted_src,
-                                            sizeof(ArrayMetaData) * rank,
-                                            sizeof(ArrayMetaData));
-  hpx_addr_t curr_sorted_tar = hpx_addr_add(sorted_tar,
-                                            sizeof(ArrayMetaData) * rank,
-                                            sizeof(ArrayMetaData));
-  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr};
-  if (!hpx_gas_try_pin(curr_sorted_src, (void **)&meta_s) ||
-      !hpx_gas_try_pin(curr_sorted_tar, (void **)&meta_t)) {
-    return HPX_ERROR;
-  }
-
-  Point *s = reinterpret_cast<Point *>(meta_s->data);
-  Point *t = reinterpret_cast<Point *>(meta_t->data);
-
   int dim3 = pow(8, unif_level);
 
   // TODO: This bit where the message is interpreted might be made easier with
@@ -456,7 +415,8 @@ int recv_points_handler(void *args, size_t size) {
       int incoming_ns = count_s[i - first];
       if (incoming_ns) {
         hpx_call(HPX_HERE, merge_points_action, done,
-                 &s, &recv_s, &ns, &incoming_ns, &unif_count_value[i], &type);
+                 &sorted_src, &recv_s, &ns, &incoming_ns,
+                 &unif_count_value[i], &type);
         recv_s += incoming_ns;
       } else {
         hpx_lco_and_set(done, HPX_NULL);
@@ -473,8 +433,8 @@ int recv_points_handler(void *args, size_t size) {
       int incoming_nt = count_t[i - first];
       if (incoming_nt) {
         hpx_call(HPX_HERE, merge_points_action, done,
-                 &t, &recv_t, &nt, &incoming_nt, &unif_count_value[i + dim3],
-                 &type);
+                 &sorted_tar, &recv_t, &nt, &incoming_nt,
+                 &unif_count_value[i + dim3], &type);
         recv_t += incoming_nt;
       } else {
         hpx_lco_and_set(done, HPX_NULL);
@@ -489,8 +449,6 @@ int recv_points_handler(void *args, size_t size) {
   // triggers this will spawn more work, but not in a synchronous way.
   hpx_lco_wait(done);
   hpx_lco_delete_sync(done);
-  hpx_gas_unpin(curr_sorted_src);
-  hpx_gas_unpin(curr_sorted_tar);
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_points_action,
@@ -579,7 +537,6 @@ int recv_node_handler(int *compressed_tree, size_t size) {
 
   hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
 
-  hpx_gas_unpin(curr_unif_grid);
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler,
@@ -592,20 +549,19 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, recv_node_action, recv_node_handler,
 //
 // This will send one message for each grid box to all other localities.
 // This does allow for maximum parallelism. It is likely the right approach.
-int send_node_handler(Node *n, ArrayMetaData *meta, int id, int type) {
+int send_node_handler(Node *n, Point *sorted, int id, int type) {
   Node *curr = &n[id];
   int first = curr->first();
   int last = curr->last();
   int range = last - first + 1;
-  Point *p = reinterpret_cast<Point *>(meta->data);
 
   // Rearrange points
   int *map = (type ? map_tar : map_src);
   Point *temp = new Point[range];
   for (int i = first; i <= last; ++i) {
-    temp[i - first] = p[map[i]];
+    temp[i - first] = sorted[map[i]];
   }
-  memcpy(p + first, temp, sizeof(Point) * range);
+  memcpy(sorted + first, temp, sizeof(Point) * range);
   delete [] temp;
 
   // Exclude curr as it is already allocated on remote localities
@@ -657,15 +613,15 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
   int rank = hpx_get_my_rank();
   int num_ranks = hpx_get_num_ranks();
 
-  Array<Point> sources{sources_gas};
-  ArrayRef<Point> src_ref = sources.ref(rank);
-  ArrayData<Point> src_data = src_ref.pin();
+  dashmm::Array<Point> sources{sources_gas};
+  dashmm::ArrayRef<Point> src_ref = sources.ref(rank);
+  dashmm::ArrayData<Point> src_data = src_ref.pin();
   Point *p_s = src_data.value();
   int n_sources = src_ref.n();
 
-  Array<Point> targets{targets_gas};
-  ArrayRef<Point> trg_ref = targets.ref(rank);
-  ArrayData<Point> trg_data = trg_ref.pin();
+  dashmm::Array<Point> targets{targets_gas};
+  dashmm::ArrayRef<Point> trg_ref = targets.ref(rank);
+  dashmm::ArrayData<Point> trg_data = trg_ref.pin();
   Point *p_t = trg_data.value();
   int n_targets = trg_ref.n();
 
@@ -709,34 +665,18 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
 
 
   // Exchange points
-  hpx_addr_t curr_sorted_s = hpx_addr_add(sorted_src,
-                                          sizeof(ArrayMetaData) * rank,
-                                          sizeof(ArrayMetaData));
-  hpx_addr_t curr_sorted_t = hpx_addr_add(sorted_tar,
-                                          sizeof(ArrayMetaData) * rank,
-                                          sizeof(ArrayMetaData));
-  hpx_addr_t curr_unif_done = hpx_addr_add(unif_done,
-                                           sizeof(hpx_addr_t) * rank,
-                                           sizeof(hpx_addr_t));
-
-  hpx_addr_t *gate{nullptr};
-
-  if (!hpx_gas_try_pin(curr_sorted_s, (void **)&meta_s) ||
-      !hpx_gas_try_pin(curr_sorted_t, (void **)&meta_t) ||
-      !hpx_gas_try_pin(curr_unif_done, (void **)&gate))
-    return HPX_ERROR;
-
   Node *ns = unif_grid;
   Node *nt = &unif_grid[dim3];
 
-  // ?
   int *global_offset_s = init_point_exchange(rank, unif_count_value,
                                              local_scount, local_offset_s,
-                                             temp_s, ns, meta_s, 's');
+                                             temp_s, ns, sorted_src_count,
+                                             &sorted_src, 's');
   int *global_offset_t = init_point_exchange(rank, unif_count_value + dim3,
                                              local_tcount, local_offset_t,
-                                             temp_t, nt, meta_t, 't');
-  hpx_lco_and_set(*gate, HPX_NULL);
+                                             temp_t, nt, sorted_tar_count,
+                                             &sorted_tar, 't');
+  hpx_lco_and_set(unif_done, HPX_NULL);
 
   // So this one is pretty simple. It sends those points from this rank
   // going to the other rank in a parcel.
@@ -762,7 +702,7 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
         } else {
           hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE,
                                           send_node_action, dual_tree_complete,
-                                          hpx_lco_set_action, &ns, &meta_s,
+                                          hpx_lco_set_action, &ns, &sorted_src,
                                           &i, &s);
         }
 
@@ -771,7 +711,7 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
         } else {
           hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE,
                                           send_node_action, dual_tree_complete,
-                                          hpx_lco_set_action, &nt, &meta_t,
+                                          hpx_lco_set_action, &nt, &sorted_tar,
                                           &i, &t);
         }
       }
@@ -811,11 +751,6 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
   delete [] bin_tar;
   delete [] map_tar;
 
-  hpx_gas_unpin(curr_sorted_s);
-  hpx_gas_unpin(curr_sorted_t);
-  hpx_gas_unpin(curr_unif_grid);
-  hpx_gas_unpin(curr_unif_done);
-
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0, create_dual_tree_action, create_dual_tree_handler,
@@ -825,26 +760,9 @@ int finalize_partition_handler(void *unused, size_t size) {
   int rank = hpx_get_my_rank();
 
   delete [] unif_count_value;
-
-  hpx_addr_t done = hpx_addr_add(unif_done, sizeof(hpx_addr_t) * rank,
-                                 sizeof(hpx_addr_t));
-  hpx_addr_t sources = hpx_addr_add(sorted_src, sizeof(ArrayMetaData) * rank,
-                                    sizeof(ArrayMetaData));
-  hpx_addr_t targets = hpx_addr_add(sorted_tar, sizeof(ArrayMetaData) * rank,
-                                    sizeof(ArrayMetaData));
-
-  hpx_addr_t *gate{nullptr};
-  ArrayMetaData *meta_s{nullptr}, *meta_t{nullptr};
-
-  if (!hpx_gas_try_pin(done, (void **)&gate) ||
-      !hpx_gas_try_pin(sources, (void **)&meta_s) ||
-      !hpx_gas_try_pin(targets, (void **)&meta_t)) {
-    return HPX_ERROR;
-  }
-
-  hpx_lco_delete_sync(*gate);
-  delete [] meta_s->data;
-  delete [] meta_t->data;
+  hpx_lco_delete_sync(unif_done);
+  delete [] sorted_src;
+  delete [] sorted_tar;
 
   int dim3 = pow(8, unif_level);
 
@@ -864,8 +782,9 @@ int finalize_partition_handler(void *unused, size_t size) {
 
     for (int j = 0; j < 8; ++j) {
       Node *child = curr->child(j);
-      if (child)
+      if (child) {
         child->destroy(true);
+      }
     }
 
     for (int j = 0; j < 8; ++j) {
@@ -884,8 +803,9 @@ int finalize_partition_handler(void *unused, size_t size) {
 
     for (int j = 0; j < 8; ++j) {
       Node *child = curr->child(j);
-      if (child)
+      if (child) {
         child->destroy(false);
+      }
     }
   }
 
@@ -896,8 +816,9 @@ int finalize_partition_handler(void *unused, size_t size) {
 
     for (int j = 0; j < 8; ++j) {
       Node *child = curr->child(j);
-      if (child)
+      if (child) {
         child->destroy(true);
+      }
     }
 
     for (int j = 0; j < 8; ++j) {
@@ -911,10 +832,6 @@ int finalize_partition_handler(void *unused, size_t size) {
 
   delete [] unif_grid;
   delete [] distribute;
-
-  hpx_gas_unpin(done);
-  hpx_gas_unpin(sources);
-  hpx_gas_unpin(targets);
 
   return HPX_SUCCESS;
 }
