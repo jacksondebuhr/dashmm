@@ -1054,8 +1054,8 @@ class LaplaceSPH {
       e2e(S_py, E[sall], 1, 0, 2); 
  
       e2e(S_mx, E[eall], 1, 0, 3); 
-      e2e(S_mx, E[1357], 1, 0, 2); 
-      e2e(S_mx, E[57], 1, 0, 2); 
+      e2e(S_mx, E[e1357], 1, 0, 2); 
+      e2e(S_mx, E[e57], 1, 0, 2); 
       e2e(S_mx, E[e5], 1, 0, 2); 
       e2e(S_px, E[wall], -1, 0, 2); 
       break; 
