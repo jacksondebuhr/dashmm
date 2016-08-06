@@ -1,6 +1,15 @@
 #include "utils.h"
 
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
 #include <functional>
+
+using dashmm::Point;
+using dashmm::Array;
+using dashmm::ArrayRef;
+using dashmm::ArrayData;
+
 
 void set_point_in_cube(Point &p) {
   double x = 1.0 * rand() / RAND_MAX - 0.5;
@@ -16,22 +25,6 @@ void set_point_on_sphere(Point &p) {
   double y = sin(theta) * sin(phi);
   double z = cos(theta);
   p = Point{x, y, z};
-}
-
-uint64_t split(unsigned k) {
-  uint64_t split = k & 0x1fffff;
-  split = (split | split << 32) & 0x1f00000000ffff;
-  split = (split | split << 16) & 0x1f0000ff0000ff;
-  split = (split | split << 8)  & 0x100f00f00f00f00f;
-  split = (split | split << 4)  & 0x10c30c30c30c30c3;
-  split = (split | split << 2)  & 0x1249249249249249;
-  return split;
-}
-
-uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
-  uint64_t key = 0;
-  key |= split(x) | split(y) << 1 | split(z) << 2;
-  return key;
 }
 
 Point *generate_weak_scaling_input(int n, char datatype, int seed) {
@@ -103,11 +96,11 @@ int point_count(char scaling, int n) {
   }
 }
 
-dashmm::Array<Point> generate_points(char scaling, char datatype, int nsrc,
+Array<Point> generate_points(char scaling, char datatype, int nsrc,
                                       int nseed, int shift) {
   size_t my_nsrc = point_count(scaling, nsrc);
 
-  dashmm::Array<Point> retval{};
+  Array<Point> retval{};
   retval.allocate(my_nsrc);
 
   Point *data{nullptr};

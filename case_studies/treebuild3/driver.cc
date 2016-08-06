@@ -2,6 +2,7 @@
 #include <getopt.h>
 
 #include "dashmm/array.h"
+using dashmm::Array;
 
 #include "tree.h"
 
@@ -19,54 +20,26 @@ int main_handler(char scaling, char datatype,
                  int nsrc, int ntar, int threshold, int nseed,
                  hpx_addr_t source_gas, hpx_addr_t target_gas) {
   int num_ranks = hpx_get_num_ranks();
+  Array<Point> sources{source_gas};
+  Array<Point> targets{target_gas};
 
   // Partition points to create dual tree
 
   hpx_time_t timer_start = hpx_time_now();
 
   // Determine domain geometry
-  hpx_addr_t domain_geometry =
-    hpx_lco_reduce_new(num_ranks, sizeof(double) * 6,
-                       domain_geometry_init_action,
-                       domain_geometry_op_action);
-
-  hpx_bcast_lsync(set_domain_geometry_action, HPX_NULL,
-                  &source_gas, &target_gas, &domain_geometry);
-
-  double var[6];
-  hpx_lco_get(domain_geometry, sizeof(double) * 6, &var);
-  hpx_lco_delete_sync(domain_geometry);
-  double size_x = var[1] - var[0];
-  double size_y = var[3] - var[2];
-  double size_z = var[5] - var[4];
-  size = fmax(size_x, fmax(size_y, size_z));
-  corner_x = (var[1] + var[0] - size) / 2;
-  corner_y = (var[3] + var[2] - size) / 2;
-  corner_z = (var[5] + var[4] - size) / 2;
-
-  // Measure the reduction time
+  compute_domain_geometry(sources, targets);
   hpx_time_t timer_domain = hpx_time_now();
 
-  // Choose uniform partition level such that the number of grids is no less
-  // than the number of ranks
-  unif_level = ceil(log(num_ranks) / log(8)) + 1;
-
-  int dim3 = pow(8, unif_level);
-  unif_count = hpx_lco_reduce_new(num_ranks, sizeof(int) * (dim3 * 2),
-                                  int_sum_ident_op,
-                                  int_sum_op);
-
-  hpx_bcast_rsync(init_partition_action, &unif_count, &unif_level, &threshold,
-                  &corner_x, &corner_y, &corner_z, &size);
-
-  // Measure the partitioning setup. This is all just getting this and that
-  // ready to do. No real work is done in the above.
+  // Perform some basic setup
+  setup_basic_data(threshold);
   hpx_time_t timer_middle = hpx_time_now();
 
-  hpx_bcast_rsync(create_dual_tree_action, &source_gas, &target_gas);
+  // Start the partitioning proper
+  create_dual_tree(sources, targets);
+  hpx_time_t timer_end = hpx_time_now();
 
   // All done, spit out some timing information before cleaning up and halting
-  hpx_time_t timer_end = hpx_time_now();
   double elapsed_total = hpx_time_diff_ms(timer_start, timer_end) / 1e3;
   double elapsed_reduction = hpx_time_diff_ms(timer_start, timer_domain) / 1e3;
   double elapsed_first = hpx_time_diff_ms(timer_domain, timer_middle) / 1e3;
@@ -76,10 +49,8 @@ int main_handler(char scaling, char datatype,
   std::cout << "  Setup: " << elapsed_first << "\n";
   std::cout << "  Partition: " << elapsed_second << "\n";
 
-  // This is just deleting the allocated resources. Nothing too special here.
-  hpx_bcast_rsync(finalize_partition_action, NULL, 0);
-
-  hpx_lco_delete_sync(unif_count);
+  // Here we clean up the allocated resources
+  finalize_partition();
 
   hpx_exit(0, nullptr);
 }
@@ -159,9 +130,9 @@ int main(int argc, char *argv[]) {
   }
 
   // First get the data setup
-  dashmm::Array<Point> sources = generate_points(scaling, datatype,
+  Array<Point> sources = generate_points(scaling, datatype,
                                                   nsrc, nseed, 0);
-  dashmm::Array<Point> targets = generate_points(scaling, datatype,
+  Array<Point> targets = generate_points(scaling, datatype,
                                                   ntar, nseed, nseed);
 
   // Then build the tree

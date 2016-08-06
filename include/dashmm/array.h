@@ -309,7 +309,9 @@ class Array {
   }
 
   // TODO do we want to add a reduction map as well? That would be useful
-  // in some cases. Especially internally for the library.
+  // in some cases. Especially internally for the library. The catch here is
+  // that the library would need to define the array reduce action with the
+  // appropriate template types, before knowing what the user will want.
 
   // TODO we need to add a method to sort the array segments in some way.
   // this is in place, bucket style probably. Probably provide an ordering

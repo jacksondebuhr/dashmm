@@ -4,30 +4,18 @@
 #include <vector>
 #include "hpx/hpx.h"
 
-#include "utils.h"
-
-#include "dashmm/reductionops.h"
-using dashmm::int_sum_ident_op;
-using dashmm::int_sum_op;
+#include "dashmm/array.h"
+#include "dashmm/index.h"
+#include "dashmm/point.h"
 
 
-// TODO: Gradually remove these dependences
-// Actions that people need to know about
-extern hpx_action_t domain_geometry_init_action;
-extern hpx_action_t domain_geometry_op_action;
-extern hpx_action_t set_domain_geometry_action;
-extern hpx_action_t init_partition_action;
-extern hpx_action_t create_dual_tree_action;
-extern hpx_action_t finalize_partition_action;
-
-// TODO: Gradually remove these dependences
-// Some globals that need to be exposed
-extern double corner_x;
-extern double corner_y;
-extern double corner_z;
-extern double size;
-extern int unif_level;
-extern hpx_addr_t unif_count;
+// Interface that has been introduced
+void compute_domain_geometry(dashmm::Array<dashmm::Point> sources,
+                             dashmm::Array<dashmm::Point> targets);
+void setup_basic_data(int threshold);
+void create_dual_tree(dashmm::Array<dashmm::Point> &sources,
+                      dashmm::Array<dashmm::Point> &targets);
+void finalize_partition();
 
 
 /// A node of the tree.
@@ -35,24 +23,28 @@ class Node {
  public:
   /// Default construct. Nothing much here
   Node() : idx_{}, first_{-1}, last_{-1}, parent_{nullptr} {
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 8; ++i) {
       child_[i] = nullptr;
+    }
     sema_ = HPX_NULL;
     complete_ = HPX_NULL;
   }
 
   /// Constuct with a known index.
-  Node(Index idx): idx_{idx}, first_{-1}, last_{-1}, parent_{nullptr} {
-    for (int i = 0; i < 8; ++i)
+  Node(dashmm::Index idx)
+      : idx_{idx}, first_{-1}, last_{-1}, parent_{nullptr} {
+    for (int i = 0; i < 8; ++i) {
       child_[i] = nullptr;
+    }
     sema_ = hpx_lco_sema_new(1);
     complete_ = hpx_lco_and_new(8);
   }
 
-  Node(Index idx, int first, int last, Node *parent)
+  Node(dashmm::Index idx, int first, int last, Node *parent)
       : idx_{idx}, first_{first}, last_{last}, parent_{parent} {
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < 8; ++i) {
       child_[i] = nullptr;
+    }
     sema_ = hpx_lco_sema_new(1);
     complete_ = hpx_lco_and_new(8);
   }
@@ -60,7 +52,7 @@ class Node {
   ~Node() { }
 
   /// These are all simple accessors
-  Index index() const {return idx_;}
+  dashmm::Index index() const {return idx_;}
   int first() const {return first_;}
   int last() const {return last_;}
   Node *parent() const {return parent_;}
@@ -69,7 +61,7 @@ class Node {
   hpx_addr_t complete() const {return complete_;}
 
   // These are simple mutators
-  void set_index(Index idx) {idx_ = idx;}
+  void set_index(dashmm::Index idx) {idx_ = idx;}
   void set_first(int first) {first_ = first;}
   void set_last(int last) {last_ = last;}
   void set_parent(Node *parent) {parent_ = parent;}
@@ -89,9 +81,8 @@ class Node {
   /// size - the size of this node
   ///
   /// TODO: we can likely merge the bin and swap arrays to save on memory
-  void partition(Point *P, int *swap, int *bin, int *map, int threshold,
-                 double corner_x, double corner_y, double corner_z,
-                 double size);
+  void partition(dashmm::Point *P, int *swap, int *bin, int *map,
+                 int threshold, dashmm::Point corner, double size);
 
   /// Return the number of descendants of this node - this is recursive, and
   /// collects all of them
@@ -107,7 +98,7 @@ class Node {
   void destroy(bool allocated_in_array);
 
  private:
-  Index idx_;               /// index of the node
+  dashmm::Index idx_;       /// index of the node
   int first_;               /// first index into the local share of points that
                             ///  are represented by this node
   int last_;                /// last index into the local share of points that
