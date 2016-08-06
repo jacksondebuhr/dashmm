@@ -177,6 +177,15 @@ class Array {
     return retval;
   }
 
+
+  // TODO: Do we want an allocate method that also takes an action and an
+  // environment, which will allocate, and then call the action on each
+  // segment. This would avoid the generate and then copy into GAS thing.
+  //
+  // Or perhaps what this means is we need to make map more flexible. It could
+  // be one action per rank, or it could be otherwise.
+
+
   /// Destroy the Array
   ///
   /// This will destroy all global allocations associated with the Array.
@@ -273,6 +282,11 @@ class Array {
     return retval;
   }
 
+  // TODO: I think we want to add a couple extra arguments, or template
+  // parameters or something. The first is if the work should map on each
+  // rank into one segment per thread, or just as one large segment. Then
+  // if we are mapping onto threads, we pick an overdecomposition factor.
+  // both of these would have defaults.
   /// Map an action onto each record in the Array
   ///
   /// This will cause the action represented by the given argument, to be
@@ -293,6 +307,18 @@ class Array {
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
   }
+
+  // TODO do we want to add a reduction map as well? That would be useful
+  // in some cases. Especially internally for the library.
+
+  // TODO we need to add a method to sort the array segments in some way.
+  // this is in place, bucket style probably. Probably provide an ordering
+  // function. That is, give a rank to each (multiple records can have the
+  // same rank)
+
+  // TODO we need to add a method to sort across localities. This temporarily
+  // allocated more memory, and replaces segments. Or perhaps it gives a whole
+  // new array, and the user must get rid of the previous
 
  private:
   /// The global address of the Array meta data.
