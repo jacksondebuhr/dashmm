@@ -93,6 +93,9 @@ class FMM97 {
                bool curr_is_leaf, DomainGeometry *domain) const {
     Index t_index = curr->idx;
 
+    // If a source node S is at the same level as \p curr and is well separated
+    // from \p curr, skip S as its contribution to \p curr has been processed by
+    // the parent of \p curr. 
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -102,9 +105,7 @@ class FMM97 {
             curr->dag.StoT(&(*S)->dag);
           }
         } else {
-          if (well_sep_test((*S)->idx, t_index)) {
-            curr->dag.MtoL(&(*S)->dag);
-          } else {
+          if (!well_sep_test((*S)->idx, t_index)) {
             proc_coll_recur(curr, *S);
           }
         }
@@ -113,9 +114,8 @@ class FMM97 {
       if (curr->idx.level() >= 2) 
         curr->dag.LtoT(&curr->dag);
     } else {
-      bool do_I2I = curr->idx.level() >= 1; 
-      if (do_I2I) 
-        curr->dag.add_interm();
+      if (curr->idx.level() >= 1) 
+        curr->dag.add_interm(); 
 
       std::vector<sourcenode_t *> newcons{};
 
@@ -127,13 +127,14 @@ class FMM97 {
             newcons.push_back(*S);
           }
         } else {
-          // If S is at the same level as \p curr and is well
-          // separated from \p curr, skip S as its contribution to \p
-          // curr has been processed by the parent of \p curr.          
-          
           if (!well_sep_test((*S)->idx, t_index)) {
+            bool do_I2I = (curr->idx.level() >= 1 && 
+                           ((*S)->idx.x() != t_index.x() || 
+                            (*S)->idx.y() != t_index.y() ||
+                            (*S)->idx.z() != t_index.z())); 
+
             bool S_is_leaf = true; 
-              
+
             for (size_t i = 0; i < 8; ++i) {
               sourcenode_t *child = (*S)->child[i]; 
               if (child != nullptr) {

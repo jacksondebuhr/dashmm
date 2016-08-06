@@ -78,15 +78,17 @@ class LaplaceSPH {
       char *data = new char[bytes](); 
       views_.add_view(0, bytes, data); 
     } else if (role == kSourceIntermediate) {
-      size_t bytes = sizeof(dcomplex_t) * nexp; 
-      char *data = new char[bytes * 6](); 
-      for (int i = 0; i < 6; ++i) 
-        views_.add_view(i, bytes, data + bytes * i); 
+      size_t bytes = sizeof(dcomplex_t) * nexp;       
+      for (int i = 0; i < 6; ++i) {
+        char *data = new char[bytes](); 
+        views_.add_view(i, bytes, data); 
+      }
     } else if (role == kTargetIntermediate) {
       size_t bytes = sizeof(dcomplex_t) * nexp; 
-      char *data = new char[bytes * 28](); 
-      for (int i = 0; i < 28; ++i) 
-        views_.add_view(i, bytes, data + bytes * i);
+      for (int i = 0; i < 28; ++i) {
+        char *data = new char[bytes](); 
+        views_.add_view(i, bytes, data); 
+      }
     }
   }
 
@@ -645,14 +647,30 @@ class LaplaceSPH {
     expansion_t *retval{new expansion_t{views_.center(), 
           n_digits, kSourceIntermediate}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
-    dcomplex_t *E = 
+    
+    // Addresses of the views
+    dcomplex_t *E_px = 
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
+    dcomplex_t *E_mx = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(1)); 
+    dcomplex_t *E_py = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(2)); 
+    dcomplex_t *E_my = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(3)); 
+    dcomplex_t *E_pz = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(4)); 
+    dcomplex_t *E_mz = 
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(5)); 
+
+    // Addresses of exponential expansions in the positive axis direction
+    dcomplex_t *EP[3] = {E_px, E_py, E_pz}; 
+    // Addresses of exponential expansions in the negative axis direction
+    dcomplex_t *EM[3] = {E_mx, E_my, E_mz}; 
 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     int p = table->p(); 
     int s = table->s(); 
     int nsh = (p + 1) * (p + 2) / 2; 
-    int nexp = table->nexp(); 
     const double *weight_ = table->weight(); 
     const int *m_ = table->m(); 
     const int *f_ = table->f(); 
@@ -665,11 +683,6 @@ class LaplaceSPH {
     // Allocate scratch space to handle x- and y-direction exponential expansions
     dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2]; 
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2]; 
-
-    // Addresses of exponential expansions in the positive axis direction
-    dcomplex_t *EP[3] = {E, E + 2 * nexp, E + 4 * nexp}; 
-    // Addresses of exponential expansions in the negative axis direction
-    dcomplex_t *EM[3] = {E + nexp, E + 3 * nexp, E + 5 * nexp}; 
 
     // Setup y-direction. Rotate the multipole expansion M about z-axis by -pi /
     // 2, making (x, y, z) frame (-y, x, z). Next, rotate it again about the new
@@ -730,8 +743,8 @@ class LaplaceSPH {
           dcomplex_t power_I {0.0, 1.0}; 
           for (int m = 1; m <= f_[k]; ++m) {
             int idx = smf_[k] + (j - 1) * f_[k] + (m - 1); 
-            up += 2 * real(ealphaj[idx]) * (z1[m] + z2[m]) * power_I; 
-            dn += 2 * real(ealphaj[idx]) * (z1[m] - z2[m]) * power_I; 
+            up += 2 * real(ealphaj[idx] * (z1[m] + z2[m])) * power_I; 
+            dn += 2 * real(ealphaj[idx] * (z1[m] - z2[m])) * power_I; 
             power_I *= dcomplex_t{0.0, 1.0};
           }
           EP[dir][offset] = weight * up;
@@ -770,19 +783,24 @@ class LaplaceSPH {
     int n_digits = views_.n_digits(); 
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits); 
     int nexp = table->nexp(); 
-    const dcomplex_t *S = 
+    const dcomplex_t *S_px = 
       reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
-    const dcomplex_t *S_px = S; // +x direction
-    const dcomplex_t *S_mx = S + nexp; // -x direction
-    const dcomplex_t *S_py = S + nexp * 2; // +y direction
-    const dcomplex_t *S_my = S + nexp * 3; // -y direction
-    const dcomplex_t *S_pz = S + nexp * 4; // +z direction
-    const dcomplex_t *S_mz = S + nexp * 5; // -z direction
+    const dcomplex_t *S_mx = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(1)); 
+    const dcomplex_t *S_py = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(2)); 
+    const dcomplex_t *S_my = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(3)); 
+    const dcomplex_t *S_pz = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(4)); 
+    const dcomplex_t *S_mz = 
+      reinterpret_cast<dcomplex_t *>(views_.view_data(5)); 
 
     ViewSet views{n_digits, kTargetIntermediate, Point{px, py, pz}}; 
 
     // Each S is at most going to contribute 3 views to the exponential
     // expansions on the target side. 
+    size_t view_size = nexp * sizeof(dcomplex_t); 
     dcomplex_t *work = new dcomplex_t[nexp * 3](); 
     dcomplex_t *T1 = work; 
     dcomplex_t *T2 = work + nexp; 
@@ -796,137 +814,137 @@ class LaplaceSPH {
     // operations. Value 0 is chosen for the constructor of the Index class. 
     if (dz == 3) {
       e2e(T1, S_mz, dx, dy, 0); 
-      views.add_view(uall, nexp, C1); 
+      views.add_view(uall, view_size, C1); 
     } else if (dz == -2) {
       e2e(T1, S_pz, -dx, -dy, 0); 
-      views.add_view(dall, nexp, C1); 
+      views.add_view(dall, view_size, C1); 
     } else if (dy == 3) {
       e2e(T1, S_my, dz, dx, 0); 
-      views.add_view(nall, nexp, C1);
+      views.add_view(nall, view_size, C1);
     } else if (dy == -2) {
       e2e(T1, S_py, -dz, -dx, 0); 
-      views.add_view(sall, nexp, C1); 
+      views.add_view(sall, view_size, C1); 
     } else if (dx == 3) {
       e2e(T1, S_mx, -dz, dy, 0); 
-      views.add_view(eall, nexp, C1); 
+      views.add_view(eall, view_size, C1); 
     } else if (dx == -2) {
       e2e(T1, S_px, dz, -dy, 0); 
-      views.add_view(wall, nexp, C1); 
+      views.add_view(wall, view_size, C1); 
     } else {
       if (dz == 2) {
         e2e(T1, S_mz, dx, dy, 0); 
-        views.add_view(u1234, nexp, C1); 
+        views.add_view(u1234, view_size, C1); 
 
         if (dy == -1) {
           e2e(T2, S_py, -dz, -dx, 0); 
-          views.add_view(s78, nexp, C2); 
+          views.add_view(s78, view_size, C2); 
         
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
-            views.add_view(w6, nexp, C3); 
+            views.add_view(w6, view_size, C3); 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
-            views.add_view(e5, nexp, C3); 
+            views.add_view(e5, view_size, C3); 
           }
         } else if (dy == 2) {
           e2e(T2, S_my, dz, dx, 0); 
-          views.add_view(n56, nexp, C2); 
+          views.add_view(n56, view_size, C2); 
         
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
-            views.add_view(w8, nexp, C3); 
+            views.add_view(w8, view_size, C3); 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
-            views.add_view(e7, nexp, C3); 
+            views.add_view(e7, view_size, C3); 
           } 
         } else {
           if (dx == -1) {            
             e2e(T2, S_px, dz, -dy, 0); 
-            views.add_view(w68, nexp, C2); 
+            views.add_view(w68, view_size, C2); 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0); 
-            views.add_view(e57, nexp, C2); 
+            views.add_view(e57, view_size, C2); 
           }
         }
       } else if (dz == -1) {
         e2e(T1, S_pz, -dx, -dy, 0); 
-        views.add_view(d5678, nexp, C1);
+        views.add_view(d5678, view_size, C1);
 
         if (dy == -1) {
           e2e(T2, S_py, -dz, -dx, 0); 
-          views.add_view(s34, nexp, C2); 
+          views.add_view(s34, view_size, C2); 
 
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
-            views.add_view(w2, nexp, C3); 
+            views.add_view(w2, view_size, C3); 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
-            views.add_view(e1, nexp, C3); 
+            views.add_view(e1, view_size, C3); 
           } 
         } else if (dy == 2) {
           e2e(T2, S_my, dz, dx, 0);
-          views.add_view(n12, nexp, C2); 
+          views.add_view(n12, view_size, C2); 
 
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0);
-            views.add_view(w4, nexp, C3); 
+            views.add_view(w4, view_size, C3); 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0);
-            views.add_view(e3, nexp, C3); 
+            views.add_view(e3, view_size, C3); 
           } 
         } else {
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
-            views.add_view(w24, nexp, C2); 
+            views.add_view(w24, view_size, C2); 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
-            views.add_view(e13, nexp, C2); 
+            views.add_view(e13, view_size, C2); 
           }
         }
       } else { 
         if (dy == -1) {
           e2e(T1, S_py, -dz, -dx, 0);
-          views.add_view(s3478, nexp, C1); 
+          views.add_view(s3478, view_size, C1); 
 
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
             e2e(T3, S_px, dz, -dy, 0);
-            views.add_view(w2, nexp, C2); 
-            views.add_view(w6, nexp, C3); 
+            views.add_view(w2, view_size, C2); 
+            views.add_view(w6, view_size, C3); 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             e2e(T3, S_mx, -dz, dy, 0);
-            views.add_view(e1, nexp, C2); 
-            views.add_view(e5, nexp, C3); 
+            views.add_view(e1, view_size, C2); 
+            views.add_view(e5, view_size, C3); 
           } 
         } else if (dy == 2) {
           e2e(T1, S_my, dz, dx, 0);
-          views.add_view(n1256, nexp, C1); 
+          views.add_view(n1256, view_size, C1); 
 
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
             e2e(T3, S_px, dz, -dy, 0);
-            views.add_view(w4, nexp, C2); 
-            views.add_view(w8, nexp, C3); 
+            views.add_view(w4, view_size, C2); 
+            views.add_view(w8, view_size, C3); 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             e2e(T3, S_mx, -dz, dy, 0);
-            views.add_view(e3, nexp, C2); 
-            views.add_view(e7, nexp, C3); 
+            views.add_view(e3, view_size, C2); 
+            views.add_view(e7, view_size, C3); 
           }
         } else { 
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
-            views.add_view(w2468, nexp, C2); 
+            views.add_view(w2468, view_size, C2); 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
-            views.add_view(e1357, nexp, C2); 
+            views.add_view(e1357, view_size, C2); 
           }
         }
       }
     }
-    expansion_t retval{views};       
-    return std::unique_ptr<expansion_t>{&retval}; 
+    expansion_t *retval = new expansion_t{views};       
+    return std::unique_ptr<expansion_t>{retval}; 
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
@@ -947,7 +965,9 @@ class LaplaceSPH {
     uLaplaceSPHTable &table = builtin_laplace_table_.at(n_digits);
     int nexp = table->nexp(); 
 
-    dcomplex_t *E = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
+    dcomplex_t *E[28]{nullptr}; 
+    for (int i = 0; i < 28; ++i) 
+      E[i] = reinterpret_cast<dcomplex_t *>(views_.view_data(i)); 
     dcomplex_t *L = 
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
     dcomplex_t *S = new dcomplex_t[nexp * 6](); 
@@ -960,134 +980,138 @@ class LaplaceSPH {
 
     switch (to_child) {
     case 0: 
-      e2e(S_mz, &E[uall * nexp], 0, 0, 3); 
-      e2e(S_mz, &E[u1234 * nexp], 0, 0, 2); 
-      e2e(S_pz, &E[dall * nexp], 0, 0, 2); 
+      e2e(S_mz, E[uall], 0, 0, 3); 
+      e2e(S_mz, E[u1234], 0, 0, 2); 
+      e2e(S_pz, E[dall], 0, 0, 2); 
 
-      e2e(S_my, &E[nall * nexp], 0, 0, 3); 
-      e2e(S_my, &E[n1256 * nexp], 0, 0, 2); 
-      e2e(S_my, &E[n12 * nexp], 0, 0, 2); 
-      e2e(S_py, &E[sall * nexp], 0, 0, 2); 
+      e2e(S_my, E[nall], 0, 0, 3); 
+      e2e(S_my, E[n1256], 0, 0, 2); 
+      e2e(S_my, E[n12], 0, 0, 2); 
+      e2e(S_py, E[sall], 0, 0, 2); 
 
-      e2e(S_mx, &E[eall * nexp], 0, 0, 3); 
-      e2e(S_mx, &E[e1357 * nexp], 0, 0, 2); 
-      e2e(S_mx, &E[e13 * nexp], 0, 0, 2); 
-      e2e(S_mx, &E[e1 * nexp], 0, 0, 2); 
-      e2e(S_px, &E[wall * nexp], 0, 0, 2); 
+      e2e(S_mx, E[eall], 0, 0, 3); 
+      e2e(S_mx, E[e1357], 0, 0, 2); 
+      e2e(S_mx, E[e13], 0, 0, 2); 
+      e2e(S_mx, E[e1], 0, 0, 2); 
+      e2e(S_px, E[wall], 0, 0, 2); 
       break; 
     case 1: 
-      e2e(S_mz, &E[uall * nexp], -1, 0, 3); 
-      e2e(S_mz, &E[u1234 * nexp], -1, 0, 2); 
-      e2e(S_pz, &E[dall * nexp], 1, 0, 2); 
+      e2e(S_mz, E[uall], -1, 0, 3); 
+      e2e(S_mz, E[u1234], -1, 0, 2); 
+      e2e(S_pz, E[dall], 1, 0, 2); 
 
-      e2e(S_my, &E[nall * nexp], 0, -1, 3); 
-      e2e(S_my, &E[n1256 * nexp], 0, -1, 2); 
-      e2e(S_my, &E[n12 * nexp], 0, -1, 2); 
-      e2e(S_py, &E[sall * nexp], 0, 1, 2); 
+      e2e(S_my, E[nall], 0, -1, 3); 
+      e2e(S_my, E[n1256], 0, -1, 2); 
+      e2e(S_my, E[n12], 0, -1, 2); 
+      e2e(S_py, E[sall], 0, 1, 2); 
 
-      e2e(S_mx, &E[eall * nexp], 0, 0, 2); 
-      e2e(S_px, &E[wall * nexp], 0, 0, 3); 
-      e2e(S_px, &E[w2468 * nexp], 0, 0, 2); 
-      e2e(S_px, &E[w24 * nexp], 0, 0, 2); 
-      e2e(S_px, &E[w2 * nexp], 0, 0, 2); 
+      e2e(S_mx, E[eall], 0, 0, 2); 
+      e2e(S_px, E[wall], 0, 0, 3); 
+      e2e(S_px, E[w2468], 0, 0, 2); 
+      e2e(S_px, E[w24], 0, 0, 2); 
+      e2e(S_px, E[w2], 0, 0, 2); 
       break;
     case 2: 
-      e2e(S_mz, &E[uall * nexp], 0, -1, 3); 
-      e2e(S_mz, &E[u1234 * nexp], 0, -1, 2); 
-      e2e(S_pz, &E[dall * nexp], 0, 1, 2); 
+      e2e(S_mz, E[uall], 0, -1, 3); 
+      e2e(S_mz, E[u1234], 0, -1, 2); 
+      e2e(S_pz, E[dall], 0, 1, 2); 
 
-      e2e(S_my, &E[nall * nexp], 0, 0, 2); 
-      e2e(S_py, &E[sall * nexp], 0, 0, 3); 
-      e2e(S_py, &E[s3478 * nexp], 0, 0, 2); 
-      e2e(S_py, &E[s34 * nexp], 0, 0, 2); 
+      e2e(S_my, E[nall], 0, 0, 2); 
+      e2e(S_py, E[sall], 0, 0, 3); 
+      e2e(S_py, E[s3478], 0, 0, 2); 
+      e2e(S_py, E[s34], 0, 0, 2); 
 
-      e2e(S_mx, &E[eall * nexp], 0, -1, 3); 
-      e2e(S_mx, &E[e1357 * nexp], 0, -1, 2); 
-      e2e(S_mx, &E[e13 * nexp], 0, -1, 2); 
-      e2e(S_mx, &E[e3 * nexp], 0, -1, 2); 
-      e2e(S_px, &E[wall * nexp], 0, 1, 2); 
+      e2e(S_mx, E[eall], 0, -1, 3); 
+      e2e(S_mx, E[e1357], 0, -1, 2); 
+      e2e(S_mx, E[e13], 0, -1, 2); 
+      e2e(S_mx, E[e3], 0, -1, 2); 
+      e2e(S_px, E[wall], 0, 1, 2); 
       break; 
     case 3: 
-      e2e(S_mz, &E[uall * nexp], -1, -1, 3); 
-      e2e(S_mz, &E[u1234 * nexp], -1, -1, 2); 
-      e2e(S_pz, &E[dall * nexp], 1, 1, 2); 
+      e2e(S_mz, E[uall], -1, -1, 3); 
+      e2e(S_mz, E[u1234], -1, -1, 2); 
+      e2e(S_pz, E[dall], 1, 1, 2); 
       
-      e2e(S_my, &E[nall * nexp], 0, -1, 2); 
-      e2e(S_py, &E[sall * nexp], 0, 1, 3); 
-      e2e(S_py, &E[s3478 * nexp], 0, 1, 2); 
-      e2e(S_py, &E[s34 * nexp], 0, 1, 2); 
+      e2e(S_my, E[nall], 0, -1, 2); 
+      e2e(S_py, E[sall], 0, 1, 3); 
+      e2e(S_py, E[s3478], 0, 1, 2); 
+      e2e(S_py, E[s34], 0, 1, 2); 
       
-      e2e(S_mx, &E[eall * nexp], 0, -1, 2); 
-      e2e(S_px, &E[wall * nexp], 0, 1, 3); 
-      e2e(S_px, &E[w2468 * nexp], 0, 1, 2); 
-      e2e(S_px, &E[w24 * nexp], 0, 1, 2); 
-      e2e(S_px, &E[w4 * nexp], 0, 1, 2); 
+      e2e(S_mx, E[eall], 0, -1, 2); 
+      e2e(S_px, E[wall], 0, 1, 3); 
+      e2e(S_px, E[w2468], 0, 1, 2); 
+      e2e(S_px, E[w24], 0, 1, 2); 
+      e2e(S_px, E[w4], 0, 1, 2); 
       break; 
     case 4: 
-      e2e(S_mz, &E[uall * nexp], 0, 0, 2); 
-      e2e(S_pz, &E[dall * nexp], 0, 0, 3); 
-      e2e(S_pz, &E[d5678 * nexp], 0, 0, 2); 
+      e2e(S_mz, E[uall], 0, 0, 2); 
+      e2e(S_pz, E[dall], 0, 0, 3); 
+      e2e(S_pz, E[d5678], 0, 0, 2); 
 
-      e2e(S_my, &E[nall * nexp], -1, 0, 3); 
-      e2e(S_my, &E[n1256 * nexp], -1, 0, 2); 
-      e2e(S_my, &E[n56 * nexp], -1, 0, 2); 
-      e2e(S_py, &E[sall * nexp], 1, 0, 2); 
+      e2e(S_my, E[nall], -1, 0, 3); 
+      e2e(S_my, E[n1256], -1, 0, 2); 
+      e2e(S_my, E[n56], -1, 0, 2); 
+      e2e(S_py, E[sall], 1, 0, 2); 
  
-      e2e(S_mx, &E[eall * nexp], 1, 0, 3); 
-      e2e(S_mx, &E[1357 * nexp], 1, 0, 2); 
-      e2e(S_mx, &E[57 * nexp], 1, 0, 2); 
-      e2e(S_mx, &E[e5 * nexp], 1, 0, 2); 
-      e2e(S_px, &E[wall * nexp], -1, 0, 2); 
+      e2e(S_mx, E[eall], 1, 0, 3); 
+      e2e(S_mx, E[1357], 1, 0, 2); 
+      e2e(S_mx, E[57], 1, 0, 2); 
+      e2e(S_mx, E[e5], 1, 0, 2); 
+      e2e(S_px, E[wall], -1, 0, 2); 
       break; 
     case 5: 
-      e2e(S_mz, &E[uall * nexp], -1, 0, 2); 
-      e2e(S_pz, &E[dall * nexp], 1, 0, 3); 
-      e2e(S_pz, &E[d5678 * nexp], 1, 0, 2); 
+      e2e(S_mz, E[uall], -1, 0, 2); 
+      e2e(S_pz, E[dall], 1, 0, 3); 
+      e2e(S_pz, E[d5678], 1, 0, 2); 
 
-      e2e(S_my, &E[nall * nexp], -1, -1, 3); 
-      e2e(S_my, &E[n1256 * nexp], -1, -1, 2); 
-      e2e(S_my, &E[n56 * nexp], -1, -1, 2); 
-      e2e(S_py, &E[sall * nexp], 1, 1, 2); 
+      e2e(S_my, E[nall], -1, -1, 3); 
+      e2e(S_my, E[n1256], -1, -1, 2); 
+      e2e(S_my, E[n56], -1, -1, 2); 
+      e2e(S_py, E[sall], 1, 1, 2); 
       
-      e2e(S_mx, &E[eall * nexp], 1, 0, 2); 
-      e2e(S_px, &E[wall * nexp], -1, 0, 3); 
-      e2e(S_px, &E[w2468 * nexp], -1, 0, 2); 
-      e2e(S_px, &E[w68 * nexp], -1, 0, 2); 
-      e2e(S_px, &E[w6 * nexp], -1, 0, 2); 
+      e2e(S_mx, E[eall], 1, 0, 2); 
+      e2e(S_px, E[wall], -1, 0, 3); 
+      e2e(S_px, E[w2468], -1, 0, 2); 
+      e2e(S_px, E[w68], -1, 0, 2); 
+      e2e(S_px, E[w6], -1, 0, 2); 
       break;
     case 6: 
-      e2e(S_mz, &E[uall * nexp], 0, -1, 2); 
-      e2e(S_pz, &E[dall * nexp], 0, 1, 3); 
-      e2e(S_pz, &E[d5678 * nexp], 0, 1, 2); 
+      e2e(S_mz, E[uall], 0, -1, 2); 
+      e2e(S_pz, E[dall], 0, 1, 3); 
+      e2e(S_pz, E[d5678], 0, 1, 2); 
 
-      e2e(S_my, &E[nall * nexp], -1, 0, 2); 
-      e2e(S_py, &E[sall * nexp], 1, 0, 3); 
-      e2e(S_py, &E[s3478 * nexp], 1, 0, 2); 
-      e2e(S_py, &E[s78 * nexp], 1, 0, 2); 
+      e2e(S_my, E[nall], -1, 0, 2); 
+      e2e(S_py, E[sall], 1, 0, 3); 
+      e2e(S_py, E[s3478], 1, 0, 2); 
+      e2e(S_py, E[s78], 1, 0, 2); 
 
-      e2e(S_mx, &E[eall * nexp], 1, -1, 3); 
-      e2e(S_mx, &E[e1357 * nexp], 1, -1, 2); 
-      e2e(S_mx, &E[e57 * nexp], 1, -1, 2); 
-      e2e(S_mx, &E[e7 * nexp], 1, -1, 2); 
-      e2e(S_px, &E[wall * nexp], -1, 1, 2); 
+      e2e(S_mx, E[eall], 1, -1, 3); 
+      e2e(S_mx, E[e1357], 1, -1, 2); 
+      e2e(S_mx, E[e57], 1, -1, 2); 
+      e2e(S_mx, E[e7], 1, -1, 2); 
+      e2e(S_px, E[wall], -1, 1, 2); 
       break; 
     case 7: 
-      e2e(S_mz, &E[uall * nexp], -1, -1, 2); 
-      e2e(S_pz, &E[dall * nexp], 1, 1, 3); 
-      e2e(S_pz, &E[d5678 * nexp], 1, 1, 2); 
+      e2e(S_mz, E[uall], -1, -1, 2); 
+      e2e(S_pz, E[dall], 1, 1, 3); 
+      e2e(S_pz, E[d5678], 1, 1, 2); 
 
-      e2e(S_my, &E[nall * nexp], -1, -1, 2); 
-      e2e(S_py, &E[sall * nexp], 1, 1, 3); 
-      e2e(S_py, &E[s3478 * nexp], 1, 1, 2); 
-      e2e(S_py, &E[s78 * nexp], 1, 1, 2); 
+      e2e(S_my, E[nall], -1, -1, 2); 
+      e2e(S_py, E[sall], 1, 1, 3); 
+      e2e(S_py, E[s3478], 1, 1, 2); 
+      e2e(S_py, E[s78], 1, 1, 2); 
 
-      e2e(S_mx, &E[eall * nexp], 1, -1, 2); 
-      e2e(S_px, &E[wall * nexp], -1, 1, 3); 
-      e2e(S_px, &E[w2468 * nexp], -1, 1, 2); 
-      e2e(S_px, &E[w68 * nexp], -1, 1, 2); 
-      e2e(S_px, &E[w8 * nexp], -1, 1, 2); 
+      e2e(S_mx, E[eall], 1, -1, 2); 
+      e2e(S_px, E[wall], -1, 1, 3); 
+      e2e(S_px, E[w2468], -1, 1, 2); 
+      e2e(S_px, E[w68], -1, 1, 2); 
+      e2e(S_px, E[w8], -1, 1, 2); 
       break;
     }
+
+    double scale = 1.0 / t_size; 
+    for (int i = 0; i < 6 * nexp; ++i) 
+      S[i] *= scale; 
 
     e2l(S_mz, 'z', false, L); 
     e2l(S_pz, 'z', true, L); 
@@ -1228,7 +1252,7 @@ class LaplaceSPH {
       // Shifting factor in z direction
       double factor_z = zs[4 * k + z]; 
       for (int j = 0; j < m[k] / 2; ++j) {
-        int sidx = (sm[j] + j) * 7 + 3; 
+        int sidx = (sm[k] + j) * 7 + 3; 
         // Shifting factor in x direction
         dcomplex_t factor_x = xs[sidx + x]; 
         // Shifting factor in y direction
