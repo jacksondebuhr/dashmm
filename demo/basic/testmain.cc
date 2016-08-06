@@ -45,6 +45,8 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::BH> bheval{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceSPH, dashmm::FMM> fmmeval{};
+dashmm::Evaluator<SourceData, TargetData, 
+                  dashmm::LaplaceSPH, dashmm::FMM97> fmm97eval{}; 
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::Direct> directeval{};
 
@@ -65,7 +67,7 @@ struct InputArguments {
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
 "Options available: [possible/values] (default value)\n"
-"  --method=[fmm/bh]            method to use (fmm)\n"
+"  --method=[fmm/fmm97/bh]            method to use (fmm)\n"
 "  --nsources=num               number of source points to generate (10000)\n"
 "  --sourcedata=[cube/sphere/plummer]\n"
 "                               source distribution type (cube)\n"
@@ -82,12 +84,12 @@ void print_usage(char *progname) {
 
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
-  retval.source_count = 10000;
+  retval.source_count = 10;
   retval.source_type = std::string{"cube"};
-  retval.target_count = 10000;
+  retval.target_count = 10;
   retval.target_type = std::string{"cube"};
-  retval.refinement_limit = 40;
-  retval.test_case = std::string{"fmm"};
+  retval.refinement_limit = 1;
+  retval.test_case = std::string{"fmm97"};
   retval.verify = true;
   retval.accuracy = 3;
 
@@ -152,7 +154,8 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stderr, "Usage ERROR: ntargets must be positive\n");
     return -1;
   }
-  if (retval.test_case != "bh" && retval.test_case != "fmm") {
+  if (retval.test_case != "bh" && retval.test_case != "fmm" 
+      && retval.test_case != "fmm97") {
     fprintf(stderr, "Usage ERROR: unknown method '%s'\n",
             retval.test_case.c_str());
     return -1;
@@ -202,9 +205,9 @@ inline double elapsed(double t1, double t0) {
 
 dashmm::Point pick_cube_position() {
   double pos[3];
-  pos[0] = (double)rand() / RAND_MAX;
-  pos[1] = (double)rand() / RAND_MAX;
-  pos[2] = (double)rand() / RAND_MAX;
+  pos[0] = (double)rand() / RAND_MAX - 0.5;
+  pos[1] = (double)rand() / RAND_MAX - 0.5;
+  pos[2] = (double)rand() / RAND_MAX - 0.5;
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
@@ -227,6 +230,7 @@ double pick_mass(bool use_negative) {
   if (use_negative && (rand() % 2)) {
     retval *= -1.0;
   }
+  //double retval = 1.0 * rand() / RAND_MAX - 0.5; 
   return retval;
 }
 
@@ -254,7 +258,7 @@ double pick_plummer_mass(int count) {
 
 void set_sources(SourceData *sources, int source_count,
                  std::string source_type, std::string test_case) {
-  bool use_negative = test_case == std::string{"fmm"};
+  bool use_negative = (test_case != std::string{"bh"}); 
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_cube_position();
@@ -407,9 +411,19 @@ void perform_evaluation_test(InputArguments args) {
                            method, expansion);
     assert(err == dashmm::kSuccess);
     tf = getticks();
-  }
-  fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
+  } else if (args.test_case == std::string{"fmm97"}) {
+    dashmm::LaplaceSPH<SourceData, TargetData> expansion{
+      dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded}; 
+    dashmm::FMM97<SourceData, TargetData, dashmm::LaplaceSPH> method{}; 
 
+    t0 = getticks(); 
+    err = fmm97eval.evaluate(source_handle, target_handle, args.refinement_limit, 
+                             method, expansion); 
+    assert(err == dashmm::kSuccess); 
+    tf = getticks(); 
+  }
+
+  fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
 
   if (args.verify) {
     // Create array for test targets
