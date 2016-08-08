@@ -943,6 +943,8 @@ class LaplaceSPH {
         }
       }
     }
+
+    delete [] work; 
     expansion_t *retval = new expansion_t{views};       
     return std::unique_ptr<expansion_t>{retval}; 
   }
@@ -1120,6 +1122,7 @@ class LaplaceSPH {
     e2l(S_mx, 'x', false, L); 
     e2l(S_px, 'x', true, L); 
 
+    delete [] S; 
     return std::unique_ptr<expansion_t>(retval); 
   }
 
