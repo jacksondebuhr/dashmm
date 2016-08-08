@@ -19,12 +19,14 @@ void set_point_in_cube(Point &p) {
 }
 
 void set_point_on_sphere(Point &p) {
-  double theta = 1.0 * rand() / RAND_MAX * M_PI_2;
+  double ctheta = 2.0 * rand() / RAND_MAX - 1.0;
+  double stheta = sqrt(1.0 - ctheta * ctheta);
   double phi = 1.0 * rand() / RAND_MAX * M_PI * 2;
-  double x = sin(theta) * cos(phi);
-  double y = sin(theta) * sin(phi);
-  double z = cos(theta);
+  double x = stheta * cos(phi);
+  double y = stheta * sin(phi);
+  double z = ctheta;
   p = Point{x, y, z};
+  fprintf(stdout, "%lg %lg %lg\n", x, y, z);
 }
 
 Point *generate_weak_scaling_input(int n, char datatype, int seed) {

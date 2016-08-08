@@ -19,46 +19,36 @@ void usage(std::string exec) {
 }
 
 /// The main action of the code starts here
-int main_handler(char scaling, char datatype,
-                 int nsrc, int ntar, int threshold, int nseed,
-                 hpx_addr_t source_gas, hpx_addr_t target_gas) {
+int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   Array<Point> sources{source_gas};
   Array<Point> targets{target_gas};
 
-  // Partition points to create dual tree
-
   hpx_time_t timer_start = hpx_time_now();
 
-  // Determine domain geometry
-  compute_domain_geometry(sources, targets);
-  hpx_time_t timer_domain = hpx_time_now();
-
   // Perform some basic setup
-  setup_basic_data(threshold);
+  RankWise<DualTree> global_tree = dual_tree_create(threshold, sources,
+                                                    targets);
   hpx_time_t timer_middle = hpx_time_now();
 
   // Start the partitioning proper
-  create_dual_tree(sources, targets);
+  create_dual_tree_old(sources, targets); // TODO this will change
   hpx_time_t timer_end = hpx_time_now();
 
   // All done, spit out some timing information before cleaning up and halting
   double elapsed_total = hpx_time_diff_ms(timer_start, timer_end) / 1e3;
-  double elapsed_reduction = hpx_time_diff_ms(timer_start, timer_domain) / 1e3;
-  double elapsed_first = hpx_time_diff_ms(timer_domain, timer_middle) / 1e3;
-  double elapsed_second = hpx_time_diff_ms(timer_middle, timer_end) / 1e3;
+  double elapsed_setup = hpx_time_diff_ms(timer_start, timer_middle) / 1e3;
+  double elapsed_dual = hpx_time_diff_ms(timer_middle, timer_end) / 1e3;
   std::cout << "Dual tree creation time: " << elapsed_total << "\n";
-  std::cout << "  Reduction: " << elapsed_reduction << "\n";
-  std::cout << "  Setup: " << elapsed_first << "\n";
-  std::cout << "  Partition: " << elapsed_second << "\n";
+  std::cout << "  Setup: " << elapsed_setup << "\n";
+  std::cout << "  Partition: " << elapsed_dual << "\n";
 
   // Here we clean up the allocated resources
-  finalize_partition();
+  dual_tree_destroy(global_tree);
 
   hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, 0, main_action, main_handler,
-           HPX_CHAR, HPX_CHAR, HPX_INT, HPX_INT, HPX_INT, HPX_INT,
-           HPX_ADDR, HPX_ADDR);
+           HPX_INT, HPX_ADDR, HPX_ADDR);
 
 int main(int argc, char *argv[]) {
   // default values
@@ -138,17 +128,13 @@ int main(int argc, char *argv[]) {
                                                   ntar, nseed, nseed);
 
   // Then build the tree
-  // TODO - make this actually work
   hpx_addr_t ssend = sources.data();  // TODO: this will eventually disappear
   hpx_addr_t tsend = targets.data();  // behind an interface
-  if (hpx_run(&main_action, nullptr, &scaling, &datatype,
-              &nsrc, &ntar, &threshold, &nseed, &ssend, &tsend)) {
+  if (hpx_run(&main_action, nullptr, &threshold, &ssend, &tsend)) {
     std::cout << "Failed to run main action" << std::endl;
   }
 
-  // Then delete the tree
-
-  // Then delete the data
+  // Then delete the point data
   sources.destroy();
   targets.destroy();
 

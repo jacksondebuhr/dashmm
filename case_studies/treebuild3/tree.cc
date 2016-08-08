@@ -27,20 +27,12 @@ using dashmm::ArrayData;
 // The domain geometry
 SharedData<DomainGeometry> domain{HPX_NULL};
 
-int unif_level;         /// The level of uniform partition
-hpx_addr_t unif_count;  /// The address of a reduction LCO used to perform the
-                        /// counting of the source and target points
-int *unif_count_value;  /// A local array holding the results
-Node *unif_grid;        /// A rankwise global holding the uniform grid
-hpx_addr_t unif_done;   /// A rankwise global holding an LCO
-
 size_t sorted_src_count; /// How many sources this rank has
 Point *sorted_src;       /// The sorted sources
 size_t sorted_tar_count; /// How many targets this rank has
 Point *sorted_tar;       /// The sorted targets
-int *distribute;        /// Array giving the distribution of the uniform grid
+int *distribute;         /// Array giving the distribution of the uniform grid
 
-int threshold;
 int *swap_src;
 int *bin_src;
 int *map_src;
@@ -75,10 +67,7 @@ uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
 
 int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                 hpx_addr_t targets_gas,
-                                hpx_addr_t dom_gas,
                                 hpx_addr_t domain_geometry) {
-  domain = SharedData<DomainGeometry>{dom_gas};
-
   Array<Point> sources{sources_gas};
   ArrayRef<Point> src_ref = sources.ref();
   ArrayData<Point> src_data = src_ref.pin();
@@ -93,7 +82,11 @@ int set_domain_geometry_handler(hpx_addr_t sources_gas,
 
   // NOTE: Here is an opportunity to do even more parallelism. This will be
   // a single thread per locality. Why not do the on locality reduction in
-  // parallel.
+  // parallel. Likely the decision to do this will depend somewhat on how
+  // many threads and how many points we have. Some smarts about this would
+  // be nice to build in. However, the main case of interest is when there
+  // are loads of particles per rank, so perhaps doing in a bunch of chunks
+  // makes sense as a default, and use a lower bound as a cutoff or something.
   for (size_t i = 0; i < src_ref.n(); ++i) {
     var[0] = fmin(var[0], s[i].x());
     var[1] = fmax(var[1], s[i].x());
@@ -118,7 +111,7 @@ int set_domain_geometry_handler(hpx_addr_t sources_gas,
 }
 HPX_ACTION(HPX_DEFAULT, 0, set_domain_geometry_action,
            set_domain_geometry_handler,
-           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR);
+           HPX_ADDR, HPX_ADDR, HPX_ADDR);
 
 void domain_geometry_init_handler(double *values, const size_t UNUSED) {
   values[0] = 1e50; // xmin
@@ -142,10 +135,8 @@ void domain_geometry_op_handler(double *lhs, double *rhs, size_t UNUSED) {
 HPX_ACTION(HPX_FUNCTION, 0, domain_geometry_op_action,
            domain_geometry_op_handler, HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-void compute_domain_geometry(Array<Point> sources, Array<Point> targets) {
-  // Allocate the shared data
-  domain = SharedData<DomainGeometry>{nullptr};
-
+hpx_addr_t compute_domain_geometry(Array<Point> sources,
+                                   Array<Point> targets) {
   // Create a reduction LCO
   hpx_addr_t domain_geometry =
     hpx_lco_reduce_new(hpx_get_num_ranks(), sizeof(double) * 6,
@@ -155,45 +146,36 @@ void compute_domain_geometry(Array<Point> sources, Array<Point> targets) {
   // Launch the reduction actions
   hpx_addr_t sglob = sources.data();
   hpx_addr_t tglob = targets.data();
-  hpx_addr_t dglob = domain.data();
   hpx_bcast_lsync(set_domain_geometry_action, HPX_NULL,
-                  &sglob, &tglob, &dglob, &domain_geometry);
+                  &sglob, &tglob, &domain_geometry);
 
-  // Get the result
-  double var[6];
-  hpx_lco_get(domain_geometry, sizeof(double) * 6, &var);
-  hpx_lco_delete_sync(domain_geometry);
-
-  // Setup DomainGeometry
-  double length = fmax(var[1] - var[0],
-                       fmax(var[3] - var[2], var[5] - var[4]));
-  DomainGeometry geo{Point{(var[1] + var[0] - length) / 2,
-                           (var[3] + var[2] - length) / 2,
-                           (var[5] + var[4] - length) / 2}, length};
-
-  // Share with everyone
-  domain.reset(&geo);
+  return domain_geometry;
 }
 
 /////////////////////////////////////////////////////////////////////
 // Basic Setup Stuff
 /////////////////////////////////////////////////////////////////////
 
-int init_partition_handler(hpx_addr_t count, int level, int limit) {
-  int dim = pow(2, level), dim3 = pow(8, level);
+int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count, int limit,
+                           hpx_addr_t domain_geometry) {
+  RankWise<DualTree *> global_tree{rwdata};
+  auto tree = global_tree.here();
 
-  unif_count = count;
-  unif_level = level;
-  threshold = limit;
+  int num_ranks = hpx_get_num_ranks();
+  tree->set_unif_level(ceil(log(num_ranks) / log(8)) + 1);
+  int dim = pow(2, tree->unif_level());
+  tree->set_dim3(pow(8, tree->unif_level()));
+  tree->set_unif_count(count);
+  tree->set_threshold(limit);
 
   // We here allocate space for the result of the counting
-  unif_count_value = new int[dim3 * 2]();
+  tree->set_unif_count_value(new int[dim3 * 2]());
 
   // Setup unif_done LCO
-  unif_done = hpx_lco_and_new(1);
+  tree->set_unif_done(hpx_lco_and_new(1));
 
   // Setup unif_grid
-  unif_grid = new Node[2 * dim3];
+  Node *unif_grid = new Node[2 * dim3];
   for (int iz = 0; iz < dim; ++iz) {
     for (int iy = 0; iy < dim; ++iy) {
       for (int ix = 0; ix < dim; ++ix) {
@@ -203,24 +185,44 @@ int init_partition_handler(hpx_addr_t count, int level, int limit) {
       }
     }
   }
+  tree->set_unif_grid(unif_grid);
+
+  // Setup domain_
+  double var[6];
+  hpx_lco_get(domain_geometry, sizeof(double) * 6, &var);
+  double length = fmax(var[1] - var[0],
+                       fmax(var[3] - var[2], var[5] - var[4]));
+  DomainGeometry geo{Point{(var[1] + var[0] - length) / 2,
+                           (var[3] + var[2] - length) / 2,
+                           (var[5] + var[4] - length) / 2}, length};
+  tree->set_domain(geo);
 
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0, init_partition_action, init_partition_handler,
-           HPX_ADDR, HPX_INT, HPX_INT);
+           HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR);
 
-void setup_basic_data(int thresh) {
+RankWise<DualTree> setup_basic_data(int threshold,
+                                    hpx_addr_t domain_geometry) {
+  RankWise<DualTree> retval{};
+  retval.allocate();
+  if (!retval.valid()) {
+    // We return the invalid value to indicate the error
+    return retval;
+  }
+
+  // Now the single things are created.
   int num_ranks = hpx_get_num_ranks();
-
-  // Choose uniform partition level such that the number of grids is no less
-  // than the number of ranks
   int level = ceil(log(num_ranks) / log(8)) + 1;
-  int dim3 = pow(8, unif_level);
+  int dim3 = pow(8, level);
   hpx_addr_t ucount = hpx_lco_reduce_new(num_ranks, sizeof(int) * (dim3 * 2),
                                         int_sum_ident_op,
                                         int_sum_op);
+  hpx_addr_t rwdata = retval.data();
+  hpx_bcast_rsync(init_partition_action, &rwdata, &ucount, &threshold,
+                  &domain_geometry);
 
-  hpx_bcast_rsync(init_partition_action, &ucount, &level, &thresh);
+  return retval;
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -838,7 +840,7 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
 HPX_ACTION(HPX_DEFAULT, 0, create_dual_tree_action, create_dual_tree_handler,
            HPX_ADDR, HPX_ADDR);
 
-void create_dual_tree(Array<Point> &sources, Array<Point> &targets) {
+void create_dual_tree_old(Array<Point> &sources, Array<Point> &targets) {
   hpx_addr_t source_gas = sources.data();
   hpx_addr_t target_gas = targets.data();
   hpx_bcast_rsync(create_dual_tree_action, &source_gas, &target_gas);
@@ -848,27 +850,74 @@ void create_dual_tree(Array<Point> &sources, Array<Point> &targets) {
 // Finalize the partition work - that is, clean up
 /////////////////////////////////////////////////////////////////////
 
-int finalize_partition_handler(void *unused, size_t UNUSED) {
+int finalize_partition_handler(hpx_addr_t rwtree) {
+  RankWise<DualTree> global_tree{rwtree};
+  auto tree = global_tree.here();
+  tree->clear_data();
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, finalize_partition_action,
+           finalize_partition_handler, HPX_ADDR);
+
+
+/////////////////////////////////////////////////////////////////////
+// DualTree utility stuff
+/////////////////////////////////////////////////////////////////////
+
+// This should be called from inside HPX-5.
+//
+// Also, we want this to return as soon as the work is started. In this way,
+// we can do whatever overlap is possible. Then there should be some interface
+// to be sure it is complete or something. Possibly even another version of
+// create that is create_sync. This means whatever overlap stuff we have going
+// will have to be saved in the rankwise data.
+RankWise<DualTree> dual_tree_create(int threshold,
+                                      Array<Point> sources,
+                                      Array<Point> targets) {
+  // Some basic tree setup
+  hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets);
+  RankWise<DualTree> retval = setup_basic_data(threshold, domain_geometry);
+  hpx_lco_delete_sync(domain_geometry);
+  if (!retval.valid()) {
+    return retval;
+  }
+
+  // then more things also
+  // TODO <-------------- YOU ARE HERE
+}
+
+
+// This should be called from inside HPX-5
+void dual_tree_destroy(RankWise<DualTree> global_tree) {
+  hpx_addr_t rwtree = global_tree.data();
+  hpx_bcast_rsync(finalize_partition_action, &rwtree);
+
+  auto tree = global_tree.here();
+  hpx_lco_delete_sync(tree->unif_count());
+}
+
+
+/////////////////////////////////////////////////////////////////////
+// DualTree interface stuff
+/////////////////////////////////////////////////////////////////////
+
+void DualTree::clear_data() {
   int rank = hpx_get_my_rank();
 
-  delete [] unif_count_value;
-  hpx_lco_delete_sync(unif_done);
-  delete [] sorted_src;
-  delete [] sorted_tar;
-
-  int dim3 = pow(8, unif_level);
+  delete [] unif_count_value_;
+  hpx_lco_delete_sync(unif_done_);
+  delete [] sorted_src_;
+  delete [] sorted_tar_;
 
   int first = (rank == 0 ? 0 : distribute[rank - 1] + 1);
   int last = distribute[rank];
 
-  // TODO: Wait! Don't we need to delete the rest of the nodes too?
-  // this should have had 2 * dim3 nodes in it.
-
   // NOTE: The difference here is that there are two different allocation
   // schemes for the nodes.
 
+  // TODO: Add some parallelism here. Otherwise, this will take a long time.
   for (int i = 0; i < first; ++i) {
-    Node *curr = &unif_grid[i];
+    Node *curr = &unif_grid_[i];
     hpx_lco_delete_sync(curr->sema());
     hpx_lco_delete_sync(curr->complete());
 
@@ -889,7 +938,7 @@ int finalize_partition_handler(void *unused, size_t UNUSED) {
   }
 
   for (int i = first; i <= last; ++i) {
-    Node *curr = &unif_grid[i];
+    Node *curr = &unif_grid_[i];
     hpx_lco_delete_sync(curr->sema());
     hpx_lco_delete_sync(curr->complete());
 
@@ -901,8 +950,8 @@ int finalize_partition_handler(void *unused, size_t UNUSED) {
     }
   }
 
-  for (int i = last + 1; i < dim3; ++i) {
-    Node *curr = &unif_grid[i];
+  for (int i = last + 1; i < dim3_; ++i) {
+    Node *curr = &unif_grid_[i];
     hpx_lco_delete_sync(curr->sema());
     hpx_lco_delete_sync(curr->complete());
 
@@ -922,19 +971,68 @@ int finalize_partition_handler(void *unused, size_t UNUSED) {
     }
   }
 
-  delete [] unif_grid;
-  delete [] distribute;
+  for (int i = 0; i < first; ++i) {
+    Node *curr = &unif_grid_[i + dim3_];
+    hpx_lco_delete_sync(curr->sema());
+    hpx_lco_delete_sync(curr->complete());
 
-  return HPX_SUCCESS;
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j);
+      if (child) {
+        child->destroy(true);
+      }
+    }
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j);
+      if (child) {
+        delete [] child;
+        break;
+      }
+    }
+  }
+
+  for (int i = first; i <= last; ++i) {
+    Node *curr = &unif_grid_[i + dim3_];
+    hpx_lco_delete_sync(curr->sema());
+    hpx_lco_delete_sync(curr->complete());
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j);
+      if (child) {
+        child->destroy(false);
+      }
+    }
+  }
+
+  for (int i = last + 1; i < dim3_; ++i) {
+    Node *curr = &unif_grid_[i + dim3_];
+    hpx_lco_delete_sync(curr->sema());
+    hpx_lco_delete_sync(curr->complete());
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j);
+      if (child) {
+        child->destroy(true);
+      }
+    }
+
+    for (int j = 0; j < 8; ++j) {
+      Node *child = curr->child(j);
+      if (child) {
+        delete [] child;
+        break;
+      }
+    }
+  }
+
+  delete [] unif_grid_;
+  delete [] distribute_;
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED, finalize_partition_action,
-           finalize_partition_handler, HPX_POINTER, HPX_SIZE_T);
 
-void finalize_partition() {
-  hpx_bcast_rsync(finalize_partition_action, NULL, 0);
-  hpx_lco_delete_sync(unif_count);
-}
 
+/////////////////////////////////////////////////////////////////////
+// Node interface stuff
 /////////////////////////////////////////////////////////////////////
 
 void Node::partition(Point *p, int *swap, int *bin, int *map,
@@ -1067,11 +1165,14 @@ void Node::destroy(bool allocated_in_array) {
     if (child_[i])
       child_[i]->destroy(allocated_in_array);
   }
-  if (sema_ != HPX_NULL)
+  if (sema_ != HPX_NULL) {
     hpx_lco_delete_sync(sema_);
-  if (complete_ != HPX_NULL)
+  }
+  if (complete_ != HPX_NULL) {
     hpx_lco_delete_sync(complete_);
-  if (allocated_in_array == false)
+  }
+  if (allocated_in_array == false) {
     delete this;
+  }
 }
 
