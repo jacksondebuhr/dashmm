@@ -5,6 +5,9 @@
 using dashmm::Array;
 
 #include "tree.h"
+using dashmm::Point;
+
+#include "utils.h"
 
 
 void usage(std::string exec) {
@@ -19,7 +22,6 @@ void usage(std::string exec) {
 int main_handler(char scaling, char datatype,
                  int nsrc, int ntar, int threshold, int nseed,
                  hpx_addr_t source_gas, hpx_addr_t target_gas) {
-  int num_ranks = hpx_get_num_ranks();
   Array<Point> sources{source_gas};
   Array<Point> targets{target_gas};
 

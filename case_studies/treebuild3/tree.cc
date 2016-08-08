@@ -148,16 +148,16 @@ void compute_domain_geometry(Array<Point> sources, Array<Point> targets) {
 
   // Create a reduction LCO
   hpx_addr_t domain_geometry =
-    hpx_lco_reduce_new(num_ranks, sizeof(double) * 6,
+    hpx_lco_reduce_new(hpx_get_num_ranks(), sizeof(double) * 6,
                        domain_geometry_init_action,
                        domain_geometry_op_action);
 
   // Launch the reduction actions
   hpx_addr_t sglob = sources.data();
   hpx_addr_t tglob = targets.data();
-  hpx_addr_t sglob = domain.data();
+  hpx_addr_t dglob = domain.data();
   hpx_bcast_lsync(set_domain_geometry_action, HPX_NULL,
-                  &sglob, &tglob, &sglob, &domain_geometry);
+                  &sglob, &tglob, &dglob, &domain_geometry);
 
   // Get the result
   double var[6];
@@ -180,7 +180,6 @@ void compute_domain_geometry(Array<Point> sources, Array<Point> targets) {
 /////////////////////////////////////////////////////////////////////
 
 int init_partition_handler(hpx_addr_t count, int level, int limit) {
-  int rank = hpx_get_my_rank();
   int dim = pow(2, level), dim3 = pow(8, level);
 
   unif_count = count;
@@ -217,9 +216,9 @@ void setup_basic_data(int thresh) {
   // than the number of ranks
   int level = ceil(log(num_ranks) / log(8)) + 1;
   int dim3 = pow(8, unif_level);
-  int ucount = hpx_lco_reduce_new(num_ranks, sizeof(int) * (dim3 * 2),
-                                  int_sum_ident_op,
-                                  int_sum_op);
+  hpx_addr_t ucount = hpx_lco_reduce_new(num_ranks, sizeof(int) * (dim3 * 2),
+                                        int_sum_ident_op,
+                                        int_sum_op);
 
   hpx_bcast_rsync(init_partition_action, &ucount, &level, &thresh);
 }
@@ -349,7 +348,7 @@ int *group_points_on_unif_grid(const Point *p_in, int npts,
 /// made into an action to make use of the parallelism available with HPX.
 int partition_node_handler(Node *n, Point *p, int *swap, int *bin, int *map) {
   auto geo = domain.value();
-  n->partition(p, swap, bin, map, threshold, geo->corner(), geo->size());
+  n->partition(p, swap, bin, map, threshold, geo->low(), geo->size());
   return HPX_SUCCESS;
 }
 HPX_ACTION(HPX_DEFAULT, 0, partition_node_action, partition_node_handler,
@@ -689,7 +688,7 @@ HPX_ACTION(HPX_DEFAULT, 0, send_node_action, send_node_handler,
 // NOTE: One thing is sure, this ought to be factored
 //
 // TODO: You are working through this. We have to stop briefly to see which
-// of the other Array's are actually needed in the GAS.
+// of the other Arrays are actually needed in the GAS.
 //
 int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
   int rank = hpx_get_my_rank();
@@ -718,9 +717,9 @@ int create_dual_tree_handler(hpx_addr_t sources_gas, hpx_addr_t targets_gas) {
   // perhaps more might be added inside these functions
   auto geo = domain.value();
   assign_points_to_unif_grid(p_s, n_sources, gid_of_sources,
-                             local_scount, geo->value());
+                             local_scount, geo.value());
   assign_points_to_unif_grid(p_t, n_targets, gid_of_targets,
-                             local_tcount, geo->value());
+                             local_tcount, geo.value());
 
   // Exchange counts
   hpx_lco_set(unif_count, sizeof(int) * dim3 * 2, local_count,
