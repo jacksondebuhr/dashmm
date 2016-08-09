@@ -107,7 +107,7 @@ class Node {
 class DualTree {
  public:
   DualTree()
-    : domain_{}, threshold_{1}, unif_level_{1}, dim_3{8},
+    : domain_{}, threshold_{1}, unif_level_{1}, dim3_{8},
       unif_count_{HPX_NULL}, unif_count_value_{nullptr}, unif_grid_{nullptr},
       unif_done_{HPX_NULL}, distribute_{nullptr}, sorted_src_count_{0},
       sorted_src_{nullptr}, sorted_tar_count_{0}, sorted_tar_{nullptr},
@@ -122,7 +122,18 @@ class DualTree {
   int *unif_count_value() const {return unif_count_value_;}
   hpx_addr_t unif_done() const {return unif_done_;}
   Node *unif_grid() const {return unif_grid_;}
-  const DomainGeometry &domain() const {return domain_;}
+  const dashmm::DomainGeometry &domain() const {return domain_;}
+  int *distribute() const {return distribute_;}
+  size_t sorted_src_count() const {return sorted_src_count_;}
+  size_t sorted_tar_count() const {return sorted_tar_count_;}
+  dashmm::Point *sorted_src() const {return sorted_src_;}
+  dashmm::Point *sorted_tar() const {return sorted_tar_;}
+  int *swap_src() const {return swap_src_;}
+  int *bin_src() const {return bin_src_;}
+  int *map_src() const {return map_src_;}
+  int *swap_tar() const {return swap_tar_;}
+  int *bin_tar() const {return bin_tar_;}
+  int *map_tar() const {return map_tar_;}
 
   void set_unif_level(int l) {unif_level_ = l;}
   void set_dim3(int d) {dim3_ = d;}
@@ -131,13 +142,34 @@ class DualTree {
   void set_unif_count_value(int *u) {unif_count_value_ = u;}
   void set_unif_done(hpx_addr_t u) {unif_done_ = u;}
   void set_unif_grid(Node *n) {unif_grid_ = n;}
-  void set_domain(const DomainGeometry &geo) {domain_ = geo;}
+  void set_domain(const dashmm::DomainGeometry &geo) {domain_ = geo;}
+  void set_distribute(int *d) {distribute_ = d;}
+  void set_sorted_src_count(size_t s) {sorted_src_count_ = s;}
+  void set_sorted_tar_count(size_t t) {sorted_tar_count_ = t;}
+  void set_sorted_src(dashmm::Point *s) {sorted_src_ = s;}
+  void set_sorted_tar(dashmm::Point *t) {sorted_tar_ = t;}
+  void set_swap_src(int *v) {swap_src_ = v;}
+  void set_bin_src(int *v) {bin_src_ = v;}
+  void set_map_src(int *v) {map_src_ = v;}
+  void set_swap_tar(int *v) {swap_tar_ = v;}
+  void set_bin_tar(int *v) {bin_tar_ = v;}
+  void set_map_tar(int *v) {map_tar_ = v;}
 
   // more complex things
   void clear_data();
+  int first(int rank) const {return rank == 0 ? 0 : distribute_[rank - 1] + 1;}
+  int last(int rank) const {return distribute_[rank];}
+  void clear_sort_data() {
+    delete [] swap_src_;
+    delete [] bin_src_;
+    delete [] map_src_;
+    delete [] swap_tar_;
+    delete [] bin_tar_;
+    delete [] map_tar_;
+  }
 
  private:
-  DomainGeometry domain_;
+  dashmm::DomainGeometry domain_;
   int threshold_;
 
   int unif_level_;
@@ -150,9 +182,9 @@ class DualTree {
   int *distribute_;
 
   size_t sorted_src_count_;
-  Point *sorted_src_;
+  dashmm::Point *sorted_src_;
   size_t sorted_tar_count_;
-  Point *sorted_tar_;
+  dashmm::Point *sorted_tar_;
 
   int *swap_src_;
   int *bin_src_;
@@ -160,18 +192,17 @@ class DualTree {
   int *swap_tar_;
   int *bin_tar_;
   int *map_tar_;
-}
-
-
-// Interface that has been introduced
-void create_dual_tree_old(dashmm::Array<dashmm::Point> &sources,
-                      dashmm::Array<dashmm::Point> &targets);
+};
 
 
 // TODO: Are these eventually put into DualTree itself?
 RankWise<DualTree> dual_tree_create(int threshold,
                                     dashmm::Array<dashmm::Point> sources,
                                     dashmm::Array<dashmm::Point> targets);
+hpx_addr_t dual_tree_partition(RankWise<DualTree> global_tree,
+                               dashmm::Array<dashmm::Point> sources,
+                               dashmm::Array<dashmm::Point> targets);
 void dual_tree_destroy(RankWise<DualTree> global_tree);
+
 
 #endif

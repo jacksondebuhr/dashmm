@@ -42,8 +42,24 @@ public:
 
   RankLocal(const RankLocal &other) = delete;
   RankLocal &operator=(const RankLocal &other) = delete;
-  RankLocal(RankLocal &&other) = delete;
-  RankLocal &operator=(RankLocal &&other) = delete;
+
+  RankLocal(RankLocal &&other) {
+    local_ = other.local_;
+    global_ = other.global_;
+    remote_ = other.remote_;
+    other.local_ = nullptr;
+    other.global_ = HPX_NULL;
+    other.remote_ = false;
+  }
+
+  RankLocal &operator=(RankLocal &&other) {
+    local_ = other.local_;
+    global_ = other.global_;
+    remote_ = other.remote_;
+    other.local_ = nullptr;
+    other.global_ = HPX_NULL;
+    other.remote_ = false;
+  }
 
   bool valid() const {return global_ != HPX_NULL && local_ != nullptr;}
   bool remote() const {return remote_;}
@@ -65,7 +81,7 @@ private:
 template <typename T>
 class RankWise {
  public:
-  RankWise(dat = HPX_NULL) : data_{dat} { }
+  RankWise(hpx_addr_t dat = HPX_NULL) : data_{dat} { }
 
   void allocate() {
     assert(data_ == HPX_NULL);

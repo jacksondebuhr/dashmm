@@ -31,7 +31,9 @@ int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   hpx_time_t timer_middle = hpx_time_now();
 
   // Start the partitioning proper
-  create_dual_tree_old(sources, targets); // TODO this will change
+  hpx_addr_t partdone = dual_tree_partition(global_tree, sources, targets);
+  hpx_lco_wait(partdone);
+  hpx_lco_delete_sync(partdone);
   hpx_time_t timer_end = hpx_time_now();
 
   // All done, spit out some timing information before cleaning up and halting
