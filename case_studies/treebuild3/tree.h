@@ -75,7 +75,7 @@ class Node {
   ///
   /// TODO: we can likely merge the bin and swap arrays to save on memory
   void partition(dashmm::Point *P, int *swap, int *bin, int *map,
-                 int threshold, dashmm::Point corner, double size);
+                 int threshold, dashmm::DomainGeometry *geo);
 
   /// Return the number of descendants of this node - this is recursive, and
   /// collects all of them

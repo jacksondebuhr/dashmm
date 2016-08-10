@@ -18,7 +18,7 @@ public:
     if (!hpx_gas_try_pin(global_, (void **)&local_)) {
       //If the pin fails, assume that it is because the address is not local
       // so get that data
-      local_ = hpx_malloc_registered(sizeof(T));
+      local_ = static_cast<T *>(hpx_malloc_registered(sizeof(T)));
       if (local_) {
         remote_ = true;
         hpx_gas_memget_sync(local_, global_, sizeof(T));
@@ -95,12 +95,12 @@ class RankWise {
     return there(hpx_get_my_rank());
   }
 
-  RankLocal<T> there(int rank) {
+  RankLocal<T> there(int rank) const {
     return RankLocal<T>(address_at(rank));
   }
 
  private:
-  hpx_addr_t address_at(int rank) {
+  hpx_addr_t address_at(int rank) const {
     assert(data_ != HPX_NULL);
     return hpx_addr_add(data_, sizeof(T) * rank, sizeof(T));
   }
