@@ -287,6 +287,10 @@ class Array {
   // rank into one segment per thread, or just as one large segment. Then
   // if we are mapping onto threads, we pick an overdecomposition factor.
   // both of these would have defaults.
+  //
+  // TODO: Can we make this a little better using something more like a normal
+  // functor?
+  //
   /// Map an action onto each record in the Array
   ///
   /// This will cause the action represented by the given argument, to be
@@ -317,6 +321,16 @@ class Array {
   // this is in place, bucket style probably. Probably provide an ordering
   // function. That is, give a rank to each (multiple records can have the
   // same rank)
+  //
+  // So the ranking function will have the signature int ranker(const T *item)
+  //
+  //
+  template <typename Callable>
+  ReturnCode rank_sort(Callable ranker) {
+    // do something different based on hpx_is_active()
+    //  if active, just do a call
+    //  if not active, a spmd run
+  }
 
   // TODO we need to add a method to sort across localities. This temporarily
   // allocated more memory, and replaces segments. Or perhaps it gives a whole

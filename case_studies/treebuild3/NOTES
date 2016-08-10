@@ -1,0 +1,17 @@
+So there are some things left to take care of with this. In no particular
+order:
+
+ * Make the tree type less silly
+   - This means make it more than a wrapper around the old globals
+   - This means move the functionality into the DualTree class
+ * Make the tree a template over the needed things
+ * Introduce the sorting interfaces for the array
+   - This includes the on rank sorting
+      This should likely return an LCO for each rank into a spmd style action
+      or back to the user when launched from user space.
+   - This includes the across rank sorting
+      This should also return an LCO for each rank, but also perhaps for each
+      uniform node of the tree
+ * Add the remaining functionality from dashmm::Tree to the DualTree
+ * Plug it into dashmm proper.
+ * Debug, rinse, repeat
