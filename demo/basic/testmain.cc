@@ -44,9 +44,9 @@ struct TargetData {
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::BH> bheval{};
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::LaplaceSPH, dashmm::FMM> fmmeval{};
+                  dashmm::Laplace, dashmm::FMM> fmmeval{};
 dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::LaplaceSPH, dashmm::FMM97> fmm97eval{}; 
+                  dashmm::Laplace, dashmm::FMM97> fmm97eval{}; 
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::Direct> directeval{};
 
@@ -406,9 +406,9 @@ void perform_evaluation_test(InputArguments args) {
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm"}) {
-    dashmm::LaplaceSPH<SourceData, TargetData> expansion{
+    dashmm::Laplace<SourceData, TargetData> expansion{
           dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded};
-    dashmm::FMM<SourceData, TargetData, dashmm::LaplaceSPH> method{};
+    dashmm::FMM<SourceData, TargetData, dashmm::Laplace> method{};
 
     t0 = getticks();
     err = fmmeval.evaluate(source_handle, target_handle, args.refinement_limit,
@@ -416,9 +416,9 @@ void perform_evaluation_test(InputArguments args) {
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm97"}) {
-    dashmm::LaplaceSPH<SourceData, TargetData> expansion{
+    dashmm::Laplace<SourceData, TargetData> expansion{
       dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded}; 
-    dashmm::FMM97<SourceData, TargetData, dashmm::LaplaceSPH> method{}; 
+    dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{}; 
 
     t0 = getticks(); 
     err = fmm97eval.evaluate(source_handle, target_handle, args.refinement_limit, 

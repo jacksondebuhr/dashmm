@@ -12,11 +12,11 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_LAPLACE_SPH_TABLE_H__
-#define __DASHMM_LAPLACE_SPH_TABLE_H__
+#ifndef __DASHMM_LAPLACE_TABLE_H__
+#define __DASHMM_LAPLACE_TABLE_H__
 
 
-/// \file include/builtins/laplace_sph_table.h
+/// \file include/builtins/laplace_table.h
 /// \brief Declaration of precomputed tables for LaplaceSPH
 
 
@@ -46,10 +46,10 @@ struct laplace_cmp {
 
 using laplace_map_t = std::map<double, double *, laplace_cmp>;
 
-class LaplaceSPHTable {
+class LaplaceTable {
  public:
-  LaplaceSPHTable(int n_digits);
-  ~LaplaceSPHTable();
+  LaplaceTable(int n_digits);
+  ~LaplaceTable();
 
   int p() const {return p_;}
   int s() const {return s_;}
@@ -102,11 +102,11 @@ class LaplaceSPHTable {
   dcomplex_t *generate_ealphaj(); 
 };
 
-using uLaplaceSPHTable = std::unique_ptr<LaplaceSPHTable>;
-using LaplaceSPHTableIterator = std::map<int, uLaplaceSPHTable>::iterator;
+using uLaplaceTable = std::unique_ptr<LaplaceTable>;
+using LaplaceTableIterator = std::map<int, uLaplaceTable>::iterator;
 
 
-extern std::map<int, uLaplaceSPHTable> builtin_laplace_table_;
+extern std::map<int, uLaplaceTable> builtin_laplace_table_;
 
 
 void legendre_Plm(int n, double x, double *P);
@@ -127,7 +127,7 @@ inline double pow_m1(const int m) {
 }
 
 
-LaplaceSPHTableIterator get_or_add_laplace_sph_table(int n_digits);
+LaplaceTableIterator get_or_add_laplace_table(int n_digits);
 
 enum MergedList {
   uall = 0, ///< +z direction list for all boxes
@@ -164,4 +164,4 @@ enum MergedList {
 } // namespace dashmm
 
 
-#endif // __DASHMM_LAPLACE_SPH_TABLE_H__
+#endif // __DASHMM_LAPLACE_TABLE_H__

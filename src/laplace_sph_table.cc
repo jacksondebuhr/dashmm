@@ -12,7 +12,7 @@
 // =============================================================================
 
 
-/// \file src/laplace_sph_table.cc
+/// \file src/laplace_table.cc
 /// \brief Implementation of precomputed tables for LaplaceSPH
 
 
@@ -22,7 +22,7 @@
 namespace dashmm {
 
 
-std::map<int, uLaplaceSPHTable> builtin_laplace_table_;
+std::map<int, uLaplaceTable> builtin_laplace_table_;
 
 
 void legendre_Plm(int n, double x, double *P) {
@@ -43,7 +43,7 @@ void legendre_Plm(int n, double x, double *P) {
 }
 
 
-LaplaceSPHTable::LaplaceSPHTable(int n_digits) {
+LaplaceTable::LaplaceTable(int n_digits) {
   int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29,
                         33, 36, 40, 43, 46};
   p_ = expan_length[n_digits];
@@ -140,7 +140,7 @@ LaplaceSPHTable::LaplaceSPHTable(int n_digits) {
 }
 
 
-LaplaceSPHTable::~LaplaceSPHTable() {
+LaplaceTable::~LaplaceTable() {
   delete [] sqf_;
   delete [] sqbinom_;
   for (auto it = dmat_plus_->begin(); it != dmat_plus_->end(); ++it)
@@ -164,7 +164,7 @@ LaplaceSPHTable::~LaplaceSPHTable() {
 }
 
 
-double *LaplaceSPHTable::generate_sqf() {
+double *LaplaceTable::generate_sqf() {
   double *sqf = new double[2 * p_ + 1];
   sqf[0] = 1.0;
   for (int i = 1; i <= p_ * 2; ++i)
@@ -173,7 +173,7 @@ double *LaplaceSPHTable::generate_sqf() {
 }
 
 
-double *LaplaceSPHTable::generate_sqbinom() {
+double *LaplaceTable::generate_sqbinom() {
   int N = 2 * p_;
   int total = (N + 1) * (N + 2) / 2;
   double *sqbinom = new double[total];
@@ -206,8 +206,8 @@ double *LaplaceSPHTable::generate_sqbinom() {
 }
 
 
-void LaplaceSPHTable::generate_wigner_dmatrix(laplace_map_t *&dp,
-                                              laplace_map_t *&dm) {
+void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
+                                           laplace_map_t *&dm) {
   double cbeta[24] = {1.0 / sqrt(5.0), 1.0 / sqrt(6.0), 1.0 / sqrt(9.0),
                       1.0 / sqrt(10.0), 1.0 / sqrt(11.0), 1.0 / sqrt(14.0),
                       1.0 / sqrt(19.0), 2.0 / sqrt(5.0), sqrt(2.0 / 3.0),
@@ -237,8 +237,8 @@ void LaplaceSPHTable::generate_wigner_dmatrix(laplace_map_t *&dp,
 }
 
 
-void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
-                                               double *dp, double *dm) {
+void LaplaceTable::generate_dmatrix_of_beta(double beta,
+                                            double *dp, double *dm) {
   double cbeta = cos(beta);
   double sbeta = sin(beta);
   double s2beta2 = (1 - cbeta) / 2; // sin^2(beta / 2)
@@ -349,7 +349,7 @@ void LaplaceSPHTable::generate_dmatrix_of_beta(double beta,
   }
 }
 
-dcomplex_t *LaplaceSPHTable::generate_xs() {
+dcomplex_t *LaplaceTable::generate_xs() {
   dcomplex_t *xs = new dcomplex_t[7 * nexp_]; 
   int offset = 0; 
   for (int k = 0; k < s_; ++k) {
@@ -366,7 +366,7 @@ dcomplex_t *LaplaceSPHTable::generate_xs() {
   return xs; 
 }
 
-dcomplex_t *LaplaceSPHTable::generate_ys() {
+dcomplex_t *LaplaceTable::generate_ys() {
   dcomplex_t *ys = new dcomplex_t[7 * nexp_]; 
   int offset = 0; 
   for (int k = 0; k < s_; ++k) {
@@ -383,7 +383,7 @@ dcomplex_t *LaplaceSPHTable::generate_ys() {
   return ys; 
 }
 
-double *LaplaceSPHTable::generate_zs() {
+double *LaplaceTable::generate_zs() {
   double *zs = new double[4 * s_]; 
   int offset = 0; 
   for (int k = 0; k < s_; ++k) {
@@ -394,7 +394,7 @@ double *LaplaceSPHTable::generate_zs() {
   return zs; 
 }
 
-double *LaplaceSPHTable::generate_lambdaknm() {
+double *LaplaceTable::generate_lambdaknm() {
   double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2]; 
   double *temp = new double[2 * p_ + 1]; 
   temp[0] = 1.0; 
@@ -415,7 +415,7 @@ double *LaplaceSPHTable::generate_lambdaknm() {
   return lambdaknm; 
 }
 
-dcomplex_t *LaplaceSPHTable::generate_ealphaj() {
+dcomplex_t *LaplaceTable::generate_ealphaj() {
   dcomplex_t *ealphaj = new dcomplex_t[smf_[s_]]; 
   int offset = 0; 
   for (int k = 0; k < s_; ++k) {
@@ -432,17 +432,17 @@ dcomplex_t *LaplaceSPHTable::generate_ealphaj() {
   return ealphaj; 
 }
 
-LaplaceSPHTableIterator get_or_add_laplace_sph_table(int n_digits) {
+LaplaceTableIterator get_or_add_laplace_table(int n_digits) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
   // or something similar.
 
-  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
+  LaplaceTableIterator entry = builtin_laplace_table_.find(n_digits);
   if (entry != builtin_laplace_table_.end()) {
     return entry;
   }
 
   builtin_laplace_table_[n_digits] =
-    std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}};
+    std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits}};
   return builtin_laplace_table_.find(n_digits);
 }
 
