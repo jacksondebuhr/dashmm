@@ -798,20 +798,19 @@ class LaplaceSPH {
 
     ViewSet views{n_digits, kTargetIntermediate, Point{px, py, pz}}; 
 
-    // Each S is at most going to contribute 3 views to the exponential
+    // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side. 
     size_t view_size = nexp * sizeof(dcomplex_t); 
-    dcomplex_t *work = new dcomplex_t[nexp * 3](); 
-    dcomplex_t *T1 = work; 
-    dcomplex_t *T2 = work + nexp; 
-    dcomplex_t *T3 = work + nexp * 2; 
+    dcomplex_t *T1 = new dcomplex_t[nexp](); 
+    dcomplex_t *T2 = new dcomplex_t[nexp](); 
+    dcomplex_t *T3 = new dcomplex_t[nexp](); 
+    bool view2 = false; 
+    bool view3 = false; 
     char *C1 = reinterpret_cast<char *>(T1); 
     char *C2 = reinterpret_cast<char *>(T2); 
     char *C3 = reinterpret_cast<char *>(T3); 
 
     // Produce views needed on the target side. 
-    // Due to normalization, the level of the index is relevant in the following
-    // operations. Value 0 is chosen for the constructor of the Index class. 
     if (dz == 3) {
       e2e(T1, S_mz, dx, dy, 0); 
       views.add_view(uall, view_size, C1); 
@@ -837,33 +836,41 @@ class LaplaceSPH {
 
         if (dy == -1) {
           e2e(T2, S_py, -dz, -dx, 0); 
-          views.add_view(s78, view_size, C2); 
+          views.add_view(s78, view_size, C2);
+          view2 = true; 
         
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
             views.add_view(w6, view_size, C3); 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
             views.add_view(e5, view_size, C3); 
+            view3 = true; 
           }
         } else if (dy == 2) {
           e2e(T2, S_my, dz, dx, 0); 
           views.add_view(n56, view_size, C2); 
-        
+          view2 = true; 
+
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
             views.add_view(w8, view_size, C3); 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
             views.add_view(e7, view_size, C3); 
+            view3 = true; 
           } 
         } else {
           if (dx == -1) {            
             e2e(T2, S_px, dz, -dy, 0); 
             views.add_view(w68, view_size, C2); 
+            view2 = true; 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0); 
             views.add_view(e57, view_size, C2); 
+            view2 = true; 
           }
         }
       } else if (dz == -1) {
@@ -873,32 +880,40 @@ class LaplaceSPH {
         if (dy == -1) {
           e2e(T2, S_py, -dz, -dx, 0); 
           views.add_view(s34, view_size, C2); 
+          view2 = true; 
 
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0); 
             views.add_view(w2, view_size, C3); 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0); 
             views.add_view(e1, view_size, C3); 
+            view3 = true; 
           } 
         } else if (dy == 2) {
           e2e(T2, S_my, dz, dx, 0);
           views.add_view(n12, view_size, C2); 
+          view2 = true;
 
           if (dx == -1) {
             e2e(T3, S_px, dz, -dy, 0);
             views.add_view(w4, view_size, C3); 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T3, S_mx, -dz, dy, 0);
             views.add_view(e3, view_size, C3); 
+            view3 = true; 
           } 
         } else {
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
             views.add_view(w24, view_size, C2); 
+            view2 = true; 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             views.add_view(e13, view_size, C2); 
+            view2 = true; 
           }
         }
       } else { 
@@ -911,11 +926,15 @@ class LaplaceSPH {
             e2e(T3, S_px, dz, -dy, 0);
             views.add_view(w2, view_size, C2); 
             views.add_view(w6, view_size, C3); 
+            view2 = true; 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             e2e(T3, S_mx, -dz, dy, 0);
             views.add_view(e1, view_size, C2); 
             views.add_view(e5, view_size, C3); 
+            view2 = true; 
+            view3 = true; 
           } 
         } else if (dy == 2) {
           e2e(T1, S_my, dz, dx, 0);
@@ -926,25 +945,37 @@ class LaplaceSPH {
             e2e(T3, S_px, dz, -dy, 0);
             views.add_view(w4, view_size, C2); 
             views.add_view(w8, view_size, C3); 
+            view2 = true; 
+            view3 = true; 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             e2e(T3, S_mx, -dz, dy, 0);
             views.add_view(e3, view_size, C2); 
             views.add_view(e7, view_size, C3); 
+            view2 = true; 
+            view3 = true; 
           }
         } else { 
           if (dx == -1) {
             e2e(T2, S_px, dz, -dy, 0);
             views.add_view(w2468, view_size, C2); 
+            view2 = true; 
           } else if (dx == 2) {
             e2e(T2, S_mx, -dz, dy, 0);
             views.add_view(e1357, view_size, C2); 
+            view2 = true; 
           }
         }
       }
     }
 
-    delete [] work; 
+    // Each view generated is *moved* into the \p views. Delete T2 (T3) is the
+    // view is not generated. 
+    if (!view2) 
+      delete [] T2; 
+    if (!view3) 
+      delete [] T3; 
+
     expansion_t *retval = new expansion_t{views};       
     return std::unique_ptr<expansion_t>{retval}; 
   }
