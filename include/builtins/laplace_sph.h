@@ -969,7 +969,7 @@ class LaplaceSPH {
       }
     }
 
-    // Each view generated is *moved* into the \p views. Delete T2 (T3) is the
+    // Each view generated is *moved* into the \p views. Delete T2 (T3) if the
     // view is not generated. 
     if (!view2) 
       delete [] T2; 

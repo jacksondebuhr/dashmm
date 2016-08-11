@@ -66,29 +66,33 @@ struct InputArguments {
 
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
-"Options available: [possible/values] (default value)\n"
-"  --method=[fmm/fmm97/bh]            method to use (fmm)\n"
-"  --nsources=num               number of source points to generate (10000)\n"
-"  --sourcedata=[cube/sphere/plummer]\n"
-"                               source distribution type (cube)\n"
-"  --ntargets=num               number of target points to generate (10000)\n"
-"  --targetdata=[cube/sphere/plummer]\n"
-"                               target distribution type (cube)\n"
-"  --threshold=num              source and target tree partition refinement\n"
-"                                 limit (40)\n"
-"  --accuracy=num               number of digits of accuracy for fmm (3)\n"
-"  --verify=[yes/no]            perform an accuracy test comparing to direct\n"
-"                                 summation (yes)\n", progname);
+          "Options available: [possible/values] (default value)\n"
+          "  --method=[fmm/fmm97/bh]            method to use (fmm)\n"
+          "  --nsources=num               "
+          "number of source points to generate (10000)\n"
+          "  --sourcedata=[cube/sphere/plummer]\n"
+          "                               source distribution type (cube)\n"
+          "  --ntargets=num               "
+          "number of target points to generate (10000)\n"
+          "  --targetdata=[cube/sphere/plummer]\n"
+          "                               target distribution type (cube)\n"
+          "  --threshold=num              "
+          "source and target tree partition refinement\n"
+          "                                 limit (40)\n"
+          "  --accuracy=num               "
+          "number of digits of accuracy for fmm (3)\n"
+          "  --verify=[yes/no]            "
+          "perform an accuracy test comparing to direct\n"
+          "                                 summation (yes)\n", progname);
 }
-
 
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
-  retval.source_count = 10;
+  retval.source_count = 10000;
   retval.source_type = std::string{"cube"};
-  retval.target_count = 10;
+  retval.target_count = 10000;
   retval.target_type = std::string{"cube"};
-  retval.refinement_limit = 1;
+  retval.refinement_limit = 40;
   retval.test_case = std::string{"fmm97"};
   retval.verify = true;
   retval.accuracy = 3;
@@ -332,7 +336,7 @@ void compare_results(TargetData *targets, int target_count,
       maxrel = relerr / exacts[i].phi.real();
     }
   }
-  fprintf(stdout, "Error for %d test points: %lg (max %lg)\n",
+  fprintf(stdout, "Error for %d test points: %4.3e (max %4.3e)\n",
                   exact_count, sqrt(numerator / denominator), maxrel);
 }
 
