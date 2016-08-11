@@ -59,3 +59,30 @@ in a different order. Nonetheless, the same set of outputs occur. The graph
 of the computation is traversed in each run, but the specific ordering of
 operations is not guaranteed to be identical. By contrast, running multiple
 times with a single HPX-5 thread will give the same output exactly.
+
+
+-----
+Tips
+-----
+
+One important design decision made on DASHMM is to be as much HPX-5 oblivious as
+possible. Unfortunately, this means the error messages likely to be encountered
+in the implementation of a user expansion is difficult to interpret. Often, the
+error is caused by memory corruption in the implementation of the required
+operators. To ease the implementation of new expansion, we recommend the
+following steps. 
+
+0. Choose cube distribution and set refinement threshold to 1. 
+
+1. Run with 6 source points and 2 target points. This will test the S_to_M and
+M_to_T operator. 
+
+2. Run with 8 source points and 3 target points. This will test the M_to_M
+operator. 
+
+3. Run with 6 source points and 8 target points. This will test the M_to_L
+operator or the combination of M_to_I, I_to_I, and I_to_L operators if
+intermediate expansions are used. 
+
+4. Run with 6 source points and 16 target points. This will test the L_to_L
+operator. 
