@@ -33,6 +33,8 @@ namespace dashmm {
 /// and target trees.
 class DomainGeometry {
  public:
+  DomainGeometry() : low_{Point{0.0, 0.0, 0.0}}, size_{0.0} { }
+
   /// Constructor from low corner and side length
   DomainGeometry(Point low, double size)
       : low_{low}, size_{size} { }

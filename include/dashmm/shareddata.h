@@ -129,6 +129,9 @@ class LocalData {
   /// if a given LocalData object needs to be passed to a number of functions,
   /// as occurs somewhere in the library. In practice, this should be avoided
   /// for simple uses.
+  //
+  // TODO: This is basically needed because the interface is a little awkward.
+  // Is there perhaps a way to improve this?
   T *value() const {return local_;}
 
  private:
@@ -203,10 +206,12 @@ class SharedData {
   /// That being said, it is possible to use this routine from inside HPX-5,
   /// provided the user remains aware of the previous warning.
   void destroy() {
-    if (hpx_is_active()) {
-      hpx_gas_free_sync(data_);
-    } else {
-      hpx_run(&shared_data_destroy_action, nullptr, &data_);
+    if (data_ != HPX_NULL) {
+      if (hpx_is_active()) {
+        hpx_gas_free_sync(data_);
+      } else {
+        hpx_run(&shared_data_destroy_action, nullptr, &data_);
+      }
     }
     data_ = HPX_NULL;
   }
