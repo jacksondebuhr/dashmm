@@ -183,8 +183,6 @@ THIS BRANCH TODO
 
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
-TODO: create test case for new ViewSet stuff? Or just do the real thing and
-      have done with it.
 TODO: We need to update the comments in the dag.h file.
 
 TODO: decide if I want to add assertions around the calls to the Expansion
@@ -221,12 +219,13 @@ Overall Plan to 1.0
         now updated after the domain is known. This will potentially get a mild
         update once the distributed tree creation is merged into the mainline
         code.
- * Make intermediate expansions possible
+ * DONE Make intermediate expansions possible
     This is provisionally DONE. This did not break the current operation of
     all existing examples. However, a specific example was not created to test
     this. Instead, the full Merge-And-Shift FMM will be implemented. If there
     are problems, then these can be easily addressed in whatever state the
     code is in.
+
 
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those

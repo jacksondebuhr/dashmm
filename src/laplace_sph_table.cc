@@ -22,7 +22,7 @@
 namespace dashmm {
 
 
-std::map<int, uLaplaceTable> builtin_laplace_table_;
+std::map<int, uLaplaceTable> builtin_laplace_table_{};
 
 
 void legendre_Plm(int n, double x, double *P) {
@@ -54,18 +54,18 @@ LaplaceTable::LaplaceTable(int n_digits) {
   generate_wigner_dmatrix(dmat_plus_, dmat_minus_);
 
   switch (n_digits) {
-  case 3: 
-    s_ = 9; 
-    nexp_ = 57; 
-    lambda_ = new double[9]{0.99273996739714473469540223504736787e-01, 
-                            0.47725674637049431137114652301534079e+00, 
+  case 3:
+    s_ = 9;
+    nexp_ = 57;
+    lambda_ = new double[9]{0.99273996739714473469540223504736787e-01,
+                            0.47725674637049431137114652301534079e+00,
                             0.10553366138218296388373573790886439e+01,
                             0.17675934335400844688024335482623428e+01,
                             0.25734262935147067530294862081063911e+01,
                             0.34482433920158257478760788217186928e+01,
                             0.43768098355472631055818055756390095e+01,
                             0.53489575720546005399569367000367492e+01,
-                            0.63576578531337464283978988532908261e+01}; 
+                            0.63576578531337464283978988532908261e+01};
     weight_ = new double[9]{0.24776441819008371281185532097879332e+00,
                             0.49188566500464336872511239562300034e+00,
                             0.65378749137677805158830324216978624e+00,
@@ -75,15 +75,15 @@ LaplaceTable::LaplaceTable(int n_digits) {
                             0.95378613136833456653818075210438110e+00,
                             0.99670261613218547047665651916759089e+00,
                             0.10429422730252668749528766056755558e+01};
-    m_ = new int[9]{4, 8, 12, 16, 20, 20, 24, 8, 2};  
-    sm_ = new int[10]{0, 2, 6, 12, 20, 30, 40, 52, 56, 57}; 
-    f_ = new int[9]{2, 3, 4, 5, 5, 4, 5, 4, 1}; 
-    smf_ = new int[10]{0, 4, 16, 40, 80, 130, 170, 230, 246, 247}; 
-    break; 
-    
+    m_ = new int[9]{4, 8, 12, 16, 20, 20, 24, 8, 2};
+    sm_ = new int[10]{0, 2, 6, 12, 20, 30, 40, 52, 56, 57};
+    f_ = new int[9]{2, 3, 4, 5, 5, 4, 5, 4, 1};
+    smf_ = new int[10]{0, 4, 16, 40, 80, 130, 170, 230, 246, 247};
+    break;
+
   case 6:
-    s_ = 18; 
-    nexp_ = 284; 
+    s_ = 18;
+    nexp_ = 284;
     lambda_ = new double[18]{0.52788527661177607475107009804560221e-01,
                              0.26949859838931256028615734976483509e+00,
                              0.63220353174689392083962502510985360e+00,
@@ -120,23 +120,23 @@ LaplaceTable::LaplaceTable(int n_digits) {
                              0.10400365437416452252250564924906939e+01,
                              0.10681548926956736522697610780596733e+01,
                              0.11090758097553685690428437737864442e+01};
-    m_ = new int[18]{6, 8, 12, 16, 20, 26, 30, 34, 38, 44, 48, 52, 
-                     56, 60, 60, 52, 4, 2}; 
-    sm_ = new int[19]{0, 3, 7, 13, 21, 31, 44, 59, 76, 95, 117, 141, 
+    m_ = new int[18]{6, 8, 12, 16, 20, 26, 30, 34, 38, 44, 48, 52,
+                     56, 60, 60, 52, 4, 2};
+    sm_ = new int[19]{0, 3, 7, 13, 21, 31, 44, 59, 76, 95, 117, 141,
                      167, 195, 225, 255, 281, 283, 284};
-    f_ = new int[18]{3, 5, 6, 7, 7, 8, 9, 9, 10, 10, 
+    f_ = new int[18]{3, 5, 6, 7, 7, 8, 9, 9, 10, 10,
                      11, 11, 11, 11, 11, 11, 7, 1};
-    smf_ = new int[19]{0, 9, 29, 65, 121, 191, 295, 430, 583, 773, 993, 
+    smf_ = new int[19]{0, 9, 29, 65, 121, 191, 295, 430, 583, 773, 993,
                       1257, 1543, 1851, 2181, 2511, 2797, 2811, 2812};
-  default: 
-    break; 
-  } 
+  default:
+    break;
+  }
 
-  xs_ = generate_xs(); 
-  ys_ = generate_ys(); 
-  zs_ = generate_zs(); 
-  lambdaknm_ = generate_lambdaknm(); 
-  ealphaj_ = generate_ealphaj(); 
+  xs_ = generate_xs();
+  ys_ = generate_ys();
+  zs_ = generate_zs();
+  lambdaknm_ = generate_lambdaknm();
+  ealphaj_ = generate_ealphaj();
 }
 
 
@@ -150,17 +150,17 @@ LaplaceTable::~LaplaceTable() {
   delete dmat_plus_;
   delete dmat_minus_;
 
-  delete [] lambda_; 
-  delete [] weight_; 
-  delete [] m_; 
-  delete [] sm_; 
-  delete [] f_; 
-  delete [] smf_; 
-  delete [] xs_; 
-  delete [] ys_; 
-  delete [] zs_; 
-  delete [] lambdaknm_; 
-  delete [] ealphaj_; 
+  delete [] lambda_;
+  delete [] weight_;
+  delete [] m_;
+  delete [] sm_;
+  delete [] f_;
+  delete [] smf_;
+  delete [] xs_;
+  delete [] ys_;
+  delete [] zs_;
+  delete [] lambdaknm_;
+  delete [] ealphaj_;
 }
 
 
@@ -350,86 +350,86 @@ void LaplaceTable::generate_dmatrix_of_beta(double beta,
 }
 
 dcomplex_t *LaplaceTable::generate_xs() {
-  dcomplex_t *xs = new dcomplex_t[7 * nexp_]; 
-  int offset = 0; 
+  dcomplex_t *xs = new dcomplex_t[7 * nexp_];
+  int offset = 0;
   for (int k = 0; k < s_; ++k) {
-    double alpha = 2 * M_PI / m_[k]; 
+    double alpha = 2 * M_PI / m_[k];
     for (int j = 1; j <= m_[k] / 2; ++j) {
-      double alphaj = j * alpha; 
-      double calphaj = cos(alphaj); 
+      double alphaj = j * alpha;
+      double calphaj = cos(alphaj);
       for (int m = -3; m <= 3; ++m) {
-        double arg = lambda_[k] * m * calphaj; 
-        xs[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+        double arg = lambda_[k] * m * calphaj;
+        xs[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
   }
-  return xs; 
+  return xs;
 }
 
 dcomplex_t *LaplaceTable::generate_ys() {
-  dcomplex_t *ys = new dcomplex_t[7 * nexp_]; 
-  int offset = 0; 
+  dcomplex_t *ys = new dcomplex_t[7 * nexp_];
+  int offset = 0;
   for (int k = 0; k < s_; ++k) {
-    double alpha = 2 * M_PI / m_[k]; 
+    double alpha = 2 * M_PI / m_[k];
     for (int j = 1; j <= m_[k] / 2; ++j) {
-      double alphaj = j * alpha; 
-      double salphaj = sin(alphaj); 
+      double alphaj = j * alpha;
+      double salphaj = sin(alphaj);
       for (int m = -3; m <= 3; ++m) {
-        double arg = lambda_[k] * m * salphaj; 
-        ys[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+        double arg = lambda_[k] * m * salphaj;
+        ys[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
   }
-  return ys; 
+  return ys;
 }
 
 double *LaplaceTable::generate_zs() {
-  double *zs = new double[4 * s_]; 
-  int offset = 0; 
+  double *zs = new double[4 * s_];
+  int offset = 0;
   for (int k = 0; k < s_; ++k) {
     for (int m = 0; m <= 3; ++m) {
-      zs[offset++] = exp(-lambda_[k] * m); 
+      zs[offset++] = exp(-lambda_[k] * m);
     }
   }
-  return zs; 
+  return zs;
 }
 
 double *LaplaceTable::generate_lambdaknm() {
-  double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2]; 
-  double *temp = new double[2 * p_ + 1]; 
-  temp[0] = 1.0; 
-  for (int i = 1; i <= p_ * 2; ++i) 
-    temp[i] = temp[i - 1] * sqrt(i); 
+  double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2];
+  double *temp = new double[2 * p_ + 1];
+  temp[0] = 1.0;
+  for (int i = 1; i <= p_ * 2; ++i)
+    temp[i] = temp[i - 1] * sqrt(i);
 
-  int offset = 0; 
+  int offset = 0;
   for (int k = 0; k < s_; ++k) {
     for (int n = 0; n <= p_; ++n) {
-      double lambdakn = pow(lambda_[k], n); 
+      double lambdakn = pow(lambda_[k], n);
       for (int m = 0; m <= n; ++m) {
-        lambdaknm[offset++] = lambdakn / temp[n - m] / temp[n + m]; 
+        lambdaknm[offset++] = lambdakn / temp[n - m] / temp[n + m];
       }
     }
-  }  
+  }
 
-  delete [] temp; 
-  return lambdaknm; 
+  delete [] temp;
+  return lambdaknm;
 }
 
 dcomplex_t *LaplaceTable::generate_ealphaj() {
-  dcomplex_t *ealphaj = new dcomplex_t[smf_[s_]]; 
-  int offset = 0; 
+  dcomplex_t *ealphaj = new dcomplex_t[smf_[s_]];
+  int offset = 0;
   for (int k = 0; k < s_; ++k) {
-    double alpha = 2 * M_PI / m_[k]; 
+    double alpha = 2 * M_PI / m_[k];
     for (int j = 1; j <= m_[k] / 2; ++j) {
-      double alpha_j = j * alpha; 
+      double alpha_j = j * alpha;
       for (int m = 1; m <= f_[k]; ++m) {
-        double arg = m * alpha_j; 
-        ealphaj[offset++] = dcomplex_t{cos(arg), sin(arg)}; 
+        double arg = m * alpha_j;
+        ealphaj[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
-  }               
-  
-  return ealphaj; 
+  }
+
+  return ealphaj;
 }
 
 LaplaceTableIterator get_or_add_laplace_table(int n_digits) {

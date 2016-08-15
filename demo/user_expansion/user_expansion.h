@@ -89,7 +89,8 @@ class User {
   //
   // DASHMM expects that the data provided by release() will have been allocated
   // using new char [].
-  User(dashmm::Point center, int n_digits, dashmm::ExpansionRole role) {
+  User(dashmm::Point center, int n_digits, double scale,
+       dashmm::ExpansionRole role) {
     // If there was more complication to UserData, this next line would need to
     // be modified.
     bytes_ = sizeof(UserData);
@@ -220,7 +221,7 @@ class User {
   std::unique_ptr<User> S_to_M(dashmm::Point center, Source *first,
               Source *last, double scale) const {
     fprintf(stdout, "S->M for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_,
+    return std::unique_ptr<User>{new User{center, acc_, 1.0,
                                           dashmm::kSourcePrimary}};
   }
 
@@ -229,7 +230,7 @@ class User {
   std::unique_ptr<User> S_to_L(dashmm::Point center, Source *first,
                                Source *last, double scale) const {
     fprintf(stdout, "S->L for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_,
+    return std::unique_ptr<User>{new User{center, acc_, 1.0,
                                           dashmm::kTargetPrimary}};
   }
 
@@ -241,7 +242,7 @@ class User {
     double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = data_->center.z() + (from_child < 4 ? h : -h);
     return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz}, acc_,
-                                          dashmm::kSourcePrimary}};
+                                          1.0, dashmm::kSourcePrimary}};
   }
 
   // This will translate a multipole expansion into a local expansion.
@@ -255,7 +256,7 @@ class User {
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
     return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz}, acc_,
-                                          dashmm::kTargetPrimary}};
+                                          1.0, dashmm::kTargetPrimary}};
   }
 
   // This will translate a local expansion from a parent node to one of
@@ -267,7 +268,7 @@ class User {
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
     return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz}, acc_,
-                                          dashmm::kTargetPrimary}};
+                                          1.0, dashmm::kTargetPrimary}};
   }
 
   // This will compute the effect of a multipole expansion on a set of
@@ -310,6 +311,12 @@ class User {
     fprintf(stdout, "Adding an expansion\n");
   }
 
+  static void update_table(int n_digits, double domain_size,
+                           const std::vector<double> &kernel_params) { }
+
+  static void delete_table() { }
+
+  static double compute_scale(dashmm::Index index) {return 1.0;}
 
  private:
   // This object acts as a handle to some other piece of memory. The details

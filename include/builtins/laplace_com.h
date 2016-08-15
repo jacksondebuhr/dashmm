@@ -71,7 +71,7 @@ class LaplaceCOM {
   using target_t = Target;
   using expansion_t = LaplaceCOM<Source, Target>;
 
-  LaplaceCOM(Point center, int n_digits, ExpansionRole role) {
+  LaplaceCOM(Point center, int n_digits, double scale, ExpansionRole role) {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -162,7 +162,7 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
                                       double scale) const {
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0, 1.0,
                                         kSourcePrimary);
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
@@ -179,7 +179,7 @@ class LaplaceCOM {
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
     assert(valid(ViewSet{}));
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0, 1.0,
                                         kSourcePrimary);
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
@@ -304,6 +304,13 @@ class LaplaceCOM {
     set_xcom(Dprime);
     set_Q(Qprime);
   }
+
+  static void update_table(int n_digits, double domain_size,
+                           const std::vector<double> &kernel_params) { }
+
+  static void delete_table() { }
+
+  static double compute_scale(Index index) {return 1.0;}
 
   /// Set the total mass of the expansion
   ///

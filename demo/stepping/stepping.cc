@@ -250,17 +250,14 @@ void perform_time_stepping(InputArguments args) {
   double t_eval{0.0};
   double t_update{0.0};
 
-  // Prototypes for the expansion and method
-  dashmm::LaplaceCOMAcc<Particle, Particle> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded
-  };
+  // Prototypes for the method
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
     double t0 = getticks();
     err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
-                          method, expansion);
+                          method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 

@@ -45,8 +45,8 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::BH> bheval{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Laplace, dashmm::FMM> fmmeval{};
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Laplace, dashmm::FMM97> fmm97eval{}; 
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Laplace, dashmm::FMM97> fmm97eval{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::Direct> directeval{};
 
@@ -158,7 +158,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stderr, "Usage ERROR: ntargets must be positive\n");
     return -1;
   }
-  if (retval.test_case != "bh" && retval.test_case != "fmm" 
+  if (retval.test_case != "bh" && retval.test_case != "fmm"
       && retval.test_case != "fmm97") {
     fprintf(stderr, "Usage ERROR: unknown method '%s'\n",
             retval.test_case.c_str());
@@ -234,7 +234,7 @@ double pick_mass(bool use_negative) {
   if (use_negative && (rand() % 2)) {
     retval *= -1.0;
   }
-  //double retval = 1.0 * rand() / RAND_MAX - 0.5; 
+  //double retval = 1.0 * rand() / RAND_MAX - 0.5;
   return retval;
 }
 
@@ -262,7 +262,7 @@ double pick_plummer_mass(int count) {
 
 void set_sources(SourceData *sources, int source_count,
                  std::string source_type, std::string test_case) {
-  bool use_negative = (test_case != std::string{"bh"}); 
+  bool use_negative = (test_case != std::string{"bh"});
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_cube_position();
@@ -396,35 +396,30 @@ void perform_evaluation_test(InputArguments args) {
   double t0{};
   double tf{};
   if (args.test_case == std::string{"bh"}) {
-    dashmm::LaplaceCOM<SourceData, TargetData> expansion{
-        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
     dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
     t0 = getticks();
     err = bheval.evaluate(source_handle, target_handle, args.refinement_limit,
-                          method, expansion);
+                          method, args.accuracy, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm"}) {
-    dashmm::Laplace<SourceData, TargetData> expansion{
-          dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded};
     dashmm::FMM<SourceData, TargetData, dashmm::Laplace> method{};
 
     t0 = getticks();
     err = fmmeval.evaluate(source_handle, target_handle, args.refinement_limit,
-                           method, expansion);
+                           method, args.accuracy, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     tf = getticks();
   } else if (args.test_case == std::string{"fmm97"}) {
-    dashmm::Laplace<SourceData, TargetData> expansion{
-      dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded}; 
-    dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{}; 
+    dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{};
 
-    t0 = getticks(); 
-    err = fmm97eval.evaluate(source_handle, target_handle, 
-                             args.refinement_limit, method, expansion); 
-    assert(err == dashmm::kSuccess); 
-    tf = getticks(); 
+    t0 = getticks();
+    err = fmm97eval.evaluate(source_handle, target_handle,
+                             args.refinement_limit, method, args.accuracy,
+                             std::vector<double>{});
+    assert(err == dashmm::kSuccess);
+    tf = getticks();
   }
 
   fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
@@ -439,10 +434,8 @@ void perform_evaluation_test(InputArguments args) {
 
     //do direct evaluation
     dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
-    dashmm::LaplaceCOM<SourceData, TargetData> direxp{
-        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
     err = directeval.evaluate(source_handle, test_handle, args.refinement_limit,
-                              direct, direxp);
+                              direct, args.accuracy, std::vector<double>{});
     assert(err == dashmm::kSuccess);
 
     //Get the results from the global address space

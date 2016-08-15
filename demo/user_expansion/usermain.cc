@@ -206,15 +206,9 @@ void perform_evaluation_test(InputArguments args) {
   // the method might propagate through the evaluation.
   dashmm::FMM<SourceData, TargetData, User> method{};
 
-  // We create a specific expansion that will be passed into evaluate so that
-  // the requested number of digits can be propagated through the evaluation.
-  User<SourceData, TargetData> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded
-  };
-
   // All that is left is to call evaluate from the Evaluator object.
   err = usereval.evaluate(source_handle, target_handle, args.refinement_limit,
-                          method, expansion);
+                          method, args.accuracy, std::vector<double>{});
 
   // Clean up resources
   err = source_handle.destroy();
