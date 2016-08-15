@@ -421,8 +421,8 @@ void perform_evaluation_test(InputArguments args) {
     dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{}; 
 
     t0 = getticks(); 
-    err = fmm97eval.evaluate(source_handle, target_handle, args.refinement_limit, 
-                             method, expansion); 
+    err = fmm97eval.evaluate(source_handle, target_handle, 
+                             args.refinement_limit, method, expansion); 
     assert(err == dashmm::kSuccess); 
     tf = getticks(); 
   }
