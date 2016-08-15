@@ -52,7 +52,7 @@
 /// Not all operations for an Expansion will need every view to be performed,
 /// and not all views will be created by any given operation. The exact
 /// details of which operations need which views are not the concern of
-/// DASHMM, but rather are the concern of the implentor of the specific
+/// DASHMM, but rather are the concern of the implementor of the specific
 /// Expansion class.
 
 
@@ -73,10 +73,14 @@ class Expansion {
   ///
   /// The first creates the object with the given center and the given
   /// accuracy parameter. For FMM, this might be the number of digits
-  /// requested. Further, the provided role will indicate how the Expansion
-  /// will be used. There is no requirement to use any of these arguments,
-  /// but the constructor must aceept them.
-  Expansion(Point center, int n_digits, ExpansionRole role);
+  /// requested. The listed scale is when the expansion type is not
+  /// scale-invariant (e.g. Yukawa) Further, the provided role will indicate
+  /// how the Expansion will be used. There is no requirement to use any of
+  /// these arguments, but the constructor must accept them.
+  ///
+  /// The scale value that will be provided to the expansion will be provided
+  /// by the compute_scale static member of this class.
+  Expansion(Point center, int n_digits, double scale, ExpansionRole role);
 
   /// The second creates the expansion from previously existing data specified
   /// with a ViewSet object.
@@ -87,17 +91,6 @@ class Expansion {
   /// The exemplar of this use is to perform an S->T operation. The expansion
   /// will get a value for n_digits from the provided ViewSet.
   Expansion(const ViewSet &views);
-
-  /// Likely, an Expansion will need a third constructor as well. This
-  /// takes a ViewSet but does allocation for the views. This is to allow
-  /// for operations to only return subsets of the views of an expansion
-  /// if only a subset is needed. This constructor would only be called
-  /// from user code inside the Expansion's implementation, and would only
-  /// be needed if there are multiple views in an expansion.
-  ///
-  /// NOTE: This, however, is not a requirement of the Expansion concept, but
-  /// merely a suggestion of an easy way to serve the other operations.
-  Expansion(Point center, int n_digits, ExpansionRole role, ViewSet &views);
 
   /// The destructor should delete the allocated memory of the object. In the
   /// simplest style of implementation, this means that only if the object
@@ -308,4 +301,44 @@ class Expansion {
   /// expansions together.
   ///
   void add_expansion(const expansion_t *temp1);
+
+
+  /// Update a kernel table
+  ///
+  /// This should generate or update a kernel table for the expansion type on
+  /// which this was called. These tables have implementations that are
+  /// entirely up to the implementer. Typically, these would be the one time
+  /// computations that are needed for the expansion in question. The input
+  /// give the various factors that might determine the values in the table.
+  /// It is likely best if the implementation saves these values, but it is
+  /// not required.
+  ///
+  /// \param n_digits - the number of digits of accuracy required by the
+  ///                   expansion
+  /// \param domain_size - the size of the top level domain
+  /// \param kernel_params - the kernel parameters that specify the interaction
+  static void update_table(int n_digits, double domain_size,
+                           const std::vector<double> &kernel_params);
+
+  /// Delete a kernel table
+  ///
+  /// This will delete all tables, if they should exist, associated with the
+  /// type of expansion.
+  static void delete_table();
+
+  /// Compute the scale to pass into expansion constructors
+  ///
+  /// This will only be called after the table exists, so the implementation
+  /// should rely on the existence of the table. In particular, any parameters
+  /// to the kernel should likely be stored in the table, and so if there is
+  /// a need to use a kernel parameter that can be assumed to be stored in the
+  /// table. Of course, the implementation of the table is responsible for
+  /// saving the kernel parameters. Further, if the scale relies on the domain
+  /// size in its computation, that too should be saved in the table.
+  ///
+  /// \param index - the index of the node containing this expansion
+  ///
+  /// \returns - the appropriate scale factor to be used in an expansion's
+  ///            constructor
+  static double compute_scale(Index index);
 };

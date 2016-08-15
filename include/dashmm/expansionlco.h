@@ -172,8 +172,11 @@ class ExpansionLCO {
   /// \param sources - the source data
   /// \param n_src - the number of sources
   /// \param scale - scaling factor
-  void S_to_M(Point center, Source *sources, size_t n_src, double scale) {
-    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}}};
+  void S_to_M(Point center, Source *sources, size_t n_src, double scale,
+              Index idx) {
+    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0},
+                  expansion_t::compute_scale(idx)};
+    expansion_t local{views};
     auto multi = local.S_to_M(center, sources, &sources[n_src], scale);
     contribute(std::move(multi));
   }
@@ -195,8 +198,11 @@ class ExpansionLCO {
   /// \param sources - the source data
   /// \param n_src - the number of sources
   /// \param scale - scaling factor
-  void S_to_L(Point center, Source *sources, size_t n_src, double scale) {
-    expansion_t local{ViewSet{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}}};
+  void S_to_L(Point center, Source *sources, size_t n_src, double scale,
+              Index idx) {
+    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0},
+                  expansion_t::compute_scale(idx)};
+    expansion_t local{views};
     auto multi = local.S_to_L(center, sources, &sources[n_src], scale);
     contribute(std::move(multi));
   }

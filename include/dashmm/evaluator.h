@@ -232,7 +232,8 @@ class Evaluator {
   /// \param targets - a DASHMM Array of the target points
   /// \param refinement_limint - the domain refinement limit
   /// \param method - a prototype of the method to use.
-  /// \param expansion - a prototpe of the expansion to use.
+  /// \param n_digits - the number of digits of accuracy required
+  /// \param kernelparams - the parameters needed by the kernel
   /// \param distro - an instance of the distribution policy to use for this
   ///                 execution.
   ///
@@ -241,18 +242,24 @@ class Evaluator {
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
-                      const expansion_t &expansion,
+                      int n_digits, const std::vector<double> &kernelparams,
                       const distropolicy_t &distro = distropolicy_t { }) {
     // pack the arguments and call the action
-    EvaluateParams args{ };
-    args.sources = sources;
-    args.targets = targets;
-    args.refinement_limit = refinement_limit;
-    args.method = method;
-    args.n_digits = expansion.accuracy();
-    args.distro = distro;
+    size_t n_params = kernelparams.size();
+    size_t total_size = sizeof(EvaluateParams) + n_params * sizeof(double);
+    EvaluateParams *args =
+        reinterpret_cast<EvaluateParams *>(new char[total_size]);
+    args->sources = sources;
+    args->targets = targets;
+    args->refinement_limit = refinement_limit;
+    args->method = method;
+    args->n_digits = n_digits;
+    args->distro = distro;
+    for (size_t i = 0; i < n_params; ++i) {
+      args->kernelparams[i] = kernelparams[i];
+    }
 
-    if (HPX_SUCCESS != hpx_run(&evaluate_, nullptr, &args, sizeof(args))) {
+    if (HPX_SUCCESS != hpx_run(&evaluate_, nullptr, args, total_size)) {
       return kRuntimeError;
     }
 
@@ -271,6 +278,7 @@ class Evaluator {
     method_t method;
     int n_digits;
     distropolicy_t distro;
+    double kernelparams[];
   };
 
   /// The evaluation action implementation
@@ -290,8 +298,14 @@ class Evaluator {
                               parms->n_digits};
     tree->partition(sources, targets, same_sandt);
 
-    // NOTE: around here is where we can perform the table creation work,
-    // (Future feature)
+    // Generate the table - TODO: this might be better as an action depending
+    // on the domain geometry being computed. But that will have to wait on
+    // the update to the interface of the tree.
+    double domain_size = tree->domain()->size();
+    size_t n_params = (total_size - sizeof(EvaluateParams)) / sizeof(double);
+    std::vector<double> kernel_params(parms->kernelparams,
+                                      &parms->kernelparams[n_params]);
+    expansion_t::update_table(parms->n_digits, domain_size, kernel_params);
 
     // TODO: Here, each locality should do the DAG creation, so perhaps this
     // is SPMD, or should one thread launch the others?
@@ -299,9 +313,6 @@ class Evaluator {
     parms->distro.compute_distribution(dag);
 
     tree->create_expansions_from_DAG(parms->n_digits);
-#ifdef DOJSONOUTPUT
-    dag.toJSON("sample.json");
-#endif
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
@@ -314,7 +325,7 @@ class Evaluator {
     hpx_lco_wait(alldone);
     hpx_lco_delete_sync(alldone);
 
-    // clean up
+    // clean up tree and table
     tree->destroy_DAG_LCOs(dag);
     delete tree;
 

@@ -182,7 +182,6 @@ DO THESE THINGS
 THIS BRANCH TODO
 
 TODO: be more clear about when an expansion needs to own data and when not.
-TODO: remove the suggested third constructor; it seems to be confusing
 TODO: clean up code where possible
 TODO: create test case for new ViewSet stuff? Or just do the real thing and
       have done with it.
@@ -214,6 +213,14 @@ TODO: Decide if we should move setup_termination_detection, setup_edge_lists
 Overall Plan to 1.0
 
  * DONE Split DAG from Tree
+ * DONE Kernel Parameters and Table generation - this is perhaps via another
+     method added to the expansion concept. This will be called at a certain
+     point during the evaluation (once the domain is available)
+        This was added to the evaluation process. The kernel parameters are
+        passed into evaluate, and they are stored in the table. The table is
+        now updated after the domain is known. This will potentially get a mild
+        update once the distributed tree creation is merged into the mainline
+        code.
  * Make intermediate expansions possible
     This is provisionally DONE. This did not break the current operation of
     all existing examples. However, a specific example was not created to test
@@ -227,9 +234,7 @@ Overall Plan to 1.0
     - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
 
- * Kernel Parameters and Table generation - this is perhaps via another
-     method added to the expansion concept. This will be called at a certain
-     point during the evaluation (once the domain is available)
+
  * Split Evaluate into pieces and expose more interface to users
     - Enable repeat use of a DAG
     - Potentially provide objects representing the tree and so on to the user
