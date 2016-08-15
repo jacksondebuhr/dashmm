@@ -53,23 +53,19 @@ class FMM97 {
     if (curr->idx.level() >= 2) {
       // If \p curr is of level 0 or 1, \p curr is not well separated
       // from any target node. As a result, there is no need to create
-      // the normal or intermediate expansion 
-      curr->dag.add_normal();
-      curr->dag.add_interm(); 
-      curr->dag.StoM(&curr->dag);
-      curr->dag.MtoI(&curr->dag); 
+      // the normal expansion. 
+      assert(curr->dag.add_normal() == true); 
+      curr->dag.StoM(&curr->dag); 
     }
   }
 
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
     if (curr->idx.level() >= 2) {
-      curr->dag.add_normal();
-      curr->dag.add_interm(); 
-      curr->dag.MtoI(&curr->dag); 
+      assert(curr->dag.add_normal() == true); 
       for (size_t i = 0; i < 8; ++i) {
-        sourcenode_t *kid = curr->child[i];
-        if (kid != nullptr) {
-          curr->dag.MtoM(&kid->dag);
+        sourcenode_t *child = curr->child[i]; 
+        if (child != nullptr) {
+          curr->dag.MtoM(&child->dag);
         }
       }
     }
@@ -81,9 +77,9 @@ class FMM97 {
       curr->dag.add_parts(); 
 
     if (curr->idx.level() >= 2) {
-      curr->dag.add_normal(); 
+      assert(curr->dag.add_normal() == true); 
       curr->dag.ItoL(&curr->parent->dag); 
-      
+
       if (curr->idx.level() >= 3) 
         curr->dag.LtoL(&curr->parent->dag); 
     }
@@ -115,7 +111,7 @@ class FMM97 {
         curr->dag.LtoT(&curr->dag);
     } else {
       if (curr->idx.level() >= 1) 
-        curr->dag.add_interm(); 
+        assert(curr->dag.add_interm() == true); 
 
       std::vector<sourcenode_t *> newcons{};
 
@@ -140,8 +136,11 @@ class FMM97 {
               if (child != nullptr) {
                 newcons.push_back(child); 
                 S_is_leaf = false; 
-                if (do_I2I) 
+                if (do_I2I) {
+                  if (child->dag.add_interm()) 
+                    child->dag.MtoI(&child->dag); 
                   curr->dag.ItoI(&child->dag); 
+                }
               }
             }
 
@@ -149,7 +148,7 @@ class FMM97 {
               newcons.push_back(*S); 
           }
         }
-      } // endfor
+      } 
 
       consider = std::move(newcons);              
     }
