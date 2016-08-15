@@ -51,8 +51,8 @@ namespace dashmm {
 /// types.
 ///
 /// Source must define a double valued 'charge' member to be used with
-/// LaplaceCOM. Target must define a std::complex<double> valued 'phi' member
-/// to be used with LaplaceCOM.
+/// Laplace. Target must define a std::complex<double> valued 'phi' member
+/// to be used with Laplace.
 template <typename Source, typename Target>
 class Laplace {
  public:
@@ -1411,4 +1411,4 @@ class Laplace {
 
 } // namespace dashmm
 
-#endif // __DASHMM_LAPLACE_SPH_EXPANSION_H__
+#endif // __DASHMM_LAPLACE_EXPANSION_H__
