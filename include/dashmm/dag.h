@@ -186,20 +186,30 @@ class DAGInfo {
   /// Add the normal node
   ///
   /// This will add a normal DAG node for the tree node owning this object.
-  void add_normal() {
-    assert(normal_ == nullptr);
-    normal_ = new DAGNode{idx_};
-    assert(normal_ != nullptr);
+  bool add_normal() {
+    bool retval = false; 
+    lock(); 
+    if (normal_ == nullptr) {
+      normal_ = new DAGNode{idx_}; 
+      retval = true;
+    }
+    unlock(); 
+    return retval; 
   }
 
   /// Add an intermediate node
   ///
   /// This will add an intermediate DAG node for the tree node associated
   /// with this object.
-  void add_interm() {
-    assert(interm_ == nullptr);
-    interm_ = new DAGNode{idx_};
-    assert(interm_ != nullptr);
+  bool add_interm() {
+    bool retval = false; 
+    lock(); 
+    if (interm_ == nullptr) {
+      interm_ = new DAGNode{idx_}; 
+      retval = true;
+    }
+    unlock(); 
+    return retval;
   }
 
   /// Add a particle node

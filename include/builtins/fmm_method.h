@@ -55,16 +55,23 @@ class FMM {
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
-    curr->dag.add_normal();
-    curr->dag.StoM(&curr->dag);
+    if (curr->idx.level() >= 2) {
+      // If \p curr is of level 0 or 1, \p curr is not well separated
+      // from any node. As a result, there is no need to create the
+      // normal expansion. 
+      assert(curr->dag.add_normal() == true);
+      curr->dag.StoM(&curr->dag);
+    }
   }
 
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_normal();
-    for (size_t i = 0; i < 8; ++i) {
-      sourcenode_t *kid = curr->child[i];
-      if (kid != nullptr) {
-        curr->dag.MtoM(&kid->dag);
+    if (curr->idx.level() >= 2) {
+      assert(curr->dag.add_normal() == true);
+      for (size_t i = 0; i < 8; ++i) {
+        sourcenode_t *kid = curr->child[i];
+        if (kid != nullptr) {
+          curr->dag.MtoM(&kid->dag);
+        }
       }
     }
   }
@@ -74,9 +81,12 @@ class FMM {
     if (curr_is_leaf) {
       curr->dag.add_parts();
     }
-    curr->dag.add_normal();
-    if (curr->parent != nullptr) {
-      curr->dag.LtoL(&curr->parent->dag);
+
+    if (curr->idx.level() >= 2) {
+      assert(curr->dag.add_normal() == true); 
+      
+      if (curr->idx.level() >= 3) 
+        curr->dag.LtoL(&curr->parent->dag); 
     }
   }
 
@@ -101,7 +111,8 @@ class FMM {
         }
       }
 
-      curr->dag.LtoT(&curr->dag);
+      if (curr->idx.level() >= 2) 
+        curr->dag.LtoT(&curr->dag);
     } else {
       std::vector<sourcenode_t *> newcons{ };
 

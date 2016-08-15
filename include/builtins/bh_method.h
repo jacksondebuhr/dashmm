@@ -72,14 +72,14 @@ class BH {
   /// In generate, BH will call S->M on the sources in a leaf node.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
-    curr->dag.add_normal();
+    assert(curr->dag.add_normal() == true);
     curr->dag.StoM(&curr->dag);
   }
 
   /// In aggregate, BH will call M->M to combine moments from the children
   /// of the current node.
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
-    curr->dag.add_normal();
+    assert(curr->dag.add_normal() == true);
     for (size_t i = 0; i < 8; ++i) {
       sourcenode_t *kid = curr->child[i];
       if (kid != nullptr) {
