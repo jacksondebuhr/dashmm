@@ -13,7 +13,7 @@
 
 
 /// \file src/laplace_table.cc
-/// \brief Implementation of precomputed tables for LaplaceSPH
+/// \brief Implementation of precomputed tables for Laplace
 
 
 #include "builtins/laplace_sph_table.h"
@@ -21,34 +21,14 @@
 
 namespace dashmm {
 
-
-std::map<int, uLaplaceTable> builtin_laplace_table_{};
-
-
-void legendre_Plm(int n, double x, double *P) {
-  double u = -sqrt(1.0 - x * x);
-  P[midx(0, 0)] = 1.0;
-  for (int i = 1; i <= n; i++)
-    P[midx(i, i)] = P[midx(i - 1, i - 1)] * u * (2 * i - 1);
-
-  for (int i = 0; i < n; i++)
-    P[midx(i + 1, i)] = P[midx(i, i)] * x * (2 * i + 1);
-
-  for (int m = 0; m <= n; m++) {
-    for (int ell = m + 2; ell <= n; ell++) {
-      P[midx(ell, m)] = ((2.0 * ell - 1) * x * P[midx(ell - 1, m)] -
-                         (ell + m - 1) * P[midx(ell - 2, m)]) / (ell - m);
-    }
-  }
-}
-
+uLaplaceTable builtin_laplace_table_; 
 
 LaplaceTable::LaplaceTable(int n_digits) {
   int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29,
                         33, 36, 40, 43, 46};
   p_ = expan_length[n_digits];
-  sqf_ = generate_sqf();
-  sqbinom_ = generate_sqbinom();
+  generate_sqf(); 
+  generate_sqbinom(); 
   dmat_plus_ = new laplace_map_t;
   dmat_minus_ = new laplace_map_t;
   generate_wigner_dmatrix(dmat_plus_, dmat_minus_);
@@ -131,12 +111,12 @@ LaplaceTable::LaplaceTable(int n_digits) {
   default:
     break;
   }
-
-  xs_ = generate_xs();
-  ys_ = generate_ys();
-  zs_ = generate_zs();
-  lambdaknm_ = generate_lambdaknm();
-  ealphaj_ = generate_ealphaj();
+  
+  generate_xs(); 
+  generate_ys(); 
+  generate_zs(); 
+  generate_lambdaknm(); 
+  generate_ealphaj(); 
 }
 
 
@@ -163,32 +143,29 @@ LaplaceTable::~LaplaceTable() {
   delete [] ealphaj_;
 }
 
-
-double *LaplaceTable::generate_sqf() {
-  double *sqf = new double[2 * p_ + 1];
-  sqf[0] = 1.0;
+void LaplaceTable::generate_sqf() {
+  sqf_ = new double[2 * p_ + 1];
+  sqf_[0] = 1.0;
   for (int i = 1; i <= p_ * 2; ++i)
-    sqf[i] = sqf[i - 1] * sqrt(i);
-  return sqf;
+    sqf_[i] = sqf_[i - 1] * sqrt(i);
 }
 
-
-double *LaplaceTable::generate_sqbinom() {
+void LaplaceTable::generate_sqbinom() {
   int N = 2 * p_;
   int total = (N + 1) * (N + 2) / 2;
-  double *sqbinom = new double[total];
+  sqbinom_ = new double[total];
 
   // Set the first three binomial coefficients
-  sqbinom[0] = 1; // binom(0, 0)
-  sqbinom[1] = 1; // binom(1, 0)
-  sqbinom[2] = 1; // binom(1, 1)
+  sqbinom_[0] = 1; // binom(0, 0)
+  sqbinom_[1] = 1; // binom(1, 0)
+  sqbinom_[2] = 1; // binom(1, 1)
 
   // Compute the rest binomial coefficients
   for (int n = 2; n <= N; ++n) {
     // Get address of binom(n, 0) in current
     // Get address of binom(n - 1, 0) in previous
-    double *current = &sqbinom[midx(n, 0)];
-    double *previous = &sqbinom[midx(n - 1, 0)];
+    double *current = &sqbinom_[midx(n, 0)];
+    double *previous = &sqbinom_[midx(n - 1, 0)];
 
     current[0] = 1; // binom(n, 0);
     for (int m = 1; m < n; ++m) {
@@ -199,12 +176,9 @@ double *LaplaceTable::generate_sqbinom() {
 
   // Compute the square root of the binomial coefficients
   for (int i = 0; i < total; ++i) {
-    sqbinom[i] = sqrt(sqbinom[i]);
+    sqbinom_[i] = sqrt(sqbinom_[i]);
   }
-
-  return sqbinom;
 }
-
 
 void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
                                            laplace_map_t *&dm) {
@@ -235,7 +209,6 @@ void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
     (*dm)[-cbeta[i]] = dm_data;
   }
 }
-
 
 void LaplaceTable::generate_dmatrix_of_beta(double beta,
                                             double *dp, double *dm) {
@@ -349,8 +322,8 @@ void LaplaceTable::generate_dmatrix_of_beta(double beta,
   }
 }
 
-dcomplex_t *LaplaceTable::generate_xs() {
-  dcomplex_t *xs = new dcomplex_t[7 * nexp_];
+void LaplaceTable::generate_xs() {
+  xs_ = new dcomplex_t[7 * nexp_];
   int offset = 0;
   for (int k = 0; k < s_; ++k) {
     double alpha = 2 * M_PI / m_[k];
@@ -359,15 +332,14 @@ dcomplex_t *LaplaceTable::generate_xs() {
       double calphaj = cos(alphaj);
       for (int m = -3; m <= 3; ++m) {
         double arg = lambda_[k] * m * calphaj;
-        xs[offset++] = dcomplex_t{cos(arg), sin(arg)};
+        xs_[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
   }
-  return xs;
 }
 
-dcomplex_t *LaplaceTable::generate_ys() {
-  dcomplex_t *ys = new dcomplex_t[7 * nexp_];
+void LaplaceTable::generate_ys() {
+  ys_ = new dcomplex_t[7 * nexp_];
   int offset = 0;
   for (int k = 0; k < s_; ++k) {
     double alpha = 2 * M_PI / m_[k];
@@ -376,26 +348,24 @@ dcomplex_t *LaplaceTable::generate_ys() {
       double salphaj = sin(alphaj);
       for (int m = -3; m <= 3; ++m) {
         double arg = lambda_[k] * m * salphaj;
-        ys[offset++] = dcomplex_t{cos(arg), sin(arg)};
+        ys_[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
   }
-  return ys;
 }
 
-double *LaplaceTable::generate_zs() {
-  double *zs = new double[4 * s_];
+void LaplaceTable::generate_zs() {
+  zs_ = new double[4 * s_];
   int offset = 0;
   for (int k = 0; k < s_; ++k) {
     for (int m = 0; m <= 3; ++m) {
-      zs[offset++] = exp(-lambda_[k] * m);
+      zs_[offset++] = exp(-lambda_[k] * m);
     }
   }
-  return zs;
 }
 
-double *LaplaceTable::generate_lambdaknm() {
-  double *lambdaknm = new double[s_ * (p_ + 1) * (p_ + 2) / 2];
+void LaplaceTable::generate_lambdaknm() {
+  lambdaknm_ = new double[s_ * (p_ + 1) * (p_ + 2) / 2];
   double *temp = new double[2 * p_ + 1];
   temp[0] = 1.0;
   for (int i = 1; i <= p_ * 2; ++i)
@@ -406,17 +376,16 @@ double *LaplaceTable::generate_lambdaknm() {
     for (int n = 0; n <= p_; ++n) {
       double lambdakn = pow(lambda_[k], n);
       for (int m = 0; m <= n; ++m) {
-        lambdaknm[offset++] = lambdakn / temp[n - m] / temp[n + m];
+        lambdaknm_[offset++] = lambdakn / temp[n - m] / temp[n + m];
       }
     }
   }
 
   delete [] temp;
-  return lambdaknm;
 }
 
-dcomplex_t *LaplaceTable::generate_ealphaj() {
-  dcomplex_t *ealphaj = new dcomplex_t[smf_[s_]];
+void LaplaceTable::generate_ealphaj() {
+  ealphaj_ = new dcomplex_t[smf_[s_]];
   int offset = 0;
   for (int k = 0; k < s_; ++k) {
     double alpha = 2 * M_PI / m_[k];
@@ -424,27 +393,39 @@ dcomplex_t *LaplaceTable::generate_ealphaj() {
       double alpha_j = j * alpha;
       for (int m = 1; m <= f_[k]; ++m) {
         double arg = m * alpha_j;
-        ealphaj[offset++] = dcomplex_t{cos(arg), sin(arg)};
+        ealphaj_[offset++] = dcomplex_t{cos(arg), sin(arg)};
       }
     }
   }
-
-  return ealphaj;
 }
 
-LaplaceTableIterator get_or_add_laplace_table(int n_digits) {
+void legendre_Plm(int n, double x, double *P) {
+  double u = -sqrt(1.0 - x * x);
+  P[midx(0, 0)] = 1.0;
+  for (int i = 1; i <= n; i++)
+    P[midx(i, i)] = P[midx(i - 1, i - 1)] * u * (2 * i - 1);
+
+  for (int i = 0; i < n; i++)
+    P[midx(i + 1, i)] = P[midx(i, i)] * x * (2 * i + 1);
+
+  for (int m = 0; m <= n; m++) {
+    for (int ell = m + 2; ell <= n; ell++) {
+      P[midx(ell, m)] = ((2.0 * ell - 1) * x * P[midx(ell - 1, m)] -
+                         (ell + m - 1) * P[midx(ell - 2, m)]) / (ell - m);
+    }
+  }
+}
+
+void get_or_add_laplace_table(int n_digits) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
   // or something similar.
 
-  LaplaceTableIterator entry = builtin_laplace_table_.find(n_digits);
-  if (entry != builtin_laplace_table_.end()) {
-    return entry;
+  // Need to add the capability to check if \p n_digits is the same as the one
+  // stored. If not, delete the current table and generate one with the updated
+  // accuracy requirement.  
+  if (builtin_laplace_table_ == nullptr) {
+    builtin_laplace_table_ = uLaplaceTable{new LaplaceTable{n_digits}};
   }
-
-  builtin_laplace_table_[n_digits] =
-    std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits}};
-  return builtin_laplace_table_.find(n_digits);
 }
-
 
 } // namespace dashmm
