@@ -1,6 +1,12 @@
 So there are some things left to take care of with this. In no particular
 order:
 
+DONE * Remove the extraneous sorting members - just do the std::partition style
+DONE * Find the place that the actual rearrangement occurs, and remove that code
+ * Have partition accept an array ref instead
+ * This likely means that Node should have an array ref as well
+ * Make the update to the sources and targets array - that is, change the
+     meta data array values
  * Make the tree type less silly
    - This means make it more than a wrapper around the old globals
    - This means move the functionality into the DualTree class
