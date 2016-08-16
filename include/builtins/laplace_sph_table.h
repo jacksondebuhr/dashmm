@@ -91,22 +91,20 @@ class LaplaceTable {
   double *lambdaknm_; 
   dcomplex_t *ealphaj_; 
 
-  double *generate_sqf();
-  double *generate_sqbinom();
+  void generate_sqf();
+  void generate_sqbinom();
   void generate_wigner_dmatrix(laplace_map_t *&dp, laplace_map_t *&dm);
   void generate_dmatrix_of_beta(double beta, double *dp, double *dm);
-  dcomplex_t *generate_xs(); 
-  dcomplex_t *generate_ys(); 
-  double *generate_zs(); 
-  double *generate_lambdaknm(); 
-  dcomplex_t *generate_ealphaj(); 
+  void generate_xs(); 
+  void generate_ys(); 
+  void generate_zs(); 
+  void generate_lambdaknm(); 
+  void generate_ealphaj(); 
 };
 
 using uLaplaceTable = std::unique_ptr<LaplaceTable>;
-using LaplaceTableIterator = std::map<int, uLaplaceTable>::iterator;
 
-
-extern std::map<int, uLaplaceTable> builtin_laplace_table_;
+extern uLaplaceTable builtin_laplace_table_; 
 
 
 void legendre_Plm(int n, double x, double *P);
@@ -126,39 +124,7 @@ inline double pow_m1(const int m) {
   return (m % 2 ? -1.0 : 1.0);
 }
 
-
-LaplaceTableIterator get_or_add_laplace_table(int n_digits);
-
-enum MergedList {
-  uall = 0, ///< +z direction list for all boxes
-  u1234 = 1, ///< +z direction list for boxes 1, 2, 3, 4
-  nall = 2, ///< +y direction list for all boxes
-  n1256 = 3, ///< +y direction list for boxes 1, 2, 5, 6
-  n12 = 4, ///< +y direction list for boxes 1, 2 
-  n56 = 5, ///< +y direction list for boxes 5, 6
-  eall = 6, ///< +x direction list for all boxes 
-  e1357 = 7, ///< +x direction list for boxes 1, 3, 5, 7
-  e13 = 8, ///< +x direction list for boxes 1, 3
-  e57 = 9, ///< +x direction list for boxes 5, 7
-  e1 = 10, ///< +x direction list for box 1
-  e3 = 11, ///< +x direction list for box 3
-  e5 = 12, ///< +x direction list for box 5
-  e7 = 13, ///< +x direction list for box 7
-  dall = 14, ///< -z direction list for all boxes
-  d5678 = 15, ///< -z direction list for boxes 5, 6, 7, 8 
-  sall = 16, ///< -y direction list for all boxes
-  s3478 = 17, ///< -y direction list for boxes 3, 4, 7, 8 
-  s34 = 18, ///< -y direction list for boxes 3, 4 
-  s78 = 19, ///< -y direction list for boxes 7, 8 
-  wall = 20, ///< -x direction list for all boxes 
-  w2468 = 21, ///< -x direction list for boxes 2, 4, 6, 8
-  w24 = 22, ///< -x direction list for boxes 2, 4
-  w68 = 23, ///< -x direction list for boxes 6, 8
-  w2 = 24, ///< -x direction list for box 2
-  w4 = 25, ///< -x direction list for box 4
-  w6 = 26, ///< -x direction list for box 6
-  w8 = 27, ///< -x direction list for box 8
-}; 
+void get_or_add_laplace_table(int n_digits);
 
 
 } // namespace dashmm
