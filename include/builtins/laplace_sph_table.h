@@ -104,12 +104,6 @@ class LaplaceTable {
 
 using uLaplaceTable = std::unique_ptr<LaplaceTable>;
 
-#if 0
-using LaplaceTableIterator = std::map<int, uLaplaceTable>::iterator;
-extern std::map<int, uLaplaceTable> builtin_laplace_table_;
-#endif 
-
-
 extern uLaplaceTable builtin_laplace_table_; 
 
 
@@ -130,8 +124,6 @@ inline double pow_m1(const int m) {
   return (m % 2 ? -1.0 : 1.0);
 }
 
-
-//LaplaceTableIterator get_or_add_laplace_table(int n_digits);
 void get_or_add_laplace_table(int n_digits);
 
 
