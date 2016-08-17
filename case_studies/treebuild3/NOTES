@@ -8,6 +8,15 @@ DONE * Have partition accept an array ref instead
 DONE * This likely means that Node should have an array ref as well
 DONE * Make the update to the sources and targets array - that is, change the
      meta data array values
+
+ * Change the expanded node construction to more standard single objects.
+   In this way we can unify somewhat the abstraction. I am not sure that the
+   alternate style is worth the effort.
+
+ * Need to build the top of the tree - perhaps the uniform grid nodes have
+   a different type? To make it simpler on the differences between the various
+   things.
+
  * Make the tree type less silly
    - This means make it more than a wrapper around the old globals
    - This means move the functionality into the DualTree class
