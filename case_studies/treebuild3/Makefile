@@ -1,5 +1,5 @@
 CXX = mpicxx
-CXXFLAGS = -std=c++11 -Wall -g -O0
+CXXFLAGS = -std=c++11 -Wall -g -O3
 
 INCLUDE = -I../../include $(shell pkg-config --cflags hpx)
 LIBS = -L../../lib -ldashmm $(shell pkg-config --libs hpx)

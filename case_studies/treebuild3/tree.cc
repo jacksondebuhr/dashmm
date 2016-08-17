@@ -455,7 +455,7 @@ int *init_point_exchange(int rank, DualTree *tree,
   }
 
   if (num_points > 0) {
-    hpx_addr_t sorted_gas = hpx_gas_alloc_local(sizeof(Point) * num_points,
+    hpx_addr_t sorted_gas = hpx_gas_alloc_local(1,
                                                 sizeof(Point) * num_points, 0);
     assert(sorted_gas != HPX_NULL);
     sorted_ref = ArrayRef<Point>{sorted_gas, num_points, num_points};
