@@ -26,6 +26,7 @@
 #include <memory>
 #include <vector>
 #include "dashmm/types.h"
+#include "builtins/special_function.h"
 
 namespace dashmm {
 
@@ -105,24 +106,6 @@ class LaplaceTable {
 using uLaplaceTable = std::unique_ptr<LaplaceTable>;
 
 extern uLaplaceTable builtin_laplace_table_; 
-
-
-void legendre_Plm(int n, double x, double *P);
-
-
-inline int midx(const int n, const int m) {
-  return n * (n + 1) / 2 + m;
-}
-
-
-inline int didx(const int n, const int mp, const int m) {
-  return n * (n + 1) * (4 * n - 1) / 6 + mp * (2 * n + 1) + n + m;
-}
-
-
-inline double pow_m1(const int m) {
-  return (m % 2 ? -1.0 : 1.0);
-}
 
 void get_or_add_laplace_table(int n_digits);
 

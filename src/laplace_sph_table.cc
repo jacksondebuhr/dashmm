@@ -399,6 +399,7 @@ void LaplaceTable::generate_ealphaj() {
   }
 }
 
+/*
 void legendre_Plm(int n, double x, double *P) {
   double u = -sqrt(1.0 - x * x);
   P[midx(0, 0)] = 1.0;
@@ -415,6 +416,7 @@ void legendre_Plm(int n, double x, double *P) {
     }
   }
 }
+*/
 
 void get_or_add_laplace_table(int n_digits) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
