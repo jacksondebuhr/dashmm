@@ -878,6 +878,12 @@ int create_dual_tree_handler(hpx_addr_t rwtree, hpx_addr_t sources_gas,
   hpx_lco_wait(dual_tree_complete);
   hpx_lco_delete_sync(dual_tree_complete);
 
+  // Replace segment in the array
+  hpx_addr_t old_src_data = sources.replace(tree->sorted_src_ref());
+  hpx_addr_t old_tar_data = targets.replace(tree->sorted_tar_ref());
+  hpx_gas_free_sync(old_src_data);
+  hpx_gas_free_sync(old_tar_data);
+
   delete [] local_count;
   delete [] local_offset_s;
   delete [] local_offset_t;
@@ -959,10 +965,6 @@ void DualTree::clear_data() {
 
   delete [] unif_count_value_;
   hpx_lco_delete_sync(unif_done_);
-  hpx_addr_t src_gas = sorted_src_.data();
-  hpx_gas_free_sync(src_gas);
-  hpx_addr_t tar_gas = sorted_tar_.data();
-  hpx_gas_free_sync(tar_gas);
 
   int b = first(rank);
   int e = last(rank);

@@ -282,6 +282,40 @@ class Array {
     return retval;
   }
 
+  // Replace the local segment. If these change the overall total number of
+  // records, that will have to be fixed with a call to resum().
+  //
+  // This can be called from an HPX thread -- and can only be done that way
+  // at the moment
+  //
+  // NOTE: It is suggested that the casual user not use this routine.
+  hpx_addr_t replace(ArrayRef<T> ref) {
+    int rank = hpx_get_my_rank();
+    hpx_addr_t global = hpx_addr_add(data_,
+                                     sizeof(ArrayMetaData) * rank,
+                                     sizeof(ArrayMetaData));
+    ArrayMetaData *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    hpx_addr_t retval = local->data;
+    local->data = ref.data();
+    local->local_count = ref.n_tot();
+
+    hpx_gas_unpin(global);
+    return retval;
+  }
+
+  // TODO: The previous suggests that perhaps there should be some way to
+  // create an array from an unknown number of things. Basically create an
+  // empty array. Each rank then creates an ArrayRef object that gets filled
+  // somehow. (This would be new functionality for ArrayRef), and then each
+  // rank will call replace. And then there would need to be the collective
+  // operation of resum(), which is not implemented yet.
+  //
+  // This would want to be worked out to have a nice interface that someone
+  // might actually want to use.
+
+
   // TODO: I think we want to add a couple extra arguments, or template
   // parameters or something. The first is if the work should map on each
   // rank into one segment per thread, or just as one large segment. Then
@@ -311,30 +345,6 @@ class Array {
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
   }
-
-  // TODO do we want to add a reduction map as well? That would be useful
-  // in some cases. Especially internally for the library. The catch here is
-  // that the library would need to define the array reduce action with the
-  // appropriate template types, before knowing what the user will want.
-
-  // TODO we need to add a method to sort the array segments in some way.
-  // this is in place, bucket style probably. Probably provide an ordering
-  // function. That is, give a rank to each (multiple records can have the
-  // same rank)
-  //
-  // So the ranking function will have the signature int ranker(const T *item)
-  //
-  //
-  //template <typename Callable>
-  //ReturnCode rank_sort(Callable ranker) {
-    // do something different based on hpx_is_active()
-    //  if active, just do a call
-    //  if not active, a spmd run
-  //}
-
-  // TODO we need to add a method to sort across localities. This temporarily
-  // allocated more memory, and replaces segments. Or perhaps it gives a whole
-  // new array, and the user must get rid of the previous
 
  private:
   /// The global address of the Array meta data.

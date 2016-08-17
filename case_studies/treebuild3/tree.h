@@ -122,6 +122,12 @@ class DualTree {
   dashmm::ArrayData<dashmm::Point> sorted_tar() const {
     return sorted_tar_.pin();
   }
+  dashmm::ArrayRef<dashmm::Point> sorted_src_ref() const {
+    return sorted_src_;
+  }
+  dashmm::ArrayRef<dashmm::Point> sorted_tar_ref() const {
+    return sorted_tar_;
+  }
 
   void set_unif_level(int l) {unif_level_ = l;}
   void set_dim3(int d) {dim3_ = d;}
