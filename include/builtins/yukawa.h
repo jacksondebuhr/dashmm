@@ -146,12 +146,12 @@ public:
     int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{center, n_digits, scale, kSourcePrimary}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
-    int p = yukawa_builtin_table_->p(); 
-    const double *sqf = yukawa_builtin_table_->sqf(); 
-    double lambda = yukawa_builtin_table_->lambda(); 
+    int p = builtin_yukawa_table_->p(); 
+    const double *sqf = builtin_yukawa_table_->sqf(); 
+    double lambda = builtin_yukawa_table_->lambda(); 
 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
-    complex_t *powers_ephi = new complex_t[p + 1]; 
+    dcomplex_t *powers_ephi = new dcomplex_t[p + 1]; 
     double *bessel = new double[p + 1];   
 
     for (auto i = first; i != last; ++i) {
@@ -161,11 +161,11 @@ public:
       double r = dist.norm(); 
 
       // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1.0e-14 ? 1.0 : z / r); 
+      double ctheta = (r <= 1.0e-14 ? 1.0 : dist.z() / r); 
 
       // Compute exp(-i * phi) for the azimuthal angle phi 
       dcomplex_t ephi = (proj / r <= 1.0e-14 ? dcomplex_t{1.0, 0.0} : 
-                         dcomplex_t{x / proj, -y /proj}); 
+                         dcomplex_t{dist.x() / proj, -dist.y() /proj}); 
 
       // Compute powers of exp(-i * phi)
       powers_ephi[0] = 1.0; 
@@ -176,7 +176,7 @@ public:
       bessel_in_scaled(p, lambda * r, scale, bessel); 
 
       // Compute legendre polynomial
-      legendre_Pnm(p, ctheta, legendre); 
+      legendre_Plm(p, ctheta, legendre); 
 
       // Compute multipole expansion M_n^m    
       for (int n = 0; n <= p; ++n) {
@@ -199,13 +199,13 @@ public:
     int n_digits = views_.n_digits(); 
     expansion_t *retval{new expansion_t{center, n_digits, scale, kTargetPrimary}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
-    int p = yukawa_builtin_table_->p(); 
-    const double *sqf = yukawa_builtin_table_->sqf(); 
-    double lambda = yukawa_builtin_table_->lambda(); 
+    int p = builtin_yukawa_table_->p(); 
+    const double *sqf = builtin_yukawa_table_->sqf(); 
+    double lambda = builtin_yukawa_table_->lambda(); 
   
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     double *bessel = new double[p + 1]; 
-    complex_t *powers_ephi = new complex_t[p + 1]; 
+    dcomplex_t *powers_ephi = new dcomplex_t[p + 1]; 
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center); 
@@ -214,11 +214,11 @@ public:
       double r = dist.norm(); 
 
       // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1.0e-14 ? 1.0 : z / r); 
+      double ctheta = (r <= 1.0e-14 ? 1.0 : dist.z() / r); 
 
       // Compute exp(-i * phi) for the azimuthal angle phi 
       dcomplex_t ephi = (proj / r <= 1.0e-14 ? dcomplex_t{1.0, 0.0} : 
-                         dcomplex_t{x / proj, -y / proj}); 
+                         dcomplex_t{dist.x() / proj, -dist.y() / proj}); 
 
       // Compute powers of exp(-i * phi) 
       powers_ephi[0] = 1.0; 
@@ -229,7 +229,7 @@ public:
       bessel_kn_scaled(p, lambda * r, scale, bessel); 
 
       // Compute legendre polynomial 
-      legendre_Pnm(p, ctheta, legendre); 
+      legendre_Plm(p, ctheta, legendre); 
 
       // Compute local expansion L_n^m
       for (int n = 0; n <= p; ++n) {
@@ -331,7 +331,9 @@ public:
 
     // Get rotation angle 
     double alpha = tab_alpha[to_child] * M_PI_4; 
-
+    
+    int p = builtin_yukawa_table_->p(); 
+    
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (to_child < 4 ? 
                         builtin_yukawa_table_->dmat_plus(1.0 / sqrt(3)) : 
@@ -356,7 +358,7 @@ public:
     
     for (int n = 0; n <= p; ++n) {
       for (int m = 0; m <= n; ++m) {
-        complex_t temp{0.0, 0.0}; 
+        dcomplex_t temp{0.0, 0.0}; 
         for (int np = m; np <= p; ++np) 
           temp += W2[midx(np, m)] * coeff[sidx(n, m, np, p)];
         W1[midx(n, m)] = temp;
@@ -375,9 +377,8 @@ public:
     double lambda = builtin_yukawa_table_->lambda(); 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     double *bessel = new double[p + 1]; 
-    complex_t *powers_ephi = new complex_t[p + 1]; 
+    dcomplex_t *powers_ephi = new dcomplex_t[p + 1]; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
-    double scale = views_.scale(); 
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, views_.center()); 
@@ -386,11 +387,11 @@ public:
       double r = dist.norm(); 
 
       // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1.0e-14 ? 1.0 : z / r); 
+      double ctheta = (r <= 1.0e-14 ? 1.0 : dist.z() / r); 
 
       // Compute exp(i * phi) for the azimuthal angle phi 
-      complex_t ephi = (proj / r <= 1.0e-14 ? dcomplex_t{1.0, 0.0} : 
-                        dcomplex_t{x / proj, y / proj}); 
+      dcomplex_t ephi = (proj / r <= 1.0e-14 ? dcomplex_t{1.0, 0.0} : 
+                         dcomplex_t{dist.x() / proj, dist.y() / proj}); 
 
       // Compute powers of exp(i * phi)
       powers_ephi[0] = 1.0; 
@@ -401,7 +402,7 @@ public:
       bessel_kn_scaled(p, lambda * r, scale, bessel); 
 
       // Compute legendre polynomial 
-      legendre_Pnm(p, ctheta, legendre); 
+      legendre_Plm(p, ctheta, legendre); 
 
       // Evaluate M_n^0
       for (int n = 0; n <= p; ++n) 
@@ -428,9 +429,9 @@ public:
     double lambda = builtin_yukawa_table_->lambda(); 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     double *bessel = new double[p + 1]; 
-    dcomplex_t *powers_ephi = new complex_t[p + 1]; 
+    dcomplex_t *powers_ephi = new dcomplex_t[p + 1]; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
-    double scale = views_.scale(); 
+    //double scale = views_.scale(); 
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, views_.center()); 
@@ -439,11 +440,11 @@ public:
       double r = dist.norm(); 
 
       // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1.0e-14 ? 1.0 : z / r); 
+      double ctheta = (r <= 1.0e-14 ? 1.0 : dist.z() / r); 
 
       // Compute exp(i * phi) for the azimuthal angle phi
-      dcomplex_t ephi = (proj / r <= eps ? dcomplex_t{1.0, 0.0} : 
-                         dcomplex_t{x / proj, y / proj}); 
+      dcomplex_t ephi = (proj / r <= 1.0e-14 ? dcomplex_t{1.0, 0.0} : 
+                         dcomplex_t{dist.x() / proj, dist.y() / proj}); 
       
       // Compute powers of exp(i * phi)
       powers_ephi[0] = 1.0; 
@@ -454,14 +455,14 @@ public:
       bessel_in_scaled(p, lambda * r, scale, bessel); 
 
       // Compute legendre polynomial
-      legendre_Pnm(p, ctheta, legendre); 
+      legendre_Plm(p, ctheta, legendre); 
 
       // Evaluate local expansion L_n^0
-      for (int n = 0; n <= p_; ++n) 
+      for (int n = 0; n <= p; ++n) 
         potential += L[midx(n, 0)] * legendre[midx(n, 0)] * bessel[n]; 
 
       // Evaluate L_n^m
-      for (int n = 1; n <= p_; ++n) {
+      for (int n = 1; n <= p; ++n) {
         for (int m = 1; m <= n; ++m) {
           int idx = midx(n, m); 
           potential += 2.0 * real(L[idx] * powers_ephi[m]) * 
@@ -518,6 +519,7 @@ public:
     // Addresses of exponential expansions in the negative axis direction
     dcomplex_t *EM[3] = {E_mx, E_my, E_mz};
 
+    int p = builtin_yukawa_table_->p(); 
     double ld = builtin_yukawa_table_->lambda() * 
       builtin_yukawa_table_->size(scale); 
 
@@ -560,7 +562,7 @@ public:
     for (int dir = 0; dir <=2; ++dir) {
       int offset = 0; 
       for (int k = 0; k < s; ++k) {
-        legendre_Pnm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre); 
+        legendre_Plm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre); 
 
         // Handle M_n^m where n is even 
         dcomplex_t *z1 = new dcomplex_t[f[k] + 1];
@@ -855,7 +857,7 @@ public:
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, views_.n_digits(),
                                         scale, kTargetPrimary}};
 
-    iny nexp = builtin_yukawa_table_->nexp(scale); 
+    int nexp = builtin_yukawa_table_->nexp(scale); 
 
     dcomplex_t *E[28]{nullptr};
     for (int i = 0; i < 28; ++i)
@@ -1045,11 +1047,11 @@ private:
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) const {
     int p = builtin_yukawa_table_->p();
     // Compute exp(i * alpha)
-    complex_t ealpha = complex_t{cos(alpha),  sin(alpha)}; 
+    dcomplex_t ealpha = dcomplex_t{cos(alpha),  sin(alpha)}; 
 
     // Compute powers of exp(i * alpha)
-    complex_t *powers_ealpha = new complex_t[p + 1]; 
-    powers_ealpha[0] = complex_t{1.0, 0.0};
+    dcomplex_t *powers_ealpha = new dcomplex_t[p + 1]; 
+    powers_ealpha[0] = dcomplex_t{1.0, 0.0};
     for (int j = 1; j <= p; ++j)
       powers_ealpha[j] = powers_ealpha[j - 1] * ealpha; 
 
@@ -1064,8 +1066,8 @@ private:
     delete [] powers_ealpha; 
   }
   
-  void rotate_sph_y(const complex_t *M, const double *d, 
-                    complex_t *MR) const {
+  void rotate_sph_y(const dcomplex_t *M, const double *d, 
+                    dcomplex_t *MR) const {
     int p = builtin_yukawa_table_->p(); 
     int offset = 0; 
     for (int n = 0; n <= p; ++n) {
@@ -1074,7 +1076,7 @@ private:
         // Retrieve address of wigner d-matrix entry d_n^{mp, 0} 
         const double *coeff = &d[didx(n, mp, 0)]; 
         // Get address of original harmonic expansion M_n^0       
-        const complex_t *Mn = &M[midx(n, 0)]; 
+        const dcomplex_t *Mn = &M[midx(n, 0)]; 
         // Compute rotated spherical harmonic M_n^mp
         MR[offset] = Mn[0] * coeff[0]; 
         double power_m = -1; 
@@ -1102,9 +1104,9 @@ private:
       double factor_z = zs[4 * k + z]; 
       for (int j = 0; j < m[k] / 2; ++j) {
         int idx = (sm[k] + j) * 7 + 3; 
-        complex_t factor_x = xs[idx + x];
-        complex_t factor_y = ys[idx + y]; 
-        E[offset] += W[offset] * factor_z * factor_y * factor_x;
+        dcomplex_t factor_x = xs[idx + x];
+        dcomplex_t factor_y = ys[idx + y]; 
+        M[offset] += W[offset] * factor_z * factor_y * factor_x;
         offset++;
       }
     }
@@ -1118,7 +1120,7 @@ private:
     const int *sm = builtin_yukawa_table_->sm(scale); 
     const int *smf = builtin_yukawa_table_->smf(scale); 
     const int *f = builtin_yukawa_table_->f(); 
-    const complex_t *ealphaj = builtin_yukawa_table_->ealphaj(scale); 
+    const dcomplex_t *ealphaj = builtin_yukawa_table_->ealphaj(scale); 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     const double *x = builtin_yukawa_table_->x(); 
     const double *w = builtin_yukawa_table_->w(); 
@@ -1163,7 +1165,7 @@ private:
         }
       }
       
-      legendre_Pnm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre); 
+      legendre_Plm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre); 
 
       double factor = w[k] / m[k]; 
       for (int n = 0; n <= p; ++n) {
@@ -1191,7 +1193,7 @@ private:
     int offset = 0; 
     double factor = M_PI_2 / ld; 
     for (int n = 0; n <= p; ++n) {
-      complex_t power_I{1.0, 0.0}; 
+      dcomplex_t power_I{1.0, 0.0}; 
       for (int m = 0; m <= n; ++m) {
         W1[offset++] *= sqf[midx(n, m)] * power_I * factor;
         power_I *= dcomplex_t{0.0, 1.0}; 
