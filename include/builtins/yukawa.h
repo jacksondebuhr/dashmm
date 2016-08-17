@@ -55,7 +55,7 @@ namespace dashmm {
 /// to be used with Yukawa.
 template <typename Source, typename Target>
 class Yukawa {
- public:
+public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Yukawa<Source, Target>;
@@ -624,7 +624,6 @@ class Yukawa {
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
                                       Index t_index) const {
-    // FIXME
     // t_index is the index of the parent node on the target side
 
     // Compute index offsets between the current source node and the 1st child
@@ -641,8 +640,8 @@ class Yukawa {
 
     // Exponential expansions on the source side
     int n_digits = views_.n_digits();
-    uLaplaceTable &table = builtin_laplace_table_.at(n_digits);
-    int nexp = table->nexp();
+    double scale = views_.scale(); 
+    int nexp = builtin_yukawa_table_->nexp(scale); 
     const dcomplex_t *S_px =
       reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     const dcomplex_t *S_mx =
@@ -656,7 +655,7 @@ class Yukawa {
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{n_digits, kTargetIntermediate, Point{px, py, pz}, 1.0};
+    ViewSet views{n_digits, kTargetIntermediate, Point{px, py, pz}, scale};
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -672,144 +671,144 @@ class Yukawa {
 
     // Produce views needed on the target side.
     if (dz == 3) {
-      e2e(T1, S_mz, dx, dy, 0);
+      e2e(T1, S_mz, dx, dy, 0, scale);
       views.add_view(uall, view_size, C1);
     } else if (dz == -2) {
-      e2e(T1, S_pz, -dx, -dy, 0);
+      e2e(T1, S_pz, -dx, -dy, 0, scale);
       views.add_view(dall, view_size, C1);
     } else if (dy == 3) {
-      e2e(T1, S_my, dz, dx, 0);
+      e2e(T1, S_my, dz, dx, 0, scale);
       views.add_view(nall, view_size, C1);
     } else if (dy == -2) {
-      e2e(T1, S_py, -dz, -dx, 0);
+      e2e(T1, S_py, -dz, -dx, 0, scale);
       views.add_view(sall, view_size, C1);
     } else if (dx == 3) {
-      e2e(T1, S_mx, -dz, dy, 0);
+      e2e(T1, S_mx, -dz, dy, 0, scale);
       views.add_view(eall, view_size, C1);
     } else if (dx == -2) {
-      e2e(T1, S_px, dz, -dy, 0);
+      e2e(T1, S_px, dz, -dy, 0, scale);
       views.add_view(wall, view_size, C1);
     } else {
       if (dz == 2) {
-        e2e(T1, S_mz, dx, dy, 0);
+        e2e(T1, S_mz, dx, dy, 0, scale);
         views.add_view(u1234, view_size, C1);
 
         if (dy == -1) {
-          e2e(T2, S_py, -dz, -dx, 0);
+          e2e(T2, S_py, -dz, -dx, 0, scale);
           views.add_view(s78, view_size, C2);
           view2 = true;
 
           if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w6, view_size, C3);
             view3 = true;
           } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e5, view_size, C3);
             view3 = true;
           }
         } else if (dy == 2) {
-          e2e(T2, S_my, dz, dx, 0);
+          e2e(T2, S_my, dz, dx, 0, scale);
           views.add_view(n56, view_size, C2);
           view2 = true;
 
           if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w8, view_size, C3);
             view3 = true;
           } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e7, view_size, C3);
             view3 = true;
           }
         } else {
           if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0);
+            e2e(T2, S_px, dz, -dy, 0, scale);
             views.add_view(w68, view_size, C2);
             view2 = true;
           } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0);
+            e2e(T2, S_mx, -dz, dy, 0, scale);
             views.add_view(e57, view_size, C2);
             view2 = true;
           }
         }
       } else if (dz == -1) {
-        e2e(T1, S_pz, -dx, -dy, 0);
+        e2e(T1, S_pz, -dx, -dy, 0, scale);
         views.add_view(d5678, view_size, C1);
 
         if (dy == -1) {
-          e2e(T2, S_py, -dz, -dx, 0);
+          e2e(T2, S_py, -dz, -dx, 0, scale);
           views.add_view(s34, view_size, C2);
           view2 = true;
 
           if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w2, view_size, C3);
             view3 = true;
           } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e1, view_size, C3);
             view3 = true;
           }
         } else if (dy == 2) {
-          e2e(T2, S_my, dz, dx, 0);
+          e2e(T2, S_my, dz, dx, 0, scale);
           views.add_view(n12, view_size, C2);
           view2 = true;
 
           if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w4, view_size, C3);
             view3 = true;
           } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e3, view_size, C3);
             view3 = true;
           }
         } else {
           if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0);
+            e2e(T2, S_px, dz, -dy, 0, scale);
             views.add_view(w24, view_size, C2);
             view2 = true;
           } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0);
+            e2e(T2, S_mx, -dz, dy, 0, scale);
             views.add_view(e13, view_size, C2);
             view2 = true;
           }
         }
       } else {
         if (dy == -1) {
-          e2e(T1, S_py, -dz, -dx, 0);
+          e2e(T1, S_py, -dz, -dx, 0, scale);
           views.add_view(s3478, view_size, C1);
 
           if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0);
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T2, S_px, dz, -dy, 0, scale);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w2, view_size, C2);
             views.add_view(w6, view_size, C3);
             view2 = true;
             view3 = true;
           } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0);
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T2, S_mx, -dz, dy, 0, scale);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e1, view_size, C2);
             views.add_view(e5, view_size, C3);
             view2 = true;
             view3 = true;
           }
         } else if (dy == 2) {
-          e2e(T1, S_my, dz, dx, 0);
+          e2e(T1, S_my, dz, dx, 0, scale);
           views.add_view(n1256, view_size, C1);
 
           if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0);
-            e2e(T3, S_px, dz, -dy, 0);
+            e2e(T2, S_px, dz, -dy, 0, scale);
+            e2e(T3, S_px, dz, -dy, 0, scale);
             views.add_view(w4, view_size, C2);
             views.add_view(w8, view_size, C3);
             view2 = true;
             view3 = true;
           } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0);
-            e2e(T3, S_mx, -dz, dy, 0);
+            e2e(T2, S_mx, -dz, dy, 0, scale);
+            e2e(T3, S_mx, -dz, dy, 0, scale);
             views.add_view(e3, view_size, C2);
             views.add_view(e7, view_size, C3);
             view2 = true;
@@ -817,11 +816,11 @@ class Yukawa {
           }
         } else {
           if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0);
+            e2e(T2, S_px, dz, -dy, 0, scale);
             views.add_view(w2468, view_size, C2);
             view2 = true;
           } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0);
+            e2e(T2, S_mx, -dz, dy, 0, scale);
             views.add_view(e1357, view_size, C2);
             view2 = true;
           }
@@ -829,7 +828,7 @@ class Yukawa {
       }
     }
 
-    // Each view generated is *moved* into the \p views. Delete T2 (T3) if the
+    // Each view generated is *moved* into \p views. Delete T2 (T3) if the
     // view is not generated.
     if (!view2)
       delete [] T2;
@@ -841,7 +840,6 @@ class Yukawa {
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
-    // FIXME
     // t_index and t_size is the index and size of the child
     // Compute child's center
     double h = t_size / 2;
@@ -853,11 +851,11 @@ class Yukawa {
       (t_index.x() % 2);
 
     int n_digits = views_.n_digits();
+    double scale = views_.scale() / 2; 
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, views_.n_digits(),
-                                        1.0, kTargetPrimary}};
+                                        scale, kTargetPrimary}};
 
-    uLaplaceTable &table = builtin_laplace_table_.at(n_digits);
-    int nexp = table->nexp();
+    iny nexp = builtin_yukawa_table_->nexp(scale); 
 
     dcomplex_t *E[28]{nullptr};
     for (int i = 0; i < 28; ++i)
@@ -874,138 +872,134 @@ class Yukawa {
 
     switch (to_child) {
     case 0:
-      e2e(S_mz, E[uall], 0, 0, 3);
-      e2e(S_mz, E[u1234], 0, 0, 2);
-      e2e(S_pz, E[dall], 0, 0, 2);
+      e2e(S_mz, E[uall], 0, 0, 3, scale);
+      e2e(S_mz, E[u1234], 0, 0, 2, scale);
+      e2e(S_pz, E[dall], 0, 0, 2, scale);
 
-      e2e(S_my, E[nall], 0, 0, 3);
-      e2e(S_my, E[n1256], 0, 0, 2);
-      e2e(S_my, E[n12], 0, 0, 2);
-      e2e(S_py, E[sall], 0, 0, 2);
+      e2e(S_my, E[nall], 0, 0, 3, scale);
+      e2e(S_my, E[n1256], 0, 0, 2, scale);
+      e2e(S_my, E[n12], 0, 0, 2, scale);
+      e2e(S_py, E[sall], 0, 0, 2, scale);
 
-      e2e(S_mx, E[eall], 0, 0, 3);
-      e2e(S_mx, E[e1357], 0, 0, 2);
-      e2e(S_mx, E[e13], 0, 0, 2);
-      e2e(S_mx, E[e1], 0, 0, 2);
-      e2e(S_px, E[wall], 0, 0, 2);
+      e2e(S_mx, E[eall], 0, 0, 3, scale);
+      e2e(S_mx, E[e1357], 0, 0, 2, scale);
+      e2e(S_mx, E[e13], 0, 0, 2, scale);
+      e2e(S_mx, E[e1], 0, 0, 2, scale);
+      e2e(S_px, E[wall], 0, 0, 2, scale);
       break;
     case 1:
-      e2e(S_mz, E[uall], -1, 0, 3);
-      e2e(S_mz, E[u1234], -1, 0, 2);
-      e2e(S_pz, E[dall], 1, 0, 2);
+      e2e(S_mz, E[uall], -1, 0, 3, scale);
+      e2e(S_mz, E[u1234], -1, 0, 2, scale);
+      e2e(S_pz, E[dall], 1, 0, 2, scale);
 
-      e2e(S_my, E[nall], 0, -1, 3);
-      e2e(S_my, E[n1256], 0, -1, 2);
-      e2e(S_my, E[n12], 0, -1, 2);
-      e2e(S_py, E[sall], 0, 1, 2);
+      e2e(S_my, E[nall], 0, -1, 3, scale);
+      e2e(S_my, E[n1256], 0, -1, 2, scale);
+      e2e(S_my, E[n12], 0, -1, 2, scale);
+      e2e(S_py, E[sall], 0, 1, 2, scale);
 
-      e2e(S_mx, E[eall], 0, 0, 2);
-      e2e(S_px, E[wall], 0, 0, 3);
-      e2e(S_px, E[w2468], 0, 0, 2);
-      e2e(S_px, E[w24], 0, 0, 2);
-      e2e(S_px, E[w2], 0, 0, 2);
+      e2e(S_mx, E[eall], 0, 0, 2, scale);
+      e2e(S_px, E[wall], 0, 0, 3, scale);
+      e2e(S_px, E[w2468], 0, 0, 2, scale);
+      e2e(S_px, E[w24], 0, 0, 2, scale);
+      e2e(S_px, E[w2], 0, 0, 2, scale);
       break;
     case 2:
-      e2e(S_mz, E[uall], 0, -1, 3);
-      e2e(S_mz, E[u1234], 0, -1, 2);
-      e2e(S_pz, E[dall], 0, 1, 2);
+      e2e(S_mz, E[uall], 0, -1, 3, scale);
+      e2e(S_mz, E[u1234], 0, -1, 2, scale);
+      e2e(S_pz, E[dall], 0, 1, 2, scale);
 
-      e2e(S_my, E[nall], 0, 0, 2);
-      e2e(S_py, E[sall], 0, 0, 3);
-      e2e(S_py, E[s3478], 0, 0, 2);
-      e2e(S_py, E[s34], 0, 0, 2);
+      e2e(S_my, E[nall], 0, 0, 2, scale);
+      e2e(S_py, E[sall], 0, 0, 3, scale);
+      e2e(S_py, E[s3478], 0, 0, 2, scale);
+      e2e(S_py, E[s34], 0, 0, 2, scale);
 
-      e2e(S_mx, E[eall], 0, -1, 3);
-      e2e(S_mx, E[e1357], 0, -1, 2);
-      e2e(S_mx, E[e13], 0, -1, 2);
-      e2e(S_mx, E[e3], 0, -1, 2);
-      e2e(S_px, E[wall], 0, 1, 2);
+      e2e(S_mx, E[eall], 0, -1, 3, scale);
+      e2e(S_mx, E[e1357], 0, -1, 2, scale);
+      e2e(S_mx, E[e13], 0, -1, 2, scale);
+      e2e(S_mx, E[e3], 0, -1, 2, scale);
+      e2e(S_px, E[wall], 0, 1, 2, scale);
       break;
     case 3:
-      e2e(S_mz, E[uall], -1, -1, 3);
-      e2e(S_mz, E[u1234], -1, -1, 2);
-      e2e(S_pz, E[dall], 1, 1, 2);
+      e2e(S_mz, E[uall], -1, -1, 3, scale);
+      e2e(S_mz, E[u1234], -1, -1, 2, scale);
+      e2e(S_pz, E[dall], 1, 1, 2, scale);
 
-      e2e(S_my, E[nall], 0, -1, 2);
-      e2e(S_py, E[sall], 0, 1, 3);
-      e2e(S_py, E[s3478], 0, 1, 2);
-      e2e(S_py, E[s34], 0, 1, 2);
+      e2e(S_my, E[nall], 0, -1, 2, scale);
+      e2e(S_py, E[sall], 0, 1, 3, scale);
+      e2e(S_py, E[s3478], 0, 1, 2, scale);
+      e2e(S_py, E[s34], 0, 1, 2, scale);
 
-      e2e(S_mx, E[eall], 0, -1, 2);
-      e2e(S_px, E[wall], 0, 1, 3);
-      e2e(S_px, E[w2468], 0, 1, 2);
-      e2e(S_px, E[w24], 0, 1, 2);
-      e2e(S_px, E[w4], 0, 1, 2);
+      e2e(S_mx, E[eall], 0, -1, 2, scale);
+      e2e(S_px, E[wall], 0, 1, 3, scale);
+      e2e(S_px, E[w2468], 0, 1, 2, scale);
+      e2e(S_px, E[w24], 0, 1, 2, scale);
+      e2e(S_px, E[w4], 0, 1, 2, scale);
       break;
     case 4:
-      e2e(S_mz, E[uall], 0, 0, 2);
-      e2e(S_pz, E[dall], 0, 0, 3);
-      e2e(S_pz, E[d5678], 0, 0, 2);
+      e2e(S_mz, E[uall], 0, 0, 2, scale);
+      e2e(S_pz, E[dall], 0, 0, 3, scale);
+      e2e(S_pz, E[d5678], 0, 0, 2, scale);
 
-      e2e(S_my, E[nall], -1, 0, 3);
-      e2e(S_my, E[n1256], -1, 0, 2);
-      e2e(S_my, E[n56], -1, 0, 2);
-      e2e(S_py, E[sall], 1, 0, 2);
+      e2e(S_my, E[nall], -1, 0, 3, scale);
+      e2e(S_my, E[n1256], -1, 0, 2, scale);
+      e2e(S_my, E[n56], -1, 0, 2, scale);
+      e2e(S_py, E[sall], 1, 0, 2, scale);
 
-      e2e(S_mx, E[eall], 1, 0, 3);
-      e2e(S_mx, E[e1357], 1, 0, 2);
-      e2e(S_mx, E[e57], 1, 0, 2);
-      e2e(S_mx, E[e5], 1, 0, 2);
-      e2e(S_px, E[wall], -1, 0, 2);
+      e2e(S_mx, E[eall], 1, 0, 3, scale);
+      e2e(S_mx, E[e1357], 1, 0, 2, scale);
+      e2e(S_mx, E[e57], 1, 0, 2, scale);
+      e2e(S_mx, E[e5], 1, 0, 2, scale);
+      e2e(S_px, E[wall], -1, 0, 2, scale);
       break;
     case 5:
-      e2e(S_mz, E[uall], -1, 0, 2);
-      e2e(S_pz, E[dall], 1, 0, 3);
-      e2e(S_pz, E[d5678], 1, 0, 2);
+      e2e(S_mz, E[uall], -1, 0, 2, scale);
+      e2e(S_pz, E[dall], 1, 0, 3, scale);
+      e2e(S_pz, E[d5678], 1, 0, 2, scale);
 
-      e2e(S_my, E[nall], -1, -1, 3);
-      e2e(S_my, E[n1256], -1, -1, 2);
-      e2e(S_my, E[n56], -1, -1, 2);
-      e2e(S_py, E[sall], 1, 1, 2);
+      e2e(S_my, E[nall], -1, -1, 3, scale);
+      e2e(S_my, E[n1256], -1, -1, 2, scale);
+      e2e(S_my, E[n56], -1, -1, 2, scale);
+      e2e(S_py, E[sall], 1, 1, 2, scale);
 
-      e2e(S_mx, E[eall], 1, 0, 2);
-      e2e(S_px, E[wall], -1, 0, 3);
-      e2e(S_px, E[w2468], -1, 0, 2);
-      e2e(S_px, E[w68], -1, 0, 2);
-      e2e(S_px, E[w6], -1, 0, 2);
+      e2e(S_mx, E[eall], 1, 0, 2, scale);
+      e2e(S_px, E[wall], -1, 0, 3, scale);
+      e2e(S_px, E[w2468], -1, 0, 2, scale);
+      e2e(S_px, E[w68], -1, 0, 2, scale);
+      e2e(S_px, E[w6], -1, 0, 2, scale);
       break;
     case 6:
-      e2e(S_mz, E[uall], 0, -1, 2);
-      e2e(S_pz, E[dall], 0, 1, 3);
-      e2e(S_pz, E[d5678], 0, 1, 2);
+      e2e(S_mz, E[uall], 0, -1, 2, scale);
+      e2e(S_pz, E[dall], 0, 1, 3, scale);
+      e2e(S_pz, E[d5678], 0, 1, 2, scale);
 
-      e2e(S_my, E[nall], -1, 0, 2);
-      e2e(S_py, E[sall], 1, 0, 3);
-      e2e(S_py, E[s3478], 1, 0, 2);
-      e2e(S_py, E[s78], 1, 0, 2);
+      e2e(S_my, E[nall], -1, 0, 2, scale);
+      e2e(S_py, E[sall], 1, 0, 3, scale);
+      e2e(S_py, E[s3478], 1, 0, 2, scale);
+      e2e(S_py, E[s78], 1, 0, 2, scale);
 
-      e2e(S_mx, E[eall], 1, -1, 3);
-      e2e(S_mx, E[e1357], 1, -1, 2);
-      e2e(S_mx, E[e57], 1, -1, 2);
-      e2e(S_mx, E[e7], 1, -1, 2);
-      e2e(S_px, E[wall], -1, 1, 2);
+      e2e(S_mx, E[eall], 1, -1, 3, scale);
+      e2e(S_mx, E[e1357], 1, -1, 2, scale);
+      e2e(S_mx, E[e57], 1, -1, 2, scale);
+      e2e(S_mx, E[e7], 1, -1, 2, scale);
+      e2e(S_px, E[wall], -1, 1, 2, scale);
       break;
     case 7:
-      e2e(S_mz, E[uall], -1, -1, 2);
-      e2e(S_pz, E[dall], 1, 1, 3);
-      e2e(S_pz, E[d5678], 1, 1, 2);
+      e2e(S_mz, E[uall], -1, -1, 2, scale);
+      e2e(S_pz, E[dall], 1, 1, 3, scale);
+      e2e(S_pz, E[d5678], 1, 1, 2, scale);
 
-      e2e(S_my, E[nall], -1, -1, 2);
-      e2e(S_py, E[sall], 1, 1, 3);
-      e2e(S_py, E[s3478], 1, 1, 2);
-      e2e(S_py, E[s78], 1, 1, 2);
+      e2e(S_my, E[nall], -1, -1, 2, scale);
+      e2e(S_py, E[sall], 1, 1, 3, scale);
+      e2e(S_py, E[s3478], 1, 1, 2, scale);
+      e2e(S_py, E[s78], 1, 1, 2, scale);
 
-      e2e(S_mx, E[eall], 1, -1, 2);
-      e2e(S_px, E[wall], -1, 1, 3);
-      e2e(S_px, E[w2468], -1, 1, 2);
-      e2e(S_px, E[w68], -1, 1, 2);
-      e2e(S_px, E[w8], -1, 1, 2);
+      e2e(S_mx, E[eall], 1, -1, 2, scale);
+      e2e(S_px, E[wall], -1, 1, 3, scale);
+      e2e(S_px, E[w2468], -1, 1, 2, scale);
+      e2e(S_px, E[w68], -1, 1, 2, scale);
+      e2e(S_px, E[w8], -1, 1, 2, scale);
       break;
     }
-
-    double scale = 1.0 / t_size;
-    for (int i = 0; i < 6 * nexp; ++i)
-      S[i] *= scale;
 
     e2l(S_mz, 'z', false, L);
     e2l(S_pz, 'z', true, L);
@@ -1041,10 +1035,11 @@ class Yukawa {
 
   static void delete_table() { }
 
-  static double compute_scale(Index index) {return 1.0;}
+  static double compute_scale(Index index) {
+    return builtin_yukawa_table_->scale(index.level()); 
+  }
 
-
- private:
+private:
   ViewSet views_;
 
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) const {
@@ -1093,8 +1088,8 @@ class Yukawa {
     }
   }
 
-  void e2e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z) const {
-    double scale = views_.scale() / 2; 
+  void e2e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z, 
+           double scale) const {
     const dcomplex_t *xs = builtin_yukawa_table_->xs(scale); 
     const dcomplex_t *ys = builtin_yukawa_table_->ys(scale); 
     const double *zs = builtin_yukawa_table_->zs(scale); 
