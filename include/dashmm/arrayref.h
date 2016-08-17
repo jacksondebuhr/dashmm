@@ -155,7 +155,7 @@ class ArrayRef {
   hpx_addr_t data() const {return data_;}
 
   /// Return a local reference
-  ArrayData<Record> pin() {
+  ArrayData<Record> pin() const {
     return ArrayData<Record>(data_);
   }
 
