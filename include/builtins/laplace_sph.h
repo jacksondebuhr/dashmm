@@ -253,8 +253,8 @@ class Laplace {
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
-    // The function is called on th expansion of the child box and
-    // s_size is the child box's size.
+    // The function is called on the expansion of the child box and 
+    // \p s_size is the child box's size.
     double h = s_size / 2;
     Point center = views_.center();
     double px = center.x() + (from_child % 2 == 0 ? h : -h);
@@ -672,7 +672,7 @@ class Laplace {
     rotate_sph_y(M, d1, W1);
 
     // Addresses of the spherical harmonic expansions
-    const dcomplex_t *SH[3] = {&W1[0], &W2[0], M};
+    const dcomplex_t *SH[3] = {W1, W2, M}; 
 
     for (int dir = 0; dir <= 2; ++dir) {
       int offset = 0;
@@ -1355,13 +1355,11 @@ class Laplace {
     if (dir == 'z') {
       contrib = W1;
     } else if (dir == 'y') {
-      //const double *d = table->dmat_plus(0.0);
       const double *d = builtin_laplace_table_->dmat_plus(0.0); 
       rotate_sph_y(W1, d, W2);
       rotate_sph_z(W2, M_PI / 2, W1);
       contrib = W1;
     } else if (dir == 'x') {
-      //const double *d = table->dmat_minus(0.0);
       const double *d = builtin_laplace_table_->dmat_minus(0.0); 
       rotate_sph_y(W1, d, W2);
       contrib = W2;
