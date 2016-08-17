@@ -24,8 +24,8 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <cassert>
 #include "dashmm/types.h"
+#include "builtins/special_function.h"
 
 namespace dashmm {
 
@@ -109,32 +109,8 @@ private:
 using uYukawaTable = std::unique_ptr<YukawaTable>; 
 extern uYukawaTable builtin_yukawa_table_; 
 
-void legendre_Plm(int n, double x, double *P);
-void legendre_Plm_gt1_scaled(int nb, double x, double scale, double *P); 
-double Gamma(double x); 
-int bessel_In(int nb, double alpha, double x, int ize, double *B); 
-void bessel_in_scaled(int nb, double x, double scale, double *B); 
-void bessel_kn_scaled(int nb, double x, double scale, double *B); 
-
-inline int midx(const int n, const int m) {
-  return n * (n + 1) / 2 + m;
-}
-
-inline int didx(const int n, const int mp, const int m) {
-  return n * (n + 1) * (4 * n - 1) / 6 + mp * (2 * n + 1) + n + m;
-}
-
-inline int sidx(int n, int m, int np, int p) {
-  return midx(n, m) * (p + 1) + np;
-}
-
-inline double pow_m1(const int m) {
-  return (m % 2 ? -1.0 : 1.0);
-}
-
 void get_or_add_yukawa_table(int n_digits, double size, double lambda); 
 
 } // namespace dashmm
-
 
 #endif // __DASHMM_YUKAWA_TABLE_H__
