@@ -181,6 +181,8 @@ DO THESE THINGS
 
 THIS BRANCH TODO
 
+TODO: Remove the offset in the array map action.
+
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
 TODO: We need to update the comments in the dag.h file.

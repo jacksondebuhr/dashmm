@@ -80,11 +80,6 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
   assert(hpx_gas_try_pin(global, (void **)&local));
   local->local_count = record_count;
   local->total_count = contrib[ranks - 1];
-  if (my_rank) {
-    local->offset = contrib[my_rank - 1];
-  } else {
-    local->offset = 0;
-  }
   local->size = record_size;
   local->data = HPX_NULL;
 
