@@ -150,9 +150,6 @@ class ExpansionLCO {
   /// Is the object currently referring to global data?
   bool valid() const {return data_ != HPX_NULL;}
 
-  /// Accuracy of expansion
-  //int accuracy() const {return 0; } //n_digits_;} //REMOVE
-
   // TODO: make this more direct. There is no reason to send a parcel since
   // we are going to be local.
   /// Set this expansion with the multipole expansion of the given sources
@@ -412,7 +409,7 @@ class ExpansionLCO {
   // Other related actions
   ///////////////////////////////////////////////////////////////////
 
-  static int spawn_out_edges_handler(int n_digits) {
+  static int spawn_out_edges_handler(int unused) {
     hpx_addr_t lco_ = hpx_thread_current_target();
     // HACK: This action is local to the expansion, so we getref here with
     // whatever as the size and things are okay...
