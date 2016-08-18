@@ -124,7 +124,7 @@ class LaplaceCOM {
       view.set_bytes(0, sizeof(LaplaceCOMData));
       view.set_data(0, (char *)data_);
     }
-    view.set_n_digits(-1);
+    //view.set_n_digits(-1);
     view.set_role(kSourcePrimary);
   }
 

@@ -119,7 +119,7 @@ class ExpansionLCO {
     input_data->index = index;
     input_data->out_edge_count = n_out;
 
-    int n_digits = expand->accuracy();
+    int n_digits = -1; //expand->accuracy();
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 

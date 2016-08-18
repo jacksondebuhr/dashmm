@@ -127,7 +127,7 @@ class Laplace {
   ViewSet get_all_views() const {return views_;}
 
   // This is likely to be removed from the interface
-  int accuracy() const {return views_.n_digits();}
+  //int accuracy() const {return views_.n_digits();}
 
   ExpansionRole role() const {return views_.role();}
 
@@ -144,7 +144,7 @@ class Laplace {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, 1.0, kSourcePrimary}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
@@ -199,7 +199,7 @@ class Laplace {
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const { 
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, 1.0, kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
@@ -263,7 +263,7 @@ class Laplace {
     double py = center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = center.z() + (from_child < 4 ? h : -h);
 
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     expansion_t *retval{new expansion_t{Point{px, py, pz}, n_digits, 1.0,
                                         kSourcePrimary}};
 
@@ -349,7 +349,7 @@ class Laplace {
     double ty = center.y() - t2s_y * s_size;
     double tz = center.z() - t2s_z * s_size;
 
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     expansion_t *retval{new expansion_t{Point{tx, ty, tz}, n_digits, 1.0,
                                         kTargetPrimary}};
     int p = builtin_laplace_table_->p(); 
@@ -414,7 +414,7 @@ class Laplace {
     double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = center.z() + (to_child < 4 ? -h : h);
 
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     expansion_t *retval{new expansion_t{Point{cx, cy, cz},
                                         n_digits, 1.0, kTargetPrimary}};
 
@@ -623,7 +623,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     expansion_t *retval{new expansion_t{views_.center(),
                                         n_digits, 1.0, kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
@@ -760,7 +760,7 @@ class Laplace {
     double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     int nexp = builtin_laplace_table_->nexp(); 
     const dcomplex_t *S_px =
       reinterpret_cast<dcomplex_t *>(views_.view_data(0));
@@ -970,7 +970,8 @@ class Laplace {
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, views_.n_digits(),
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, -1, 
+                                                             //views_.n_digits()
                                         1.0, kTargetPrimary}};
 
     int nexp = builtin_laplace_table_->nexp(); 

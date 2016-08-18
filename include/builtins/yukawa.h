@@ -126,7 +126,7 @@ public:
   ViewSet get_all_views() const {return views_;}
 
   // This is likely to be removed from the interface
-  int accuracy() const {return views_.n_digits();}
+  //int accuracy() const {return views_.n_digits();}
 
   ExpansionRole role() const {return views_.role();}
 
@@ -144,7 +144,7 @@ public:
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       //Source *last, double scale) const {
                                       Source *last) const {
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, scale, kSourcePrimary}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
@@ -198,7 +198,7 @@ public:
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
-    int n_digits = views_.n_digits(); 
+    int n_digits = -1; //views_.n_digits(); 
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, scale, kTargetPrimary}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
@@ -259,7 +259,7 @@ public:
     double py = center.y() + (from_child % 4 <= 1 ? h : -h); 
     double pz = center.z() + (from_child < 4 ? h : -h); 
 
-    int n_digits = views_.n_digits(); 
+    int n_digits = -1; //views_.n_digits(); 
     double scale = views_.scale(); 
     expansion_t *retval{new 
         expansion_t{Point{px, py, pz}, n_digits, scale * 2, kSourcePrimary}}; 
@@ -324,7 +324,7 @@ public:
     double cy = center.y() + (to_child % 4 <= 1 ? -h : h); 
     double cz = center.z() + (to_child < 4 ? -h : h); 
 
-    int n_digits = views_.n_digits(); 
+    int n_digits = -1; //views_.n_digits(); 
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{Point{cx, cy, cz}, 
           n_digits, scale / 2, kTargetPrimary}}; 
@@ -499,7 +499,7 @@ public:
   }
 
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{views_.center(),
                                         n_digits, scale, kSourceIntermediate}};
@@ -646,7 +646,7 @@ public:
     double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale(); 
     int nexp = builtin_yukawa_table_->nexp(scale); 
     const dcomplex_t *S_px =
@@ -857,9 +857,9 @@ public:
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
-    int n_digits = views_.n_digits();
+    int n_digits = -1; //views_.n_digits();
     double scale = views_.scale() / 2; 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, views_.n_digits(),
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, -1, //views_.n_digits(),
                                         scale, kTargetPrimary}};
 
     int nexp = builtin_yukawa_table_->nexp(scale); 
