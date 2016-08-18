@@ -443,7 +443,7 @@ class ExpansionLCO {
     OutEdgeRecord *out_edges = reinterpret_cast<OutEdgeRecord *>(
         &scratch->payload[scratch->expansion_size]);
 
-    // make a local copy of the edge count, and set the n_digits for remotes
+    // make a local copy of the edge count
     int save_count = scratch->out_edge_count;
 
     // loop over the sorted edges
