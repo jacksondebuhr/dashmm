@@ -282,8 +282,6 @@ class Evaluator {
   };
 
   /// The evaluation action implementation
-  // TODO: Recheck this - I think this should all work as is when the array is
-  // all on one locality; the root locality.
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     // TODO: These need an update. We should decide if the tree creation
     // is called in a SPMD way, or in a diffusive way. This will make the

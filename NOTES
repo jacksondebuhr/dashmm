@@ -182,6 +182,8 @@ DO THESE THINGS
 THIS BRANCH TODO
 
 TODO: Remove the offset in the array map action.
+TODO: demo/basic should also report the kernel used
+TODO: remove n_digits where possible - tree for sure
 
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible

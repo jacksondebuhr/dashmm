@@ -1,11 +1,7 @@
 #include <iostream>
 #include <getopt.h>
 
-#include "dashmm/array.h"
-using dashmm::Array;
-
 #include "tree.h"
-using dashmm::Point;
 
 #include "utils.h"
 
@@ -26,12 +22,12 @@ int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   hpx_time_t timer_start = hpx_time_now();
 
   // Perform some basic setup
-  RankWise<DualTree> global_tree = dual_tree_create(threshold, sources,
-                                                    targets);
+  RankWise<DualTree> global_tree =
+      DualTree::create(threshold, sources, targets);
   hpx_time_t timer_middle = hpx_time_now();
 
   // Start the partitioning proper
-  hpx_addr_t partdone = dual_tree_partition(global_tree, sources, targets);
+  hpx_addr_t partdone = DualTree::partition(global_tree, sources, targets);
   hpx_lco_wait(partdone);
   hpx_lco_delete_sync(partdone);
   hpx_time_t timer_end = hpx_time_now();
@@ -45,7 +41,7 @@ int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   std::cout << "  Partition: " << elapsed_dual << "\n";
 
   // Here we clean up the allocated resources
-  dual_tree_destroy(global_tree);
+  DualTree::destroy(global_tree);
 
   hpx_exit(0, nullptr);
 }
@@ -62,6 +58,12 @@ int main(int argc, char *argv[]) {
   int threshold = 1;
   int nseed = -1; // Number of seeds used for generating input for strong
                   // scaling test
+
+
+  // TODO - This is temporarily a thing; remove this in favor of evaluator
+  // eventually
+  registrar();
+
 
   if (hpx_init(&argc, &argv)) {
     std::cout << "HPX: failed to initialize" << std::endl;
