@@ -119,7 +119,7 @@ class ExpansionLCO {
     input_data->index = index;
     input_data->out_edge_count = n_out;
 
-    int n_digits = -1; //expand->accuracy();
+    int n_digits = -1; // TODO: should be removed
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 
@@ -173,7 +173,7 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
     double scale = expansion_t::compute_scale(idx);
-    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
     expansion_t local{views};
     auto multi = local.S_to_M(center, sources, &sources[n_src]);
     contribute(std::move(multi));
@@ -197,7 +197,7 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
     double scale = expansion_t::compute_scale(idx);     
-    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
     expansion_t local{views};
     auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));

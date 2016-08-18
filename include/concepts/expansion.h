@@ -80,7 +80,7 @@ class Expansion {
   ///
   /// The scale value that will be provided to the expansion will be provided
   /// by the compute_scale static member of this class.
-  Expansion(Point center, int n_digits, double scale, ExpansionRole role);
+  Expansion(Point center, double scale, ExpansionRole role);
 
   /// The second creates the expansion from previously existing data specified
   /// with a ViewSet object.
@@ -139,11 +139,6 @@ class Expansion {
 
   /// Get all the current views of the object
   ViewSet get_all_views() const;
-
-  /// Returns the accuracy of the expansion - this is the number given to the
-  /// constructor as n_digits, or is some nonsense value if n_digits is not
-  /// used.
-  int accuracy() const;
 
   /// Get the role of this expansion
   ExpansionRole role() const;

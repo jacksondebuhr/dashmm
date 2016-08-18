@@ -51,7 +51,7 @@ class ViewSet {
   /// Create an empty ViewSet, while setting some vitals
   ///
   /// \param role - the role of the represented views
-  ViewSet(int ndig, ExpansionRole role, const Point &center, double scale)
+  ViewSet(ExpansionRole role, const Point &center, double scale)
     : views_{}, role_{role}, center_{center}, scale_{scale} { }
 
   /// Clear the ViewSet, including the n_digits and role.
