@@ -141,7 +141,7 @@ class Tree {
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method, DistroPolicy>;
 
   Tree(method_t met, size_t limit, int digits)
-      : method_{met}, refinement_limit_{limit}, n_digits_{digits},
+    : method_{met}, refinement_limit_{limit}, 
         source_root_{nullptr}, target_root_{nullptr}, domain_{nullptr} { }
 
   ~Tree() {
@@ -162,7 +162,6 @@ class Tree {
   Tree(Tree &&other) {
     method_ = other.method;
     refinement_limit_ = other.refinement_limit_;
-    n_digits_ = other.n_digits_;
     source_root_ = other.source_root_;
     target_root_ = other.target_root_;
     domain_ = other.domain_;
@@ -174,7 +173,6 @@ class Tree {
   Tree &operator=(Tree &&other) {
     method_ = other.method;
     refinement_limit_ = other.refinement_limit_;
-    n_digits_ = other.n_digits_;
     source_root_ = other.source_root_;
     target_root_ = other.target_root_;
     domain_ = other.domain_;
@@ -193,10 +191,6 @@ class Tree {
 
   /// Returns the refinement limit for tree construction
   int refinement_limit() const {return refinement_limit_;}
-
-  /// Returns the number of digits in any created expansion
-  int n_digits() const {return n_digits_;}
-
 
   /// Compute the domain for the given sources and targets
   ///
@@ -1214,7 +1208,6 @@ class Tree {
   // Data that is constant for each node of the tree
   method_t method_;
   size_t refinement_limit_;
-  int n_digits_;
 
   // The roots of the two trees
   sourcenode_t *source_root_;
