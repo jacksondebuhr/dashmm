@@ -1123,9 +1123,8 @@ class Tree {
             expansionlco_t expand{edge[i].target,
                                   (int)edge[i].other_member};
             auto geo = domain.value();
-            double scale = 1.0 / geo->size_from_level(edge[i].idx.level());
             Point center = geo->center_from_index(edge[i].idx);
-            expand.S_to_M(center, sources, n_src, scale, edge[i].idx);
+            expand.S_to_M(center, sources, n_src, edge[i].idx); 
           }
           break;
         case Operation::StoL:

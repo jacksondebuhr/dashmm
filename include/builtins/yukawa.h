@@ -142,8 +142,10 @@ public:
   }
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
-                                      Source *last, double scale) const {
-    int n_digits = views_.n_digits(); 
+                                      //Source *last, double scale) const {
+                                      Source *last) const {
+    int n_digits = views_.n_digits();
+    double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, scale, kSourcePrimary}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
     int p = builtin_yukawa_table_->p(); 
