@@ -178,6 +178,8 @@ int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count, int limit,
         unif_grid[mid] = Node{Index{ix, iy, iz, tree->unif_level()}};
         unif_grid[mid + tree->dim3()] =
             Node{Index{ix, iy, iz, tree->unif_level()}};
+        unif_grid[mid].add_lock();
+        unif_grid[mid + tree->dim3()].add_lock();
       }
     }
   }
@@ -462,12 +464,11 @@ int *init_point_exchange(int rank, DualTree *tree,
 
     for (int i = first; i <= last; ++i) {
       Node *curr = &n[i];
-      curr->set_parts(sorted_ref.slice(global_offset[i - first],
-                                       global_count[i]));
+      curr->parts = sorted_ref.slice(global_offset[i - first], global_count[i]);
 
       if (local_count[i]) {
         // Copy local points before merging remote points
-        auto sorted = curr->parts().pin();
+        auto sorted = curr->parts.pin();
         memcpy(sorted.value() + curr->first(),
                &temp[local_offset[i]],
                sizeof(Point) * local_count[i]);
@@ -506,9 +507,9 @@ int merge_points_handler(Point *temp, Node *n,
   auto local_tree = global_tree.here();
 
   // Note: all the pointers are local to the calling rank.
-  hpx_lco_sema_p(n->sema());
+  n->lock();
   size_t first = n->first();
-  auto localp = n->parts().pin();
+  auto localp = n->parts.pin();
   Point *p = localp.value();
   memcpy(p + first, temp, sizeof(Point) * n_arrived);
 
@@ -525,7 +526,7 @@ int merge_points_handler(Point *temp, Node *n,
                &n, &geoarg, &thresh);
     }
   }
-  hpx_lco_sema_v(n->sema(), HPX_NULL);
+  n->unlock();
 
   return HPX_SUCCESS;
 }
@@ -844,6 +845,9 @@ int create_dual_tree_handler(hpx_addr_t rwtree, hpx_addr_t sources_gas,
                                           send_node_action, dual_tree_complete,
                                           hpx_lco_set_action, &ns, &arg,
                                           &i, &s, &rwtree);
+          hpx_call_when(ns[i].complete(),
+                        ns[i].complete(), hpx_lco_delete_action,
+                        HPX_NULL, nullptr, 0);
         }
 
         if (tree->unif_count_value()[i + tree->dim3()] == 0) {
@@ -854,6 +858,9 @@ int create_dual_tree_handler(hpx_addr_t rwtree, hpx_addr_t sources_gas,
                                           send_node_action, dual_tree_complete,
                                           hpx_lco_set_action, &nt, &arg,
                                           &i, &t, &rwtree);
+          hpx_call_when(nt[i].complete(),
+                        nt[i].complete(), hpx_lco_delete_action,
+                        HPX_NULL, nullptr, 0);
         }
       }
     } else {
@@ -861,15 +868,19 @@ int create_dual_tree_handler(hpx_addr_t rwtree, hpx_addr_t sources_gas,
         if (tree->unif_count_value()[i] == 0) {
           hpx_lco_and_set(dual_tree_complete, HPX_NULL);
         } else {
-          hpx_call_when(ns[i].complete(), dual_tree_complete,
-                        hpx_lco_set_action, HPX_NULL, NULL, 0);
+          hpx_call_when_with_continuation(ns[i].complete(),
+              dual_tree_complete, hpx_lco_set_action,
+              ns[i].complete(), hpx_lco_delete_action,
+              nullptr, 0);
         }
 
         if (tree->unif_count_value()[i + tree->dim3()] == 0) {
           hpx_lco_and_set(dual_tree_complete, HPX_NULL);
         } else {
-          hpx_call_when(nt[i].complete(), dual_tree_complete,
-                        hpx_lco_set_action, HPX_NULL, NULL, 0);
+          hpx_call_when_with_continuation(nt[i].complete(),
+              dual_tree_complete, hpx_lco_set_action,
+              nt[i].complete(), hpx_lco_delete_action,
+              nullptr, 0);
         }
       }
     }
@@ -972,21 +983,23 @@ void DualTree::clear_data() {
   // NOTE: The difference here is that there are two different allocation
   // schemes for the nodes.
 
-  // TODO: Add some parallelism here. Otherwise, this will take a long time.
+  // TODO: Add some parallelism here. Otherwise, this could take a long time.
+  //  Most of the delay has been removed by making the lco delete themselves
+  //  along the way, and only having those nodes that need semaphores have
+  //  semaphores
   for (int i = 0; i < b; ++i) {
     Node *curr = &unif_grid_[i];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(true);
       }
     }
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         delete [] child;
         break;
@@ -996,11 +1009,10 @@ void DualTree::clear_data() {
 
   for (int i = b; i <= e; ++i) {
     Node *curr = &unif_grid_[i];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(false);
       }
@@ -1009,18 +1021,17 @@ void DualTree::clear_data() {
 
   for (int i = e + 1; i < dim3_; ++i) {
     Node *curr = &unif_grid_[i];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(true);
       }
     }
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         delete [] child;
         break;
@@ -1030,18 +1041,17 @@ void DualTree::clear_data() {
 
   for (int i = 0; i < b; ++i) {
     Node *curr = &unif_grid_[i + dim3_];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(true);
       }
     }
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         delete [] child;
         break;
@@ -1051,11 +1061,10 @@ void DualTree::clear_data() {
 
   for (int i = b; i <= e; ++i) {
     Node *curr = &unif_grid_[i + dim3_];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(false);
       }
@@ -1064,18 +1073,17 @@ void DualTree::clear_data() {
 
   for (int i = e + 1; i < dim3_; ++i) {
     Node *curr = &unif_grid_[i + dim3_];
-    hpx_lco_delete_sync(curr->sema());
-    hpx_lco_delete_sync(curr->complete());
+    curr->delete_lock();
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         child->destroy(true);
       }
     }
 
     for (int j = 0; j < 8; ++j) {
-      Node *child = curr->child(j);
+      Node *child = curr->child[j];
       if (child) {
         delete [] child;
         break;
@@ -1098,9 +1106,11 @@ void Node::partition(int threshold, DomainGeometry *geo) {
   // TODO perhaps change the argument type to avoid this cast
   bool is_leaf = num_points <= (size_t)threshold;
 
-  if (parent_) {
-    hpx_call_when(complete_, parent_->complete(), hpx_lco_set_action,
-                  HPX_NULL, NULL, 0);
+  if (parent) {
+    hpx_call_when_with_continuation(complete_,
+        parent->complete(), hpx_lco_set_action,
+        complete_, hpx_lco_delete_action,
+        nullptr, 0);
   }
 
   if (is_leaf) {
@@ -1108,13 +1118,13 @@ void Node::partition(int threshold, DomainGeometry *geo) {
     hpx_lco_and_set_num(complete_, 8, HPX_NULL);
   } else {
     // Compute center of the node
-    double h = geo->size() / pow(2, idx_.level());
-    double center_x = geo->low().x() + (idx_.x() + 0.5) * h;
-    double center_y = geo->low().y() + (idx_.y() + 0.5) * h;
-    double center_z = geo->low().z() + (idx_.z() + 0.5) * h;
+    double h = geo->size() / pow(2, idx.level());
+    double center_x = geo->low().x() + (idx.x() + 0.5) * h;
+    double center_y = geo->low().y() + (idx.y() + 0.5) * h;
+    double center_z = geo->low().z() + (idx.z() + 0.5) * h;
 
     // Get the local data
-    auto p_local = parts_.pin();
+    auto p_local = parts.pin();
     Point *p = p_local.value();
 
     // Sort the particles among the children
@@ -1155,88 +1165,16 @@ void Node::partition(int threshold, DomainGeometry *geo) {
     // Create child nodes
     for (int i = 0; i < 8; ++i) {
       if (stat[i]) {
-        auto cparts = parts_.slice(offset[i], stat[i]);
-        Node *child = new Node{idx_.child(i), cparts, this};
-        child_[i] = child;
+        auto cparts = parts.slice(offset[i], stat[i]);
+        Node *cnd = new Node{idx.child(i), cparts, this};
+        child[i] = cnd;
 
         hpx_call(HPX_HERE, partition_node_action, HPX_NULL,
-                 &child, &geo, &threshold);
+                 &cnd, &geo, &threshold);
       } else {
         hpx_lco_and_set(complete_, HPX_NULL);
       }
     }
-  }
-}
-
-int Node::n_descendants() const {
-  int count = 1;
-  for (int i = 0; i < 8; ++i) {
-    if (child_[i] != nullptr)
-      count += child_[i]->n_descendants();
-  }
-  return count;
-}
-
-void Node::compress(int *branch, int *tree, int parent, int &curr) const {
-  for (int i = 0; i < 8; ++i) {
-    if (child_[i] != nullptr) {
-      branch[curr] = i; // tracks which child exists
-      tree[curr] = parent; // tracks the parent of the node being processed
-      curr++; // Move onto the next slot
-      // curr - 1 is the parent location for the subtree rooted at child_[i]
-      child_[i]->compress(branch, tree, curr - 1, curr);
-    }
-  }
-}
-
-void Node::extract(const int *branch, const int *tree, int n_nodes) {
-  // Extract a compressed remote tree representation. As the tree is remote,
-  // only {parent_, child_, idx_} fields are needed.
-
-  Node *descendants = new Node[n_nodes];
-
-  // The compressed tree is created in depth first fashion. And there are two
-  // choices here to fill in the parent_, child_, and idx_ fields of the
-  // descendants.
-
-  // Approach I: Setup parent_ and child_, which is an embarassingly parallel
-  // operation on the @p branch and @p tree. Afterwards, fan out along the tree
-  // to fill in idx.
-
-  // Approach II: Go over the input sequentially. For each node encountered, by
-  // the depth first property, the index of its parent is already set. So one
-  // can finish in one loop.
-
-  // If on each rank, there are multiple subtrees being merged, approach II
-  // might be sufficient. Approach I can be considered if finer granularity is
-  // needed.
-
-  // Approach II is implemented here.
-  for (int i = 0; i < n_nodes; ++i) {
-    int pos = tree[i];
-    int which = branch[i];
-    Node *curr = &descendants[i];
-    Node *parent = (pos < 0 ? this : &descendants[pos]);
-
-    curr->set_parent(parent);
-    curr->set_index(parent->index().child(which));
-    parent->set_child(which, curr);
-  }
-}
-
-void Node::destroy(bool allocated_in_array) {
-  for (int i = 0; i < 8; ++i) {
-    if (child_[i])
-      child_[i]->destroy(allocated_in_array);
-  }
-  if (sema_ != HPX_NULL) {
-    hpx_lco_delete_sync(sema_);
-  }
-  if (complete_ != HPX_NULL) {
-    hpx_lco_delete_sync(complete_);
-  }
-  if (allocated_in_array == false) {
-    delete this;
   }
 }
 

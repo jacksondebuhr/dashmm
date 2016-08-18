@@ -14,10 +14,9 @@
 /// A node of the tree.
 class Node {
  public:
-  /// Default construct. Nothing much here
-  Node() : idx_{}, parts_{}, first_{0}, parent_{nullptr} {
+  Node() : idx{}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
-      child_[i] = nullptr;
+      child[i] = nullptr;
     }
     sema_ = HPX_NULL;
     complete_ = HPX_NULL;
@@ -25,71 +24,213 @@ class Node {
 
   /// Constuct with a known index.
   Node(dashmm::Index idx)
-      : idx_{idx}, parts_{}, first_{0}, parent_{nullptr} {
+      : idx{idx}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
-      child_[i] = nullptr;
+      child[i] = nullptr;
     }
-    sema_ = hpx_lco_sema_new(1);
+    sema_ = HPX_NULL;
     complete_ = hpx_lco_and_new(8);
   }
 
+  /// Construct with an index, a particle segment and a parent
   Node(dashmm::Index idx, dashmm::ArrayRef<dashmm::Point> parts, Node *parent)
-      : idx_{idx}, parts_{parts}, first_{0}, parent_{parent} {
+      : idx{idx}, parts{parts}, parent{parent}, first_{0} {
     for (int i = 0; i < 8; ++i) {
-      child_[i] = nullptr;
+      child[i] = nullptr;
     }
-    sema_ = hpx_lco_sema_new(1);
+    sema_ = HPX_NULL;
     complete_ = hpx_lco_and_new(8);
   }
 
   ~Node() { }
 
-  /// These are all simple accessors
-  dashmm::Index index() const {return idx_;}
+  /// Returns the first record into which new records may be copied.
   size_t first() const {return first_;}
-  Node *parent() const {return parent_;}
-  Node *child(int i) const {return child_[i];}
-  hpx_addr_t sema() const {return sema_;}
-  hpx_addr_t complete() const {return complete_;}
-  dashmm::ArrayRef<dashmm::Point> parts() const {return parts_;}
-  size_t num_parts() const {return parts_.n();}
 
-  // These are simple mutators
-  void set_index(dashmm::Index idx) {idx_ = idx;}
+  /// Returns the LCO signaling completion of partitioning for this node
+  hpx_addr_t complete() const {return complete_;}
+
+  /// Gives the number of particles in the segment owned by this node
+  size_t num_parts() const {return parts.n();}
+
+  /// Create semaphore as needed
+  void add_lock() {
+    assert(sema_ == HPX_NULL);
+    sema_ = hpx_lco_sema_new(1);
+  }
+
+  void delete_lock() {
+    assert(sema_ != HPX_NULL);
+    hpx_lco_delete_sync(sema_);
+    sema_ = HPX_NULL;
+  }
+
+  void lock() const {
+    // TODO consider making this an if with graceful error case
+    assert(sema_ != HPX_NULL);
+    hpx_lco_sema_p(sema_);
+  }
+
+  void unlock() const {
+    assert(sema_ != HPX_NULL);
+    hpx_lco_sema_v(sema_, HPX_NULL);
+  }
+
+  /// Increment the first record that is open
+  ///
+  /// See first() above. This will increment the location in which new records
+  /// can be added to the rebalanced portion of the point data for this node.
+  /// This will return if the given increment fills up the remaining spots in
+  /// the segment of global array.
+  ///
+  /// NOTE: This should only be called once this node has been lock()-ed
+  ///
+  /// NOTE: This is only used for the nodes of the uniform grid.
+  ///
+  /// \param incr - the number of records that has just been added to the
+  ///               segment.
+  ///
+  /// \returns - true if the segment is full; false otherwise
   bool increment_first(size_t incr) {
     first_ += incr;
-    return first_ >= parts_.n();
+    return first_ >= parts.n();
   }
-  void set_parent(Node *parent) {parent_ = parent;}
-  void set_child(int i, Node *child) {child_[i] = child;}
-  void set_parts(dashmm::ArrayRef<dashmm::Point> parts) {parts_ = parts;}
 
-  /// Partition the given points
+  /// Partition the node
   ///
-  /// P - the point data; this is a per locality array in local memory
-  /// threshold - the partitioning threshold
-  /// geo - the domain geometry
+  /// In addition to sorting the points associated with this node, this will
+  /// create the needed children and schedule the work of partitioning for
+  /// those children.
+  ///
+  /// \param threshold - the partitioning threshold
+  /// \param geo - the domain geometry
   void partition(int threshold, dashmm::DomainGeometry *geo);
 
-  /// Return the number of descendants of this node - this is recursive, and
-  /// collects all of them
-  int n_descendants() const;
+  /// Return the size of the branch below this node
+  ///
+  /// This will return the total number of descendants of this node.
+  ///
+  /// \returns - the number of nodes in the branch below this node
+  int n_descendants() const {
+    int count = 1;
+    for (int i = 0; i < 8; ++i) {
+      if (child[i] != nullptr) {
+        count += child[i]->n_descendants();
+      }
+    }
+    return count;
+  }
 
+  /// Return the number of immediate descendants of this node
+  ///
+  /// \returns - the number of non-null children of this node.
+  int n_children() const {
+    int retval{0};
+    for (int i = 0; i < 8; ++i) {
+      if (child[i] != nullptr) {
+        ++retval;
+      }
+    }
+    return retval;
+  }
 
-  void compress(int *branch, int *tree, int parent, int &curr) const;
-  void extract(const int *branch, const int *tree, int n_nodes);
+  /// Predicate for testing if this node is a leaf
+  ///
+  /// \returns - true if a leaf; false otherwise
+  bool is_leaf() const {return n_children() == 0;}
+
+  /// Compress the branch information into the provided buffers
+  ///
+  /// This will compress the branch information, which can then be sent
+  /// to other ranks, where is can be extracted into the needed nodes.
+  ///
+  /// \param branch - buffers holding the tree structure
+  /// \param tree -
+  /// \param parent - the index of the parent of this node
+  /// \param curr - the current slot in the buffers; this is updated during
+  ///               the call to compress()
+  void compress(int *branch, int *tree, int parent, int &curr) const {
+    for (int i = 0; i < 8; ++i) {
+      if (child[i] != nullptr) {
+        branch[curr] = i; // tracks which child exists
+        tree[curr] = parent; // tracks the parent of the node being processed
+        curr++; // Move onto the next slot
+        // curr - 1 is the parent location for the subtree rooted at child[i]
+        child[i]->compress(branch, tree, curr - 1, curr);
+      }
+    }
+  }
+
+  /// Extract the branch information from the provided buffers
+  ///
+  /// This will extract the branch information received from other ranks,
+  /// which can then be reified into the needed nodes.
+  ///
+  /// \param branch - buffers holding the tree structure
+  /// \param tree -
+  /// \param n_nodes - the number of nodes
+  void extract(const int *branch, const int *tree, int n_nodes) {
+    // Extract a compressed remote tree representation. As the tree is remote,
+    // only {parent, child, idx} fields are needed.
+
+    // TODO I think I don't want to do this one this way, favoring instead
+    // a more typical structure. I will think about it
+    Node *descendants = new Node[n_nodes];
+
+    // The compressed tree is created in depth first fashion. And there are two
+    // choices here to fill in the parent, child, and idx fields of the
+    // descendants.
+
+    // Approach I: Setup parent and child, which is an embarassingly parallel
+    // operation on the @p branch and @p tree. Afterwards, fan out along the
+    // tree to fill in idx.
+
+    // Approach II: Go over the input sequentially. For each node encountered,
+    // by the depth first property, the index of its parent is already set.
+    // So one can finish in one loop.
+
+    // If on each rank, there are multiple subtrees being merged, approach II
+    // might be sufficient. Approach I can be considered if finer granularity is
+    // needed.
+
+    // Approach II is implemented here.
+    for (int i = 0; i < n_nodes; ++i) {
+      int pos = tree[i];
+      int which = branch[i];
+      Node *curr = &descendants[i];
+      Node *parent = (pos < 0 ? this : &descendants[pos]);
+
+      curr->parent = parent;
+      curr->idx = parent->idx.child(which);
+      parent->child[which] = curr;
+    }
+  }
 
   /// Destroy the node - this will recursively destroy children, freeing up
   /// the two LCOs associated with the node. is allocated_in_array is true,
   /// this will not destroy the node itself, as that would cause trouble.
-  void destroy(bool allocated_in_array);
+  void destroy(bool allocated_in_array) {
+    for (int i = 0; i < 8; ++i) {
+      if (child[i]) {
+        child[i]->destroy(allocated_in_array);
+      }
+    }
+    if (sema_ != HPX_NULL) {
+      hpx_lco_delete_sync(sema_);
+    }
+    if (!allocated_in_array) {
+      delete this;
+    }
+  }
+
+
+  dashmm::Index idx;                      /// index of the node
+  dashmm::ArrayRef<dashmm::Point> parts;  /// segment for this node
+  Node *parent;                           /// parent node
+  Node *child[8];                         /// children of this node
 
  private:
-  dashmm::Index idx_;       /// index of the node
-  dashmm::ArrayRef<dashmm::Point> parts_;
-  size_t first_;               /// first record that is available
-  Node *parent_;            /// parent node
-  Node *child_[8];          /// children of this node
+  size_t first_;            /// first record that is available
   hpx_addr_t sema_;         /// restrict concurrent modification
   hpx_addr_t complete_;     /// This is used to indicate that partitioning is
                             ///  complete
