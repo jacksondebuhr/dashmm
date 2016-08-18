@@ -86,8 +86,7 @@ class ExpansionLCO {
                                       DistroPolicy>;
 
   /// Construct the expansion from a given global address.
-  ExpansionLCO(hpx_addr_t addr, int n_digits)
-      : data_{addr}, n_digits_{n_digits} { }
+  ExpansionLCO(hpx_addr_t addr) : data_{addr} {} 
 
   /// Construct the expansion LCO from expansion data
   ///
@@ -119,7 +118,6 @@ class ExpansionLCO {
     input_data->index = index;
     input_data->out_edge_count = n_out;
 
-    int n_digits = -1; // TODO: should be removed
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 
@@ -129,12 +127,12 @@ class ExpansionLCO {
     delete [] input_data;
 
     data_ = retval;
-    n_digits_ = n_digits;
 
     // setup the out edge action
     assert(data_ != HPX_NULL);
     if (n_out != 0) {
-      hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &n_digits);
+      int unused = 0; 
+      hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &unused);
     }
   }
 
@@ -143,7 +141,6 @@ class ExpansionLCO {
     if (data_ != HPX_NULL) {
       hpx_lco_delete_sync(data_);
       data_ = HPX_NULL;
-      n_digits_ = -1;
     }
   }
 
@@ -154,7 +151,7 @@ class ExpansionLCO {
   bool valid() const {return data_ != HPX_NULL;}
 
   /// Accuracy of expansion
-  int accuracy() const {return n_digits_;}
+  int accuracy() const {return 0; } //n_digits_;} //REMOVE
 
   // TODO: make this more direct. There is no reason to send a parcel since
   // we are going to be local.
@@ -424,7 +421,7 @@ class ExpansionLCO {
 
     // Shortcut to the work in the case of a single locality
     if (hpx_get_num_ranks() == 1) {
-      spawn_out_edges_work(head, n_digits);
+      spawn_out_edges_work(head);
       hpx_lco_release(lco_, head);
       return HPX_SUCCESS;
     }
@@ -448,7 +445,6 @@ class ExpansionLCO {
 
     // make a local copy of the edge count, and set the n_digits for remotes
     int save_count = scratch->out_edge_count;
-    scratch->yet_to_arrive = n_digits;
 
     // loop over the sorted edges
     int my_rank = hpx_get_my_rank();
@@ -472,7 +468,7 @@ class ExpansionLCO {
 
       // Now send the parcel or do the work
       if (curr_rank == my_rank) {
-        spawn_out_edges_work(scratch, n_digits);
+        spawn_out_edges_work(scratch); 
       } else {
         size_t message_size = sizeof(Header) + scratch->expansion_size
                                            + send_edges_size;
@@ -511,14 +507,12 @@ class ExpansionLCO {
     // TODO: decide if this is a continuation action, or a return action
     // sent from here
 
-    // NOTE: we use yet_to_arrive to send the n_digits with these messages.
-    // At this point, yet_to_arrive is 0, so if that is needed, just use 0.
-    spawn_out_edges_work(head, head->yet_to_arrive);
+    spawn_out_edges_work(head); 
 
     return HPX_SUCCESS;
   }
 
-  static void spawn_out_edges_work(Header *head, int n_digits) {
+  static void spawn_out_edges_work(Header *head) {
     ViewSet views{};
     if (head->out_edge_count > 0) {
       ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
@@ -536,32 +530,28 @@ class ExpansionLCO {
     for (int i = 0; i < head->out_edge_count; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
-          m_to_m_out_edge(head, views, out_edges[i].target, n_digits);
+          m_to_m_out_edge(head, views, out_edges[i].target);
           break;
         case Operation::MtoL:
-          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
-                          n_digits);
+          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx); 
           break;
         case Operation::LtoL:
-          l_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
-                          n_digits);
+          l_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
           break;
         case Operation::MtoT:
-          m_to_t_out_edge(head, out_edges[i].target, n_digits);
+          m_to_t_out_edge(head, out_edges[i].target); 
           break;
         case Operation::LtoT:
-          l_to_t_out_edge(head, out_edges[i].target, n_digits);
+          l_to_t_out_edge(head, out_edges[i].target); 
           break;
         case Operation::MtoI:
-          m_to_i_out_edge(head, views, out_edges[i].target, n_digits);
+          m_to_i_out_edge(head, views, out_edges[i].target);
           break;
         case Operation::ItoI:
-          i_to_i_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
-                          n_digits);
+          i_to_i_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
           break;
         case Operation::ItoL:
-          i_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx,
-                          n_digits);
+          i_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
           break;
         default:
           assert(0 && "Impossible operation during out edge spawn");
@@ -571,7 +561,7 @@ class ExpansionLCO {
   }
 
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, int n_digits) {
+                              hpx_addr_t target) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double s_size = geo->size_from_level(head->index.level());
     int from_child = head->index.which_child();
@@ -580,12 +570,12 @@ class ExpansionLCO {
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
 
-    expansionlco_t destination{target, n_digits};
+    expansionlco_t destination{target};
     destination.contribute(std::move(translated));
   }
 
   static void m_to_l_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, Index tidx, int n_digits) {
+                              hpx_addr_t target, Index tidx) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double s_size = geo->size_from_level(head->index.level());
 
@@ -594,12 +584,12 @@ class ExpansionLCO {
     auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
 
-    expansionlco_t lco{target, n_digits};
+    expansionlco_t lco{target};
     lco.contribute(std::move(translated));
   }
 
   static void l_to_l_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, Index tidx, int n_digits) {
+                              hpx_addr_t target, Index tidx) {
     int to_child = tidx.which_child();
     LocalData<DomainGeometry> geo = head->domain.value();
     double t_size = geo->size_from_level(tidx.level());
@@ -608,18 +598,18 @@ class ExpansionLCO {
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
 
-    expansionlco_t total{target, n_digits};
+    expansionlco_t total{target};
     total.contribute(std::move(translated));
   }
 
-  static void m_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
+  static void m_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
     targetlco_t destination{target, 0}; 
     destination.contribute_M_to_T(head->expansion_size, head->payload);  
   }
 
-  static void l_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
+  static void l_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
@@ -627,17 +617,17 @@ class ExpansionLCO {
   }
 
   static void m_to_i_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, int n_digits) {
+                              hpx_addr_t target) {
     expansion_t lexp{views};
     auto translated = lexp.M_to_I(head->index);
     lexp.release();
 
-    expansionlco_t lco{target, n_digits};
+    expansionlco_t lco{target};
     lco.contribute(std::move(translated));
   }
 
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, Index tidx, int n_digits) {
+                              hpx_addr_t target, Index tidx) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double s_size = geo->size_from_level(head->index.level());
 
@@ -645,12 +635,12 @@ class ExpansionLCO {
     auto translated = lexp.I_to_I(head->index, s_size, tidx);
     lexp.release();
 
-    expansionlco_t lco{target, n_digits};
+    expansionlco_t lco{target};
     lco.contribute(std::move(translated));
   }
 
   static void i_to_l_out_edge(Header *head, const ViewSet &views,
-                              hpx_addr_t target, Index tidx, int n_digits) {
+                              hpx_addr_t target, Index tidx) {
     LocalData<DomainGeometry> geo = head->domain.value();
     double t_size = geo->size_from_level(tidx.level());
 
@@ -658,7 +648,7 @@ class ExpansionLCO {
     auto translated = lexp.I_to_L(tidx, t_size);
     lexp.release();
 
-    expansionlco_t lco{target, n_digits};
+    expansionlco_t lco{target};
     lco.contribute(std::move(translated));
   }
 
@@ -682,7 +672,6 @@ class ExpansionLCO {
   static hpx_action_t create_from_expansion_;
 
   hpx_addr_t data_;     // this is the LCO
-  int n_digits_;
 };
 
 template <typename S, typename T,

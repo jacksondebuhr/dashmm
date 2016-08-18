@@ -967,13 +967,15 @@ class Tree {
                                 DAGNode **tnodes, size_t n_tnodes) {
     // If this is a bottleneck, we can easily make this some kind of parfor
     for (size_t i = 0; i < n_snodes; ++i) {
-      expansionlco_t expand{snodes[i]->global_addx,
-                            (int)snodes[i]->other_member};
+      //expansionlco_t expand{snodes[i]->global_addx,
+      //(int)snodes[i]->other_member};
+      expansionlco_t expand{snodes[i]->global_addx}; 
       expand.set_out_edge_data(snodes[i]->out_edges);
     }
     for (size_t i = 0; i < n_tnodes; ++i) {
-      expansionlco_t expand{tnodes[i]->global_addx,
-                            (int)tnodes[i]->other_member};
+      //expansionlco_t expand{tnodes[i]->global_addx,
+      //(int)tnodes[i]->other_member};
+      expansionlco_t expand{tnodes[i]->global_addx}; 
       expand.set_out_edge_data(tnodes[i]->out_edges);
     }
     return HPX_SUCCESS;
@@ -1109,8 +1111,7 @@ class Tree {
           break;
         case Operation::StoM:
           {
-            expansionlco_t expand{edge[i].target,
-                                  (int)edge[i].other_member};
+            expansionlco_t expand{edge[i].target}; 
             auto geo = domain.value();
             Point center = geo->center_from_index(edge[i].idx);
             expand.S_to_M(center, sources, n_src, edge[i].idx); 
@@ -1118,8 +1119,7 @@ class Tree {
           break;
         case Operation::StoL:
           {
-            expansionlco_t expand{edge[i].target,
-                                  (int)edge[i].other_member};
+            expansionlco_t expand{edge[i].target}; 
             auto geo = domain.value();
             Point center = geo->center_from_index(edge[i].idx);
             expand.S_to_L(center, sources, n_src, edge[i].idx);
@@ -1136,7 +1136,7 @@ class Tree {
           {
             // S_to_T on expansion LCOs do not need any of the
             // expansionlco_t's state, so we create a default object.
-            expansionlco_t expand{HPX_NULL, 0};
+            expansionlco_t expand{HPX_NULL};
             targetlco_t targets{edge[i].target,
                                 edge[i].other_member};
             expand.S_to_T(sources, n_src, targets);
