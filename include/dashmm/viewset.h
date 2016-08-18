@@ -54,7 +54,7 @@ class ViewSet {
   ViewSet(ExpansionRole role, const Point &center, double scale)
     : views_{}, role_{role}, center_{center}, scale_{scale} { }
 
-  /// Clear the ViewSet, including the n_digits and role.
+  /// Clear the ViewSet
   void clear();
 
   /// Add a view to the set by index.
