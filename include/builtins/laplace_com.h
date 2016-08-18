@@ -162,7 +162,6 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
                                       Source *last) const { 
-    //double scale) const {
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0, 1.0,
                                         kSourcePrimary);
     temp->calc_mtot(first, last);
@@ -171,9 +170,8 @@ class LaplaceCOM {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      Source *first, Source *last,
-                                      double scale) const {
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
+                                      Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 

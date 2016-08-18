@@ -181,11 +181,8 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /*
-  /// \param scale - scaling factor (one over the size of the source box)
-  std::unique_ptr<expansion_t> S_to_M(Point center, source_t *first,
-                                      source_t *last, double scale) const;
-  */
+  ///
+  /// \returns - The resulting multipole expansion
   std::unique_ptr<expansion_t> S_to_M(Point center, source_t *first,
                                       source_t *last) const;
 
@@ -198,12 +195,11 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /// \param scale - scaling factor (one over the size of the target box)
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      source_t *first, source_t *last,
-                                      double scale) const;
+  std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first, 
+                                      source_t *last) const; 
+  //double scale) const;
 
   /// Change center of a multipole expansion
   ///

@@ -143,7 +143,6 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
-                                      //Source *last, double scale) const {
                                       Source *last) const {
     int n_digits = views_.n_digits();
     double scale = views_.scale(); 
@@ -199,8 +198,9 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last, double scale) const {
+                                      Source *last) const { 
     int n_digits = views_.n_digits();
+    double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, n_digits, 1.0, kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_laplace_table_->p(); 

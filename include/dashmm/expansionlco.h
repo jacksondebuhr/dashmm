@@ -195,13 +195,11 @@ class ExpansionLCO {
   /// \param center - the center of the computed expansion
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  /// \param scale - scaling factor
-  void S_to_L(Point center, Source *sources, size_t n_src, double scale,
-              Index idx) {
-    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0},
-                  expansion_t::compute_scale(idx)};
+  void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+    double scale = expansion_t::compute_scale(idx);     
+    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
     expansion_t local{views};
-    auto multi = local.S_to_L(center, sources, &sources[n_src], scale);
+    auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));
   }
 
