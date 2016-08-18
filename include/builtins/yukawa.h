@@ -1026,7 +1026,7 @@ public:
 
   static void update_table(int n_digits, double domain_size,
                            const std::vector<double> &kernel_params) {
-    get_or_add_yukawa_table(n_digits, domain_size, kernel_params[0]); 
+    update_yukawa_table(n_digits, domain_size, kernel_params[0]); 
   }
 
   static void delete_table() { }
