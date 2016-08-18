@@ -151,7 +151,7 @@ class ExpansionLCO {
   bool valid() const {return data_ != HPX_NULL;}
 
   /// Accuracy of expansion
-  int accuracy() const {return 0; } //n_digits_;} //REMOVE
+  //int accuracy() const {return 0; } //n_digits_;} //REMOVE
 
   // TODO: make this more direct. There is no reason to send a parcel since
   // we are going to be local.
