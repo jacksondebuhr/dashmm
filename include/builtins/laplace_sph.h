@@ -491,7 +491,8 @@ class Laplace {
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  void M_to_T(Target *first, Target *last, double scale) const {
+  void M_to_T(Target *first, Target *last) const {
+    double scale = views_.scale();    
     int p = builtin_laplace_table_->p(); 
     const double *sqf = builtin_laplace_table_->sqf(); 
 

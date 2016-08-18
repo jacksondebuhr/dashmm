@@ -196,7 +196,7 @@ class LaplaceCOM {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  void M_to_T(Target *first, Target *last, double scale) const {
+  void M_to_T(Target *first, Target *last) const {
     assert(valid(ViewSet{}));
     for (auto i = first; i != last; ++i) {
       Point pos{i->position};

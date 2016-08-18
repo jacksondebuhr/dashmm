@@ -199,7 +199,6 @@ class Expansion {
   /// \returns - The resulting local expansion
   std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first, 
                                       source_t *last) const; 
-  //double scale) const;
 
   /// Change center of a multipole expansion
   ///
@@ -245,8 +244,7 @@ class Expansion {
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor (one over the size of source box)
-  void M_to_T(target_t *first, target_t *last, double scale) const;
+  void M_to_T(target_t *first, target_t *last) const;
 
   /// Apply a local expansion to a set of targets
   ///
