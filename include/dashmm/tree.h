@@ -374,12 +374,10 @@ class Tree {
   /// tree.
   ///
   /// This is a synchronous operation.
-  ///
-  /// \param n_digits - the accuracy parameter of the expansion being used in
-  ///                   this evaluation.
-  void create_expansions_from_DAG(int n_digits) {
+  void create_expansions_from_DAG() {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
+    int n_digits = -1; 
 
     tree_t *argthis = this;
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,

@@ -312,7 +312,8 @@ class Evaluator {
     DAG dag = tree->create_DAG(same_sandt);
     parms->distro.compute_distribution(dag);
 
-    tree->create_expansions_from_DAG(parms->n_digits);
+    //tree->create_expansions_from_DAG(parms->n_digits);
+    tree->create_expansions_from_DAG();
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
