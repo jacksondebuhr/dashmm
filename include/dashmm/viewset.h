@@ -46,18 +46,15 @@ class ViewSet {
  public:
   /// Create an empty ViewSet
   ViewSet()
-    : views_{}, n_digits_{-1}, role_{kNoRoleNeeded}, center_{0.0, 0.0, 0.0},
-      scale_{1.0} { }
+    : views_{}, role_{kNoRoleNeeded}, center_{0.0, 0.0, 0.0}, scale_{1.0} { }
 
   /// Create an empty ViewSet, while setting some vitals
   ///
-  /// \param ndig - the number of digits in the represented views
   /// \param role - the role of the represented views
-  ViewSet(int ndig, ExpansionRole role, const Point &center, double scale)
-      : views_{}, n_digits_{ndig}, role_{role}, center_{center},
-        scale_{scale} { }
+  ViewSet(ExpansionRole role, const Point &center, double scale)
+    : views_{}, role_{role}, center_{center}, scale_{scale} { }
 
-  /// Clear the ViewSet, including the n_digits and role.
+  /// Clear the ViewSet
   void clear();
 
   /// Add a view to the set by index.
@@ -85,9 +82,6 @@ class ViewSet {
   /// Set the data pointer of a given view
   void set_data(int view, char *data) {views_[view].data = data;}
 
-  /// Set the accuracy of the ViewSet
-  void set_n_digits(int ndig) {n_digits_ = ndig;}
-
   /// Set the role of the view set
   void set_role(ExpansionRole role) {role_ = role;}
 
@@ -105,9 +99,6 @@ class ViewSet {
 
   /// Get the data pointer of a given view
   char *view_data(int view) const {return views_[view].data;}
-
-  /// Get the accuracy for the ViewSet
-  int n_digits() const {return n_digits_;}
 
   /// Get the role for the ViewSet
   ExpansionRole role() const {return role_;}
@@ -144,7 +135,6 @@ class ViewSet {
 
  private:
   std::vector<View> views_;
-  int n_digits_;
   ExpansionRole role_;
   Point center_;
   double scale_;

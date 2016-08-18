@@ -49,12 +49,13 @@ using laplace_map_t = std::map<double, double *, laplace_cmp>;
 
 class LaplaceTable {
  public:
-  LaplaceTable(int n_digits);
+  LaplaceTable(int n_digits, double size);
   ~LaplaceTable();
 
   int p() const {return p_;}
   int s() const {return s_;}
   int nexp() const {return nexp_;}
+  double scale(int lev) const {return scale_ * pow(2, lev);} 
   const double *sqf() const {return sqf_;}
   const double *sqbinom() const {return sqbinom_;}
   const double *dmat_plus(double v) const {return dmat_plus_->at(v);}
@@ -73,6 +74,7 @@ class LaplaceTable {
 
  private:
   int p_;
+  double scale_; // scaling factor of level 0 to normalize box size to 1
   double *sqf_;
   double *sqbinom_;
   laplace_map_t *dmat_plus_;
@@ -107,8 +109,7 @@ using uLaplaceTable = std::unique_ptr<LaplaceTable>;
 
 extern uLaplaceTable builtin_laplace_table_; 
 
-void get_or_add_laplace_table(int n_digits);
-
+void update_laplace_table(int n_digits, double size); 
 
 } // namespace dashmm
 

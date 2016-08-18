@@ -23,7 +23,8 @@ namespace dashmm {
 
 uLaplaceTable builtin_laplace_table_; 
 
-LaplaceTable::LaplaceTable(int n_digits) {
+LaplaceTable::LaplaceTable(int n_digits, double size) {
+  scale_ = 1.0 / size; 
   int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29,
                         33, 36, 40, 43, 46};
   p_ = expan_length[n_digits];
@@ -399,35 +400,17 @@ void LaplaceTable::generate_ealphaj() {
   }
 }
 
-/*
-void legendre_Plm(int n, double x, double *P) {
-  double u = -sqrt(1.0 - x * x);
-  P[midx(0, 0)] = 1.0;
-  for (int i = 1; i <= n; i++)
-    P[midx(i, i)] = P[midx(i - 1, i - 1)] * u * (2 * i - 1);
-
-  for (int i = 0; i < n; i++)
-    P[midx(i + 1, i)] = P[midx(i, i)] * x * (2 * i + 1);
-
-  for (int m = 0; m <= n; m++) {
-    for (int ell = m + 2; ell <= n; ell++) {
-      P[midx(ell, m)] = ((2.0 * ell - 1) * x * P[midx(ell - 1, m)] -
-                         (ell + m - 1) * P[midx(ell - 2, m)]) / (ell - m);
-    }
-  }
-}
-*/
-
-void get_or_add_laplace_table(int n_digits) {
+void update_laplace_table(int n_digits, double size) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
   // or something similar.
 
   // Need to add the capability to check if \p n_digits is the same as the one
   // stored. If not, delete the current table and generate one with the updated
   // accuracy requirement.  
-  if (builtin_laplace_table_ == nullptr) {
-    builtin_laplace_table_ = uLaplaceTable{new LaplaceTable{n_digits}};
-  }
+
+  if (builtin_laplace_table_ == nullptr) 
+    builtin_laplace_table_ = uLaplaceTable{new LaplaceTable{n_digits, size}}; 
 }
+
 
 } // namespace dashmm

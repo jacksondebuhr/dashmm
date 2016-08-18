@@ -6,7 +6,7 @@ namespace dashmm {
 
 void ViewSet::clear() {
   views_.clear();
-  n_digits_ = -1;
+  //n_digits_ = -1;
   role_ = kNoRoleNeeded;
 }
 
@@ -37,9 +37,7 @@ size_t ViewSet::bytes() const {
 
 
 void ViewSet::serialize(WriteBuffer &buffer) {
-  bool e = buffer.write((char *)&n_digits_, sizeof(n_digits_));
-  assert(e);
-  e = buffer.write((char *)&role_, sizeof(role_));
+  bool e = buffer.write((char *)&role_, sizeof(role_));
   assert(e);
   e = buffer.write(count());
   assert(e);
@@ -75,10 +73,7 @@ void ViewSet::interpret(ReadBuffer &buffer) {
   // NOTE: this clears out the ViewSet
   views_.clear();
 
-  bool e = buffer.read(&n_digits_);
-  assert(e);
-
-  e = buffer.read(&role_);
+  bool e = buffer.read(&role_);
   assert(e);
 
   int ct{0};

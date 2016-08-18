@@ -141,7 +141,7 @@ class Tree {
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method, DistroPolicy>;
 
   Tree(method_t met, size_t limit, int digits)
-      : method_{met}, refinement_limit_{limit}, n_digits_{digits},
+    : method_{met}, refinement_limit_{limit}, 
         source_root_{nullptr}, target_root_{nullptr}, domain_{nullptr} { }
 
   ~Tree() {
@@ -162,7 +162,6 @@ class Tree {
   Tree(Tree &&other) {
     method_ = other.method;
     refinement_limit_ = other.refinement_limit_;
-    n_digits_ = other.n_digits_;
     source_root_ = other.source_root_;
     target_root_ = other.target_root_;
     domain_ = other.domain_;
@@ -174,7 +173,6 @@ class Tree {
   Tree &operator=(Tree &&other) {
     method_ = other.method;
     refinement_limit_ = other.refinement_limit_;
-    n_digits_ = other.n_digits_;
     source_root_ = other.source_root_;
     target_root_ = other.target_root_;
     domain_ = other.domain_;
@@ -193,10 +191,6 @@ class Tree {
 
   /// Returns the refinement limit for tree construction
   int refinement_limit() const {return refinement_limit_;}
-
-  /// Returns the number of digits in any created expansion
-  int n_digits() const {return n_digits_;}
-
 
   /// Compute the domain for the given sources and targets
   ///
@@ -380,18 +374,15 @@ class Tree {
   /// tree.
   ///
   /// This is a synchronous operation.
-  ///
-  /// \param n_digits - the accuracy parameter of the expansion being used in
-  ///                   this evaluation.
-  void create_expansions_from_DAG(int n_digits) {
+  void create_expansions_from_DAG() {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
 
     tree_t *argthis = this;
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-             &done, &n_digits, &argthis, &source_root_);
+             &done, &argthis, &source_root_);
     hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-             &done, &n_digits, &argthis, &target_root_);
+             &done, &argthis, &target_root_);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -851,15 +842,15 @@ class Tree {
   }
 
   static int create_S_expansions_from_DAG_handler(
-        hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
+        hpx_addr_t done, tree_t *tree, sourcenode_t *node) {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
 
     // create the normal expansion if needed
     if (node->dag.has_normal()) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, n_digits,
-                        expansion_t::compute_scale(node->idx), kSourcePrimary}
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx), 
+            kSourcePrimary}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -871,9 +862,8 @@ class Tree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm()) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, n_digits,
-                        expansion_t::compute_scale(node->idx),
-                        kSourceIntermediate}
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
+            kSourceIntermediate}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
@@ -893,7 +883,7 @@ class Tree {
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
           hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &n_digits, &tree, &node->child[i]);
+                   &cdone, &tree, &node->child[i]);
         }
       }
 
@@ -911,15 +901,15 @@ class Tree {
   }
 
   static int create_T_expansions_from_DAG_handler(
-        hpx_addr_t done, int n_digits, tree_t *tree, targetnode_t *node) {
+        hpx_addr_t done, tree_t *tree, targetnode_t *node) {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
 
     // create the normal expansion if needed
     if (node->dag.has_normal()) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, n_digits,
-                        expansion_t::compute_scale(node->idx), kTargetPrimary}
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx), 
+            kTargetPrimary}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -931,9 +921,8 @@ class Tree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm()) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, n_digits,
-                        expansion_t::compute_scale(node->idx),
-                        kTargetIntermediate}
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
+            kTargetIntermediate}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
@@ -961,7 +950,7 @@ class Tree {
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
           hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &n_digits, &tree, &node->child[i]);
+                   &cdone, &tree, &node->child[i]);
         }
       }
 
@@ -1123,9 +1112,8 @@ class Tree {
             expansionlco_t expand{edge[i].target,
                                   (int)edge[i].other_member};
             auto geo = domain.value();
-            double scale = 1.0 / geo->size_from_level(edge[i].idx.level());
             Point center = geo->center_from_index(edge[i].idx);
-            expand.S_to_M(center, sources, n_src, scale, edge[i].idx);
+            expand.S_to_M(center, sources, n_src, edge[i].idx); 
           }
           break;
         case Operation::StoL:
@@ -1133,9 +1121,8 @@ class Tree {
             expansionlco_t expand{edge[i].target,
                                   (int)edge[i].other_member};
             auto geo = domain.value();
-            double scale = 1.0 / geo->size_from_level(edge[i].idx.level());
             Point center = geo->center_from_index(edge[i].idx);
-            expand.S_to_L(center, sources, n_src, scale, edge[i].idx);
+            expand.S_to_L(center, sources, n_src, edge[i].idx);
           }
           break;
         case Operation::MtoM:   // NOTE: Fall-through
@@ -1216,7 +1203,6 @@ class Tree {
   // Data that is constant for each node of the tree
   method_t method_;
   size_t refinement_limit_;
-  int n_digits_;
 
   // The roots of the two trees
   sourcenode_t *source_root_;

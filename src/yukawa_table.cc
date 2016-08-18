@@ -475,4 +475,8 @@ void YukawaTable::generate_l2l() {
   delete [] bessel;
 }
 
+void update_yukawa_table(int n_digits, double size, double lambda) {
+
+}
+
 } // namespace dashmm

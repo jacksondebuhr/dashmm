@@ -119,7 +119,7 @@ class ExpansionLCO {
     input_data->index = index;
     input_data->out_edge_count = n_out;
 
-    int n_digits = expand->accuracy();
+    int n_digits = -1; // TODO: should be removed
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 
@@ -171,13 +171,11 @@ class ExpansionLCO {
   /// \param center - the center of the computed expansion
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  /// \param scale - scaling factor
-  void S_to_M(Point center, Source *sources, size_t n_src, double scale,
-              Index idx) {
-    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0},
-                  expansion_t::compute_scale(idx)};
+  void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+    double scale = expansion_t::compute_scale(idx);
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
     expansion_t local{views};
-    auto multi = local.S_to_M(center, sources, &sources[n_src], scale);
+    auto multi = local.S_to_M(center, sources, &sources[n_src]);
     contribute(std::move(multi));
   }
 
@@ -197,13 +195,11 @@ class ExpansionLCO {
   /// \param center - the center of the computed expansion
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  /// \param scale - scaling factor
-  void S_to_L(Point center, Source *sources, size_t n_src, double scale,
-              Index idx) {
-    ViewSet views{n_digits_, kNoRoleNeeded, Point{0.0, 0.0, 0.0},
-                  expansion_t::compute_scale(idx)};
+  void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+    double scale = expansion_t::compute_scale(idx);     
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
     expansion_t local{views};
-    auto multi = local.S_to_L(center, sources, &sources[n_src], scale);
+    auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));
   }
 
@@ -617,25 +613,17 @@ class ExpansionLCO {
   }
 
   static void m_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double scale = 1.0 / geo->size_from_level(head->index.level());
-
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
-    targetlco_t destination{target, 0};
-    destination.contribute_M_to_T(head->expansion_size, head->payload,
-                                  n_digits, scale);
+    targetlco_t destination{target, 0}; 
+    destination.contribute_M_to_T(head->expansion_size, head->payload);  
   }
 
   static void l_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double scale = 1.0 / geo->size_from_level(head->index.level());
-
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_L_to_T(head->expansion_size, head->payload,
-                                  n_digits, scale);
+    destination.contribute_L_to_T(head->expansion_size, head->payload); 
   }
 
   static void m_to_i_out_edge(Header *head, const ViewSet &views,

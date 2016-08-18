@@ -80,7 +80,7 @@ class Expansion {
   ///
   /// The scale value that will be provided to the expansion will be provided
   /// by the compute_scale static member of this class.
-  Expansion(Point center, int n_digits, double scale, ExpansionRole role);
+  Expansion(Point center, double scale, ExpansionRole role);
 
   /// The second creates the expansion from previously existing data specified
   /// with a ViewSet object.
@@ -140,11 +140,6 @@ class Expansion {
   /// Get all the current views of the object
   ViewSet get_all_views() const;
 
-  /// Returns the accuracy of the expansion - this is the number given to the
-  /// constructor as n_digits, or is some nonsense value if n_digits is not
-  /// used.
-  int accuracy() const;
-
   /// Get the role of this expansion
   ExpansionRole role() const;
 
@@ -181,9 +176,10 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /// \param scale - scaling factor (one over the size of the source box)
+  ///
+  /// \returns - The resulting multipole expansion
   std::unique_ptr<expansion_t> S_to_M(Point center, source_t *first,
-                                      source_t *last, double scale) const;
+                                      source_t *last) const;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -194,12 +190,10 @@ class Expansion {
   /// \param center - the point around which to form the expansion
   /// \param first - address of the first source
   /// \param last - address of one past the last source
-  /// \param scale - scaling factor (one over the size of the target box)
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      source_t *first, source_t *last,
-                                      double scale) const;
+  std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first, 
+                                      source_t *last) const; 
 
   /// Change center of a multipole expansion
   ///
@@ -245,15 +239,13 @@ class Expansion {
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor (one over the size of source box)
-  void M_to_T(target_t *first, target_t *last, double scale) const;
+  void M_to_T(target_t *first, target_t *last) const;
 
   /// Apply a local expansion to a set of targets
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor (one over the size of the target box)
-  void L_to_T(target_t *first, target_t *last, double scale) const;
+  void L_to_T(target_t *first, target_t *last) const;
 
   /// Compute the direct interaction between sources and targets
   ///

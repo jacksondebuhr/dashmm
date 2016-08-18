@@ -70,7 +70,7 @@ class LaplaceCOMAcc {
   using target_t = Target;
   using expansion_t = LaplaceCOMAcc<Source, Target>;
 
-  LaplaceCOMAcc(Point center, int n_digits, double scale, ExpansionRole role) {
+  LaplaceCOMAcc(Point center, double scale, ExpansionRole role) {
     bytes_ = sizeof(LaplaceCOMAccData);
     data_ = reinterpret_cast<LaplaceCOMAccData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -123,7 +123,6 @@ class LaplaceCOMAcc {
       view.set_bytes(0, sizeof(LaplaceCOMAccData));
       view.set_data(0, (char *)data_);
     }
-    view.set_n_digits(-1);
     view.set_role(kSourcePrimary);
   }
 
@@ -159,9 +158,9 @@ class LaplaceCOMAcc {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
-                                      double scale) const {
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0, 1.0,
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
+                                      Source *last) const {
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
@@ -169,16 +168,15 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      Source *first, Source *last,
-                                      double scale) const {
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
+                                      Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
     assert(valid(ViewSet{}));
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0, 1.0,
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
@@ -196,7 +194,7 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  void M_to_T(Target *first, Target *last, double scale) const {
+  void M_to_T(Target *first, Target *last) const {
     assert(valid(ViewSet{}));
     for (auto i = first; i != last; ++i) {
       Point pos{i->position};
@@ -244,7 +242,7 @@ class LaplaceCOMAcc {
     }
   }
 
-  void L_to_T(Target *first, Target *last, double scale) const { }
+  void L_to_T(Target *first, Target *last) const { }
 
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {

@@ -109,7 +109,7 @@ private:
 using uYukawaTable = std::unique_ptr<YukawaTable>; 
 extern uYukawaTable builtin_yukawa_table_; 
 
-void get_or_add_yukawa_table(int n_digits, double size, double lambda); 
+void update_yukawa_table(int n_digits, double size, double lambda); 
 
 } // namespace dashmm
 
