@@ -168,11 +168,11 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::create_S_expansions_from_DAG_,
                         tree_t::create_S_expansions_from_DAG_handler,
-                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::create_T_expansions_from_DAG_,
                         tree_t::create_T_expansions_from_DAG_handler,
-                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::edge_lists_,
                         tree_t::edge_lists_handler,
@@ -312,7 +312,6 @@ class Evaluator {
     DAG dag = tree->create_DAG(same_sandt);
     parms->distro.compute_distribution(dag);
 
-    //tree->create_expansions_from_DAG(parms->n_digits);
     tree->create_expansions_from_DAG();
 
     // NOTE: the previous has to finish for the following. So the previous

@@ -377,13 +377,12 @@ class Tree {
   void create_expansions_from_DAG() {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
-    int n_digits = -1; 
 
     tree_t *argthis = this;
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-             &done, &n_digits, &argthis, &source_root_);
+             &done, &argthis, &source_root_);
     hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-             &done, &n_digits, &argthis, &target_root_);
+             &done, &argthis, &target_root_);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -843,7 +842,7 @@ class Tree {
   }
 
   static int create_S_expansions_from_DAG_handler(
-        hpx_addr_t done, int n_digits, tree_t *tree, sourcenode_t *node) {
+        hpx_addr_t done, tree_t *tree, sourcenode_t *node) {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
 
@@ -884,7 +883,7 @@ class Tree {
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
           hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &n_digits, &tree, &node->child[i]);
+                   &cdone, &tree, &node->child[i]);
         }
       }
 
@@ -902,7 +901,7 @@ class Tree {
   }
 
   static int create_T_expansions_from_DAG_handler(
-        hpx_addr_t done, int n_digits, tree_t *tree, targetnode_t *node) {
+        hpx_addr_t done, tree_t *tree, targetnode_t *node) {
     auto domain = tree->domain_.value();
     Point n_center = domain->center_from_index(node->idx);
 
@@ -951,7 +950,7 @@ class Tree {
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
           hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &n_digits, &tree, &node->child[i]);
+                   &cdone, &tree, &node->child[i]);
         }
       }
 
