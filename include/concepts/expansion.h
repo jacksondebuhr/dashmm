@@ -250,8 +250,7 @@ class Expansion {
   ///
   /// \param first - the first target point
   /// \param last - one past the last target point
-  /// \param scale - scaling factor (one over the size of the target box)
-  void L_to_T(target_t *first, target_t *last, double scale) const;
+  void L_to_T(target_t *first, target_t *last) const;
 
   /// Compute the direct interaction between sources and targets
   ///

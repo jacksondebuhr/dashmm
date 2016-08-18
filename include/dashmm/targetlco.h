@@ -125,15 +125,12 @@ class TargetLCO {
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
   void contribute_M_to_T(size_t bytes, void *data,
-                         //int n_digits, double scale) const {
                          int n_digits) const {
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
     assert(input);
     input->code = kMtoT;
     input->n_digits = n_digits;
-    //input->scale = scale;
-    //input->scale = 0.0; 
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -145,15 +142,13 @@ class TargetLCO {
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
   /// \param n_digits - accuracy of the expansion
-  /// \param scale - scaling factor
   void contribute_L_to_T(size_t bytes, void *data,
-                         int n_digits, double scale) const {
+                         int n_digits) const {
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
     assert(input);
     input->code = kLtoT;
     input->n_digits = n_digits;
-    input->scale = scale;
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -181,7 +176,6 @@ class TargetLCO {
   struct MtoT {
     int code;
     int n_digits;
-    //double scale;
     size_t bytes;
     char data[];
   };
@@ -190,7 +184,6 @@ class TargetLCO {
   struct LtoT {
     int code;
     int n_digits;
-    double scale;
     size_t bytes;
     char data[];
   };
@@ -253,7 +246,8 @@ class TargetLCO {
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
-      LtoT *input = readbuf.interpret<LtoT>();
+      // TODO: take a look at this LtoT type. We use nothing but the code here. 
+      readbuf.interpret<LtoT>(); 
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -265,7 +259,7 @@ class TargetLCO {
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
-      expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());

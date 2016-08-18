@@ -428,8 +428,9 @@ public:
     delete [] bessel; 
   }
 
-  void L_to_T(Target *first, Target *last, double scale) const {
+  void L_to_T(Target *first, Target *last) const {
     int p = builtin_yukawa_table_->p(); 
+    double scale = views_.scale(); 
     double lambda = builtin_yukawa_table_->lambda(); 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     double *bessel = new double[p + 1]; 

@@ -222,7 +222,7 @@ class LaplaceCOM {
     }
   }
 
-  void L_to_T(Target *first, Target *last, double scale) const { }
+  void L_to_T(Target *first, Target *last) const {} 
 
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {

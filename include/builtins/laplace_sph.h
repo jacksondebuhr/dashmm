@@ -549,8 +549,9 @@ class Laplace {
     delete [] legendre;
   }
 
-  void L_to_T(Target *first, Target *last, double scale) const {
+  void L_to_T(Target *first, Target *last) const {
     int p = builtin_laplace_table_->p(); 
+    double scale = views_.scale(); 
     const double *sqf = builtin_laplace_table_->sqf(); 
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];

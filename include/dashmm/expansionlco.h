@@ -621,14 +621,11 @@ class ExpansionLCO {
   }
 
   static void l_to_t_out_edge(Header *head, hpx_addr_t target, int n_digits) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double scale = 1.0 / geo->size_from_level(head->index.level());
-
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
     destination.contribute_L_to_T(head->expansion_size, head->payload,
-                                  n_digits, scale);
+                                  n_digits);
   }
 
   static void m_to_i_out_edge(Header *head, const ViewSet &views,
