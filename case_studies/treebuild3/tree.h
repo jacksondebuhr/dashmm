@@ -42,8 +42,6 @@ using dashmm::ArrayData;
 // TODO - this will be removed eventually in favor of a foward declaration of
 // the evaluator
 void registrar();
-uint64_t morton_key(unsigned x, unsigned y, unsigned z);
-
 
 
 /// A node of the tree.
@@ -87,6 +85,12 @@ class Node {
 
   /// Gives the number of particles in the segment owned by this node
   size_t num_parts() const {return parts.n();}
+
+  /// Create a completion detection and gate
+  void add_completion() {
+    assert(complete_ == HPX_NULL);
+    complete_ = hpx_lco_and_new(8);
+  }
 
   /// Create semaphore as needed
   void add_lock() {
@@ -148,7 +152,7 @@ class Node {
     // TODO perhaps change the argument type to avoid this cast
     bool is_leaf = num_points <= (size_t)threshold;
 
-    if (parent) {
+    if (parent && parent->complete() != HPX_NULL) {
       hpx_call_when_with_continuation(complete_,
           parent->complete(), hpx_lco_set_action,
           complete_, hpx_lco_delete_action,
@@ -287,8 +291,6 @@ class Node {
     // Extract a compressed remote tree representation. As the tree is remote,
     // only {parent, child, idx} fields are needed.
 
-    // TODO I think I don't want to do this one this way, favoring instead
-    // a more typical structure. I will think about it
     Node *descendants = new Node[n_nodes];
 
     // The compressed tree is created in depth first fashion. And there are two
@@ -345,10 +347,6 @@ class Node {
   // TODO
   // DAGInfo dag;                            /// The DAG info for this node
 
-  // TODO
-  // We have to have this in node, and since stuff from DualTree needs to call
-  // this we make it public. There could be some way to avoid the circular
-  // reference needed to make this part of DualTree.
   static hpx_action_t partition_node_;
 
  private:
@@ -371,7 +369,8 @@ class DualTree {
  public:
   DualTree()
     : domain_{}, refinement_limit_{1}, unif_level_{1}, dim3_{8},
-      unif_count_{HPX_NULL}, unif_count_value_{nullptr}, unif_grid_{nullptr},
+      unif_count_{HPX_NULL}, unif_count_value_{nullptr},
+      unif_grid_src_{nullptr}, unif_grid_tar_{nullptr},
       unif_done_{HPX_NULL}, distribute_{nullptr}, sorted_src_{},
       sorted_tar_{} { }
 
@@ -381,44 +380,15 @@ class DualTree {
   // TODO define move construction and assignment?
   // Is this needed?
 
-  // simple accessors and mutators
-  // TODO this is a bit of a mess, is there a way to clean this up?
-  //  When the various actions become part of the class, we can probably
-  //  just hit these directly. This is way too much interface for the average
-  //  user.
-  int unif_level() const {return unif_level_;}
-  int dim3() const {return dim3_;}
-  Node *unif_grid_src(size_t i = 0) const {return &unif_grid_[i];}
-  Node *unif_grid_tar(size_t i = 0) const {return &unif_grid_[dim3_ + i];}
-  hpx_addr_t unif_count() const {return unif_count_;}
+  // simple accessors
   int *unif_count_src(size_t i = 0) const {return &unif_count_value_[i];}
   int *unif_count_tar(size_t i = 0) const {
     return &unif_count_value_[i + dim3_];
   }
-  hpx_addr_t unif_done() const {return unif_done_;}
-  int refinement_limit() const {return refinement_limit_;}
-  const DomainGeometry &domain() const {return domain_;}
   size_t sorted_src_count() const {return sorted_src_.n_tot();}
   size_t sorted_tar_count() const {return sorted_tar_.n_tot();}
   ArrayData<Point> sorted_src() const {return sorted_src_.pin();}
   ArrayData<Point> sorted_tar() const {return sorted_tar_.pin();}
-  ArrayRef<Point> sorted_src_ref() const {return sorted_src_;}
-  ArrayRef<Point> sorted_tar_ref() const {return sorted_tar_;}
-
-  void set_unif_level(int l) {unif_level_ = l;}
-  void set_dim3(int d) {dim3_ = d;}
-  void set_unif_grid(Node *n) {unif_grid_ = n;}
-  void set_unif_count(hpx_addr_t u) {unif_count_ = u;}
-  void set_unif_count_value(int *u) {unif_count_value_ = u;}
-  void set_unif_done(hpx_addr_t u) {unif_done_ = u;}
-  void set_refinement_limit(int t) {refinement_limit_ = t;}
-  void set_domain(const DomainGeometry &geo) {domain_ = geo;}
-  void set_distribution(int *d) {
-    assert(d != nullptr);
-    distribute_ = d;
-  }
-  void set_sorted_src(ArrayRef<Point> s) {sorted_src_ = s;}
-  void set_sorted_tar(ArrayRef<Point> t) {sorted_tar_ = t;}
 
 
   // Things to make it fit with DASHMM
@@ -439,12 +409,9 @@ class DualTree {
     // NOTE: The difference here is that there are two different allocation
     // schemes for the nodes.
 
-    // TODO: Add some parallelism here. Otherwise, this could take a long time.
-    //  Most of the delay has been removed by making the lco delete themselves
-    //  along the way, and only having those nodes that need semaphores have
-    //  semaphores
+    // TODO: Add some parallelism here?
     for (int i = 0; i < b; ++i) {
-      Node *curr = &unif_grid_[i];
+      Node *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -464,7 +431,7 @@ class DualTree {
     }
 
     for (int i = b; i <= e; ++i) {
-      Node *curr = &unif_grid_[i];
+      Node *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -476,7 +443,7 @@ class DualTree {
     }
 
     for (int i = e + 1; i < dim3_; ++i) {
-      Node *curr = &unif_grid_[i];
+      Node *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -496,7 +463,7 @@ class DualTree {
     }
 
     for (int i = 0; i < b; ++i) {
-      Node *curr = &unif_grid_[i + dim3_];
+      Node *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -516,7 +483,7 @@ class DualTree {
     }
 
     for (int i = b; i <= e; ++i) {
-      Node *curr = &unif_grid_[i + dim3_];
+      Node *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -528,7 +495,7 @@ class DualTree {
     }
 
     for (int i = e + 1; i < dim3_; ++i) {
-      Node *curr = &unif_grid_[i + dim3_];
+      Node *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
@@ -547,7 +514,8 @@ class DualTree {
       }
     }
 
-    delete [] unif_grid_;
+    delete [] source_root_;
+    delete [] target_root_;
     delete [] distribute_;
   }
 
@@ -611,6 +579,22 @@ class DualTree {
 
     auto tree = global_tree.here();
     hpx_lco_delete_sync(tree->unif_count_);
+  }
+
+  static uint64_t split(unsigned k) {
+    uint64_t split = k & 0x1fffff;
+    split = (split | split << 32) & 0x1f00000000ffff;
+    split = (split | split << 16) & 0x1f0000ff0000ff;
+    split = (split | split << 8)  & 0x100f00f00f00f00f;
+    split = (split | split << 4)  & 0x10c30c30c30c30c3;
+    split = (split | split << 2)  & 0x1249249249249249;
+    return split;
+  }
+
+  static uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
+    uint64_t key = 0;
+    key |= split(x) | split(y) << 1 | split(z) << 2;
+    return key;
   }
 
 
@@ -710,7 +694,7 @@ class DualTree {
 
     int num_ranks = hpx_get_num_ranks();
     tree->unif_level_ = ceil(log(num_ranks) / log(8)) + 1;
-    int dim = pow(2, tree->unif_level_);
+    //int dim = pow(2, tree->unif_level_);
     tree->dim3_ = pow(8, tree->unif_level_);
     tree->unif_count_ = count;
     tree->refinement_limit_ = limit;
@@ -721,21 +705,78 @@ class DualTree {
     // Setup unif_done LCO
     tree->unif_done_ = hpx_lco_and_new(1);
 
+    // TODO - factor this for sure
     // Setup unif_grid
-    Node *unif_grid = new Node[2 * tree->dim3_];
+    int n_top_nodes{1};
+    for (int i = 1; i < tree->unif_level_; ++i) {
+      n_top_nodes += pow(8, i);
+    }
+    tree->source_root_ = new Node[n_top_nodes + tree->dim3_]{};
+    tree->target_root_ = new Node[n_top_nodes + tree->dim3_]{};
+    tree->unif_grid_src_ = &tree->source_root_[n_top_nodes];
+    tree->unif_grid_tar_ = &tree->target_root_[n_top_nodes];
+
+    tree->source_root_[0].idx = Index{0, 0, 0, 0};
+    tree->target_root_[0].idx = Index{0, 0, 0, 0};
+    int startingnode{0};
+    int stoppingnode{1};
+    for (int level = 0; level < tree->unif_level_ ; ++level) {
+      for (int nd = startingnode; nd < stoppingnode; ++nd) {
+        Node *snode = &tree->source_root_[nd];
+        Node *tnode = &tree->target_root_[nd];
+
+        if (level != tree->unif_level_ - 1) {
+          // At the lower levels, we do not require the ordering
+          int firstchild = nd * 8 + 1;
+          for (int i = 0; i < 8; ++i) {
+            Node *scnode = &tree->source_root_[firstchild + i];
+            Node *tcnode = &tree->target_root_[firstchild + i];
+            snode->child[i] = scnode;
+            tnode->child[i] = tcnode;
+            scnode->idx = snode->idx.child(i);
+            tcnode->idx = tnode->idx.child(i);
+            scnode->parent = snode;
+            tcnode->parent = tnode;
+          }
+        } else {
+          // The final level does need the ordering
+          for (int i = 0; i < 8; ++i) {
+            Index cindex = snode->idx.child(i);
+            uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
+            snode->child[i] = &tree->unif_grid_src_[morton];
+            tnode->child[i] = &tree->unif_grid_tar_[morton];
+            tree->unif_grid_src_[morton].idx = cindex;
+            tree->unif_grid_tar_[morton].idx = cindex;
+            tree->unif_grid_src_[morton].parent = snode;
+            tree->unif_grid_tar_[morton].parent = tnode;
+            tree->unif_grid_src_[morton].add_lock();
+            tree->unif_grid_tar_[morton].add_lock();
+            tree->unif_grid_src_[morton].add_completion();
+            tree->unif_grid_tar_[morton].add_completion();
+          }
+        }
+      }
+
+      startingnode += pow(8, level);
+      stoppingnode += pow(8, level + 1);
+    }
+
+    // Then the uniform grid
+    /*
     for (int iz = 0; iz < dim; ++iz) {
       for (int iy = 0; iy < dim; ++iy) {
         for (int ix = 0; ix < dim; ++ix) {
           uint64_t mid = morton_key(ix, iy, iz);
-          unif_grid[mid] = Node{Index{ix, iy, iz, tree->unif_level_}};
-          unif_grid[mid + tree->dim3_] =
+          tree->unif_grid_src_[mid] =
               Node{Index{ix, iy, iz, tree->unif_level_}};
-          unif_grid[mid].add_lock();
-          unif_grid[mid + tree->dim3_].add_lock();
+          tree->unif_grid_tar_[mid] =
+              Node{Index{ix, iy, iz, tree->unif_level_}};
+          tree->unif_grid_src_[mid].add_lock();
+          tree->unif_grid_tar_[mid].add_lock();
         }
       }
     }
-    tree->unif_grid_ = unif_grid;
+    */
 
     // Setup domain_
     double var[6];
@@ -935,10 +976,10 @@ class DualTree {
     int *gid_of_targets = new int[n_targets]();
     // TODO: perhaps these are actions? That is a coarse parallelism - then
     // perhaps more might be added inside these functions
-    assign_points_to_unif_grid(p_s, n_sources, tree->domain(),
+    assign_points_to_unif_grid(p_s, n_sources, tree->domain_,
                                tree->unif_level_, gid_of_sources,
                                local_scount);
-    assign_points_to_unif_grid(p_t, n_targets, tree->domain(),
+    assign_points_to_unif_grid(p_t, n_targets, tree->domain_,
                                tree->unif_level_, gid_of_targets,
                                local_tcount);
 
@@ -1017,7 +1058,6 @@ class DualTree {
           if (curr->increment_first(local_count[i])) {
             // This grid does not expect remote points.
             // Spawn adaptive partitioning
-            // TODO: This is a mild cheat for the type...
             const DomainGeometry *arg = &(tree->domain_);
             int threshold = tree->refinement_limit_;
             hpx_call(HPX_HERE, Node::partition_node_, HPX_NULL,
@@ -1105,7 +1145,7 @@ class DualTree {
     if (recv_ns) {
       char type = 's';
       for (int i = first; i <= last; ++i) {
-        Node *ns = local_tree->unif_grid_src(i);
+        Node *ns = &local_tree->unif_grid_src_[i];
         int incoming_ns = count_s[i - first];
         if (incoming_ns) {
           hpx_call(HPX_HERE, merge_points_, done,
@@ -1123,7 +1163,7 @@ class DualTree {
     if (recv_nt) {
       char type = 't';
       for (int i = first; i <= last; ++i) {
-        Node *nt = local_tree->unif_grid_tar(i);
+        Node *nt = &local_tree->unif_grid_tar_[i];
         int incoming_nt = count_t[i - first];
         if (incoming_nt) {
           hpx_call(HPX_HERE, merge_points_, done,
@@ -1230,9 +1270,9 @@ class DualTree {
     int n_nodes = compressed_tree[2];
     Node *curr{nullptr};
     if (type) {
-      curr = local_tree->unif_grid_src(id);
+      curr = &local_tree->unif_grid_src_[id];
     } else {
-      curr = local_tree->unif_grid_tar(id);
+      curr = &local_tree->unif_grid_tar_[id];
     }
 
     if (n_nodes) {
@@ -1256,10 +1296,6 @@ class DualTree {
   static int send_node_handler(Node *n, Point *sorted, int id, int type,
                                hpx_addr_t rwaddr) {
     Node *curr = &n[id];
-
-    // TODO: I think this is okay to remove; check this
-    //RankWise<DualTree> global_tree{rwaddr};
-    //auto local_tree = global_tree.here();
 
     // Exclude curr as it is already allocated on remote localities
     int n_nodes = curr->n_descendants() - 1;
@@ -1342,8 +1378,8 @@ class DualTree {
 
 
     // Exchange points
-    Node *ns = tree->unif_grid_src();
-    Node *nt = tree->unif_grid_tar();
+    Node *ns = tree->unif_grid_src_;
+    Node *nt = tree->unif_grid_tar_;
 
     int *global_offset_s = init_point_exchange(rank, &*tree, local_scount,
                                                local_offset_s, p_s, ns, 's');
@@ -1423,8 +1459,8 @@ class DualTree {
     hpx_lco_delete_sync(dual_tree_complete);
 
     // Replace segment in the array
-    hpx_addr_t old_src_data = sources.replace(tree->sorted_src_ref());
-    hpx_addr_t old_tar_data = targets.replace(tree->sorted_tar_ref());
+    hpx_addr_t old_src_data = sources.replace(tree->sorted_src_);
+    hpx_addr_t old_tar_data = targets.replace(tree->sorted_tar_);
     hpx_gas_free_sync(old_src_data);
     hpx_gas_free_sync(old_tar_data);
 
@@ -1455,7 +1491,10 @@ class DualTree {
   int dim3_;
   hpx_addr_t unif_count_;
   int *unif_count_value_;
-  Node *unif_grid_;
+  Node *source_root_;
+  Node *target_root_;
+  Node *unif_grid_src_;
+  Node *unif_grid_tar_;
   hpx_addr_t unif_done_;
 
   int *distribute_;
@@ -1463,6 +1502,7 @@ class DualTree {
   ArrayRef<Point> sorted_src_;
   ArrayRef<Point> sorted_tar_;
 
+  // These are the actions for this class
   static hpx_action_t domain_geometry_init_;
   static hpx_action_t domain_geometry_op_;
   static hpx_action_t set_domain_geometry_;

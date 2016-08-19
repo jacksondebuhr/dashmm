@@ -209,6 +209,11 @@ TODO: create standard regression and performance testing script to determine
       quality of a build.
 TODO: Decide if we should move setup_termination_detection, setup_edge_lists
       and destroy_DAG_LCOs into evaluator
+TODO: Decode if we should also test Hilbert ordering on the top level distrib
+      of the tree. This might have some better locality.
+TODO: Further, should we allow for a non-space-filling curve distribution.
+      This might be a way to make a non-contiguous chunk on the SFC a better
+      overall distribution.
 
 
 

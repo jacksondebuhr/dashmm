@@ -1,31 +1,8 @@
 So there are some things left to take care of with this. In no particular
 order:
 
-DONE * Remove the extraneous sorting members - just do the std::partition style
-DONE * Find the place that the actual rearrangement occurs, and remove that code
-DONE * Make it so the sorted data ends up in the global address space
-DONE * Have partition accept an array ref instead
-DONE * This likely means that Node should have an array ref as well
-DONE * Make the update to the sources and targets array - that is, change the
-     meta data array values
-
- * Need to build the top of the tree - perhaps the uniform grid nodes have
-   a different type? To make it simpler on the differences between the various
-   things.
- * Need to split joint structures, as the source and target types can be
-   different.
-
- * Make the tree type less silly
-   - This means make it more than a wrapper around the old globals
-   - This means move the functionality into the DualTree class
  * Make the tree a template over the needed things
- * Introduce the sorting interfaces for the array
-   - This includes the on rank sorting
-      This should likely return an LCO for each rank into a spmd style action
-      or back to the user when launched from user space.
-   - This includes the across rank sorting
-      This should also return an LCO for each rank, but also perhaps for each
-      uniform node of the tree
+
  * Add the remaining functionality from dashmm::Tree to the DualTree
  * Plug it into dashmm proper.
  * Debug, rinse, repeat
