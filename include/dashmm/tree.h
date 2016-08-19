@@ -138,10 +138,11 @@ class Tree {
   using tree_t = Tree<Source, Target, Expansion, Method, DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
                                       DistroPolicy>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method, DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
+                                DistroPolicy>;
 
   Tree(method_t met, size_t limit, int digits)
-    : method_{met}, refinement_limit_{limit}, 
+    : method_{met}, refinement_limit_{limit},
         source_root_{nullptr}, target_root_{nullptr}, domain_{nullptr} { }
 
   ~Tree() {
@@ -849,14 +850,14 @@ class Tree {
     // create the normal expansion if needed
     if (node->dag.has_normal()) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx), 
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
             kSourcePrimary}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
                             HPX_THERE(node->dag.normal()->locality));
-      node->dag.set_normal_expansion(expand.lco()); 
+      node->dag.set_normal_expansion(expand.lco());
     }
 
     // If there is to be an intermediate expansion, create that
@@ -870,7 +871,7 @@ class Tree {
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
                                 HPX_THERE(node->dag.interm()->locality));
-      node->dag.set_interm_expansion(intexp_lco.lco()); 
+      node->dag.set_interm_expansion(intexp_lco.lco());
     }
 
     // spawn work at children
@@ -908,14 +909,14 @@ class Tree {
     // create the normal expansion if needed
     if (node->dag.has_normal()) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx), 
+        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
             kTargetPrimary}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
                             HPX_THERE(node->dag.normal()->locality));
-      node->dag.set_normal_expansion(expand.lco()); 
+      node->dag.set_normal_expansion(expand.lco());
     }
 
     // If there is to be an intermediate expansion, create that
@@ -929,7 +930,7 @@ class Tree {
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
                                 HPX_THERE(node->dag.interm()->locality));
-      node->dag.set_interm_expansion(intexp_lco.lco()); 
+      node->dag.set_interm_expansion(intexp_lco.lco());
     }
 
     // NOTE: this spawn through the tree does not end when the tree ends.
@@ -967,11 +968,11 @@ class Tree {
                                 DAGNode **tnodes, size_t n_tnodes) {
     // If this is a bottleneck, we can easily make this some kind of parfor
     for (size_t i = 0; i < n_snodes; ++i) {
-      expansionlco_t expand{snodes[i]->global_addx}; 
+      expansionlco_t expand{snodes[i]->global_addx};
       expand.set_out_edge_data(snodes[i]->out_edges);
     }
     for (size_t i = 0; i < n_tnodes; ++i) {
-      expansionlco_t expand{tnodes[i]->global_addx}; 
+      expansionlco_t expand{tnodes[i]->global_addx};
       expand.set_out_edge_data(tnodes[i]->out_edges);
     }
     return HPX_SUCCESS;
@@ -1107,15 +1108,15 @@ class Tree {
           break;
         case Operation::StoM:
           {
-            expansionlco_t expand{edge[i].target}; 
+            expansionlco_t expand{edge[i].target};
             auto geo = domain.value();
             Point center = geo->center_from_index(edge[i].idx);
-            expand.S_to_M(center, sources, n_src, edge[i].idx); 
+            expand.S_to_M(center, sources, n_src, edge[i].idx);
           }
           break;
         case Operation::StoL:
           {
-            expansionlco_t expand{edge[i].target}; 
+            expansionlco_t expand{edge[i].target};
             auto geo = domain.value();
             Point center = geo->center_from_index(edge[i].idx);
             expand.S_to_L(center, sources, n_src, edge[i].idx);

@@ -1,9 +1,29 @@
 #include <iostream>
 #include <getopt.h>
 
+#include "registrar.h"
 #include "tree.h"
-
 #include "utils.h"
+
+
+// The eventual merge into DASHMM will use the position member of Source and
+// Target. Hence the following.
+struct Source {
+  Point position;
+};
+
+struct Target {
+  Point position;
+};
+
+
+// We can get away with silly things for the final three arguments as there
+// are no requirements of them in the current code.
+Registrar<Source, Target, int, int, int> reg{};
+
+
+using dualtree_t = DualTree<Source, Target, int, int, int>;
+
 
 
 void usage(std::string exec) {
@@ -16,18 +36,18 @@ void usage(std::string exec) {
 
 /// The main action of the code starts here
 int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
-  Array<Point> sources{source_gas};
-  Array<Point> targets{target_gas};
+  Array<Source> sources{source_gas};
+  Array<Target> targets{target_gas};
 
   hpx_time_t timer_start = hpx_time_now();
 
   // Perform some basic setup
-  RankWise<DualTree> global_tree =
-      DualTree::create(threshold, sources, targets);
+  RankWise<dualtree_t> global_tree =
+      dualtree_t::create(threshold, sources, targets);
   hpx_time_t timer_middle = hpx_time_now();
 
   // Start the partitioning proper
-  hpx_addr_t partdone = DualTree::partition(global_tree, sources, targets);
+  hpx_addr_t partdone = dualtree_t::partition(global_tree, sources, targets);
   hpx_lco_wait(partdone);
   hpx_lco_delete_sync(partdone);
   hpx_time_t timer_end = hpx_time_now();
@@ -41,7 +61,7 @@ int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   std::cout << "  Partition: " << elapsed_dual << "\n";
 
   // Here we clean up the allocated resources
-  DualTree::destroy(global_tree);
+  dualtree_t::destroy(global_tree);
 
   hpx_exit(0, nullptr);
 }
@@ -57,13 +77,6 @@ int main(int argc, char *argv[]) {
   int ntar = 20;
   int threshold = 1;
   int nseed = -1; // Number of seeds used for generating input for strong
-                  // scaling test
-
-
-  // TODO - This is temporarily a thing; remove this in favor of evaluator
-  // eventually
-  registrar();
-
 
   if (hpx_init(&argc, &argv)) {
     std::cout << "HPX: failed to initialize" << std::endl;
@@ -126,10 +139,10 @@ int main(int argc, char *argv[]) {
   }
 
   // First get the data setup
-  Array<Point> sources = generate_points(scaling, datatype,
-                                                  nsrc, nseed, 0);
-  Array<Point> targets = generate_points(scaling, datatype,
-                                                  ntar, nseed, nseed);
+  Array<Source> sources = generate_points<Source>(scaling, datatype,
+                                          nsrc, nseed, 0);
+  Array<Target> targets = generate_points<Target>(scaling, datatype,
+                                          ntar, nseed, nseed);
 
   // Then build the tree
   hpx_addr_t ssend = sources.data();  // TODO: this will eventually disappear

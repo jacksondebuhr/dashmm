@@ -41,12 +41,32 @@ using dashmm::ArrayData;
 
 // TODO - this will be removed eventually in favor of a foward declaration of
 // the evaluator
-void registrar();
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
+class Registrar;
 
 
 /// A node of the tree.
+template <typename Source, typename Target, typename Record,
+          template <typename, typename> class Expansion,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
 class Node {
  public:
+  using source_t = Source;
+  using target_t = Target;
+  using record_t = Record;
+  using expansion_t = Expansion<Source, Target>;
+  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
+  using node_t = Node<Source, Target, Record, Expansion, Method, DistroPolicy>;
+  using arrayref_t = ArrayRef<Record>;
+
   Node() : idx{}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
@@ -56,8 +76,7 @@ class Node {
   }
 
   /// Constuct with a known index.
-  Node(Index idx)
-      : idx{idx}, parts{}, parent{nullptr}, first_{0} {
+  Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -66,7 +85,7 @@ class Node {
   }
 
   /// Construct with an index, a particle segment and a parent
-  Node(Index idx, ArrayRef<Point> parts, Node *parent)
+  Node(Index idx, arrayref_t parts, node_t *parent)
       : idx{idx}, parts{parts}, parent{parent}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
@@ -171,25 +190,25 @@ class Node {
 
       // Get the local data
       auto p_local = parts.pin();
-      Point *p = p_local.value();
+      record_t *p = p_local.value();
 
       // Sort the particles among the children
-      Point *splits[9]{};
+      record_t *splits[9]{};
       splits[0] = p;
       splits[8] = &p[num_points];
 
-      auto z_comp = [&center_z](Point &a) {
+      auto z_comp = [&center_z](record_t &a) {
         return a.z() < center_z;
       };
       splits[4] = std::partition(splits[0], splits[8], z_comp);
 
-      auto y_comp = [&center_y](Point &a) {
+      auto y_comp = [&center_y](record_t &a) {
         return a.y() < center_y;
       };
       splits[2] = std::partition(splits[0], splits[4], y_comp);
       splits[6] = std::partition(splits[4], splits[8], y_comp);
 
-      auto x_comp = [&center_x](Point &a) {
+      auto x_comp = [&center_x](record_t &a) {
         return a.x() < center_x;
       };
       splits[1] = std::partition(splits[0], splits[2], x_comp);
@@ -212,7 +231,7 @@ class Node {
       for (int i = 0; i < 8; ++i) {
         if (stat[i]) {
           auto cparts = parts.slice(offset[i], stat[i]);
-          Node *cnd = new Node{idx.child(i), cparts, this};
+          node_t *cnd = new node_t{idx.child(i), cparts, this};
           child[i] = cnd;
 
           hpx_call(HPX_HERE, partition_node_, HPX_NULL,
@@ -291,7 +310,7 @@ class Node {
     // Extract a compressed remote tree representation. As the tree is remote,
     // only {parent, child, idx} fields are needed.
 
-    Node *descendants = new Node[n_nodes];
+    node_t *descendants = new node_t[n_nodes]{};
 
     // The compressed tree is created in depth first fashion. And there are two
     // choices here to fill in the parent, child, and idx fields of the
@@ -313,8 +332,8 @@ class Node {
     for (int i = 0; i < n_nodes; ++i) {
       int pos = tree[i];
       int which = branch[i];
-      Node *curr = &descendants[i];
-      Node *parent = (pos < 0 ? this : &descendants[pos]);
+      node_t *curr = &descendants[i];
+      node_t *parent = (pos < 0 ? this : &descendants[pos]);
 
       curr->parent = parent;
       curr->idx = parent->idx.child(which);
@@ -341,18 +360,18 @@ class Node {
 
 
   Index idx;                      /// index of the node
-  ArrayRef<Point> parts;  /// segment for this node
-  Node *parent;                           /// parent node
-  Node *child[8];                         /// children of this node
+  arrayref_t parts;               /// segment for this node
+  node_t *parent;                 /// parent node
+  node_t *child[8];               /// children of this node
   // TODO
-  // DAGInfo dag;                            /// The DAG info for this node
+  // DAGInfo dag;                    /// The DAG info for this node
 
   static hpx_action_t partition_node_;
 
  private:
   friend void registrar();
 
-  static int partition_node_handler(Node *n, DomainGeometry *geo,
+  static int partition_node_handler(node_t *n, DomainGeometry *geo,
                                     int threshold) {
     n->partition(threshold, geo);
     return HPX_SUCCESS;
@@ -364,9 +383,39 @@ class Node {
                             ///  complete
 };
 
+template <typename S, typename T, typename R,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Node<S, T, R, E, M, D>::partition_node_ = HPX_ACTION_NULL;
 
+
+
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
 class DualTree {
  public:
+  using source_t = Source;
+  using target_t = Target;
+  using expansion_t = Expansion<Source, Target>;
+  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
+  using sourcenode_t = Node<Source, Target, Source, Expansion, Method,
+                            DistroPolicy>;
+  using targetnode_t = Node<Source, Target, Target, Expansion, Method,
+                            DistroPolicy>;
+  using sourceref_t = ArrayRef<Source>;
+  using sourcearraydata_t = ArrayData<Source>;
+  using targetref_t = ArrayRef<Target>;
+  using targetarraydata_t = ArrayData<Target>;
+  using tree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
+
+
   DualTree()
     : domain_{}, refinement_limit_{1}, unif_level_{1}, dim3_{8},
       unif_count_{HPX_NULL}, unif_count_value_{nullptr},
@@ -374,26 +423,49 @@ class DualTree {
       unif_done_{HPX_NULL}, distribute_{nullptr}, sorted_src_{},
       sorted_tar_{} { }
 
-  DualTree(const DualTree &other) = delete;
-  DualTree &operator=(const DualTree &other) = delete;
+  DualTree(const tree_t &other) = delete;
+  tree_t &operator=(const tree_t &other) = delete;
 
   // TODO define move construction and assignment?
   // Is this needed?
 
   // simple accessors
+  // NOTE: These might not be allowed to have a default argument
+  template <typename SourceOrTarget>
+  int *unif_count(size_t i = 0) = delete;
+  template <>
+  int *unif_count<Source>(size_t i = 0) {return &unif_count_value_[i];}
+  template <>
+  int *unif_count<Target>(size_t i = 0) {
+    return &unif_count_value_[i + dim3_];
+  }
+
+  template <typename SourceOrTarget>
+  Node<SourceOrTarget> *unif_grid() = delete;
+  template <>
+  Node<Source> unif_grid() {return unif_grid_src_;}
+  template <>
+  Node<Target> unif_grid() {return unif_grid_tar_;}
+
   int *unif_count_src(size_t i = 0) const {return &unif_count_value_[i];}
   int *unif_count_tar(size_t i = 0) const {
     return &unif_count_value_[i + dim3_];
   }
   size_t sorted_src_count() const {return sorted_src_.n_tot();}
   size_t sorted_tar_count() const {return sorted_tar_.n_tot();}
-  ArrayData<Point> sorted_src() const {return sorted_src_.pin();}
-  ArrayData<Point> sorted_tar() const {return sorted_tar_.pin();}
+  sourcearraydata_t sorted_src() const {return sorted_src_.pin();}
+  targetarraydata_t sorted_tar() const {return sorted_tar_.pin();}
+
+  template <typename SourceOrTarget>
+  void set_sorted(ArrayRef<SourceOrTarget> ref) = delete;
+  template <>
+  void set_sorted(ArrayRef<Source> ref) {sorted_src_ = ref;}
+  template <>
+  void set_sorted(ArrayRef<Target> ref) {sorted_tar_ = ref;}
 
 
-  // Things to make it fit with DASHMM
-  // const method_t &method() const {return method_;}
-  // void set_method(const method_t &method) {method_ = method;}
+  const method_t &method() const {return method_;}
+  void set_method(const method_t &method) {method_ = method;}
 
 
   // more complex things
@@ -411,18 +483,18 @@ class DualTree {
 
     // TODO: Add some parallelism here?
     for (int i = 0; i < b; ++i) {
-      Node *curr = &unif_grid_src_[i];
+      sourcenode_t *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        sourcenode_t *child = curr->child[j];
         if (child) {
           child->destroy(true);
         }
       }
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        sourcenode_t *child = curr->child[j];
         if (child) {
           delete [] child;
           break;
@@ -431,11 +503,11 @@ class DualTree {
     }
 
     for (int i = b; i <= e; ++i) {
-      Node *curr = &unif_grid_src_[i];
+      sourcenode_t *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        sourcenode_t *child = curr->child[j];
         if (child) {
           child->destroy(false);
         }
@@ -443,18 +515,18 @@ class DualTree {
     }
 
     for (int i = e + 1; i < dim3_; ++i) {
-      Node *curr = &unif_grid_src_[i];
+      sourcenode_t *curr = &unif_grid_src_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        sourcenode_t *child = curr->child[j];
         if (child) {
           child->destroy(true);
         }
       }
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        sourcenode_t *child = curr->child[j];
         if (child) {
           delete [] child;
           break;
@@ -463,18 +535,18 @@ class DualTree {
     }
 
     for (int i = 0; i < b; ++i) {
-      Node *curr = &unif_grid_tar_[i];
+      targetnode_t *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        targetnode_t *child = curr->child[j];
         if (child) {
           child->destroy(true);
         }
       }
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        targetnode_t *child = curr->child[j];
         if (child) {
           delete [] child;
           break;
@@ -483,11 +555,11 @@ class DualTree {
     }
 
     for (int i = b; i <= e; ++i) {
-      Node *curr = &unif_grid_tar_[i];
+      targetnode_t *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        targetnode_t *child = curr->child[j];
         if (child) {
           child->destroy(false);
         }
@@ -495,18 +567,18 @@ class DualTree {
     }
 
     for (int i = e + 1; i < dim3_; ++i) {
-      Node *curr = &unif_grid_tar_[i];
+      targetnode_t *curr = &unif_grid_tar_[i];
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        targetnode_t *child = curr->child[j];
         if (child) {
           child->destroy(true);
         }
       }
 
       for (int j = 0; j < 8; ++j) {
-        Node *child = curr->child[j];
+        targetnode_t *child = curr->child[j];
         if (child) {
           delete [] child;
           break;
@@ -518,6 +590,7 @@ class DualTree {
     delete [] target_root_;
     delete [] distribute_;
   }
+
 
   int first(int rank) const {return rank == 0 ? 0 : distribute_[rank - 1] + 1;}
   int last(int rank) const {return distribute_[rank];}
@@ -544,10 +617,10 @@ class DualTree {
   // will have to be saved in the rankwise data.
   //
   // This is to be called from a single thread
-  static RankWise<DualTree> create(int threshold, Array<Point> sources,
-                                   Array<Point> targets) {
+  static RankWise<tree_t> create(int threshold, Array<Source> sources,
+                                   Array<Target> targets) {
     hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets);
-    RankWise<DualTree> retval = setup_basic_data(threshold, domain_geometry);
+    RankWise<tree_t> retval = setup_basic_data(threshold, domain_geometry);
     hpx_lco_delete_sync(domain_geometry);
     return retval;
   }
@@ -555,9 +628,9 @@ class DualTree {
   // This should be called from inside HPX-5
   //
   // This is to be called from a single thread
-  static hpx_addr_t partition(RankWise<DualTree> global_tree,
-                              Array<Point> sources,
-                              Array<Point> targets) {
+  static hpx_addr_t partition(RankWise<tree_t> global_tree,
+                              Array<Source> sources,
+                              Array<Target> targets) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
 
@@ -573,7 +646,7 @@ class DualTree {
   // This should be called from inside HPX-5
   //
   // This is to be called from a single thread
-  static void destroy(RankWise<DualTree> global_tree) {
+  static void destroy(RankWise<tree_t> global_tree) {
     hpx_addr_t rwtree = global_tree.data();
     hpx_bcast_rsync(finalize_partition_, &rwtree);
 
@@ -599,40 +672,40 @@ class DualTree {
 
 
  private:
-  friend void registrar();
+  friend class Registrar<Source, Target, Expansion, Method, DistroPolicy>;
 
   static int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                          hpx_addr_t targets_gas,
                                          hpx_addr_t domain_geometry) {
-    Array<Point> sources{sources_gas};
-    ArrayRef<Point> src_ref = sources.ref();
-    ArrayData<Point> src_data = src_ref.pin();
-    Point *s = src_data.value();
+    Array<Source> sources{sources_gas};
+    sourceref_t src_ref = sources.ref();
+    sourcearraydata_t src_data = src_ref.pin();
+    Source *s = src_data.value();
 
-    Array<Point> targets{targets_gas};
-    ArrayRef<Point> trg_ref = targets.ref();
-    ArrayData<Point> trg_data = trg_ref.pin();
-    Point *t = trg_data.value();
+    Array<Target> targets{targets_gas};
+    targetref_t trg_ref = targets.ref();
+    targetarraydata_t trg_data = trg_ref.pin();
+    Target *t = trg_data.value();
 
     double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50};
 
     // TODO: add more parallelism
     for (size_t i = 0; i < src_ref.n(); ++i) {
-      var[0] = fmin(var[0], s[i].x());
-      var[1] = fmax(var[1], s[i].x());
-      var[2] = fmin(var[2], s[i].y());
-      var[3] = fmax(var[3], s[i].y());
-      var[4] = fmin(var[4], s[i].z());
-      var[5] = fmax(var[5], s[i].z());
+      var[0] = fmin(var[0], s[i].position.x());
+      var[1] = fmax(var[1], s[i].position.x());
+      var[2] = fmin(var[2], s[i].position.y());
+      var[3] = fmax(var[3], s[i].position.y());
+      var[4] = fmin(var[4], s[i].position.z());
+      var[5] = fmax(var[5], s[i].position.z());
     }
 
     for (size_t i = 0; i < trg_ref.n(); ++i) {
-      var[0] = fmin(var[0], t[i].x());
-      var[1] = fmax(var[1], t[i].x());
-      var[2] = fmin(var[2], t[i].y());
-      var[3] = fmax(var[3], t[i].y());
-      var[4] = fmin(var[4], t[i].z());
-      var[5] = fmax(var[5], t[i].z());
+      var[0] = fmin(var[0], t[i].position.x());
+      var[1] = fmax(var[1], t[i].position.x());
+      var[2] = fmin(var[2], t[i].position.y());
+      var[3] = fmax(var[3], t[i].position.y());
+      var[4] = fmin(var[4], t[i].position.z());
+      var[5] = fmax(var[5], t[i].position.z());
     }
 
     hpx_lco_set_lsync(domain_geometry, sizeof(double) * 6, var, HPX_NULL);
@@ -670,8 +743,8 @@ class DualTree {
   /// \param targets - the target array
   ///
   /// \returns - address of an LCO containing the reduced domain
-  static hpx_addr_t compute_domain_geometry(Array<Point> sources,
-                                            Array<Point> targets) {
+  static hpx_addr_t compute_domain_geometry(Array<Source> sources,
+                                            Array<Target> targets) {
     // Create a reduction LCO
     hpx_addr_t domain_geometry =
       hpx_lco_reduce_new(hpx_get_num_ranks(), sizeof(double) * 6,
@@ -689,12 +762,11 @@ class DualTree {
 
   static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
                                     int limit, hpx_addr_t domain_geometry) {
-    RankWise<DualTree> global_tree{rwdata};
+    RankWise<tree_t> global_tree{rwdata};
     auto tree = global_tree.here();
 
     int num_ranks = hpx_get_num_ranks();
     tree->unif_level_ = ceil(log(num_ranks) / log(8)) + 1;
-    //int dim = pow(2, tree->unif_level_);
     tree->dim3_ = pow(8, tree->unif_level_);
     tree->unif_count_ = count;
     tree->refinement_limit_ = limit;
@@ -711,8 +783,8 @@ class DualTree {
     for (int i = 1; i < tree->unif_level_; ++i) {
       n_top_nodes += pow(8, i);
     }
-    tree->source_root_ = new Node[n_top_nodes + tree->dim3_]{};
-    tree->target_root_ = new Node[n_top_nodes + tree->dim3_]{};
+    tree->source_root_ = new sourcenode_t[n_top_nodes + tree->dim3_]{};
+    tree->target_root_ = new targetnode_t[n_top_nodes + tree->dim3_]{};
     tree->unif_grid_src_ = &tree->source_root_[n_top_nodes];
     tree->unif_grid_tar_ = &tree->target_root_[n_top_nodes];
 
@@ -722,15 +794,15 @@ class DualTree {
     int stoppingnode{1};
     for (int level = 0; level < tree->unif_level_ ; ++level) {
       for (int nd = startingnode; nd < stoppingnode; ++nd) {
-        Node *snode = &tree->source_root_[nd];
-        Node *tnode = &tree->target_root_[nd];
+        sourcenode_t *snode = &tree->source_root_[nd];
+        targetnode_t *tnode = &tree->target_root_[nd];
 
         if (level != tree->unif_level_ - 1) {
           // At the lower levels, we do not require the ordering
           int firstchild = nd * 8 + 1;
           for (int i = 0; i < 8; ++i) {
-            Node *scnode = &tree->source_root_[firstchild + i];
-            Node *tcnode = &tree->target_root_[firstchild + i];
+            sourcenode_t *scnode = &tree->source_root_[firstchild + i];
+            targetnode_t *tcnode = &tree->target_root_[firstchild + i];
             snode->child[i] = scnode;
             tnode->child[i] = tcnode;
             scnode->idx = snode->idx.child(i);
@@ -761,23 +833,6 @@ class DualTree {
       stoppingnode += pow(8, level + 1);
     }
 
-    // Then the uniform grid
-    /*
-    for (int iz = 0; iz < dim; ++iz) {
-      for (int iy = 0; iy < dim; ++iy) {
-        for (int ix = 0; ix < dim; ++ix) {
-          uint64_t mid = morton_key(ix, iy, iz);
-          tree->unif_grid_src_[mid] =
-              Node{Index{ix, iy, iz, tree->unif_level_}};
-          tree->unif_grid_tar_[mid] =
-              Node{Index{ix, iy, iz, tree->unif_level_}};
-          tree->unif_grid_src_[mid].add_lock();
-          tree->unif_grid_tar_[mid].add_lock();
-        }
-      }
-    }
-    */
-
     // Setup domain_
     double var[6];
     hpx_lco_get(domain_geometry, sizeof(double) * 6, &var);
@@ -791,9 +846,9 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-  static RankWise<DualTree> setup_basic_data(int threshold,
-                                             hpx_addr_t domain_geometry) {
-    RankWise<DualTree> retval{};
+  static RankWise<tree_t> setup_basic_data(int threshold,
+                                           hpx_addr_t domain_geometry) {
+    RankWise<tree_t> retval{};
     retval.allocate();
     if (!retval.valid()) {
       // We return the invalid value to indicate the error
@@ -879,7 +934,8 @@ class DualTree {
   // This will assign the points to the uniform grid. This gives the points
   // the id (in the Morton Key sense) of the box to which they are assigned,
   // and it will count the numbers in each box.
-  static void assign_points_to_unif_grid(const Point *P, int npts,
+  template <typename SourceOrTarget>
+  static void assign_points_to_unif_grid(const SourceOrTarget *P, int npts,
                                          const DomainGeometry &geo,
                                          int unif_level, int *gid,
                                          int *count) {
@@ -890,10 +946,13 @@ class DualTree {
     //   This would perhaps be worth timing.
     int dim = pow(2, unif_level);
     for (int i = 0; i < npts; ++i) {
-      const Point *p = &P[i];
-      int xid = std::min(dim - 1, (int)(dim * (p->x() - corner.x()) * scale));
-      int yid = std::min(dim - 1, (int)(dim * (p->y() - corner.y()) * scale));
-      int zid = std::min(dim - 1, (int)(dim * (p->z() - corner.z()) * scale));
+      const SourceOrTarget *p = &P[i];
+      int xid = std::min(dim - 1,
+                         (int)(dim * (p->position.x() - corner.x()) * scale));
+      int yid = std::min(dim - 1,
+                         (int)(dim * (p->position.y() - corner.y()) * scale));
+      int zid = std::min(dim - 1,
+                         (int)(dim * (p->position.z() - corner.z()) * scale));
       gid[i] = morton_key(xid, yid, zid);
       count[gid[i]]++;
     }
@@ -907,8 +966,10 @@ class DualTree {
   //
   // TODO: Work out what the correct way to parallelize this would be. And then
   // make that happen.
-  static int *group_points_on_unif_grid(Point *p_in, int npts, int dim3,
-                                        int *gid_of_points, const int *count) {
+  template <typename SourceOrTarget>
+  static int *group_points_on_unif_grid(SourceOrTarget *p_in, int npts,
+                                        int dim3, int *gid_of_points,
+                                        const int *count) {
     int *offset = new int[dim3]();
 
     offset[0] = 0;
@@ -925,7 +986,7 @@ class DualTree {
     }
 
     // Declare some loop variables
-    Point source, save;
+    SourceOrTarget source, save;
     int source_sort, save_sort;
     int isource, isave, idest;
 
@@ -965,8 +1026,8 @@ class DualTree {
   }
 
   // New factor
-  static int *sort_local_points(DualTree *tree, Point *p_s,
-                                int n_sources, Point *p_t, int n_targets,
+  static int *sort_local_points(DualTree *tree, source_t *p_s,
+                                int n_sources, target_t *p_t, int n_targets,
                                 int **local_offset_s, int **local_offset_t) {
     int *local_count = new int[tree->dim3_ * 2]();
     int *local_scount = local_count;
@@ -1008,23 +1069,20 @@ class DualTree {
   // to change rank into their correct location. If it is detected that all of
   // the points for that part of the tree have arrived, then the partitioning
   // work will begin.
-  static int *init_point_exchange(int rank, DualTree *tree,
+  template <typename SourceOrTarget>
+  static int *init_point_exchange(int rank, tree_t *tree,
                                   const int *local_count,
                                   const int *local_offset,
-                                  const Point *temp, Node *n,
-                                  char type) {
+                                  const SourceOrTarget *temp,
+                                  Node<SourceOrTarget> *n) {
     int first = tree->first(rank);
     int last = tree->last(rank);
     int range = last - first + 1;
 
-    ArrayRef<Point> sorted_ref{};
+    ArrayRef<SourceOrTarget> sorted_ref{};
     int *global_count{nullptr};
 
-    if (type == 's') {
-      global_count = tree->unif_count_src();
-    } else {
-      global_count = tree->unif_count_tar();
-    }
+    global_count = tree->unif_count<SourceOrTarget>();
 
     // Compute global_offset
     int *global_offset = new int[range]();
@@ -1037,12 +1095,12 @@ class DualTree {
 
     if (num_points > 0) {
       hpx_addr_t sorted_gas = hpx_gas_alloc_local(
-          1, sizeof(Point) * num_points, 0);
+          1, sizeof(SourceOrTarget) * num_points, 0);
       assert(sorted_gas != HPX_NULL);
-      sorted_ref = ArrayRef<Point>{sorted_gas, num_points, num_points};
+      sorted_ref = ArrayRef<SourceOrTarget>{sorted_gas, num_points, num_points};
 
       for (int i = first; i <= last; ++i) {
-        Node *curr = &n[i];
+        Node<SourceOrTarget> *curr = &n[i];
         curr->parts = sorted_ref.slice(global_offset[i - first],
                                        global_count[i]);
 
@@ -1060,49 +1118,45 @@ class DualTree {
             // Spawn adaptive partitioning
             const DomainGeometry *arg = &(tree->domain_);
             int threshold = tree->refinement_limit_;
-            hpx_call(HPX_HERE, Node::partition_node_, HPX_NULL,
+            hpx_call(HPX_HERE, Node<SourceOrTarget>::partition_node_, HPX_NULL,
                      &curr, &arg, &threshold);
           }
         }
       }
     }
 
-    if (type == 's') {
-      tree->sorted_src_ = sorted_ref;
-    } else {
-      tree->sorted_tar_ = sorted_ref;
-    }
+    tree->set_sorted(sorted_ref);
 
     return global_offset;
   }
 
+  // TODO this is going to be a more major bit of work. The sources and
+  // targets are getting sent about. And so we need to update the messaging
+  // and all of the rest of that to make it come out right with the two
+  // different types.
+
   // This action merges particular points with the sorted list. Also, if this
   // is the last set of points that are merged, this will go ahead and start
   // the adaptive partitioning of that part of the local tree.
-  static int merge_points_handler(Point *temp, Node *n,
-                           int n_arrived, int n_total, char type,
-                           hpx_addr_t rwgas) {
-    RankWise<DualTree> global_tree{rwgas};
+  template <typename SourceOrTarget>
+  static int merge_points_handler(SourceOrTarget *temp,
+                                  Node<SourceOrTarget> *n, int n_arrived,
+                                  int n_total, hpx_addr_t rwgas) {
+    RankWise<tree_t> global_tree{rwgas};
     auto local_tree = global_tree.here();
 
     // Note: all the pointers are local to the calling rank.
     n->lock();
     size_t first = n->first();
     auto localp = n->parts.pin();
-    Point *p = localp.value();
-    memcpy(p + first, temp, sizeof(Point) * n_arrived);
+    SourceOrTarget *p = localp.value();
+    memcpy(p + first, temp, sizeof(SourceOrTarget) * n_arrived);
 
     if (n->increment_first(n_arrived)) {
       const DomainGeometry *geoarg = &(local_tree->domain_);
       int thresh = local_tree->refinement_limit_;
-
-      if (type == 's') {
-        hpx_call(HPX_HERE, Node::partition_node_, HPX_NULL,
-                 &n, &geoarg, &thresh);
-      } else {
-        hpx_call(HPX_HERE, Node::partition_node_, HPX_NULL,
-                 &n, &geoarg, &thresh);
-      }
+      hpx_call(HPX_HERE, Node<SourceOrTarget>::partition_node_, HPX_NULL,
+               &n, &geoarg, &thresh);
     }
     n->unlock();
 
@@ -1114,7 +1168,7 @@ class DualTree {
   // partition if this happens to be the last block for a given uniform grid.
   static int recv_points_handler(void *args, size_t UNUSED) {
     hpx_addr_t *rwarg = static_cast<hpx_addr_t *>(args);
-    RankWise<DualTree> global_tree{*rwarg};
+    RankWise<tree_t> global_tree{*rwarg};
     auto local_tree = global_tree.here();
 
     // Wait until the buffer is allocated before merging incoming messages
@@ -1133,24 +1187,23 @@ class DualTree {
     int recv_nt = meta[3];
     int *count_s = &meta[4]; // Used only if recv_ns > 0
     int *count_t = count_s + range * (recv_ns > 0); // Used only if recv_nt > 0
-    Point *recv_s =
-      reinterpret_cast<Point *>(static_cast<char *>(args) + sizeof(int) * 4 +
+    source_t *recv_s =
+      reinterpret_cast<source_t *>(static_cast<char *>(args) + sizeof(int) * 4 +
                                 sizeof(hpx_addr_t) +
                                 sizeof(int) * range * (recv_ns > 0) +
                                 sizeof(int) * range * (recv_nt > 0));
-    Point *recv_t = recv_s + recv_ns;
+    target_t *recv_t = reinterpret_cast<target_t *>(recv_s + recv_ns);
 
     hpx_addr_t done = hpx_lco_and_new(range * 2);
 
     if (recv_ns) {
-      char type = 's';
       for (int i = first; i <= last; ++i) {
         Node *ns = &local_tree->unif_grid_src_[i];
         int incoming_ns = count_s[i - first];
         if (incoming_ns) {
-          hpx_call(HPX_HERE, merge_points_, done,
+          hpx_call(HPX_HERE, merge_points_source_, done,
                    &recv_s, &ns, &incoming_ns,
-                   local_tree->unif_count_src(i), &type, rwarg);
+                   local_tree->unif_count_src(i), rwarg);
           recv_s += incoming_ns;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
@@ -1161,15 +1214,13 @@ class DualTree {
     }
 
     if (recv_nt) {
-      char type = 't';
       for (int i = first; i <= last; ++i) {
         Node *nt = &local_tree->unif_grid_tar_[i];
         int incoming_nt = count_t[i - first];
         if (incoming_nt) {
-          hpx_call(HPX_HERE, merge_points_, done,
+          hpx_call(HPX_HERE, merge_points_target_, done,
                    &recv_t, &nt, &incoming_nt,
-                   local_tree->unif_count_tar(i),
-                   &type, rwarg);
+                   local_tree->unif_count_tar(i), rwarg);
           recv_t += incoming_nt;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
@@ -1188,15 +1239,15 @@ class DualTree {
   }
 
   // This is pretty straightforward. This rank will send to the given rank all
-  // those particles that are to be shipped out. There is nothing too complicated
-  // in this, just some indexing and so forth.
+  // those particles that are to be shipped out. There is nothing too
+  // complicated in this, just some indexing and so forth.
   //
   // NOTE: This would be a bit nicer looking using the Buffer types.
   static int send_points_handler(int rank, int *count_s, int *count_t,
                                  int *offset_s, int *offset_t,
-                                 Point *sources, Point *targets,
+                                 source_t *sources, target_t *targets,
                                  hpx_addr_t rwaddr) {
-    RankWise<DualTree> global_tree{rwaddr};
+    RankWise<tree_t> global_tree{rwaddr};
     auto local_tree = global_tree.here();
 
     // Note: all the pointers are local to the calling rank.
@@ -1212,10 +1263,10 @@ class DualTree {
     // Parcel message length
     size_t bytes = sizeof(hpx_addr_t) + sizeof(int) * 4;
     if (send_ns) {
-      bytes += sizeof(int) * range + sizeof(Point) * send_ns;
+      bytes += sizeof(int) * range + sizeof(source_t) * send_ns;
     }
     if (send_nt) {
-      bytes += sizeof(int) * range + sizeof(Point) * send_nt;
+      bytes += sizeof(int) * range + sizeof(target_t) * send_nt;
     }
 
     // Acquire parcel
@@ -1243,12 +1294,12 @@ class DualTree {
     char *meta_s = static_cast<char *>(data) + sizeof(hpx_addr_t) +
       sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
     if (send_ns) {
-      memcpy(meta_s, &sources[offset_s[first]], sizeof(Point) * send_ns);
+      memcpy(meta_s, &sources[offset_s[first]], sizeof(source_t) * send_ns);
     }
 
-    char *meta_t = meta_s + send_ns * sizeof(Point);
+    char *meta_t = meta_s + send_ns * sizeof(source_t);
     if (send_nt) {
-      memcpy(meta_t, &targets[offset_t[first]], sizeof(Point) * send_nt);
+      memcpy(meta_t, &targets[offset_t[first]], sizeof(target_t) * send_nt);
     }
 
     hpx_parcel_set_target(p, HPX_THERE(rank));
@@ -1259,29 +1310,24 @@ class DualTree {
   }
 
   // This is the action on the other side that receives the partitioned tree.
+  template <typename SourceOrTarget>
   static int recv_node_handler(char *message_buffer, size_t UNUSED) {
     hpx_addr_t *rwdata = reinterpret_cast<hpx_addr_t *>(message_buffer);
     int *compressed_tree = reinterpret_cast<int *>(
                                 message_buffer + sizeof(hpx_addr_t));
-    RankWise<DualTree> global_tree{*rwdata};
+    RankWise<tree_t> global_tree{*rwdata};
     auto local_tree = global_tree.here();
-    int type = compressed_tree[0];
-    int id = compressed_tree[1];
-    int n_nodes = compressed_tree[2];
-    Node *curr{nullptr};
-    if (type) {
-      curr = &local_tree->unif_grid_src_[id];
-    } else {
-      curr = &local_tree->unif_grid_tar_[id];
-    }
+    int id = compressed_tree[0];
+    int n_nodes = compressed_tree[1];
+    Node<SourceOrTarget> *grid = local_tree->unif_grid<SourceOrTarget>();
 
     if (n_nodes) {
-      const int *branch = &compressed_tree[3];
-      const int *tree = &compressed_tree[3 + n_nodes];
-      curr->extract(branch, tree, n_nodes);
+      const int *branch = &compressed_tree[2];
+      const int *tree = &compressed_tree[2 + n_nodes];
+      grid[id].extract(branch, tree, n_nodes);
     }
 
-    hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
+    hpx_lco_and_set_num(grid[id].complete(), 8, HPX_NULL);
 
     return HPX_SUCCESS;
   }
@@ -1293,25 +1339,25 @@ class DualTree {
   //
   // This will send one message for each grid box to all other localities.
   // This does allow for maximum parallelism. It is likely the right approach.
-  static int send_node_handler(Node *n, Point *sorted, int id, int type,
-                               hpx_addr_t rwaddr) {
-    Node *curr = &n[id];
+  template <typename SourceOrTarget>
+  static int send_node_handler(Node<SourceOrTarget> *n, SourceOrTarget *sorted,
+                               int id, hpx_addr_t rwaddr) {
+    Node<SourceOrTarget> *curr = &n[id];
 
     // Exclude curr as it is already allocated on remote localities
     int n_nodes = curr->n_descendants() - 1;
-    size_t msgsize = sizeof(int) * (3 + n_nodes * 2) + sizeof(hpx_addr_t);
+    size_t msgsize = sizeof(int) * (2 + n_nodes * 2) + sizeof(hpx_addr_t);
     char *message_buffer = new char[msgsize];
     hpx_addr_t *rwdata = reinterpret_cast<hpx_addr_t *>(message_buffer);
     int *compressed_tree = reinterpret_cast<int *>(
                                 message_buffer + sizeof(hpx_addr_t));
 
     *rwdata = rwaddr;
-    compressed_tree[0] = type; // source tree is 0, target tree is 1
-    compressed_tree[1] = id; // where to merge
-    compressed_tree[2] = n_nodes; // # of nodes
+    compressed_tree[0] = id; // where to merge
+    compressed_tree[1] = n_nodes; // # of nodes
     if (n_nodes) {
-      int *branch = &compressed_tree[3];
-      int *tree = &compressed_tree[3 + n_nodes];
+      int *branch = &compressed_tree[2];
+      int *tree = &compressed_tree[2 + n_nodes];
       int pos = 0;
       curr->compress(branch, tree, -1, pos);
     }
@@ -1319,12 +1365,13 @@ class DualTree {
     int rank = hpx_get_my_rank();
     int num_ranks = hpx_get_num_ranks();
     hpx_addr_t done = hpx_lco_and_new(num_ranks - 1);
+    hpx_action_t receive_action = receive_node_action<SourceOrTarget>();
 
     for (int r = 0; r < num_ranks; ++r) {
       if (r != rank) {
         hpx_parcel_t *p = hpx_parcel_acquire(message_buffer, msgsize);
         hpx_parcel_set_target(p, HPX_THERE(r));
-        hpx_parcel_set_action(p, recv_node_);
+        hpx_parcel_set_action(p, receive_action);
         hpx_parcel_send(p, done);
       }
     }
@@ -1339,31 +1386,33 @@ class DualTree {
   // This appears to be the main action that creates the trees. This will
   // organize and call out to the other actions.
   // NOTE: One thing is sure, this ought to be factored
+  //
+  // TODO - not done yet
   static int create_dual_tree_handler(hpx_addr_t rwtree,
                                       hpx_addr_t sources_gas,
                                       hpx_addr_t targets_gas) {
     int rank = hpx_get_my_rank();
     int num_ranks = hpx_get_num_ranks();
 
-    RankWise<DualTree> global_tree{rwtree};
+    RankWise<tree_t> global_tree{rwtree};
     auto tree = global_tree.here();
 
-    Array<Point> sources{sources_gas};
-    ArrayRef<Point> src_ref = sources.ref(rank);
-    ArrayData<Point> src_data = src_ref.pin();
-    Point *p_s = src_data.value();
+    Array<source_t> sources{sources_gas};
+    sourceref_t src_ref = sources.ref(rank);
+    sourcearraydata_t src_data = src_ref.pin();
+    Source *p_s = src_data.value();
     int n_sources = src_ref.n();
 
-    Array<Point> targets{targets_gas};
-    ArrayRef<Point> trg_ref = targets.ref(rank);
-    ArrayData<Point> trg_data = trg_ref.pin();
-    Point *p_t = trg_data.value();
+    Array<target_t> targets{targets_gas};
+    targetref_t trg_ref = targets.ref(rank);
+    targetarraydata_t trg_data = trg_ref.pin();
+    Target *p_t = trg_data.value();
     int n_targets = trg_ref.n();
 
     // Assign points to uniform grid
     int *local_offset_s{nullptr};
     int *local_offset_t{nullptr};
-    int *local_count = DualTree::sort_local_points(&*tree, p_s, n_sources,
+    int *local_count = sort_local_points(&*tree, p_s, n_sources,
                                          p_t, n_targets, &local_offset_s,
                                          &local_offset_t);
     int *local_scount = local_count;
@@ -1378,13 +1427,13 @@ class DualTree {
 
 
     // Exchange points
-    Node *ns = tree->unif_grid_src_;
-    Node *nt = tree->unif_grid_tar_;
+    sourcenode_t *ns = tree->unif_grid_src_;
+    targetnode_t *nt = tree->unif_grid_tar_;
 
     int *global_offset_s = init_point_exchange(rank, &*tree, local_scount,
-                                               local_offset_s, p_s, ns, 's');
+                                               local_offset_s, p_s, ns);
     int *global_offset_t = init_point_exchange(rank, &*tree, local_tcount,
-                                               local_offset_t, p_t, nt, 't');
+                                               local_offset_t, p_t, nt);
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
 
     // So this one is pretty simple. It sends those points from this rank
@@ -1402,18 +1451,17 @@ class DualTree {
     for (int r = 0; r < num_ranks; ++r) {
       int first = tree->first(r);
       int last = tree->last(r);
-      int s{0}, t{1};
 
       if (r == rank) {
         for (int i = first; i <= last; ++i) {
           if (*(tree->unif_count_src(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
-            Point *arg = tree->sorted_src().value();
-            hpx_call_when_with_continuation(ns[i].complete(), HPX_HERE,
-                                            send_node_, dual_tree_complete,
-                                            hpx_lco_set_action, &ns, &arg,
-                                            &i, &s, &rwtree);
+            source_t *arg = tree->sorted_src().value();
+            hpx_call_when_with_continuation(ns[i].complete(),
+                HPX_HERE, send_node_action<Source>(),
+                dual_tree_complete, hpx_lco_set_action,
+                &ns, &arg, &i, &rwtree);
             hpx_call_when(ns[i].complete(),
                           ns[i].complete(), hpx_lco_delete_action,
                           HPX_NULL, nullptr, 0);
@@ -1422,11 +1470,11 @@ class DualTree {
           if (*(tree->unif_count_tar(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
-            Point *arg = tree->sorted_tar().value();
-            hpx_call_when_with_continuation(nt[i].complete(), HPX_HERE,
-                                            send_node_, dual_tree_complete,
-                                            hpx_lco_set_action, &nt, &arg,
-                                            &i, &t, &rwtree);
+            target_t *arg = tree->sorted_tar().value();
+            hpx_call_when_with_continuation(nt[i].complete(),
+                HPX_HERE, send_node_action<Target>(),
+                dual_tree_complete, hpx_lco_set_action,
+                &nt, &arg, &i, &rwtree);
             hpx_call_when(nt[i].complete(),
                           nt[i].complete(), hpx_lco_delete_action,
                           HPX_NULL, nullptr, 0);
@@ -1474,7 +1522,7 @@ class DualTree {
   }
 
   static int finalize_partition_handler(hpx_addr_t rwtree) {
-    RankWise<DualTree> global_tree{rwtree};
+    RankWise<tree_t> global_tree{rwtree};
     auto tree = global_tree.here();
     tree->clear_data();
     return HPX_SUCCESS;
@@ -1491,30 +1539,170 @@ class DualTree {
   int dim3_;
   hpx_addr_t unif_count_;
   int *unif_count_value_;
-  Node *source_root_;
-  Node *target_root_;
-  Node *unif_grid_src_;
-  Node *unif_grid_tar_;
+  sourcenode_t *source_root_;
+  targetnode_t *target_root_;
+  sourcenode_t *unif_grid_src_;
+  targetnode_t *unif_grid_tar_;
   hpx_addr_t unif_done_;
 
   int *distribute_;
 
-  ArrayRef<Point> sorted_src_;
-  ArrayRef<Point> sorted_tar_;
+  sourceref_t sorted_src_;
+  targetref_t sorted_tar_;
+
+  method_t method_;
 
   // These are the actions for this class
+  template <typename R>
+  static hpx_action_t receive_node_action() = delete;
+  template <>
+  static hpx_action_t receive_node_action<Source>() {
+    return recv_node_source_;
+  }
+  template <>
+  static hpx_action_t receiveNode_action<Target>() {
+    return recv_node_target_;
+  }
+
+  template <typename R>
+  static hpx_action_t send_node_action() = delete;
+  template <>
+  static hpx_action_t send_node_action<Source>() {
+    return send_node_source_;
+  }
+  template <>
+  static hpx_action_t send_node_action<Target>() {
+    return send_node_target_;
+  }
+
   static hpx_action_t domain_geometry_init_;
   static hpx_action_t domain_geometry_op_;
   static hpx_action_t set_domain_geometry_;
   static hpx_action_t init_partition_;
-  static hpx_action_t merge_points_;
+  static hpx_action_t merge_points_source_;
+  static hpx_action_t merge_points_target_;
   static hpx_action_t recv_points_;
   static hpx_action_t send_points_;
-  static hpx_action_t recv_node_;
-  static hpx_action_t send_node_;
+  static hpx_action_t recv_node_source_;
+  static hpx_action_t recv_node_target_;
+  static hpx_action_t send_node_source_;
+  static hpx_action_t send_node_target_;
   static hpx_action_t create_dual_tree_;
   static hpx_action_t finalize_partition_;
 };
 
+
+// TODO add action definitions
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::domain_geometry_init_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::domain_geometry_op_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::set_domain_geometry_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::init_partition_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::merge_points_source_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::merge_points_target_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::recv_points_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::send_points_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::recv_node_source_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::recv_node_target_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::send_node_source_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::send_node_target_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::create_dual_tree_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::finalize_partition_ = HPX_ACTION_NULL;
 
 #endif
