@@ -71,12 +71,11 @@ struct DAGNode {
 
   int locality;                  /// the locality where this will be placed
   hpx_addr_t global_addx;        /// global address of object serving this node
-  size_t other_member;           /// this is either n_digits for an expansion or
-                                 /// n_targets for a target lco
-
+  size_t n_parts;                /// number of points stored in a target lco 
+                                 /// or a source ref
   DAGNode(Index i)
-      : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-        other_member{0} { }
+    : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
+    n_parts{0} {} 
   void add_out_edge(DAGNode *end, Operation op) {
     out_edges.push_back(DAGEdge{this, end, op});
   }
@@ -254,9 +253,8 @@ class DAGInfo {
   ///
   /// \param expand - the expansion LCO represented by this object's normal
   ///                 DAG node.
-  void set_normal_expansion(const hpx_addr_t addx, const int acc) {
+  void set_normal_expansion(const hpx_addr_t addx) {
     normal_->global_addx = addx;
-    normal_->other_member = acc;
   }
 
   /// Sets the global data for the intermediate DAG node
@@ -267,10 +265,9 @@ class DAGInfo {
   ///
   /// \param expand - the expansion LCO represented by this object's
   ///                 intermediate DAG node.
-  void set_interm_expansion(const hpx_addr_t addx, const int acc) {
+  void set_interm_expansion(const hpx_addr_t addx) {
     if (interm_ != nullptr) {
       interm_->global_addx = addx;
-      interm_->other_member = acc;
     }
   }
 
@@ -286,7 +283,7 @@ class DAGInfo {
     assert(parts_ != nullptr);
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
-      parts_->other_member = num;
+      parts_->n_parts = num; 
     }
   }
 
@@ -302,7 +299,7 @@ class DAGInfo {
   void set_sourceref(const hpx_addr_t addx, const int num) {
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
-      parts_->other_member = num;
+      parts_->n_parts = num;
     }
   }
 
