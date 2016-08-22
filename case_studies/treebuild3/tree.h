@@ -198,18 +198,18 @@ class Node {
       splits[8] = &p[num_points];
 
       auto z_comp = [&center_z](record_t &a) {
-        return a.z() < center_z;
+        return a.position.z() < center_z;
       };
       splits[4] = std::partition(splits[0], splits[8], z_comp);
 
       auto y_comp = [&center_y](record_t &a) {
-        return a.y() < center_y;
+        return a.position.y() < center_y;
       };
       splits[2] = std::partition(splits[0], splits[4], y_comp);
       splits[6] = std::partition(splits[4], splits[8], y_comp);
 
       auto x_comp = [&center_x](record_t &a) {
-        return a.x() < center_x;
+        return a.position.x() < center_x;
       };
       splits[1] = std::partition(splits[0], splits[2], x_comp);
       splits[3] = std::partition(splits[2], splits[4], x_comp);
@@ -432,20 +432,10 @@ class DualTree {
   // simple accessors
   // NOTE: These might not be allowed to have a default argument
   template <typename SourceOrTarget>
-  int *unif_count(size_t i = 0) = delete;
-  template <>
-  int *unif_count<Source>(size_t i = 0) {return &unif_count_value_[i];}
-  template <>
-  int *unif_count<Target>(size_t i = 0) {
-    return &unif_count_value_[i + dim3_];
-  }
+  int *unif_count() = delete;
 
   template <typename SourceOrTarget>
   Node<SourceOrTarget> *unif_grid() = delete;
-  template <>
-  Node<Source> unif_grid() {return unif_grid_src_;}
-  template <>
-  Node<Target> unif_grid() {return unif_grid_tar_;}
 
   int *unif_count_src(size_t i = 0) const {return &unif_count_value_[i];}
   int *unif_count_tar(size_t i = 0) const {
@@ -458,11 +448,6 @@ class DualTree {
 
   template <typename SourceOrTarget>
   void set_sorted(ArrayRef<SourceOrTarget> ref) = delete;
-  template <>
-  void set_sorted(ArrayRef<Source> ref) {sorted_src_ = ref;}
-  template <>
-  void set_sorted(ArrayRef<Target> ref) {sorted_tar_ = ref;}
-
 
   const method_t &method() const {return method_;}
   void set_method(const method_t &method) {method_ = method;}
@@ -1555,25 +1540,10 @@ class DualTree {
   // These are the actions for this class
   template <typename R>
   static hpx_action_t receive_node_action() = delete;
-  template <>
-  static hpx_action_t receive_node_action<Source>() {
-    return recv_node_source_;
-  }
-  template <>
-  static hpx_action_t receiveNode_action<Target>() {
-    return recv_node_target_;
-  }
 
   template <typename R>
   static hpx_action_t send_node_action() = delete;
-  template <>
-  static hpx_action_t send_node_action<Source>() {
-    return send_node_source_;
-  }
-  template <>
-  static hpx_action_t send_node_action<Target>() {
-    return send_node_target_;
-  }
+
 
   static hpx_action_t domain_geometry_init_;
   static hpx_action_t domain_geometry_op_;
@@ -1592,7 +1562,45 @@ class DualTree {
 };
 
 
-// TODO add action definitions
+// TODO: this is not going to work... tree_t is not defined here
+// There is actually a bit of a workaround, a dummy type, but that is a
+// load of junk for this. It might be that this is really showing the strain
+// of having a DualTree class but not a Tree class.
+
+template <>
+int *tree_t::unif_count<Source>() {return unif_count_value_;}
+template <>
+int *tree_t::unif_count<Target>() {return &unif_count_value_[dim3_];}
+
+template <>
+Node<Source> tree_t::unif_grid() {return unif_grid_src_;}
+template <>
+Node<Target> tree_t::unif_grid() {return unif_grid_tar_;}
+
+template <>
+void tree_t::set_sorted(ArrayRef<Source> ref) {sorted_src_ = ref;}
+template <>
+void tree_t::set_sorted(ArrayRef<Target> ref) {sorted_tar_ = ref;}
+
+template <>
+static hpx_action_t tree_t::receive_node_action<Source>() {
+  return recv_node_source_;
+}
+template <>
+static hpx_action_t tree_t::receiveNode_action<Target>() {
+  return recv_node_target_;
+}
+
+template <>
+static hpx_action_t tree_t::send_node_action<Source>() {
+  return send_node_source_;
+}
+template <>
+static hpx_action_t tree_t::send_node_action<Target>() {
+  return send_node_target_;
+}
+
+
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,

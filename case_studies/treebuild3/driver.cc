@@ -16,13 +16,20 @@ struct Target {
   Point position;
 };
 
+template <typename A, typename B>
+class Stub {
+};
 
-// We can get away with silly things for the final three arguments as there
-// are no requirements of them in the current code.
-Registrar<Source, Target, int, int, int> reg{};
+template <typename A, typename B, template <typename, typename> class C,
+          typename D>
+class Stump {
+};
 
 
-using dualtree_t = DualTree<Source, Target, int, int, int>;
+Registrar<Source, Target, Stub, Stump, int> reg{};
+
+
+using dualtree_t = DualTree<Source, Target, Stub, Stump, int>;
 
 
 

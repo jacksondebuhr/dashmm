@@ -5,6 +5,7 @@ order:
    tree that wraps up the source and target trees? This might clear up a good
    deal of the duplication in the current version? I think so...
       If we do this, get it working as a template first...
+      Turns out that might be more difficult than it is worth.
 
  * Go back through and privatize anything you can
  * See what you can do about the int vs. size_t thing here
