@@ -7,6 +7,9 @@ order:
       If we do this, get it working as a template first...
       Turns out that might be more difficult than it is worth.
 
+      This might mean we can also remove some of the template parameters from
+      the node and the tree, and only the DualTree will have the full set.
+
  * Go back through and privatize anything you can
  * See what you can do about the int vs. size_t thing here
 
