@@ -970,10 +970,12 @@ class DualTree {
     // Tell each tree to delete itself
     hpx_addr_t clear_done = hpx_lco_and_new(2);
     assert(clear_done != HPX_NULL);
+    sourcetree_t *starg = &source_tree_;
     hpx_call(HPX_HERE, sourcetree_t::delete_tree_, clear_done,
-             &source_tree_, &dim3_, &b, &e);
+             &starg, &dim3_, &b, &e);
+    targettree_t *ttarg = &target_tree_;
     hpx_call(HPX_HERE, targettree_t::delete_tree_, clear_done,
-             &target_tree_, &dim3_, &b, &e);
+             &ttarg, &dim3_, &b, &e);
     hpx_lco_wait(clear_done);
     hpx_lco_delete_sync(clear_done);
 
@@ -1146,10 +1148,12 @@ class DualTree {
     // Call out to tree setup stuff
     hpx_addr_t setup_done = hpx_lco_and_new(2);
     assert(setup_done != HPX_NULL);
+    sourcetree_t *starg = &tree->source_tree_;
     hpx_call(HPX_HERE, sourcetree_t::setup_basics_, setup_done,
-             &tree->source_tree_, &tree->refinement_limit_);
+             &starg, &tree->unif_level_);
+    targettree_t *ttarg = &tree->target_tree_;
     hpx_call(HPX_HERE, targettree_t::setup_basics_, setup_done,
-             &tree->target_tree_, &tree->refinement_limit_);
+             &ttarg, &tree->unif_level_);
 
     // We here allocate space for the result of the counting
     tree->unif_count_value_ = new int[tree->dim3_ * 2]();

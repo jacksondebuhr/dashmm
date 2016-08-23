@@ -10,6 +10,9 @@ order:
       This might mean we can also remove some of the template parameters from
       the node and the tree, and only the DualTree will have the full set.
 
+ * Change DualTree to hold pointers to the trees. That will clean up a bunch
+   of hooey.
+
  * Go back through and privatize anything you can
  * See what you can do about the int vs. size_t thing here
 
