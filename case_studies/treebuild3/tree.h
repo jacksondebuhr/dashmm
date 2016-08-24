@@ -508,6 +508,8 @@ class Tree {
           delete child;
         }
       }
+
+      hpx_lco_delete_sync(curr->complete());
     }
 
     for (int i = last + 1; i < ndim; ++i) {
@@ -978,6 +980,13 @@ class DualTree {
              &target_tree_, &dim3_, &b, &e);
     hpx_lco_wait(clear_done);
     hpx_lco_delete_sync(clear_done);
+
+    // the unif counts
+    delete [] unif_count_value_;
+
+    // then free the trees themselves
+    delete source_tree_;
+    delete target_tree_;
 
     delete [] distribute_;
   }
@@ -1523,6 +1532,7 @@ class DualTree {
     }
 
     hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
+    assert(dual_tree_complete != HPX_NULL);
 
     for (int r = 0; r < num_ranks; ++r) {
       int first = tree->first(r);
@@ -1535,13 +1545,11 @@ class DualTree {
           } else {
             source_t *arg = tree->sorted_src().value();
             int typearg = 0;
+            assert(ns[i].complete() != HPX_NULL);
             hpx_call_when_with_continuation(ns[i].complete(),
                 HPX_HERE, sourcetree_t::send_node_,
                 dual_tree_complete, hpx_lco_set_action,
                 &ns, &arg, &i, &rwtree, &typearg);
-            hpx_call_when(ns[i].complete(),
-                          ns[i].complete(), hpx_lco_delete_action,
-                          HPX_NULL, nullptr, 0);
           }
 
           if (*(tree->unif_count_tar(i)) == 0) {
@@ -1549,13 +1557,11 @@ class DualTree {
           } else {
             target_t *arg = tree->sorted_tar().value();
             int typearg = 1;
+            assert(nt[i].complete() != HPX_NULL);
             hpx_call_when_with_continuation(nt[i].complete(),
                 HPX_HERE, targettree_t::send_node_,
                 dual_tree_complete, hpx_lco_set_action,
                 &nt, &arg, &i, &rwtree, &typearg);
-            hpx_call_when(nt[i].complete(),
-                          nt[i].complete(), hpx_lco_delete_action,
-                          HPX_NULL, nullptr, 0);
           }
         }
       } else {
@@ -1563,6 +1569,7 @@ class DualTree {
           if (*(tree->unif_count_src(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
+            assert(ns[i].complete() != HPX_NULL);
             hpx_call_when_with_continuation(ns[i].complete(),
                 dual_tree_complete, hpx_lco_set_action,
                 ns[i].complete(), hpx_lco_delete_action,
@@ -1572,6 +1579,7 @@ class DualTree {
           if (*(tree->unif_count_tar(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
+            assert(nt[i].complete() != HPX_NULL);
             hpx_call_when_with_continuation(nt[i].complete(),
                 dual_tree_complete, hpx_lco_set_action,
                 nt[i].complete(), hpx_lco_delete_action,

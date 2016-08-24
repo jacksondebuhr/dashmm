@@ -83,6 +83,8 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
   local->size = record_size;
   local->data = HPX_NULL;
 
+  delete [] contrib;
+
   int retval{0};
   if (record_count) {
     local->data = hpx_gas_alloc_local(1, record_count * record_size, 0);
