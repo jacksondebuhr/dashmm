@@ -350,13 +350,13 @@ class Node {
     for (int i = 0; i < 8; ++i) {
       if (child[i]) {
         child[i]->destroy(allocated_in_array);
+        if (!allocated_in_array) {
+          delete child[i];
+        }
       }
     }
     if (sema_ != HPX_NULL) {
       hpx_lco_delete_sync(sema_);
-    }
-    if (!allocated_in_array) {
-      delete this;
     }
   }
 
@@ -505,6 +505,7 @@ class Tree {
         node_t *child = curr->child[j];
         if (child) {
           child->destroy(false);
+          delete child;
         }
       }
     }
@@ -932,7 +933,8 @@ class DualTree {
   DualTree()
     : domain_{}, refinement_limit_{1}, unif_level_{1}, dim3_{8},
       unif_count_{HPX_NULL}, unif_count_value_{nullptr},
-      distribute_{nullptr}, method_{}, source_tree_{}, target_tree_{} { }
+      distribute_{nullptr}, method_{}, source_tree_{nullptr},
+      target_tree_{nullptr} { }
 
   DualTree(const dualtree_t &other) = delete;
   dualtree_t &operator=(const dualtree_t &other) = delete;
@@ -948,14 +950,14 @@ class DualTree {
   const DomainGeometry *domain() const {return &domain_;}
   int refinement_limit() const {return refinement_limit_;}
 
-  sourcenode_t *unif_grid_source() {return source_tree_.unif_grid_;}
+  sourcenode_t *unif_grid_source() {return source_tree_->unif_grid_;}
 
-  targetnode_t *unif_grid_target() {return target_tree_.unif_grid_;}
+  targetnode_t *unif_grid_target() {return target_tree_->unif_grid_;}
 
-  size_t sorted_src_count() const {return source_tree_.sorted_.n_tot();}
-  size_t sorted_tar_count() const {return target_tree_.sorted_.n_tot();}
-  sourcearraydata_t sorted_src() const {return source_tree_.sorted_.pin();}
-  targetarraydata_t sorted_tar() const {return target_tree_.sorted_.pin();}
+  size_t sorted_src_count() const {return source_tree_->sorted_.n_tot();}
+  size_t sorted_tar_count() const {return target_tree_->sorted_.n_tot();}
+  sourcearraydata_t sorted_src() const {return source_tree_->sorted_.pin();}
+  targetarraydata_t sorted_tar() const {return target_tree_->sorted_.pin();}
 
   const method_t &method() const {return method_;}
   void set_method(const method_t &method) {method_ = method;}
@@ -970,12 +972,10 @@ class DualTree {
     // Tell each tree to delete itself
     hpx_addr_t clear_done = hpx_lco_and_new(2);
     assert(clear_done != HPX_NULL);
-    sourcetree_t *starg = &source_tree_;
     hpx_call(HPX_HERE, sourcetree_t::delete_tree_, clear_done,
-             &starg, &dim3_, &b, &e);
-    targettree_t *ttarg = &target_tree_;
+             &source_tree_, &dim3_, &b, &e);
     hpx_call(HPX_HERE, targettree_t::delete_tree_, clear_done,
-             &ttarg, &dim3_, &b, &e);
+             &target_tree_, &dim3_, &b, &e);
     hpx_lco_wait(clear_done);
     hpx_lco_delete_sync(clear_done);
 
@@ -1144,16 +1144,19 @@ class DualTree {
     tree->dim3_ = pow(8, tree->unif_level_);
     tree->unif_count_ = count;
     tree->refinement_limit_ = limit;
+    tree->source_tree_ =
+      new Tree<Source, Target, Source, Expansion, Method, DistroPolicy>{};
+    tree->target_tree_ =
+      new Tree<Source, Target, Target, Expansion, Method, DistroPolicy>{};
 
     // Call out to tree setup stuff
     hpx_addr_t setup_done = hpx_lco_and_new(2);
     assert(setup_done != HPX_NULL);
-    sourcetree_t *starg = &tree->source_tree_;
+
     hpx_call(HPX_HERE, sourcetree_t::setup_basics_, setup_done,
-             &starg, &tree->unif_level_);
-    targettree_t *ttarg = &tree->target_tree_;
+             &tree->source_tree_, &tree->unif_level_);
     hpx_call(HPX_HERE, targettree_t::setup_basics_, setup_done,
-             &ttarg, &tree->unif_level_);
+             &tree->target_tree_, &tree->unif_level_);
 
     // We here allocate space for the result of the counting
     tree->unif_count_value_ = new int[tree->dim3_ * 2]();
@@ -1317,8 +1320,8 @@ class DualTree {
     // Wait until the buffer is allocated before merging incoming messages
     // We could do this as a call when, but then we need to be aware of the
     // addresses for every rank's LCO. For now, we do this, as it is simpler.
-    sourcetree_t *stree = &local_tree->source_tree_;
-    targettree_t *ttree = &local_tree->target_tree_;
+    sourcetree_t *stree = local_tree->source_tree_;
+    targettree_t *ttree = local_tree->target_tree_;
     hpx_lco_wait(stree->unif_done_);
     hpx_lco_wait(ttree->unif_done_);
 
@@ -1496,16 +1499,16 @@ class DualTree {
                                           tree->dim3_);
 
     // Exchange points
-    sourcenode_t *ns = tree->source_tree_.unif_grid_;
-    targetnode_t *nt = tree->target_tree_.unif_grid_;
+    sourcenode_t *ns = tree->source_tree_->unif_grid_;
+    targetnode_t *nt = tree->target_tree_->unif_grid_;
     int firstarg = tree->first(rank);
     int lastarg = tree->last(rank);
     int *global_offset_s = sourcetree_t::init_point_exchange(
-        &tree->source_tree_, firstarg, lastarg, tree->unif_count_src(),
+        tree->source_tree_, firstarg, lastarg, tree->unif_count_src(),
         local_scount, local_offset_s, &tree->domain_, tree->refinement_limit_,
         p_s, ns);
     int *global_offset_t = targettree_t::init_point_exchange(
-        &tree->target_tree_, firstarg, lastarg, tree->unif_count_tar(),
+        tree->target_tree_, firstarg, lastarg, tree->unif_count_tar(),
         local_tcount, local_offset_t, &tree->domain_, tree->refinement_limit_,
         p_t, nt);
 
@@ -1582,8 +1585,8 @@ class DualTree {
     hpx_lco_delete_sync(dual_tree_complete);
 
     // Replace segment in the array
-    hpx_addr_t old_src_data = sources.replace(tree->source_tree_.sorted_);
-    hpx_addr_t old_tar_data = targets.replace(tree->target_tree_.sorted_);
+    hpx_addr_t old_src_data = sources.replace(tree->source_tree_->sorted_);
+    hpx_addr_t old_tar_data = targets.replace(tree->target_tree_->sorted_);
     hpx_gas_free_sync(old_src_data);
     hpx_gas_free_sync(old_tar_data);
 
@@ -1616,8 +1619,8 @@ class DualTree {
   int *distribute_;
   method_t method_;
 
-  sourcetree_t source_tree_;
-  targettree_t target_tree_;
+  sourcetree_t *source_tree_;
+  targettree_t *target_tree_;
 
 
   static hpx_action_t domain_geometry_init_;
