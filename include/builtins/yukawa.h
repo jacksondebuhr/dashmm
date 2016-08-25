@@ -493,7 +493,7 @@ public:
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{views_.center(),
-                                        scale, kSourceIntermediate}};
+          scale, kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -1176,7 +1176,7 @@ private:
       int offset = 1; 
       for (int n = 1; n <= p; n += 2) {
         for (int m = 0; m <= n; ++m) {
-          W1[offset] *= -1;
+          W1[offset++] *= -1;
         }
         offset += (n + 2);
       }
