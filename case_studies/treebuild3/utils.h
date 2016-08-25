@@ -9,6 +9,7 @@
 
 #include "dashmm/point.h"
 #include "dashmm/array.h"
+using dashmm::Array;
 
 
 int point_count(char scaling, int n);
@@ -19,7 +20,7 @@ void set_point_in_cube(Record &p) {
   double x = 1.0 * rand() / RAND_MAX - 0.5;
   double y = 1.0 * rand() / RAND_MAX - 0.5;
   double z = 1.0 * rand() / RAND_MAX - 0.5;
-  p.posistion = dashmm::Point{x, y, z};
+  p.position = dashmm::Point{x, y, z};
 }
 
 template <typename Record>
@@ -40,7 +41,7 @@ Record *generate_weak_scaling_input(int n, char datatype, int seed) {
 
   srand(seed);
   std::function<void(Record &)> set_point =
-    (datatype == 'c' ? set_point_in_cube : set_point_on_sphere);
+    (datatype == 'c' ? set_point_in_cube<Record> : set_point_on_sphere<Record>);
 
   for (int i = 0; i < n; ++i) {
     set_point(retval[i]);
@@ -56,7 +57,7 @@ Record *generate_strong_scaling_input(int n, char datatype, int rank,
   // the points in each chunk, where 0 <= r < nseed
 
   std::function<void(Record &)> set_point =
-    (datatype == 'c' ? set_point_in_cube : set_point_on_sphere);
+    (datatype == 'c' ? set_point_in_cube<Record> : set_point_on_sphere<Record>);
 
   int q1, r1, q2, r2, nsrc_curr_rank, s1, s2;
 
@@ -103,11 +104,13 @@ dashmm::Array<Record> generate_points(char scaling, char datatype,
 
   Record *data{nullptr};
   if (scaling == 'w') {
-    data = generate_weak_scaling_input(my_nsrc, datatype,
+    data = generate_weak_scaling_input<Record>(my_nsrc, datatype,
                                        hpx_get_my_rank() + 2);
   } else {
-    data = generate_strong_scaling_input(nsrc, datatype, hpx_get_my_rank(),
-                                         hpx_get_num_ranks(), nseed, shift);
+    data = generate_strong_scaling_input<Record>(nsrc, datatype,
+                                                 hpx_get_my_rank(),
+                                                 hpx_get_num_ranks(),
+                                                 nseed, shift);
   }
 
   retval.put(0, my_nsrc, data);
