@@ -21,7 +21,7 @@
 
 namespace dashmm {
 
-uLaplaceTable builtin_laplace_table_; 
+std::unique_ptr<LaplaceTable> builtin_laplace_table_; 
 
 LaplaceTable::LaplaceTable(int n_digits, double size) {
   scale_ = 1.0 / size; 
@@ -409,7 +409,8 @@ void update_laplace_table(int n_digits, double size) {
   // accuracy requirement.  
 
   if (builtin_laplace_table_ == nullptr) 
-    builtin_laplace_table_ = uLaplaceTable{new LaplaceTable{n_digits, size}}; 
+    builtin_laplace_table_ = 
+      std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits, size}}; 
 }
 
 

@@ -19,7 +19,7 @@
 namespace dashmm {
 
 const int YukawaTable::maxlev = 21; 
-uYukawaTable builtin_yukawa_table_; 
+std::unique_ptr<YukawaTable> builtin_yukawa_table_; 
 
 YukawaTable::YukawaTable(int n_digits, double size, double lambda) {
   const int maxlev = 21; 
@@ -476,7 +476,9 @@ void YukawaTable::generate_l2l() {
 }
 
 void update_yukawa_table(int n_digits, double size, double lambda) {
-
+  if (builtin_yukawa_table_ == nullptr) 
+    builtin_yukawa_table_ = 
+      std::unique_ptr<YukawaTable>{new YukawaTable{n_digits, size, lambda}}; 
 }
 
 } // namespace dashmm

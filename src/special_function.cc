@@ -37,7 +37,7 @@ void legendre_Plm(int n, double x, double *P) {
   }
 }
 
-void legendre_Pnm_gt1_scaled(int nb, double x, double scale, double *P) {
+void legendre_Plm_gt1_scaled(int nb, double x, double scale, double *P) {
   double v = scale * x; 
   double w = scale * scale; 
   double u = sqrt(x * x - 1.0) * scale; 

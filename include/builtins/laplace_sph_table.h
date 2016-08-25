@@ -105,9 +105,7 @@ class LaplaceTable {
   void generate_ealphaj(); 
 };
 
-using uLaplaceTable = std::unique_ptr<LaplaceTable>;
-
-extern uLaplaceTable builtin_laplace_table_; 
+extern std::unique_ptr<LaplaceTable> builtin_laplace_table_; 
 
 void update_laplace_table(int n_digits, double size); 
 

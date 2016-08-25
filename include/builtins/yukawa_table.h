@@ -106,8 +106,7 @@ private:
   void generate_l2l(); 
 }; 
 
-using uYukawaTable = std::unique_ptr<YukawaTable>; 
-extern uYukawaTable builtin_yukawa_table_; 
+extern std::unique_ptr<YukawaTable> builtin_yukawa_table_; 
 
 void update_yukawa_table(int n_digits, double size, double lambda); 
 
