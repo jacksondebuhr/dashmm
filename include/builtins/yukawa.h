@@ -652,7 +652,7 @@ public:
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{kTargetIntermediate, Point{px, py, pz}, scale};
+    ViewSet views{kTargetIntermediate, Point{px, py, pz}, 2 * scale};
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -1107,7 +1107,8 @@ private:
   }        
 
   void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) const {
-    double scale = views_.scale(); 
+    // Note: this function is called on the parent node. 
+    double scale = views_.scale() / 2;; 
     int p = builtin_yukawa_table_->p(); 
     int s = builtin_yukawa_table_->s(); 
     const int *m = builtin_yukawa_table_->m(scale); 
@@ -1169,19 +1170,6 @@ private:
       }    
     }
 
-    if (!sgn) {
-      // If the exponential expansion is not along the positive axis
-      // direction with respect to the source, flip the sign of the
-      // converted L_n^m where n is odd
-      int offset = 1; 
-      for (int n = 1; n <= p; n += 2) {
-        for (int m = 0; m <= n; ++m) {
-          W1[offset++] *= -1;
-        }
-        offset += (n + 2);
-      }
-    }
-
     // Scale the local expansion by
     // (2 * n + 1) * (n - m)! / (n + m)! * (-1)^n * i^m * pi / 2 / ld 
     int offset = 0; 
@@ -1193,6 +1181,19 @@ private:
         power_I *= dcomplex_t{0.0, 1.0}; 
       }
       factor *= -1;
+    }
+
+    if (!sgn) {
+      // If the exponential expansion is not along the positive axis
+      // direction with respect to the source, flip the sign of the
+      // converted L_n^m where n is odd
+      int offset = 1; 
+      for (int n = 1; n <= p; n += 2) {
+        for (int m = 0; m <= n; ++m) {
+          W1[offset++] *= -1;
+        }
+        offset += (n + 2);
+      }
     }
 
     if (dir == 'z') {
