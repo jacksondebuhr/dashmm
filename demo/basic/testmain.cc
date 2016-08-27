@@ -47,12 +47,10 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Laplace, dashmm::FMM> laplace_fmm{}; 
 dashmm::Evaluator<SourceData, TargetData, 
                   dashmm::Laplace, dashmm::FMM97> laplace_fmm97{}; 
-/*
 dashmm::Evaluator<SourceData, TargetData, 
                   dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
 dashmm::Evaluator<SourceData, TargetData, 
                   dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{}; 
-*/
                   
 struct InputArguments {
   int source_count;
@@ -147,6 +145,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
       retval.accuracy = atoi(optarg);
       break;
     case 'k': 
+      retval.kernel = optarg; 
       break; 
     case 'h':
       print_usage(argv[0]);
@@ -214,8 +213,9 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
             retval.source_count, retval.source_type.c_str());
     fprintf(stdout, "%d targets in a %s distribution\n",
             retval.target_count, retval.target_type.c_str());
-    fprintf(stdout, "method: %s \nthreshold: %d\n\n",
-            retval.method.c_str(), retval.refinement_limit);
+    fprintf(stdout, "method: %s \nthreshold: %d\nkernel: %s\n\n",
+            retval.method.c_str(), retval.refinement_limit, 
+            retval.kernel.c_str());
   } else {
     // Only have rank 0 create data
     retval.source_count = 0;
@@ -450,7 +450,6 @@ void perform_evaluation_test(InputArguments args) {
     }
   } else if (args.kernel == std::string{"yukawa"}) {
     if (args.method == std::string{"fmm97"}) {
-      /*
       dashmm::FMM97<SourceData, TargetData, dashmm::Yukawa> method{}; 
       std::vector<double> kernelparms(1, 0.1); 
 
@@ -460,7 +459,6 @@ void perform_evaluation_test(InputArguments args) {
                                   args.accuracy, kernelparms); 
       assert(err == dashmm::kSuccess); 
       tf = getticks();
-      */
     }
   }
 
@@ -482,13 +480,11 @@ void perform_evaluation_test(InputArguments args) {
                                     args.accuracy, std::vector<double>{});
       assert(err == dashmm::kSuccess);
     } else if (args.kernel == "yukawa") {
-      /*
       dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{}; 
       std::vector<double> kernelparms(1, 0.1); 
       err = yukawa_direct.evaluate(source_handle, test_handle, 
                                    args.refinement_limit, direct, 
                                    args.accuracy, kernelparms); 
-      */
       assert(err == dashmm::kSuccess); 
     }
 
