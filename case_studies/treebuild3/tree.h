@@ -343,20 +343,23 @@ class Node {
     }
   }
 
-  /// Destroy the node - this will recursively destroy children, freeing up
-  /// the two LCOs associated with the node. is allocated_in_array is true,
-  /// this will not destroy the node itself, as that would cause trouble.
-  void destroy(bool allocated_in_array) {
-    for (int i = 0; i < 8; ++i) {
-      if (child[i]) {
-        child[i]->destroy(allocated_in_array);
-        if (!allocated_in_array) {
-          delete child[i];
+  // This is not recursive because we are working with HPX-5's small stack
+  // size probably.
+  static void destroy_branch(node_t *root) {
+    std::vector<node_t *> V{root};
+    while (!V.empty()) {
+      std::vector<node_t *> C{};
+      for (size_t i = 0; i < V.size(); ++i) {
+        assert(V[i] != nullptr);
+        for (int j = 0; j < 8; ++j) {
+          if (V[i]->child[j]) {
+            C.push_back(V[i]->child[j]);
+          }
         }
+        delete V[i];
+        V[i] = nullptr;
       }
-    }
-    if (sema_ != HPX_NULL) {
-      hpx_lco_delete_sync(sema_);
+      V = std::move(C);
     }
   }
 
@@ -484,13 +487,6 @@ class Tree {
       for (int j = 0; j < 8; ++j) {
         node_t *child = curr->child[j];
         if (child) {
-          child->destroy(true);
-        }
-      }
-
-      for (int j = 0; j < 8; ++j) {
-        node_t *child = curr->child[j];
-        if (child) {
           delete [] child;
           break;
         }
@@ -502,10 +498,8 @@ class Tree {
       curr->delete_lock();
 
       for (int j = 0; j < 8; ++j) {
-        node_t *child = curr->child[j];
-        if (child) {
-          child->destroy(false);
-          delete child;
+        if (curr->child[j]) {
+          node_t::destroy_branch(curr->child[j]);
         }
       }
 
@@ -515,13 +509,6 @@ class Tree {
     for (int i = last + 1; i < ndim; ++i) {
       node_t *curr = &tree->unif_grid_[i];
       curr->delete_lock();
-
-      for (int j = 0; j < 8; ++j) {
-        node_t *child = curr->child[j];
-        if (child) {
-          child->destroy(true);
-        }
-      }
 
       for (int j = 0; j < 8; ++j) {
         node_t *child = curr->child[j];
