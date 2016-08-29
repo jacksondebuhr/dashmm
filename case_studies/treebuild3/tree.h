@@ -295,27 +295,18 @@ class Node {
   /// This will compress the branch information, which can then be sent
   /// to other ranks, where is can be extracted into the needed nodes.
   ///
-  /// \param branch - buffers holding the tree structure
-  /// \param tree -
-  /// \param parent - the index of the parent of this node
-  /// \param curr - the current slot in the buffers; this is updated during
-  ///               the call to compress()
-  void compress(int *branch, int *tree, int parent, int &curr) const {
-    /*
-    for (int i = 0; i < 8; ++i) {
-      if (child[i] != nullptr) {
-        branch[curr] = i; // tracks which child exists
-        tree[curr] = parent; // tracks the parent of the node being processed
-        curr++; // Move onto the next slot
-        // curr - 1 is the parent location for the subtree rooted at child[i]
-        child[i]->compress(branch, tree, curr - 1, curr);
-      }
-    }
-    //*/
-
-    // TODO This is a non-recursive version; is it better? Does it work?
+  /// The structure of these is as two arrays, with one entry for each node
+  /// except the root of the branch (which is the uniform grid node below
+  /// which this branch is found, which is also this). One array gives the
+  /// index of the parent of the current node, and the other gives which child
+  /// of that parent is the current node.
+  ///
+  /// \param branch - which child of the parent indicated by tree is this node
+  /// \param tree - which node is the parent of the given node
+  void compress(int *branch, int *tree) const {
     std::vector<const node_t *> V{this};
     std::vector<int> V_idx{-1};
+    int curr = 0;
     while (!V.empty()) {
       std::vector<const node_t *> C{};
       std::vector<int> C_idx{};
@@ -718,8 +709,7 @@ class Tree {
     if (n_nodes) {
       int *branch = &compressed_tree[3];
       int *tree = &compressed_tree[3 + n_nodes];
-      int pos = 0;
-      curr->compress(branch, tree, -1, pos);
+      curr->compress(branch, tree);
     }
 
     int rank = hpx_get_my_rank();
