@@ -26,6 +26,7 @@ class Stump {
 };
 
 
+// Register the actions with the runtime
 Registrar<Source, Target, Stub, Stump, int> reg{};
 
 

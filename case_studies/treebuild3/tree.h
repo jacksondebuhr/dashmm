@@ -99,6 +99,9 @@ class Node {
   ~Node() { }
 
   /// Returns the first record into which new records may be copied.
+  ///
+  /// NOTE: the node should be locked before using this to guarantee consistent
+  /// access.
   size_t first() const {return first_;}
 
   /// Returns the LCO signaling completion of partitioning for this node
@@ -111,12 +114,14 @@ class Node {
   void add_completion() {
     assert(complete_ == HPX_NULL);
     complete_ = hpx_lco_and_new(8);
+    assert(complete_ != HPX_NULL);
   }
 
   /// Create semaphore as needed
   void add_lock() {
     assert(sema_ == HPX_NULL);
     sema_ = hpx_lco_sema_new(1);
+    assert(sema_ != HPX_NULL);
   }
 
   /// Delete semaphore
@@ -128,7 +133,6 @@ class Node {
 
   /// Lock the semaphore
   void lock() const {
-    // TODO consider making this an if with graceful error case
     assert(sema_ != HPX_NULL);
     hpx_lco_sema_p(sema_);
   }
@@ -251,11 +255,19 @@ class Node {
   ///
   /// \returns - the number of nodes in the branch below this node
   int n_descendants() const {
-    int count = 1;
-    for (int i = 0; i < 8; ++i) {
-      if (child[i] != nullptr) {
-        count += child[i]->n_descendants();
+    std::vector<const node_t *> V{this};
+    int count = 0;
+    while (!V.empty()) {
+      count += V.size();
+      std::vector<const node_t *> C{};
+      for (size_t i = 0; i < V.size(); ++i) {
+        for (int j = 0; j < 8; ++j) {
+          if (V[i]->child[j]) {
+            C.push_back(V[i]->child[j]);
+          }
+        }
       }
+      V = std::move(C);
     }
     return count;
   }
@@ -289,6 +301,7 @@ class Node {
   /// \param curr - the current slot in the buffers; this is updated during
   ///               the call to compress()
   void compress(int *branch, int *tree, int parent, int &curr) const {
+    /*
     for (int i = 0; i < 8; ++i) {
       if (child[i] != nullptr) {
         branch[curr] = i; // tracks which child exists
@@ -297,6 +310,28 @@ class Node {
         // curr - 1 is the parent location for the subtree rooted at child[i]
         child[i]->compress(branch, tree, curr - 1, curr);
       }
+    }
+    //*/
+
+    // TODO This is a non-recursive version; is it better? Does it work?
+    std::vector<const node_t *> V{this};
+    std::vector<int> V_idx{-1};
+    while (!V.empty()) {
+      std::vector<const node_t *> C{};
+      std::vector<int> C_idx{};
+      for (size_t i = 0; i < V.size(); ++i) {
+        assert(V[i] != nullptr);
+        for (int j = 0; j < 8; ++j) {
+          if (V[i]->child[j]) {
+            branch[curr] = j;
+            tree[curr] = V_idx[i];
+            C.push_back(V[i]->child[j]);
+            C_idx.push_back(curr++);
+          }
+        }
+      }
+      V = std::move(C);
+      V_idx = std::move(C_idx);
     }
   }
 
@@ -636,8 +671,8 @@ class Tree {
       Node<Source> *grid = local_tree->unif_grid_source();
 
       if (n_nodes) {
-        const int *branch = &compressed_tree[2];
-        const int *tree = &compressed_tree[2 + n_nodes];
+        const int *branch = &compressed_tree[3];
+        const int *tree = &compressed_tree[3 + n_nodes];
         grid[id].extract(branch, tree, n_nodes);
       }
 
@@ -646,8 +681,8 @@ class Tree {
       Node<Target> *grid = local_tree->unif_grid_target();
 
       if (n_nodes) {
-        const int *branch = &compressed_tree[2];
-        const int *tree = &compressed_tree[2 + n_nodes];
+        const int *branch = &compressed_tree[3];
+        const int *tree = &compressed_tree[3 + n_nodes];
         grid[id].extract(branch, tree, n_nodes);
       }
 
@@ -747,6 +782,7 @@ class Tree {
 
         if (local_count[i]) {
           // Copy local points before merging remote points
+          curr->lock();
           auto sorted = curr->parts.pin();
           memcpy(sorted.value() + curr->first(),
                  &temp[local_offset[i]],
@@ -758,6 +794,7 @@ class Tree {
             hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
                      &curr, &geo, &threshold);
           }
+          curr->unlock();
         }
       }
     }

@@ -5,9 +5,6 @@
 #include <hpx/hpx.h>
 
 
-extern hpx_action_t rankwise_init_action;
-
-
 template <typename T>
 class RankLocal {
 public:
