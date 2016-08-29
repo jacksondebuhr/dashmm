@@ -8,11 +8,3 @@ order:
  * Add the remaining functionality from dashmm::Tree to the DualTree
  * Plug it into dashmm proper.
  * Debug, rinse, repeat
-
-
-
- * Change the expanded node construction to more standard single objects.
-   In this way we can unify somewhat the abstraction. I am not sure that the
-   alternate style is worth the effort. This is perhaps too much work to be
-   worth it. I can leave a note to see if it impacts performance in some way.
-   But not now. That is a test for later.

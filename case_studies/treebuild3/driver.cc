@@ -6,6 +6,10 @@
 #include "utils.h"
 
 
+// NOTE: there is no reason to clean this up either. This is just the test
+// driver.
+
+
 // The eventual merge into DASHMM will use the position member of Source and
 // Target. Hence the following.
 struct Source {

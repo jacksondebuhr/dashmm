@@ -1,5 +1,9 @@
 #include "utils.h"
 
+
+// NOTE: No cleanup needed, this is just a helper for the test driver.
+
+
 int point_count(char scaling, int n) {
   if (scaling == 'w') {
     return n;

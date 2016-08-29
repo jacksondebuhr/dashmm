@@ -2,6 +2,9 @@
 #define __TREBUILD_3_UTILS_H__
 
 
+// NOTE: no cleanup needed. These are just helpers for the test driver.
+
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>

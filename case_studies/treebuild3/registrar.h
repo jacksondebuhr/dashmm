@@ -2,6 +2,10 @@
 #define __REGISTRAR_H__
 
 
+// NOTE: no cleanup needed. This is just a stand-in for the evaluator in the
+// real code. So there is no point making this better.
+
+
 #include "hpx/hpx.h"
 
 #include "dashmm/arrayref.h"
@@ -64,7 +68,7 @@ class TreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::merge_points_,
                         tree_t::merge_points_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT, HPX_ADDR);
+                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_ADDR);
   }
 };
 

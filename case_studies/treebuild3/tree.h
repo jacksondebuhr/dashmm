@@ -1,3 +1,16 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
 #ifndef __TREE_H__
 #define __TREE_H__
 
@@ -61,7 +74,10 @@ template <typename Source, typename Target,
 class Registrar;
 
 
-/// A node of the tree.
+/// A Node of a tree.
+///
+/// This is a template over the record type. In DASHMM, this will be either
+/// the Source type or the Target type.
 template <typename Record>
 class Node {
  public:
@@ -69,6 +85,7 @@ class Node {
   using node_t = Node<Record>;
   using arrayref_t = ArrayRef<Record>;
 
+  /// The default constructor allocates nothing, and sets all to zero.
   Node() : idx{}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
@@ -77,7 +94,8 @@ class Node {
     complete_ = HPX_NULL;
   }
 
-  /// Constuct with a known index.
+  /// Constuct with a known index. This will set the index of the node,
+  /// and will allocate the completion detection LCO.
   Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
@@ -87,6 +105,8 @@ class Node {
   }
 
   /// Construct with an index, a particle segment and a parent
+  ///
+  /// This will also create the completion detection LCO.
   Node(Index idx, arrayref_t parts, node_t *parent)
       : idx{idx}, parts{parts}, parent{parent}, first_{0} {
     for (int i = 0; i < 8; ++i) {
@@ -96,6 +116,11 @@ class Node {
     complete_ = hpx_lco_and_new(8);
   }
 
+  /// Any allocated LCOs are cleaned up explicitly.
+  ///
+  /// The completion LCOs are cleaned up as they finish their detection, and
+  /// pass on any messages dependent on them. Very few nodes of the tree ever
+  /// get a lock, so those are cleaned up when needed.
   ~Node() { }
 
   /// Returns the first record into which new records may be copied.
@@ -154,7 +179,7 @@ class Node {
   ///
   /// NOTE: This is only used for the nodes of the uniform grid.
   ///
-  /// \param incr - the number of records that has just been added to the
+  /// \param incr - the number of records that have just been added to the
   ///               segment.
   ///
   /// \returns - true if the segment is full; false otherwise
@@ -255,6 +280,8 @@ class Node {
   ///
   /// \returns - the number of nodes in the branch below this node
   int n_descendants() const {
+    // NOTE: the implementation is not recursive because HPX-5 can work with
+    // small stack sizes.
     std::vector<const node_t *> V{this};
     int count = 0;
     while (!V.empty()) {
@@ -304,6 +331,8 @@ class Node {
   /// \param branch - which child of the parent indicated by tree is this node
   /// \param tree - which node is the parent of the given node
   void compress(int *branch, int *tree) const {
+    // NOTE: the non-recursive implementation is to take into account HPX-5's
+    // small default stack size.
     std::vector<const node_t *> V{this};
     std::vector<int> V_idx{-1};
     int curr = 0;
@@ -369,9 +398,14 @@ class Node {
     }
   }
 
-  // This is not recursive because we are working with HPX-5's small stack
-  // size probably.
+  /// Destroy the data in a branch
+  ///
+  /// This is only ever called on the local nodes. This will traverse the
+  /// branch and delete all nodes below the given node.
+  ///
+  /// \param root - the root of the branch.
   static void destroy_branch(node_t *root) {
+    // NOTE: this is not recursive because HPX-5 has small default stacks.
     std::vector<node_t *> V{root};
     while (!V.empty()) {
       std::vector<node_t *> C{};
@@ -433,6 +467,17 @@ template <typename Source, typename Target,
 class DualTree;
 
 
+/// The tree class represents one of the trees in a given evaluation
+///
+/// The Tree is a template over the typical DASHMM types, as well as a
+/// Record type that indicates if this is a Source tree or a Target tree.
+///
+/// The nodes are arranged in a hybrid way in this tree. The top of the tree
+/// (up to and including the finest uniform level) are allocated in an array.
+/// The branches owned by this rank are allocated in the traditional fashion,
+/// one node at a time. Branches from remotes are allocated in an array.
+/// The two different schemes reflect that we sometimes know how many nodes we
+/// shall need, and other times we do not.
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -447,10 +492,16 @@ class Tree {
   using tree_t = Tree<Source, Target, Record, Expansion, Method, DistroPolicy>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
 
+  /// Tree construction just default initializes the object
   Tree() : root_{nullptr}, unif_grid_{nullptr}, unif_done_{HPX_NULL},
            sorted_{} { }
 
-  // Some basic setup during initial tree construction
+  /// Setup some basic information during initial tree construction
+  ///
+  /// This action is the target of a broadcast. The basic information about
+  /// the tree is set up in this action. The most important of which is the
+  /// allocation of the top portions of the tree containing the root, and
+  /// extending to the finest uniform level of partitioning.
   static int setup_basics_handler(tree_t *tree, int unif_level) {
     tree->unif_done_ = hpx_lco_and_new(1);
     assert(tree->unif_done_ != HPX_NULL);
@@ -501,7 +552,11 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // Tear down the data in the tree
+  /// Destroy allocated data for this tree.
+  ///
+  /// This will delete the local branches of the tree as well as destroying
+  /// any locks allocated for the uniform grid, and will free the remote
+  /// branches.
   static int delete_tree_handler(tree_t *tree, int ndim, int first, int last) {
     // NOTE: The difference here is that there are two different allocation
     // schemes for the nodes.
@@ -552,9 +607,13 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // This will assign the points to the uniform grid. This gives the points
-  // the id (in the Morton Key sense) of the box to which they are assigned,
-  // and it will count the numbers in each box.
+  /// Assign points to the uniform grid.
+  ///
+  /// This will assign the points to the uniform grid. This gives the points
+  /// the id (in the Morton Key sense) of the box to which they are assigned,
+  /// and it will count the numbers in each box. This is a key first step to
+  /// computing the distribution of the sources and targets during tree
+  /// construction.
   static int assign_points_to_unif_grid(const record_t *P, int npts,
                                          const DomainGeometry *geo,
                                          int unif_level, int *gid,
@@ -580,8 +639,13 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // This will rearrange the particles into their bin order. This is a stable
-  // reordering.
+  /// Reorder the particles according to their place in the uniform grid
+  ///
+  /// This will rearrange the particles into their bin order. This is a stable
+  /// reordering.
+  ///
+  /// This routine is adapted from a routine in the publicly available code
+  /// GADGET-2 (http://wwwmpa.mpa-garching.mpg.de/gadget/).
   //
   // TODO: Note that this too is a serial operation. Could we do some on-rank
   // parallelism here?
@@ -645,7 +709,13 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // This is the action on the other side that receives the partitioned tree.
+  /// Receive partitioned tree nodes from a remote locality
+  ///
+  /// This action receives the compressed representation of a remote branch
+  /// of the tree, and then expands it into node objects, connectint it to
+  /// the correct portion of the tree at this locality. In general, there will
+  /// be one such message per uniform grid node not owned by this locality, per
+  /// tree.
   static int recv_node_handler(char *message_buffer, size_t UNUSED) {
     hpx_addr_t *rwdata = reinterpret_cast<hpx_addr_t *>(message_buffer);
     int *compressed_tree = reinterpret_cast<int *>(
@@ -683,13 +753,9 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // This action is called once the individual grids are done.
-  // Also, this is where the points are finally rearranged. All other work has
-  // been to set up their eventual index in the sorted situation. Here is the
-  // actual shuffling.
-  //
-  // This will send one message for each grid box to all other localities.
-  // This does allow for maximum parallelism. It is likely the right approach.
+  /// This action sends compressed node representation to remote localities.
+  ///
+  /// This action is called once the individual grids are done.
   static int send_node_handler(node_t *n, record_t *sorted,
                                int id, hpx_addr_t rwaddr, int type) {
     node_t *curr = &n[id];
@@ -732,13 +798,28 @@ class Tree {
     return HPX_SUCCESS;
   }
 
-  // This sets up some orgnaizational structures. The return value is an
-  // array of offsets in the final set of points for each part of the uniform
-  // grid. This is basically just setup. There is a chance that some work occurs
-  // in one branch. Before leaving, this will bring the points that do not have
-  // to change rank into their correct location. If it is detected that all of
-  // the points for that part of the tree have arrived, then the partitioning
-  // work will begin.
+  /// Initialize point exchange between ranks
+  ///
+  /// This is largely just a setup procedure to compute a few things that are
+  /// needed for point exchanges. The most important of which is the global
+  /// offset in this rank's data where each incoming batch of points will be
+  /// stored in the sorted array. Also, this allocates the segment of memory
+  /// that will store the sorted data.
+  ///
+  /// \param tree - the tree object
+  /// \param first - the first node of the uniform grid owned by this rank
+  /// \param last - the last node of the uniform grid owned by this rank
+  /// \param global_count - the global counts in each node of the uniform grid
+  /// \param local_count - the local counts in each node of the uniform grid
+  /// \param local_offset - where in the local data are the points for each node
+  ///                       of the uniform grid
+  /// \param geo - the domain geometry for the tree
+  /// \param threshold - the partitioning threshold for the tree
+  /// \param temp - the local point data
+  /// \param n - the uniform grid nodes
+  ///
+  /// \returns - the global offset into this rank's data for each uniform grid
+  ///            node's points.
   static int *init_point_exchange(tree_t *tree, int first, int last,
                                   const int *global_count,
                                   const int *local_count,
@@ -789,7 +870,6 @@ class Tree {
       }
     }
 
-    // this is actually part of tree now, and not dual tree as is done here
     tree->sorted_ = sorted_ref;
 
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
@@ -797,11 +877,18 @@ class Tree {
     return global_offset;
   }
 
-  // This action merges particular points with the sorted list. Also, if this
-  // is the last set of points that are merged, this will go ahead and start
-  // the adaptive partitioning of that part of the local tree.
+  /// Merge incoming points into the local array
+  ///
+  /// This action merges particular points with the sorted list. Also, if this
+  /// is the last set of points that are merged, this will go ahead and start
+  /// the adaptive partitioning of that part of the local tree.
+  ///
+  /// \param temp - the local data
+  /// \param n - the uniform grid nodes
+  /// \param n_arrived - the number arriving in this message
+  /// \param rwgas - the address of the rankwise dual tree
   static int merge_points_handler(record_t *temp, node_t *n, int n_arrived,
-                                  int n_total, hpx_addr_t rwgas) {
+                                  hpx_addr_t rwgas) {
     RankWise<dualtree_t> global_tree{rwgas};
     auto local_tree = global_tree.here();
 
@@ -823,6 +910,7 @@ class Tree {
     return HPX_SUCCESS;
   }
 
+  /// Split the bits of an integer to be used in a Morton Key
   static uint64_t split(unsigned k) {
     uint64_t split = k & 0x1fffff;
     split = (split | split << 32) & 0x1f00000000ffff;
@@ -833,6 +921,7 @@ class Tree {
     return split;
   }
 
+  /// Compute the Morton key for a gives set of indices
   static uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
     uint64_t key = 0;
     key |= split(x) | split(y) << 1 | split(z) << 2;
@@ -845,10 +934,12 @@ private:
   friend class TreeRegistrar<Source, Target, Record, Expansion, Method,
                              DistroPolicy>;
 
-  node_t *root_;
-  node_t *unif_grid_;
-  hpx_addr_t unif_done_;
-  arrayref_t sorted_;
+  node_t *root_;            /// Root of the tree
+  node_t *unif_grid_;       /// The uniform grid
+  hpx_addr_t unif_done_;    /// An LCO indicating that the uniform partition is
+                            /// complete
+  arrayref_t sorted_;       /// A reference to the sorted point data owned by
+                            /// this tree.
 
   static hpx_action_t setup_basics_;
   static hpx_action_t delete_tree_;
@@ -922,6 +1013,10 @@ hpx_action_t Tree<S, T, R, E, M, D>::merge_points_ = HPX_ACTION_NULL;
 /////////////////////////////////////////////////////////////////////
 
 
+/// The DualTree organizes the source and target tree and handles common work
+///
+/// The DualTree manages all work that instersects between the two trees.
+/// This object stores the pointers to the source and target trees.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -946,39 +1041,67 @@ class DualTree {
                             DistroPolicy>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
 
+  /// Construction is always default
   DualTree()
     : domain_{}, refinement_limit_{1}, unif_level_{1}, dim3_{8},
       unif_count_{HPX_NULL}, unif_count_value_{nullptr},
       distribute_{nullptr}, method_{}, source_tree_{nullptr},
       target_tree_{nullptr} { }
 
+  /// We delete the copy constructor and copy assignement operator.
   DualTree(const dualtree_t &other) = delete;
   dualtree_t &operator=(const dualtree_t &other) = delete;
 
   // TODO define move construction and assignment?
   // Is this needed?
 
-  // simple accessors
+  /// Return the number of source points in the uniform grid
+  ///
+  /// This routine returns the address of the given information,
+  ///
+  /// \parma i - the uniform grid node in question
   int *unif_count_src(size_t i = 0) const {return &unif_count_value_[i];}
+
+  /// Return the number of target points in the uniform grid
+  ///
+  /// This routine returns the address of the given information,
+  ///
+  /// \parma i - the uniform grid node in question
   int *unif_count_tar(size_t i = 0) const {
     return &unif_count_value_[i + dim3_];
   }
+
+  /// Return the DomainGeometry for this DualTree.
   const DomainGeometry *domain() const {return &domain_;}
+
+  /// Return the refinement limit used to build the tree.
   int refinement_limit() const {return refinement_limit_;}
 
+  /// Return the uniform grid for the source tree.
   sourcenode_t *unif_grid_source() {return source_tree_->unif_grid_;}
 
+  /// Return the uniform grid for the target tree.
   targetnode_t *unif_grid_target() {return target_tree_->unif_grid_;}
 
+  /// Return the number of post-sorting sources.
   size_t sorted_src_count() const {return source_tree_->sorted_.n_tot();}
+
+  /// Return the number of post-sorting targets.
   size_t sorted_tar_count() const {return target_tree_->sorted_.n_tot();}
+
+  /// Return the sorted sources.
   sourcearraydata_t sorted_src() const {return source_tree_->sorted_.pin();}
+
+  /// Return the sorted targets.
   targetarraydata_t sorted_tar() const {return target_tree_->sorted_.pin();}
 
+  /// Return the method this object will use for DAG operations.
   const method_t &method() const {return method_;}
+
+  /// Set the method this object will use for DAG operations.
   void set_method(const method_t &method) {method_ = method;}
 
-  // more complex things
+  /// Destroy any allocated memory associated with this DualTree.
   void clear_data() {
     int rank = hpx_get_my_rank();
 
@@ -1005,7 +1128,10 @@ class DualTree {
     delete [] distribute_;
   }
 
+  /// Return the first uniform grid node owned by the given rank.
   int first(int rank) const {return rank == 0 ? 0 : distribute_[rank - 1] + 1;}
+
+  /// Return the last uniform grid node owned by the given rank.
   int last(int rank) const {return distribute_[rank];}
 
 
@@ -1019,17 +1145,21 @@ class DualTree {
   // void destroy_DAG_LCOs(DAG &dag)
 
 
-  // External interface - these are likely the most important
-
-  // This should be called from inside HPX-5.
-  //
-  // Also, we want this to return as soon as the work is started. In this way,
-  // we can do whatever overlap is possible. Then there should be some interface
-  // to be sure it is complete or something. Possibly even another version of
-  // create that is create_sync. This means whatever overlap stuff we have going
-  // will have to be saved in the rankwise data.
-  //
-  // This is to be called from a single thread
+  /// Create the basic data for a distributed tree for use with DASHMM
+  ///
+  /// This will compute the domain from the given source and target points and
+  /// will create the basic data for a distributed tree with that domain. The
+  /// return object is a RankWise object storing each copy of the local tree.
+  ///
+  /// This call is synchronous, and should be called from inside an HPX thread.
+  /// Further, this is to be called in a diffusive style; only a single thread
+  /// should call this function.
+  ///
+  /// \param threshold - the partitioning threshold for the tree
+  /// \param sources - the source data
+  /// \param targets - the target data
+  ///
+  /// \returns - the RankWise object containing the dual tree
   static RankWise<dualtree_t> create(int threshold, Array<Source> sources,
                                      Array<Target> targets) {
     hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets);
@@ -1038,9 +1168,24 @@ class DualTree {
     return retval;
   }
 
-  // This should be called from inside HPX-5
-  //
-  // This is to be called from a single thread
+  /// Partition the tree
+  ///
+  /// This will do the bulk of the work for partitioning and creating the
+  /// distributed tree. After the call to this routine, the source and target
+  /// data will be redistributed to make evaluation easier for DASHMM. Behind
+  /// the scenes, the local segments of the arrays inside sources and targets
+  /// will have been replaced.
+  ///
+  /// This routine should be called from inside an HPX thread. Further, this is
+  /// to be called in a diffusive style; this should be called from only a
+  /// single thread. This routine will handle involving all ranks in the
+  /// system.
+  ///
+  /// \param global_tree - an object previously initialized with create()
+  /// \param sources - the source data
+  /// \param targets - the target data
+  ///
+  /// \returns - an LCO indication completion of the partitioning.
   static hpx_addr_t partition(RankWise<dualtree_t> global_tree,
                               Array<Source> sources,
                               Array<Target> targets) {
@@ -1056,9 +1201,13 @@ class DualTree {
     return retval;
   }
 
-  // This should be called from inside HPX-5
-  //
-  // This is to be called from a single thread
+  /// Destroy a distributed tree.
+  ///
+  /// This cleans up all allocated resources used by the DualTree.
+  ///
+  /// This should be called from an HPX thread, in a diffusive style.
+  ///
+  /// \param global_tree - the distributed tree
   static void destroy(RankWise<dualtree_t> global_tree) {
     hpx_addr_t rwtree = global_tree.data();
     hpx_bcast_rsync(finalize_partition_, &rwtree);
@@ -1071,6 +1220,15 @@ class DualTree {
  private:
   friend class Registrar<Source, Target, Expansion, Method, DistroPolicy>;
 
+  /// Action to set the domain geometry given the sources and targets
+  ///
+  /// This action is the target of a broadcast, and computes the domain for
+  /// the local sources and targets. The result is then given to a reduction
+  /// LCO which reduces each rank's portion.
+  ///
+  /// \param sources_gas - the global address of the source data
+  /// \param targets_gas - the global address of the target data
+  /// \param domain_geometry - a reduction LCO to which the local domain is sent
   static int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                          hpx_addr_t targets_gas,
                                          hpx_addr_t domain_geometry) {
@@ -1110,6 +1268,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Operation implementing the identity for the domain reduction
   static void domain_geometry_init_handler(double *values,
                                            const size_t UNUSED) {
     values[0] = 1e50; // xmin
@@ -1120,6 +1279,7 @@ class DualTree {
     values[5] = -1e50; // zmax
   }
 
+  /// Operation implementing the reduction for the domain reduction
   static void domain_geometry_op_handler(double *lhs, double *rhs,
                                          size_t UNUSED) {
     lhs[0] = fmin(lhs[0], rhs[0]);
@@ -1157,6 +1317,15 @@ class DualTree {
     return domain_geometry;
   }
 
+  /// Action to perform initializtion of basic data for the local tree
+  ///
+  /// This is the target of a broadcast, and it sets various data about the
+  /// tree.
+  ///
+  /// \param rwdata - the global address of the global tree
+  /// \param count - an LCO in which the uniform grid counting is reduced
+  /// \param limit - the partitioning threshold for the tree
+  /// \param domain_geometry - the LCO in which the domain is reduced
   static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
                                     int limit, hpx_addr_t domain_geometry) {
     RankWise<dualtree_t> global_tree{rwdata};
@@ -1201,6 +1370,12 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Allocate and setup a Dual Tree
+  ///
+  /// This will both allocate and setup a dual tree.
+  ///
+  /// \param threshold - the partitioning threshold
+  /// \param domain_geometry - an LCO into which the domain is reduced
   static RankWise<dualtree_t> setup_basic_data(int threshold,
                                            hpx_addr_t domain_geometry) {
     RankWise<dualtree_t> retval{};
@@ -1224,14 +1399,21 @@ class DualTree {
     return retval;
   }
 
-  // Given the global counts, this will partition the uniform grid among the
-  // available localities. There is perhaps some room for simplification here.
-  // I would rather shoot for fixed targets instead of aiming to take a fair
-  // fraction of whatever is left. But there might not be any real performance
-  // impact either way.
-  //
   // TODO: Note that this would be a target for a second member of the
   // Distribution Policy
+  // TODO: can this be simplified? In particular, use the same target for each
+  // rather than a changing target.
+  //
+  /// Partition the available points among the localities
+  ///
+  /// Given the uniform counts, this will provide a good guess at a
+  /// distribution of those points. This operates basically through the Morton
+  /// ordering of the uniform grid nodes, and aims to have segments of the
+  /// space-filling curve which have similar total counts.
+  ///
+  /// \param num_ranks - the number of localities to divide between
+  /// \param global - the global counts
+  /// \param len - the number of unform grid nodes
   static int *distribute_points(int num_ranks, const int *global, int len) {
     int *ret = new int[num_ranks]();
 
@@ -1286,7 +1468,25 @@ class DualTree {
     return ret;
   }
 
-  // Get counting and sort the local points
+  /// Count and sort the local points
+  ///
+  /// This will assign the local points to the uniform grid, and it will also
+  /// rearrange them according to which node of the uniform grid. This will
+  /// ultimately return the local counts per uniform grid node which will later
+  /// be combined into a global count. The returned counts are allocated in
+  /// this routine; the caller assumes ownership of the returned array.
+  ///
+  /// \param tree - the dual tree
+  /// \param p_s - the source data
+  /// \param n_sources - the number of sources
+  /// \param p_t - the target data
+  /// \param n_targets - the number of targets
+  /// \param local_offset_s - array that will be allocated and filled with the
+  ///                         local offsets for the sources
+  /// \param local_offset_t - array that will be allocated and filled with the
+  ///                         local offsets for the targets
+  ///
+  /// \returns - the local counts per uniform grid node
   static int *sort_local_points(DualTree *tree, source_t *p_s,
                                 int n_sources, target_t *p_t, int n_targets,
                                 int **local_offset_s, int **local_offset_t) {
@@ -1332,9 +1532,18 @@ class DualTree {
     return local_count;
   }
 
-  // This is the 'far-side' of the send points message. This action merges the
-  // incoming points into the sorted list and will then spawn the adaptive
-  // partition if this happens to be the last block for a given uniform grid.
+  /// Merge incoming points into the sorted list and spawns adapative paritition
+  ///
+  /// This action is the 'far side' of the send points message. This will
+  /// read the incoming points and merge them with the local data. If the
+  /// uniform grid node to which they belong has received all of the points it
+  /// is waiting for, this routine will then spawn the adaptive partitioning
+  /// of that branch.
+  ///
+  /// This is a marshalled action, and so the message data is rather opaque.
+  ///
+  /// \param args - a buffer containing the incoming message.
+  /// \parma UNUSED - the size of the message.
   static int recv_points_handler(void *args, size_t UNUSED) {
     hpx_addr_t *rwarg = static_cast<hpx_addr_t *>(args);
     RankWise<dualtree_t> global_tree{*rwarg};
@@ -1374,8 +1583,7 @@ class DualTree {
         int incoming_ns = count_s[i - first];
         if (incoming_ns) {
           hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
-                   &recv_s, &ns, &incoming_ns,
-                   local_tree->unif_count_src(i), rwarg);
+                   &recv_s, &ns, &incoming_ns, rwarg);
           recv_s += incoming_ns;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
@@ -1391,8 +1599,7 @@ class DualTree {
         int incoming_nt = count_t[i - first];
         if (incoming_nt) {
           hpx_call(HPX_HERE, targettree_t::merge_points_, done,
-                   &recv_t, &nt, &incoming_nt,
-                   local_tree->unif_count_tar(i), rwarg);
+                   &recv_t, &nt, &incoming_nt, rwarg);
           recv_t += incoming_nt;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
@@ -1410,11 +1617,19 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-  // This is pretty straightforward. This rank will send to the given rank all
-  // those particles that are to be shipped out. There is nothing too
-  // complicated in this, just some indexing and so forth.
-  //
-  // NOTE: This would be a bit nicer looking using the Buffer types.
+  /// Send the points to the remote that will assume ownership
+  ///
+  /// This action sends points to remote localities that have been assigned
+  /// the points during distribution.
+  ///
+  /// \param rank - the rank to which we are sending
+  /// \param count_s - the source counts
+  /// \param count_t - that target counts
+  /// \param offset_s - the source offsets
+  /// \param offset_t - the target offsets
+  /// \param sources - the source data
+  /// \param targets - the target data
+  /// \param rwaddr - the global address of the dual tree
   static int send_points_handler(int rank, int *count_s, int *count_t,
                                  int *offset_s, int *offset_t,
                                  source_t *sources, target_t *targets,
@@ -1481,9 +1696,14 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-  // This appears to be the main action that creates the trees. This will
-  // organize and call out to the other actions.
-  // NOTE: One thing is sure, this ought to be factored
+  /// The action responsible for dual tree partitioning
+  ///
+  /// This action is the target of a broadcast and manages all the work
+  /// required to build the distributed trees.
+  ///
+  /// \param rwtree - the global address of the dual tree
+  /// \param sources_gas - the source data
+  /// \param targets_gas - the target data
   static int create_dual_tree_handler(hpx_addr_t rwtree,
                                       hpx_addr_t sources_gas,
                                       hpx_addr_t targets_gas) {
@@ -1621,6 +1841,12 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to destroy the tree
+  ///
+  /// This action is the target of a broadcast that is used to destroy the
+  /// tree.
+  ///
+  /// \param rwtree - global address of the dual tree
   static int finalize_partition_handler(hpx_addr_t rwtree) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
@@ -1632,17 +1858,17 @@ class DualTree {
   // Now for the data members
   //
 
-  DomainGeometry domain_;
-  int refinement_limit_;
-  int unif_level_;
-  int dim3_;
-  hpx_addr_t unif_count_;
-  int *unif_count_value_;
-  int *distribute_;
-  method_t method_;
+  DomainGeometry domain_;     /// domain size
+  int refinement_limit_;      /// refinement threshold
+  int unif_level_;            /// level of uniform partition
+  int dim3_;                  /// number of uniform nodes
+  hpx_addr_t unif_count_;     /// LCO reducing the uniform counts
+  int *unif_count_value_;     /// local data storing the uniform counts
+  int *distribute_;           /// the computed distribution of the nodes
+  method_t method_;           /// method used during DAG discovery
 
-  sourcetree_t *source_tree_;
-  targettree_t *target_tree_;
+  sourcetree_t *source_tree_; /// The source tree
+  targettree_t *target_tree_; /// The target tree
 
 
   static hpx_action_t domain_geometry_init_;
