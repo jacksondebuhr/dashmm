@@ -16,10 +16,6 @@ struct Source {
   Point position;
 };
 
-struct Target {
-  Point position;
-};
-
 template <typename A, typename B>
 class Stub {
 };
@@ -31,10 +27,10 @@ class Stump {
 
 
 // Register the actions with the runtime
-Registrar<Source, Target, Stub, Stump, int> reg{};
+Registrar<Source, Source, Stub, Stump, int> reg{};
 
 
-using dualtree_t = DualTree<Source, Target, Stub, Stump, int>;
+using dualtree_t = DualTree<Source, Source, Stub, Stump, int>;
 
 
 
@@ -42,14 +38,15 @@ void usage(std::string exec) {
   std::cout << "Usage: " << exec << " --scaling=[w/s] "
             << "--datatype=[c/s] "
             << "--nsrc=num " << "--ntar=num "
-            << "--threshold=num " << "--nseed=num " << std::endl;
+            << "--threshold=num " << "--nseed=num "
+            << "--samesandt " << std::endl;
   std::cout << "Note: --nseed=num required if --scaling=s" << std::endl;
 }
 
 /// The main action of the code starts here
 int main_handler(int threshold, hpx_addr_t source_gas, hpx_addr_t target_gas) {
   Array<Source> sources{source_gas};
-  Array<Target> targets{target_gas};
+  Array<Source> targets{target_gas};
 
   hpx_time_t timer_start = hpx_time_now();
 
@@ -89,6 +86,7 @@ int main(int argc, char *argv[]) {
   int ntar = 20;
   int threshold = 1;
   int nseed = -1; // Number of seeds used for generating input for strong
+  int samesandt = 0;
 
   if (hpx_init(&argc, &argv)) {
     std::cout << "HPX: failed to initialize" << std::endl;
@@ -104,35 +102,39 @@ int main(int argc, char *argv[]) {
     {"threshold", required_argument, 0, 'l'},
     {"nseed", required_argument, 0, 'r'},
     {"help", no_argument, 0, 'h'},
+    {"samesandt", no_argument, 0, 'w'},
     {0, 0, 0, 0}
   };
 
   int long_index = 0;
   bool valid_arguments = true;
-  while ((opt = getopt_long(argc, argv, "s:d:e:n:m:l:r:h",
+  while ((opt = getopt_long(argc, argv, "s:d:e:n:m:l:r:h:w",
                             long_options, &long_index)) != -1) {
     switch (opt) {
-    case 's':
-      scaling = *optarg;
-      break;
     case 'd':
       datatype = *optarg;
-      break;
-    case 'n':
-      nsrc = atoi(optarg);
-      break;
-    case 'm':
-      ntar = atoi(optarg);
-      break;
-    case 'l':
-      threshold = atoi(optarg);
-      break;
-    case 'r':
-      nseed = atoi(optarg);
       break;
     case 'h':
       usage(std::string{argv[0]});
       valid_arguments = false;
+      break;
+    case 'l':
+      threshold = atoi(optarg);
+      break;
+    case 'm':
+      ntar = atoi(optarg);
+      break;
+    case 'n':
+      nsrc = atoi(optarg);
+      break;
+    case 'r':
+      nseed = atoi(optarg);
+      break;
+    case 's':
+      scaling = *optarg;
+      break;
+    case 'w':
+      samesandt = 1;
       break;
     }
   }
@@ -153,8 +155,12 @@ int main(int argc, char *argv[]) {
   // First get the data setup
   Array<Source> sources = generate_points<Source>(scaling, datatype,
                                           nsrc, nseed, 0);
-  Array<Target> targets = generate_points<Target>(scaling, datatype,
-                                          ntar, nseed, nseed);
+  Array<Source> targets{};
+  if (samesandt) {
+    targets = sources;
+  } else {
+    targets = generate_points<Source>(scaling, datatype, ntar, nseed, nseed);
+  }
 
   // Then build the tree
   hpx_addr_t ssend = sources.data();  // TODO: this will eventually disappear
@@ -165,7 +171,9 @@ int main(int argc, char *argv[]) {
 
   // Then delete the point data
   sources.destroy();
-  targets.destroy();
+  if (!samesandt) {
+    targets.destroy();
+  }
 
   hpx_finalize();
 
