@@ -660,177 +660,42 @@ public:
     dcomplex_t *T1 = new dcomplex_t[nexp]();
     dcomplex_t *T2 = new dcomplex_t[nexp]();
     dcomplex_t *T3 = new dcomplex_t[nexp]();
-    bool view2 = false;
-    bool view3 = false;
     char *C1 = reinterpret_cast<char *>(T1);
     char *C2 = reinterpret_cast<char *>(T2);
     char *C3 = reinterpret_cast<char *>(T3);
+    dcomplex_t *T[3] = {T1, T2, T3}; 
+    char *C[3] = {C1, C2, C3}; 
+    bool used[3] = {false, false, false}; 
 
-    // Produce views needed on the target side.
-    if (dz == 3) {
-      e2e(T1, S_mz, dx, dy, 0, scale);
-      views.add_view(uall, view_size, C1);
-    } else if (dz == -2) {
-      e2e(T1, S_pz, -dx, -dy, 0, scale);
-      views.add_view(dall, view_size, C1);
-    } else if (dy == 3) {
-      e2e(T1, S_my, dz, dx, 0, scale);
-      views.add_view(nall, view_size, C1);
-    } else if (dy == -2) {
-      e2e(T1, S_py, -dz, -dx, 0, scale);
-      views.add_view(sall, view_size, C1);
-    } else if (dx == 3) {
-      e2e(T1, S_mx, -dz, dy, 0, scale);
-      views.add_view(eall, view_size, C1);
-    } else if (dx == -2) {
-      e2e(T1, S_px, dz, -dy, 0, scale);
-      views.add_view(wall, view_size, C1);
-    } else {
-      if (dz == 2) {
-        e2e(T1, S_mz, dx, dy, 0, scale);
-        views.add_view(u1234, view_size, C1);
+    for (int i = 0; i < 3; ++i) {
+      int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i]; 
+      
+      if (tag == -1) 
+        break; 
 
-        if (dy == -1) {
-          e2e(T2, S_py, -dz, -dx, 0, scale);
-          views.add_view(s78, view_size, C2);
-          view2 = true;
-
-          if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w6, view_size, C3);
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e5, view_size, C3);
-            view3 = true;
-          }
-        } else if (dy == 2) {
-          e2e(T2, S_my, dz, dx, 0, scale);
-          views.add_view(n56, view_size, C2);
-          view2 = true;
-
-          if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w8, view_size, C3);
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e7, view_size, C3);
-            view3 = true;
-          }
-        } else {
-          if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0, scale);
-            views.add_view(w68, view_size, C2);
-            view2 = true;
-          } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0, scale);
-            views.add_view(e57, view_size, C2);
-            view2 = true;
-          }
-        }
-      } else if (dz == -1) {
-        e2e(T1, S_pz, -dx, -dy, 0, scale);
-        views.add_view(d5678, view_size, C1);
-
-        if (dy == -1) {
-          e2e(T2, S_py, -dz, -dx, 0, scale);
-          views.add_view(s34, view_size, C2);
-          view2 = true;
-
-          if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w2, view_size, C3);
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e1, view_size, C3);
-            view3 = true;
-          }
-        } else if (dy == 2) {
-          e2e(T2, S_my, dz, dx, 0, scale);
-          views.add_view(n12, view_size, C2);
-          view2 = true;
-
-          if (dx == -1) {
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w4, view_size, C3);
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e3, view_size, C3);
-            view3 = true;
-          }
-        } else {
-          if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0, scale);
-            views.add_view(w24, view_size, C2);
-            view2 = true;
-          } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0, scale);
-            views.add_view(e13, view_size, C2);
-            view2 = true;
-          }
-        }
+      if (tag <= 1) { 
+        e2e(T[i], S_mz, dx, dy, 0, scale); 
+      } else if (tag <= 5) {
+        e2e(T[i], S_my, dz, dx, 0, scale); 
+      } else if (tag <= 13) {
+        e2e(T[i], S_mx, -dz, dy, 0, scale); 
+      } else if (tag <= 15) {
+        e2e(T[i], S_pz, -dx, -dy, 0, scale); 
+      } else if (tag <= 19) {
+        e2e(T[i], S_py, -dz, -dx, 0, scale); 
       } else {
-        if (dy == -1) {
-          e2e(T1, S_py, -dz, -dx, 0, scale);
-          views.add_view(s3478, view_size, C1);
-
-          if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0, scale);
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w2, view_size, C2);
-            views.add_view(w6, view_size, C3);
-            view2 = true;
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0, scale);
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e1, view_size, C2);
-            views.add_view(e5, view_size, C3);
-            view2 = true;
-            view3 = true;
-          }
-        } else if (dy == 2) {
-          e2e(T1, S_my, dz, dx, 0, scale);
-          views.add_view(n1256, view_size, C1);
-
-          if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0, scale);
-            e2e(T3, S_px, dz, -dy, 0, scale);
-            views.add_view(w4, view_size, C2);
-            views.add_view(w8, view_size, C3);
-            view2 = true;
-            view3 = true;
-          } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0, scale);
-            e2e(T3, S_mx, -dz, dy, 0, scale);
-            views.add_view(e3, view_size, C2);
-            views.add_view(e7, view_size, C3);
-            view2 = true;
-            view3 = true;
-          }
-        } else {
-          if (dx == -1) {
-            e2e(T2, S_px, dz, -dy, 0, scale);
-            views.add_view(w2468, view_size, C2);
-            view2 = true;
-          } else if (dx == 2) {
-            e2e(T2, S_mx, -dz, dy, 0, scale);
-            views.add_view(e1357, view_size, C2);
-            view2 = true;
-          }
-        }
+        e2e(T[i], S_px, dz, -dy, 0, scale); 
       }
+     
+      views.add_view(tag, view_size, C[i]); 
+      used[i] = true; 
     }
 
-    // Each view generated is *moved* into \p views. Delete T2 (T3) if the
-    // view is not generated.
-    if (!view2)
-      delete [] T2;
-    if (!view3)
-      delete [] T3;
+    if (used[1] == false) 
+      delete [] T2; 
+
+    if (used[2] == false) 
+      delete [] T3; 
 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
