@@ -49,4 +49,6 @@ enum MergedList {
   w8 = 27, ///< -x direction list for box 8
 }; 
 
+extern const int merge_and_shift_table[6][6][6][3]; 
+
 #endif // __DASHMM_MERGE_SHIFT_H__
