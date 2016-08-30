@@ -33,6 +33,7 @@
 
 // DASHMM
 #include "dashmm/array.h"
+#include "dashmm/dag.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/domaingeometry.h"
@@ -47,6 +48,9 @@ using dashmm::Index;
 using dashmm::Array;
 using dashmm::ArrayRef;
 using dashmm::ArrayData;
+using dashmm::DAGInfo;
+using dashmm::DAGNode;
+using dashmm::DAGEdge;
 
 // New things for this example
 #include "rankwise.h"
@@ -196,7 +200,8 @@ class Node {
   ///
   /// \param threshold - the partitioning threshold
   /// \param geo - the domain geometry
-  void partition(int threshold, DomainGeometry *geo) {
+  // TODO update for same s and t
+  void partition(int threshold, DomainGeometry *geo, int same_sandt) {
     size_t num_points = num_parts();
     assert(num_points >= 1);
     // TODO perhaps change the argument type to avoid this cast
@@ -266,7 +271,7 @@ class Node {
           child[i] = cnd;
 
           hpx_call(HPX_HERE, partition_node_, HPX_NULL,
-                   &cnd, &geo, &threshold);
+                   &cnd, &geo, &threshold, &same_sandt);
         } else {
           hpx_lco_and_set(complete_, HPX_NULL);
         }
@@ -428,8 +433,7 @@ class Node {
   arrayref_t parts;               /// segment for this node
   node_t *parent;                 /// parent node
   node_t *child[8];               /// children of this node
-  // TODO
-  // DAGInfo dag;                    /// The DAG info for this node
+  //DAGInfo dag;                    /// The DAG info for this node
 
   static hpx_action_t partition_node_;
 
@@ -437,8 +441,8 @@ class Node {
   friend class NodeRegistrar<Record>;
 
   static int partition_node_handler(node_t *n, DomainGeometry *geo,
-                                    int threshold) {
-    n->partition(threshold, geo);
+                                    int threshold, int same_sandt) {
+    n->partition(threshold, geo, same_sandt);
     return HPX_SUCCESS;
   }
 
@@ -488,13 +492,19 @@ class Tree {
  public:
   using record_t = Record;
   using node_t = Node<Record>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using arrayref_t = ArrayRef<Record>;
   using tree_t = Tree<Source, Target, Record, Expansion, Method, DistroPolicy>;
+  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method,
+                            DistroPolicy>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
 
   /// Tree construction just default initializes the object
   Tree() : root_{nullptr}, unif_grid_{nullptr}, unif_done_{HPX_NULL},
            sorted_{} { }
+
+  arrayref_t sorted() const {return sorted_;}
 
   /// Setup some basic information during initial tree construction
   ///
@@ -820,7 +830,7 @@ class Tree {
   ///
   /// \returns - the global offset into this rank's data for each uniform grid
   ///            node's points.
-  static int *init_point_exchange(tree_t *tree, int first, int last,
+  static void init_point_exchange(tree_t *tree, int first, int last,
                                   const int *global_count,
                                   const int *local_count,
                                   const int *local_offset,
@@ -862,19 +872,75 @@ class Tree {
           if (curr->increment_first(local_count[i])) {
             // This grid does not expect remote points.
             // Spawn adaptive partitioning
+            int ssat = 0;
             hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-                     &curr, &geo, &threshold);
+                     &curr, &geo, &threshold, &ssat);
           }
           curr->unlock();
         }
       }
     }
 
+    // TODO this will have to be different - the target tree might need to use
+    // the one from the source tree
     tree->sorted_ = sorted_ref;
 
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
 
-    return global_offset;
+    delete [] global_offset;
+  }
+
+  static void init_point_exchange_same_s_and_t(
+      tree_t *tree, int first, int last, const int *global_count,
+      const int *local_count, const int *local_offset,
+      const DomainGeometry *geo, int threshold, const record_t *temp,
+      node_t *n, sourcenode_t *snodes, sourcetree_t *source_tree) {
+    int range = last - first + 1;
+    arrayref_t sorted_ref{};
+
+    // Compute global_offset
+    int *global_offset = new int[range]();
+    size_t num_points = global_count[first];
+    for (int i = first + 1; i <= last; ++i) {
+      num_points += global_count[i];
+      global_offset[i - first] = global_offset[i - first - 1] +
+                                 global_count[i - 1];
+    }
+
+    if (num_points > 0) {
+      for (int i = first; i <= last; ++i) {
+        // When S == T, we need to set the parts on the target to be the
+        // parts on the equivalent source node
+        node_t *curr = &n[i];
+        sourcenode_t *curr_source = &snodes[i];
+        ArrayRef<Source> sparts = curr_source->parts;
+        curr->parts = arrayref_t{sparts.data(), sparts.n(), sparts.n_tot()};
+
+        if (local_count[i]) {
+          curr->lock();
+          // still need to increment first, and still need to partition
+          // if things are ready. The only catch is that we have to wait for
+          // the equivalent source node to be ready before we start.
+          if (curr->increment_first(local_count[i])) {
+            // This grid does not expect remote points.
+            // Spawn adaptive partitioning
+            int ssat = 1;
+            hpx_call_when(curr_source->complete(), HPX_HERE,
+                          node_t::partition_node_, HPX_NULL,
+                          &curr, &geo, &threshold, &ssat);
+          }
+          curr->unlock();
+        }
+      }
+    }
+
+    // Again, the target tree reuses the data from the source tree
+    ArrayRef<Source> ssort = source_tree->sorted();
+    tree->sorted_ = arrayref_t{ssort.data(), ssort.n(), ssort.n_tot()};
+
+    hpx_lco_and_set(tree->unif_done_, HPX_NULL);
+
+    delete [] global_offset;
   }
 
   /// Merge incoming points into the local array
@@ -884,7 +950,7 @@ class Tree {
   /// the adaptive partitioning of that part of the local tree.
   ///
   /// \param temp - the local data
-  /// \param n - the uniform grid nodes
+  /// \param n - the uniform grid node
   /// \param n_arrived - the number arriving in this message
   /// \param rwgas - the address of the rankwise dual tree
   static int merge_points_handler(record_t *temp, node_t *n, int n_arrived,
@@ -902,10 +968,44 @@ class Tree {
     if (n->increment_first(n_arrived)) {
       const DomainGeometry *geoarg = local_tree->domain();
       int thresh = local_tree->refinement_limit();
+      int ssat = 0;
       hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-               &n, &geoarg, &thresh);
+               &n, &geoarg, &thresh, &ssat);
     }
     n->unlock();
+
+    return HPX_SUCCESS;
+  }
+
+  /// Merge incoming points into the local array
+  ///
+  /// This action performs the S == T version of point merging. In this version,
+  /// no points are actually merged, as that is handles in the Source version of
+  /// this routine. Instead, this merely updates the first counter, and
+  /// calls to partitioning when appropriate. Note, this is now a call when
+  /// waiting on the completion of the partitioning in the source tree.
+  ///
+  /// \param temp - the local data
+  /// \param n - the uniform grid node
+  /// \param n_arrived - the number arriving in this message
+  /// \param rwgas - the address of the rankwise dual tree
+  // TODO very little goes on in this. Perhaps hoist this into the calling
+  // context.
+  static int merge_points_same_s_and_t_handler(targetnode_t *target_node,
+      int n_arrived, sourcenode_t *source_node, hpx_addr_t rwgas) {
+    RankWise<dualtree_t> global_tree{rwgas};
+    auto local_tree = global_tree.here();
+
+    target_node->lock();
+    if (target_node->increment_first(n_arrived)) {
+      const DomainGeometry *geoarg = local_tree->domain();
+      int thresh = local_tree->refinement_limit();
+      int ssat = 1;
+      hpx_call_when(source_node->complete(),
+                    HPX_HERE, node_t::partition_node_, HPX_NULL,
+                    &target_node, &geoarg, &thresh, &ssat);
+    }
+    target_node->unlock();
 
     return HPX_SUCCESS;
   }
@@ -948,6 +1048,7 @@ private:
   static hpx_action_t assign_points_;
   static hpx_action_t group_points_;
   static hpx_action_t merge_points_;
+  static hpx_action_t merge_points_same_s_and_t_;
 };
 
 template <typename S, typename T, typename R,
@@ -1005,6 +1106,15 @@ template <typename S, typename T, typename R,
                     typename> class M,
           typename D>
 hpx_action_t Tree<S, T, R, E, M, D>::merge_points_ = HPX_ACTION_NULL;
+
+template <typename S, typename T, typename R,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Tree<S, T, R, E, M, D>::merge_points_same_s_and_t_
+    = HPX_ACTION_NULL;
 
 
 /////////////////////////////////////////////////////////////////////
@@ -1162,8 +1272,14 @@ class DualTree {
   /// \returns - the RankWise object containing the dual tree
   static RankWise<dualtree_t> create(int threshold, Array<Source> sources,
                                      Array<Target> targets) {
-    hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets);
-    RankWise<dualtree_t> retval = setup_basic_data(threshold, domain_geometry);
+    bool same_sandt{false};
+    if (sources.data() == targets.data()) {
+      same_sandt = true;
+    }
+    hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets,
+                                                         same_sandt);
+    RankWise<dualtree_t> retval = setup_basic_data(threshold, domain_geometry,
+                                                   same_sandt);
     hpx_lco_delete_sync(domain_geometry);
     return retval;
   }
@@ -1231,16 +1347,12 @@ class DualTree {
   /// \param domain_geometry - a reduction LCO to which the local domain is sent
   static int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                          hpx_addr_t targets_gas,
-                                         hpx_addr_t domain_geometry) {
+                                         hpx_addr_t domain_geometry,
+                                         int same_sandt) {
     Array<source_t> sources{sources_gas};
     sourceref_t src_ref = sources.ref();
     sourcearraydata_t src_data = src_ref.pin();
     Source *s = src_data.value();
-
-    Array<target_t> targets{targets_gas};
-    targetref_t trg_ref = targets.ref();
-    targetarraydata_t trg_data = trg_ref.pin();
-    Target *t = trg_data.value();
 
     double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50};
 
@@ -1254,13 +1366,21 @@ class DualTree {
       var[5] = fmax(var[5], s[i].position.z());
     }
 
-    for (size_t i = 0; i < trg_ref.n(); ++i) {
-      var[0] = fmin(var[0], t[i].position.x());
-      var[1] = fmax(var[1], t[i].position.x());
-      var[2] = fmin(var[2], t[i].position.y());
-      var[3] = fmax(var[3], t[i].position.y());
-      var[4] = fmin(var[4], t[i].position.z());
-      var[5] = fmax(var[5], t[i].position.z());
+    // Only do the targets if they are different from the sources
+    if (!same_sandt) {
+      Array<target_t> targets{targets_gas};
+      targetref_t trg_ref = targets.ref();
+      targetarraydata_t trg_data = trg_ref.pin();
+      Target *t = trg_data.value();
+
+      for (size_t i = 0; i < trg_ref.n(); ++i) {
+        var[0] = fmin(var[0], t[i].position.x());
+        var[1] = fmax(var[1], t[i].position.x());
+        var[2] = fmin(var[2], t[i].position.y());
+        var[3] = fmax(var[3], t[i].position.y());
+        var[4] = fmin(var[4], t[i].position.z());
+        var[5] = fmax(var[5], t[i].position.z());
+      }
     }
 
     hpx_lco_set_lsync(domain_geometry, sizeof(double) * 6, var, HPX_NULL);
@@ -1301,7 +1421,8 @@ class DualTree {
   ///
   /// \returns - address of an LCO containing the reduced domain
   static hpx_addr_t compute_domain_geometry(Array<Source> sources,
-                                            Array<Target> targets) {
+                                            Array<Target> targets,
+                                            bool same_sandt) {
     // Create a reduction LCO
     hpx_addr_t domain_geometry =
       hpx_lco_reduce_new(hpx_get_num_ranks(), sizeof(double) * 6,
@@ -1311,8 +1432,9 @@ class DualTree {
     // Launch the reduction actions
     hpx_addr_t sglob = sources.data();
     hpx_addr_t tglob = targets.data();
+    int ssat = (same_sandt ? 1 : 0);
     hpx_bcast_lsync(set_domain_geometry_, HPX_NULL,
-                    &sglob, &tglob, &domain_geometry);
+                    &sglob, &tglob, &domain_geometry, &ssat);
 
     return domain_geometry;
   }
@@ -1327,7 +1449,8 @@ class DualTree {
   /// \param limit - the partitioning threshold for the tree
   /// \param domain_geometry - the LCO in which the domain is reduced
   static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
-                                    int limit, hpx_addr_t domain_geometry) {
+                                    int limit, hpx_addr_t domain_geometry,
+                                    int same_sandt) {
     RankWise<dualtree_t> global_tree{rwdata};
     auto tree = global_tree.here();
 
@@ -1340,6 +1463,7 @@ class DualTree {
       new Tree<Source, Target, Source, Expansion, Method, DistroPolicy>{};
     tree->target_tree_ =
       new Tree<Source, Target, Target, Expansion, Method, DistroPolicy>{};
+    tree->same_sandt_ = same_sandt;
 
     // Call out to tree setup stuff
     hpx_addr_t setup_done = hpx_lco_and_new(2);
@@ -1377,7 +1501,8 @@ class DualTree {
   /// \param threshold - the partitioning threshold
   /// \param domain_geometry - an LCO into which the domain is reduced
   static RankWise<dualtree_t> setup_basic_data(int threshold,
-                                           hpx_addr_t domain_geometry) {
+                                               hpx_addr_t domain_geometry,
+                                               bool same_sandt) {
     RankWise<dualtree_t> retval{};
     retval.allocate();
     if (!retval.valid()) {
@@ -1393,8 +1518,9 @@ class DualTree {
                                            int_sum_ident_op,
                                            int_sum_op);
     hpx_addr_t rwdata = retval.data();
+    int ssat = (same_sandt ? 1 : 0);
     hpx_bcast_rsync(init_partition_, &rwdata, &ucount, &threshold,
-                    &domain_geometry);
+                    &domain_geometry, &ssat);
 
     return retval;
   }
@@ -1520,9 +1646,14 @@ class DualTree {
     hpx_call(HPX_HERE, sourcetree_t::group_points_, group_done,
              &p_s, &n_sources, &tree->dim3_, &gid_of_sources, &local_scount,
              &local_offset_s);
-    hpx_call(HPX_HERE, targettree_t::group_points_, group_done,
-             &p_t, &n_targets, &tree->dim3_, &gid_of_targets, &local_tcount,
-             &local_offset_t);
+    // Only reorder targets if the sources and targets are different
+    if (!tree->same_sandt_) {
+      hpx_call(HPX_HERE, targettree_t::group_points_, group_done,
+               &p_t, &n_targets, &tree->dim3_, &gid_of_targets, &local_tcount,
+               &local_offset_t);
+    } else {
+      hpx_lco_and_set(group_done, HPX_NULL);
+    }
     hpx_lco_wait(group_done);
     hpx_lco_delete_sync(group_done);
 
@@ -1579,9 +1710,9 @@ class DualTree {
 
     if (recv_ns) {
       for (int i = first; i <= last; ++i) {
-        sourcenode_t *ns = &stree->unif_grid_[i];
         int incoming_ns = count_s[i - first];
         if (incoming_ns) {
+          sourcenode_t *ns = &stree->unif_grid_[i];
           hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
                    &recv_s, &ns, &incoming_ns, rwarg);
           recv_s += incoming_ns;
@@ -1595,9 +1726,9 @@ class DualTree {
 
     if (recv_nt) {
       for (int i = first; i <= last; ++i) {
-        targetnode_t *nt = &ttree->unif_grid_[i];
         int incoming_nt = count_t[i - first];
         if (incoming_nt) {
+          targetnode_t *nt = &ttree->unif_grid_[i];
           hpx_call(HPX_HERE, targettree_t::merge_points_, done,
                    &recv_t, &nt, &incoming_nt, rwarg);
           recv_t += incoming_nt;
@@ -1606,7 +1737,22 @@ class DualTree {
         }
       }
     } else {
-      hpx_lco_and_set_num(done, range, HPX_NULL);
+      if (local_tree->same_sandt_) {
+        // S == T means do a special version of merge.
+        for (int i = first; i <= last; ++i) {
+          int incoming_nt = count_s[i - first];
+          if (incoming_nt) {
+            targetnode_t *nt = &ttree->unif_grid_[i];
+            sourcenode_t *ns = &stree->unif_grid_[i];
+            hpx_call(HPX_HERE, targettree_t::merge_points_same_s_and_t_,
+                     done, &nt, &incoming_nt, &ns, rwarg);
+          } else {
+            hpx_lco_and_set(done, HPX_NULL);
+          }
+        }
+      } else {
+        hpx_lco_and_set_num(done, range, HPX_NULL);
+      }
     }
 
     // Wait until the data has been merged before releasing the parcel
@@ -1641,10 +1787,16 @@ class DualTree {
     int first = local_tree->first(rank);
     int last = local_tree->last(rank);
     int range = last - first + 1;
-    int send_ns = 0, send_nt = 0;
+    int send_ns = 0;
+    int send_nt = 0;
     for (int i = first; i <= last; ++i) {
       send_ns += count_s[i];
       send_nt += count_t[i];
+    }
+
+    // Clear out the target sends if S == T
+    if (local_tree->same_sandt_) {
+      send_nt = 0;
     }
 
     // Parcel message length
@@ -1746,14 +1898,19 @@ class DualTree {
     targetnode_t *nt = tree->target_tree_->unif_grid_;
     int firstarg = tree->first(rank);
     int lastarg = tree->last(rank);
-    int *global_offset_s = sourcetree_t::init_point_exchange(
-        tree->source_tree_, firstarg, lastarg, tree->unif_count_src(),
-        local_scount, local_offset_s, &tree->domain_, tree->refinement_limit_,
-        p_s, ns);
-    int *global_offset_t = targettree_t::init_point_exchange(
-        tree->target_tree_, firstarg, lastarg, tree->unif_count_tar(),
-        local_tcount, local_offset_t, &tree->domain_, tree->refinement_limit_,
-        p_t, nt);
+    sourcetree_t::init_point_exchange(tree->source_tree_, firstarg, lastarg,
+        tree->unif_count_src(), local_scount, local_offset_s, &tree->domain_,
+        tree->refinement_limit_, p_s, ns);
+    if (!tree->same_sandt_) {
+      targettree_t::init_point_exchange(tree->target_tree_, firstarg, lastarg,
+          tree->unif_count_tar(), local_tcount, local_offset_t, &tree->domain_,
+          tree->refinement_limit_, p_t, nt);
+    } else {
+      targettree_t::init_point_exchange_same_s_and_t(tree->target_tree_,
+          firstarg, lastarg, tree->unif_count_tar(), local_tcount,
+          local_offset_t, &tree->domain_, tree->refinement_limit_, p_t, nt,
+          ns, tree->source_tree_);
+    }
 
     // So this one is pretty simple. It sends those points from this rank
     // going to the other rank in a parcel.
@@ -1828,15 +1985,15 @@ class DualTree {
 
     // Replace segment in the array
     hpx_addr_t old_src_data = sources.replace(tree->source_tree_->sorted_);
-    hpx_addr_t old_tar_data = targets.replace(tree->target_tree_->sorted_);
     hpx_gas_free_sync(old_src_data);
-    hpx_gas_free_sync(old_tar_data);
+    if (!tree->same_sandt_) {
+      hpx_addr_t old_tar_data = targets.replace(tree->target_tree_->sorted_);
+      hpx_gas_free_sync(old_tar_data);
+    }
 
     delete [] local_count;
     delete [] local_offset_s;
     delete [] local_offset_t;
-    delete [] global_offset_s;
-    delete [] global_offset_t;
 
     return HPX_SUCCESS;
   }
@@ -1869,6 +2026,8 @@ class DualTree {
 
   sourcetree_t *source_tree_; /// The source tree
   targettree_t *target_tree_; /// The target tree
+
+  int same_sandt_;            /// Made from the same sources and targets
 
 
   static hpx_action_t domain_geometry_init_;

@@ -23,7 +23,7 @@ class NodeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         node_t::partition_node_,
                         node_t::partition_node_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_INT);
+                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT);
   }
 };
 
@@ -69,6 +69,10 @@ class TreeRegistrar {
                         tree_t::merge_points_,
                         tree_t::merge_points_handler,
                         HPX_POINTER, HPX_POINTER, HPX_INT, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        tree_t::merge_points_same_s_and_t_,
+                        tree_t::merge_points_same_s_and_t_handler,
+                        HPX_POINTER, HPX_INT, HPX_POINTER, HPX_ADDR);
   }
 };
 
@@ -101,7 +105,7 @@ class Registrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::set_domain_geometry_,
                         dualtree_t::set_domain_geometry_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
                         dualtree_t::domain_geometry_init_,
                         dualtree_t::domain_geometry_init_handler,
@@ -113,7 +117,7 @@ class Registrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::init_partition_,
                         dualtree_t::init_partition_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR);
+                        HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         dualtree_t::recv_points_,
                         dualtree_t::recv_points_handler,
