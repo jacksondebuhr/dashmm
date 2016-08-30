@@ -1,33 +1,10 @@
 So there are some things left to take care of with this. In no particular
 order:
 
-DONE * Think about the following: should we define a tree class, and then a dual
-   tree that wraps up the source and target trees? This might clear up a good
-   deal of the duplication in the current version? I think so...
-      If we do this, get it working as a template first...
-      Turns out that might be more difficult than it is worth.
-
-      This might mean we can also remove some of the template parameters from
-      the node and the tree, and only the DualTree will have the full set.
-DONE * Change DualTree to hold pointers to the trees. That will clean up a bunch
-   of hooey.
-DONE * Make the tree a template over the needed things
-
- * Fix the weird deletion problem that crops up sometimes that does not seem
-   to be our problem.
-
  * Go back through and privatize anything you can
  * See what you can do about the int vs. size_t thing here
-
+ * Clean it all up.
 
  * Add the remaining functionality from dashmm::Tree to the DualTree
  * Plug it into dashmm proper.
  * Debug, rinse, repeat
-
-
-
- * Change the expanded node construction to more standard single objects.
-   In this way we can unify somewhat the abstraction. I am not sure that the
-   alternate style is worth the effort. This is perhaps too much work to be
-   worth it. I can leave a note to see if it impacts performance in some way.
-   But not now. That is a test for later.

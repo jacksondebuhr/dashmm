@@ -2,6 +2,9 @@
 #define __TREBUILD_3_UTILS_H__
 
 
+// NOTE: no cleanup needed. These are just helpers for the test driver.
+
+
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -32,7 +35,6 @@ void set_point_on_sphere(Record &p) {
   double y = stheta * sin(phi);
   double z = ctheta;
   p.position = dashmm::Point{x, y, z};
-  fprintf(stdout, "%lg %lg %lg\n", x, y, z);
 }
 
 template <typename Record>

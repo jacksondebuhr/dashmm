@@ -64,21 +64,6 @@ thing in any event, so why not bake it into the interface. And then, if the
 user wishes, they can go ahead and only load on one rank or so on.
   Though, this will complicate the error comparison thing...
 
-The array should also get a new method that will perform a sort over the local
-data blocks according to some criterion. Not sure how we should specify it, but
-basically it is a map from the record to an integer that gives the ordering.
-Having multiple records with the same sort order is fine.
-  Perhaps this first runs by and labels the records, and then orders them
-  after that. Knowing the bin in that way I think allows for a pretty okay
-  sort to happen. Especially given that this is not a comparison sort. Really
-  this is a grouping operation.
-
-  This would mutate the array in place.
-
-Then there would be a second operation that creates a new distributed sort of
-  the data. This would create a new array. Even if only internally before
-  returning the new thing to the user.
-
 
 I think array ref does not need to change. It can only refer to data in a local
 chunk. So an array ref that spans localities is not possible.
@@ -183,7 +168,6 @@ THIS BRANCH TODO
 
 TODO: Remove the offset in the array map action.
 TODO: demo/basic should also report the kernel used
-TODO: remove n_digits where possible - tree for sure
 
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
@@ -269,6 +253,9 @@ TODO: What is it about HPX-5 that is absolutely needed by DASHMM? Would
       insulate ourselves from the HPX-5 risk?
 TODO: Make the Array type work from inside HPX-5 threads also
         (We have no use case for this just yet. Delay)
+        (Also, think about adding the two kinds of sorting to the Array.
+         at the moment, there is not really any use case in mind, other than
+         wouldn't it be nice. So we can delay this until we need it.)
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
         (This is not a bad idea, but it can wait, as long as the docs warn
          users.)
