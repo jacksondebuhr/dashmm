@@ -60,7 +60,8 @@ class FMM {
       // from any node. As a result, there is no need to create the
       // normal expansion. 
       assert(curr->dag.add_normal() == true);
-      curr->dag.StoM(&curr->dag);
+      curr->dag.StoM(&curr->dag, 
+                     expansion_t::weight_estimate(Operation::StoM)); 
     }
   }
 
@@ -70,7 +71,8 @@ class FMM {
       for (size_t i = 0; i < 8; ++i) {
         sourcenode_t *kid = curr->child[i];
         if (kid != nullptr) {
-          curr->dag.MtoM(&kid->dag);
+          curr->dag.MtoM(&kid->dag, 
+                         expansion_t::weight_estimate(Operation::MtoM));
         }
       }
     }
@@ -86,25 +88,30 @@ class FMM {
       assert(curr->dag.add_normal() == true); 
       
       if (curr->idx.level() >= 3) 
-        curr->dag.LtoL(&curr->parent->dag); 
+        curr->dag.LtoL(&curr->parent->dag, 
+                       expansion_t::weight_estimate(Operation::LtoL)); 
     }
   }
 
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const {
     Index t_index = curr->idx;
+    int StoL = expansion_t::weight_estimate(Operation::StoL); 
+    int StoT = expansion_t::weight_estimate(Operation::StoT); 
+    int LtoT = expansion_t::weight_estimate(Operation::LtoT); 
+    int MtoL = expansion_t::weight_estimate(Operation::MtoL); 
 
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag);
+            curr->dag.StoL(&(*S)->dag, StoL); 
           } else {
-            curr->dag.StoT(&(*S)->dag);
+            curr->dag.StoT(&(*S)->dag, StoT); 
           }
         } else {
           if (well_sep_test((*S)->idx, t_index)) {
-            curr->dag.MtoL(&(*S)->dag);
+            curr->dag.MtoL(&(*S)->dag, MtoL); 
           } else {
             proc_coll_recur(curr, *S);
           }
@@ -112,20 +119,20 @@ class FMM {
       }
 
       if (curr->idx.level() >= 2) 
-        curr->dag.LtoT(&curr->dag);
+        curr->dag.LtoT(&curr->dag, LtoT); 
     } else {
       std::vector<sourcenode_t *> newcons{ };
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag);
+            curr->dag.StoL(&(*S)->dag, StoL); 
           } else {
             newcons.push_back(*S);
           }
         } else {
           if (well_sep_test((*S)->idx, t_index)) {
-            curr->dag.MtoL(&(*S)->dag);
+            curr->dag.MtoL(&(*S)->dag, MtoL); 
           } else {
             bool S_is_leaf = true;
             for (size_t i = 0; i < 8; ++i) {
@@ -188,11 +195,14 @@ class FMM {
   }
 
   void proc_coll_recur(targetnode_t *T, sourcenode_t *S) const {
+    int MtoT = expansion_t::weight_estimate(Operation::MtoT);
+    int StoT = expansion_t::weight_estimate(Operation::StoT); 
+
     if (well_sep_test_asymmetric(S->idx, T->idx)) {
-      S->dag.MtoT(&T->dag);
+      S->dag.MtoT(&T->dag, MtoT);                   
     } else {
       if (S->is_leaf()) {
-        T->dag.StoT(&S->dag);
+        T->dag.StoT(&S->dag, StoT); 
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];

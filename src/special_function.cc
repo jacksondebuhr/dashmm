@@ -131,7 +131,7 @@ double Gamma(double x) {
   } else if (y < 12.0) {
     double y1 = y; 
     double z; 
-    int n; 
+    int n = 0; 
     if (y < 1.0) {
       z = y; 
       y += 1.0;

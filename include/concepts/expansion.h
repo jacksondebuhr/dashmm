@@ -333,4 +333,10 @@ class Expansion {
   /// \returns - the appropriate scale factor to be used in an expansion's
   ///            constructor
   static double compute_scale(Index index);
+
+  /// \param op - Type of operation
+  ///
+  /// \returns - estimate of the work unit of the operation
+  static int weight_estiate(Operation op, 
+                            Index s = Index{}, Index t = Index{});
 };

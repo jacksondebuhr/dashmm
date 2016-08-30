@@ -70,6 +70,21 @@ enum ExpansionRole {
   kNoRoleNeeded = 4
 };
 
+/// Operation codes to indicate the type of edge
+enum class Operation {
+  Nop,
+  StoM,
+  StoL,
+  MtoM,
+  MtoL,
+  LtoL,
+  MtoT,
+  LtoT,
+  StoT,
+  MtoI,
+  ItoI,
+  ItoL
+};
 
 } // namespace dashmm
 

@@ -336,6 +336,11 @@ class LaplaceCOMAcc {
 
   static double compute_scale(Index index) {return 1.0;}
 
+  static int weight_estimate(Operation op, 
+                             Index s = Index{}, Index t = Index{}) {
+    return 1;
+  }
+
   /// Set the total mass of the expansion
   ///
   /// This sets the monopole term for the expansion.

@@ -900,6 +900,28 @@ public:
     return builtin_yukawa_table_->scale(index.level()); 
   }
 
+  static int weight_estimate(Operation op, 
+                             Index s = Index{}, Index t = Index{}) {
+    int weight = 0; 
+    if (op == Operation::MtoI) {
+      weight = 6; 
+    } else if (op == Operation::ItoI) {
+      int weight = 0; 
+      int dx = s.x() - 2 * t.x(); 
+      int dy = s.y() - 2 * t.y(); 
+      int dz = s.z() - 2 * t.z(); 
+      for (int i = 0; i < 3; ++i) {
+        int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i]; 
+        if (tag == -1)
+          break; 
+        weight++;
+      }
+    } else {
+      weight = 1; 
+    } 
+    return weight; 
+  }
+
 private:
   ViewSet views_;
 

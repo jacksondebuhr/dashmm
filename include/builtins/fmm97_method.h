@@ -55,7 +55,8 @@ class FMM97 {
       // from any target node. As a result, there is no need to create
       // the normal expansion. 
       assert(curr->dag.add_normal() == true); 
-      curr->dag.StoM(&curr->dag); 
+      curr->dag.StoM(&curr->dag, 
+                     expansion_t::weight_estimate(Operation::StoM));  
     }
   }
 
@@ -65,7 +66,8 @@ class FMM97 {
       for (size_t i = 0; i < 8; ++i) {
         sourcenode_t *child = curr->child[i]; 
         if (child != nullptr) {
-          curr->dag.MtoM(&child->dag);
+          curr->dag.MtoM(&child->dag, 
+                         expansion_t::weight_estimate(Operation::MtoM));
         }
       }
     }
@@ -78,16 +80,22 @@ class FMM97 {
 
     if (curr->idx.level() >= 2) {
       assert(curr->dag.add_normal() == true); 
-      curr->dag.ItoL(&curr->parent->dag); 
+      curr->dag.ItoL(&curr->parent->dag, 
+                     expansion_t::weight_estimate(Operation::ItoL)); 
 
       if (curr->idx.level() >= 3) 
-        curr->dag.LtoL(&curr->parent->dag); 
+        curr->dag.LtoL(&curr->parent->dag, 
+                       expansion_t::weight_estimate(Operation::LtoL)); 
     }
   }
 
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const {
     Index t_index = curr->idx;
+    int StoL = expansion_t::weight_estimate(Operation::StoL); 
+    int StoT = expansion_t::weight_estimate(Operation::StoT); 
+    int LtoT = expansion_t::weight_estimate(Operation::LtoT); 
+    int MtoI = expansion_t::weight_estimate(Operation::MtoI); 
 
     // If a source node S is at the same level as \p curr and is well separated
     // from \p curr, skip S as its contribution to \p curr has been processed by
@@ -96,9 +104,9 @@ class FMM97 {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag);
+            curr->dag.StoL(&(*S)->dag, StoL); 
           } else {
-            curr->dag.StoT(&(*S)->dag);
+            curr->dag.StoT(&(*S)->dag, StoT); 
           }
         } else {
           if (!well_sep_test((*S)->idx, t_index)) {
@@ -108,7 +116,7 @@ class FMM97 {
       }
 
       if (curr->idx.level() >= 2) 
-        curr->dag.LtoT(&curr->dag);
+        curr->dag.LtoT(&curr->dag, LtoT); 
     } else {
       if (curr->idx.level() >= 1) 
         assert(curr->dag.add_interm() == true); 
@@ -118,7 +126,7 @@ class FMM97 {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag);
+            curr->dag.StoL(&(*S)->dag, StoL); 
           } else {
             newcons.push_back(*S);
           }
@@ -138,8 +146,11 @@ class FMM97 {
                 S_is_leaf = false; 
                 if (do_I2I) {
                   if (child->dag.add_interm()) 
-                    child->dag.MtoI(&child->dag); 
-                  curr->dag.ItoI(&child->dag); 
+                    child->dag.MtoI(&child->dag, MtoI); 
+                  curr->dag.ItoI(&child->dag, 
+                                 expansion_t::weight_estimate(Operation::ItoI, 
+                                                              (*S)->idx, 
+                                                              t_index)); 
                 }
               }
             }
@@ -195,11 +206,13 @@ class FMM97 {
   }
 
   void proc_coll_recur(targetnode_t *T, sourcenode_t *S) const {
+    int MtoT = expansion_t::weight_estimate(Operation::MtoT);
+    int StoT = expansion_t::weight_estimate(Operation::StoT);
     if (well_sep_test_asymmetric(S->idx, T->idx)) {
-      S->dag.MtoT(&T->dag);
+      S->dag.MtoT(&T->dag, MtoT); 
     } else {
       if (S->is_leaf()) {
-        T->dag.StoT(&S->dag);
+        T->dag.StoT(&S->dag, StoT); 
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];

@@ -84,7 +84,8 @@ class Direct {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
         if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            curr->dag.StoT(&(*i)->dag);
+            curr->dag.StoT(&(*i)->dag, 
+                           expansion_t::weight_estimate(Operation::StoT));
           } else {
             newcons.push_back(*i);
           }
