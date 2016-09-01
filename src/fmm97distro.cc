@@ -1,0 +1,136 @@
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
+
+#include "builtins/fmm97distro.h"
+
+#include <algorithm>
+#include <map>
+#include <limits>
+
+namespace dashmm {
+
+void FMM97Distro::compute_distribution(DAG &dag) {
+  // color all the DAG node
+  for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
+    DAGNode *s = dag.source_leaves[i]; 
+    s->color = 0; 
+    color(s); 
+  }
+
+  // Confine M and I of the source tree
+  for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
+    DAGNode *n = dag.source_leaves[i]; 
+    assert(n->locality != -1); 
+    confine(n, 's'); 
+  } 
+
+  // Confine L of the target tree
+  for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
+    DAGNode *n = dag.target_leaves[i]; 
+    assert(n->locality != -1); 
+    confine(n, 't'); 
+  }
+
+  // Make decision on I of the target tree
+  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
+    DAGNode *n = dag.target_nodes[i]; 
+    if (n->locality == -1) 
+      assign(n); 
+  }  
+}
+
+void FMM97Distro::color(DAGNode *s) {
+  for (size_t i = 0; i < s->out_edges.size(); ++i) {
+    DAGNode *t = s->out_edges[i].target; 
+    t->color = std::max(t->color, s->color + 1); 
+    color(t); 
+  }
+}
+
+void FMM97Distro::confine(DAGNode *n, char type) {
+  if (n->locality != -1) 
+    return; 
+
+  assert(type == 's' || type == 't'); 
+
+  if (type == 's') {
+    for (size_t i = 0; i < n->out_edges.size(); ++i) {
+      DAGNode *target = n->out_edges[i].target; 
+      Operation op = n->out_edges[i].op; 
+      
+      if (op == Operation::StoM || op == Operation::MtoM ||
+          op == Operation::MtoI) {
+        target->locality = n->locality; 
+        confine(target, type); 
+      }
+    }
+  } else {
+    for (size_t i = 0; i < n->in_edges.size(); ++i) {
+      DAGNode *source = n->in_edges[i].source; 
+      Operation op = n->in_edges[i].op; 
+
+      if (op == Operation::LtoT || op == Operation::LtoL) {
+        source->locality = n->locality; 
+        confine(source, type); 
+      }
+    }
+  }
+}
+
+void FMM97Distro::assign(DAGNode *n) {
+  // \param n is the expansion LCO for an intermediate expansion of
+  // the target tree.  
+  
+  // Compute communication cost if \param n and the DAGNodes of its
+  // \param out_edges are placed on different localities. 
+  int target_locality = n->out_edges[0].target->locality; 
+  int out_weight = n->out_edges.size() * n->out_edges[0].weight; 
+
+  // Categorize incoming edges 
+  std::map<int, int> color; 
+  std::map<int, int> weight; 
+  int in_weight = 0; 
+
+  for (size_t i = 0; i < n->in_edges.size(); ++i) {
+    int w = n->in_edges[i].weight; 
+    int c = n->in_edges[i].source->color; 
+    int source_locality = n->in_edges[i].source->locality;
+
+    color[source_locality] = std::max(color[source_locality], c); 
+    weight[source_locality] += w; 
+    in_weight += w; 
+  }
+
+  int min_weight = std::numeric_limits<int>::max(); 
+  int max_color = std::numeric_limits<int>::min(); 
+  int locality = -1; 
+
+  for (auto i = weight.begin(); i != weight.end(); ++i) {
+    int source_locality = i->first; 
+    int w = i->second + out_weight * (source_locality != target_locality); 
+    int c = color[source_locality]; 
+
+    if (w < min_weight) {
+      min_weight = w; 
+      max_color = c; 
+      locality = source_locality;
+    } else if (w == min_weight &&  c > max_color) {
+      max_color = c; 
+      locality = source_locality;
+    }
+  }
+
+  n->locality = locality; 
+}
+
+} // dashmm
