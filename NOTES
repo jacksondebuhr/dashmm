@@ -164,6 +164,22 @@ DO THESE THINGS
 
 
 
+INTEGRATING TREEBUILD3
+
+ * Move files about, including putting rankwise into include/dashmm
+ * Replace registrar with evaluator
+ * Update any action registration lines
+ * Finish create_expansions_from_DAG
+ * Finish setup_edge_lists
+ * Finish start_DAG_evaluation
+ * Deal with the return messages about the addresses of the remote LCOs
+    (Do we even want to do this? There is an issue with termination detection
+     here.)
+ * Have Evaluator use the new interface for the DualTree
+
+
+
+
 THIS BRANCH TODO
 
 TODO: Remove the offset in the array map action.
