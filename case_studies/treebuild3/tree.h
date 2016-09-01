@@ -51,6 +51,7 @@ using dashmm::ArrayData;
 using dashmm::DAGInfo;
 using dashmm::DAGNode;
 using dashmm::DAGEdge;
+using dashmm::DAG;
 
 // New things for this example
 #include "rankwise.h"
@@ -100,7 +101,7 @@ class Node {
 
   /// Constuct with a known index. This will set the index of the node,
   /// and will allocate the completion detection LCO.
-  Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, first_{0} {
+  Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, dag{idx}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -112,7 +113,7 @@ class Node {
   ///
   /// This will also create the completion detection LCO.
   Node(Index idx, arrayref_t parts, node_t *parent)
-      : idx{idx}, parts{parts}, parent{parent}, first_{0} {
+      : idx{idx}, parts{parts}, parent{parent}, dag{idx}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -198,9 +199,15 @@ class Node {
   /// create the needed children and schedule the work of partitioning for
   /// those children.
   ///
+  /// same_sandt will be nonzero only for target nodes, and only sometimes.
+  /// In this case, the following does not sort the records, but merely finds
+  /// the split point, which will have been established already by the source
+  /// tree partioning.
+  ///
   /// \param threshold - the partitioning threshold
   /// \param geo - the domain geometry
-  // TODO update for same s and t
+  /// \param same_sandt - is this a run where the sources and targets are
+  ///                     identical.
   void partition(int threshold, DomainGeometry *geo, int same_sandt) {
     size_t num_points = num_parts();
     assert(num_points >= 1);
@@ -236,21 +243,34 @@ class Node {
       auto z_comp = [&center_z](record_t &a) {
         return a.position.z() < center_z;
       };
-      splits[4] = std::partition(splits[0], splits[8], z_comp);
-
       auto y_comp = [&center_y](record_t &a) {
         return a.position.y() < center_y;
       };
-      splits[2] = std::partition(splits[0], splits[4], y_comp);
-      splits[6] = std::partition(splits[4], splits[8], y_comp);
-
       auto x_comp = [&center_x](record_t &a) {
         return a.position.x() < center_x;
       };
-      splits[1] = std::partition(splits[0], splits[2], x_comp);
-      splits[3] = std::partition(splits[2], splits[4], x_comp);
-      splits[5] = std::partition(splits[4], splits[6], x_comp);
-      splits[7] = std::partition(splits[6], splits[8], x_comp);
+
+      if (same_sandt) {
+        splits[4] = std::partition_point(splits[0], splits[8], z_comp);
+
+        splits[2] = std::partition_point(splits[0], splits[4], y_comp);
+        splits[6] = std::partition_point(splits[4], splits[8], y_comp);
+
+        splits[1] = std::partition_point(splits[0], splits[2], x_comp);
+        splits[3] = std::partition_point(splits[2], splits[4], x_comp);
+        splits[5] = std::partition_point(splits[4], splits[6], x_comp);
+        splits[7] = std::partition_point(splits[6], splits[8], x_comp);
+      } else {
+        splits[4] = std::partition(splits[0], splits[8], z_comp);
+
+        splits[2] = std::partition(splits[0], splits[4], y_comp);
+        splits[6] = std::partition(splits[4], splits[8], y_comp);
+
+        splits[1] = std::partition(splits[0], splits[2], x_comp);
+        splits[3] = std::partition(splits[2], splits[4], x_comp);
+        splits[5] = std::partition(splits[4], splits[6], x_comp);
+        splits[7] = std::partition(splits[6], splits[8], x_comp);
+      }
 
       // Perform some counting
       int stat[8]{};
@@ -399,6 +419,7 @@ class Node {
 
       curr->parent = parent;
       curr->idx = parent->idx.child(which);
+      curr->dag.set_index(parent->idx.child(which));
       parent->child[which] = curr;
     }
   }
@@ -433,7 +454,7 @@ class Node {
   arrayref_t parts;               /// segment for this node
   node_t *parent;                 /// parent node
   node_t *child[8];               /// children of this node
-  //DAGInfo dag;                    /// The DAG info for this node
+  DAGInfo dag;                    /// The DAG info for this node
 
   static hpx_action_t partition_node_;
 
@@ -539,6 +560,7 @@ class Tree {
             node_t *scnode = &tree->root_[firstchild + i];
             snode->child[i] = scnode;
             scnode->idx = snode->idx.child(i);
+            scnode->dag.set_index(snode->idx.child(i));
             scnode->parent = snode;
           }
         } else {
@@ -548,6 +570,7 @@ class Tree {
             uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
             snode->child[i] = &tree->unif_grid_[morton];
             tree->unif_grid_[morton].idx = cindex;
+            tree->unif_grid_[morton].dag.set_index(cindex);
             tree->unif_grid_[morton].parent = snode;
             tree->unif_grid_[morton].add_lock();
             tree->unif_grid_[morton].add_completion();
@@ -881,8 +904,6 @@ class Tree {
       }
     }
 
-    // TODO this will have to be different - the target tree might need to use
-    // the one from the source tree
     tree->sorted_ = sorted_ref;
 
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
@@ -989,8 +1010,6 @@ class Tree {
   /// \param n - the uniform grid node
   /// \param n_arrived - the number arriving in this message
   /// \param rwgas - the address of the rankwise dual tree
-  // TODO very little goes on in this. Perhaps hoist this into the calling
-  // context.
   static int merge_points_same_s_and_t_handler(targetnode_t *target_node,
       int n_arrived, sourcenode_t *source_node, hpx_addr_t rwgas) {
     RankWise<dualtree_t> global_tree{rwgas};
@@ -1113,8 +1132,8 @@ template <typename S, typename T, typename R,
                     template <typename, typename> class,
                     typename> class M,
           typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::merge_points_same_s_and_t_
-    = HPX_ACTION_NULL;
+hpx_action_t Tree<S, T, R, E, M, D>::merge_points_same_s_and_t_ =
+                                                          HPX_ACTION_NULL;
 
 
 /////////////////////////////////////////////////////////////////////
@@ -1244,15 +1263,118 @@ class DualTree {
   /// Return the last uniform grid node owned by the given rank.
   int last(int rank) const {return distribute_[rank];}
 
+  /// Create the DAG for this tree using the method specified for this object.
+  ///
+  /// This will allocate and collect the DAG nodes into the returned object.
+  ///
+  /// \returns - the resulting DAG.
+  DAG create_DAG() {
+    // Do work on the source tree
+    hpx_addr_t sdone = hpx_lco_future_new(0);
+    assert(sdone != HPX_NULL);
 
-  // More DASHMM stuff
-  // DAG create_DAG(bool same_sandt)
-  // void collect_DAG_nodes(DAG &dag)
-  // void create_expansions_from_DAG(int n_digits)
-  // hpx_addr_t setup_termination_detection(DAG &dag)
-  // void setup_edge_lists(DAG &dag)
-  // void start_DAG_evaluation()
-  // void destroy_DAG_LCOs(DAG &dag)
+    dualtree_t *thetree = this;
+    hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
+             &thetree, &source_tree_->root_, &sdone);
+
+    hpx_lco_wait(sdone);
+    hpx_lco_delete_sync(sdone);
+
+    // Do work on the target tree
+    hpx_addr_t tdone = hpx_lco_future_new(0);
+    assert(tdone != HPX_NULL);
+
+    std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
+    consider->push_back(source_tree_->root_);
+    hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
+             &thetree, &target_tree_->root_, &consider, &same_sandt_, &tdone);
+
+    hpx_lco_wait(tdone);
+    hpx_lco_delete_sync(tdone);
+
+    DAG retval{};
+    collect_DAG_nodes(retval);
+    return retval;
+  }
+
+  /// Traverse the tree and collect the DAG nodes
+  ///
+  /// This will collect the nodes of the DAG into three groups: the source
+  /// nodes of the DAG, the target nodes of the DAG, and all other nodes.
+  /// The source and target nodes are the input and output nodes respectively.
+  /// The remainder are those nodes containing an intermediate computation.
+  ///
+  /// This is a synchronous operation.
+  ///
+  /// \param dag - a DAG object to be populated
+  void collect_DAG_nodes(DAG &dag) {
+    collect_DAG_nodes_from_S_node(source_tree_->root_, dag.source_leaves,
+                                  dag.source_nodes);
+    collect_DAG_nodes_from_T_node(target_tree_->root_, dag.target_leaves,
+                                  dag.target_nodes);
+  }
+
+  // TODO
+  // void create_expansions_from_DAG(int n_digits)    // VERY INVOLVED
+
+  /// Sets up termination detection for a DASHMM evaluation
+  ///
+  /// This is an asynchronous operation. The returned LCO becomes the
+  /// responsibility of the caller.
+  ///
+  /// \param targets - vector of target nodes in the DAG
+  /// \param internals - vector of internal nodes in the DAG
+  ///
+  /// \returns - LCO that will signal that all targets have completed their
+  ///            computation.
+  hpx_addr_t setup_termination_detection(DAG &dag) {
+    size_t n_targs = dag.target_leaves.size();
+    size_t n_tinternal = dag.target_nodes.size();
+    size_t n_sinternal = dag.source_nodes.size();
+
+    hpx_addr_t retval = hpx_lco_and_new(n_targs + n_tinternal + n_sinternal);
+    assert(retval != HPX_NULL);
+
+    std::vector<DAGNode *> *argaddx = &dag.target_leaves;
+    std::vector<DAGNode *> *tinternalsaddx = &dag.target_nodes;
+    std::vector<DAGNode *> *sinternalsaddx = &dag.source_nodes;
+    hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval,
+             &argaddx, &n_targs, &tinternalsaddx, &n_tinternal,
+             &sinternalsaddx, &n_sinternal);
+
+    return retval;
+  }
+
+  // TODO
+  // void setup_edge_lists(DAG &dag)         // MEDIUM - involves ExpansionLCO
+  // void start_DAG_evaluation()                      // VERY INVOLVED
+
+  /// Destroys the LCOs associated with the DAG
+  ///
+  /// This is a synchronous operation. This destroys not only the expansion
+  /// LCOs, but also the target LCOs.
+  ///
+  /// \param targets - the target nodes of the DAG
+  /// \param internal - the internal nodes of the DAG
+  void destroy_DAG_LCOs(DAG &dag) {
+    hpx_addr_t done = hpx_lco_and_new(3);
+    assert(done != HPX_NULL);
+
+    DAGNode **data = dag.target_leaves.data();
+    size_t n_data = dag.target_leaves.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+
+    data = dag.target_nodes.data();
+    n_data = dag.target_nodes.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+
+    data = dag.source_nodes.data();
+    n_data = dag.source_nodes.size();
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+
+    hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
+  }
 
 
   /// Create the basic data for a distributed tree for use with DASHMM
@@ -2011,6 +2133,156 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+
+  void collect_DAG_nodes_from_S_node(sourcenode_t *root,
+                                     std::vector<DAGNode *> &sources,
+                                     std::vector<DAGNode *> &internals) {
+    for (int i = 0; i < 8; ++i) {
+      if (root->child[i]) {
+        collect_DAG_nodes_from_S_node(root->child[i], sources, internals);
+      }
+    }
+    root->dag.collect_DAG_nodes(sources, internals);
+  }
+
+  void collect_DAG_nodes_from_T_node(targetnode_t *root,
+                                     std::vector<DAGNode *> &targets,
+                                     std::vector<DAGNode *> &internals) {
+    for (int i = 0; i < 8; ++i) {
+      if (root->child[i]) {
+        collect_DAG_nodes_from_T_node(root->child[i], targets, internals);
+      }
+    }
+    root->dag.collect_DAG_nodes(targets, internals);
+  }
+
+  static int source_apply_method_child_done_handler(dualtree_t *tree,
+                                                    sourcenode_t *node,
+                                                    hpx_addr_t done) {
+    tree->method_.aggregate(node, &tree->domain_);
+    hpx_lco_delete_sync(done);
+    return HPX_SUCCESS;
+  }
+
+  static int source_apply_method_handler(dualtree_t *tree, sourcenode_t *node,
+                                         hpx_addr_t done) {
+    int n_children = node->n_children();
+    if (n_children == 0) {
+      tree->method_.generate(node, &tree->domain_);
+      node->dag.set_parts_locality(hpx_get_my_rank());
+      node->dag.set_normal_locality(hpx_get_my_rank());
+      hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
+      return HPX_SUCCESS;
+    }
+
+    hpx_addr_t cdone = hpx_lco_and_new(n_children);
+    assert(cdone != HPX_NULL);
+
+    for (int i = 0; i < 8; ++i) {
+      if (node->child[i] == nullptr) continue;
+      hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
+               &tree, &node->child[i], &cdone);
+    }
+
+    // Once the children are done, call aggregate here, continuing a set to
+    // done once that has happened.
+    assert(cdone != HPX_NULL);
+    hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, done,
+                  &tree, &node, &cdone);
+
+    return HPX_SUCCESS;
+  }
+
+  static int target_apply_method_handler(dualtree_t *tree, targetnode_t *node,
+                                         std::vector<sourcenode_t *> *consider,
+                                         int same_sandt, hpx_addr_t done) {
+    bool refine = false;
+    if (node->parts.n() > (size_t)tree->refinement_limit_) {
+      refine = tree->method_.refine_test((bool)same_sandt, node, *consider);
+    }
+
+    tree->method_.inherit(node, &tree->domain_, !refine);
+    tree->method_.process(node, *consider, !refine, &tree->domain_);
+    node->dag.set_parts_locality(hpx_get_my_rank());
+    node->dag.set_normal_locality(hpx_get_my_rank());
+
+    if (refine) {
+      int n_children = node->n_children();
+      hpx_addr_t cdone = hpx_lco_and_new(n_children);
+      assert(cdone);
+
+      for (int i = 0; i < 8; ++i) {
+        if (node->child[i] == nullptr) continue;
+        std::vector<sourcenode_t *> *ccons =
+            new std::vector<sourcenode_t *>{};
+        *ccons = *consider;
+        hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
+                 &tree, &node->child[i], &ccons, &same_sandt, &cdone);
+      }
+
+      assert(cdone != HPX_NULL);
+      hpx_call_when(cdone, cdone, hpx_lco_delete_action,
+                    done, nullptr, 0);
+    } else {
+      hpx_lco_set_lsync(done, 0, nullptr, HPX_NULL);
+    }
+
+    delete consider;
+
+    return HPX_SUCCESS;
+  }
+
+  static int termination_detection_handler(hpx_addr_t done,
+                                           std::vector<DAGNode *> *targs,
+                                           size_t n_targs,
+                                           std::vector<DAGNode *> *tint,
+                                           size_t n_tint,
+                                           std::vector<DAGNode *> *sint,
+                                           size_t n_sint) {
+    // If this is insufficiently parallel, we can always make this action
+    // call itself with smaller and smaller chunks of the array.
+    for (size_t i = 0; i < n_targs; ++i) {
+      assert((*targs)[i] != nullptr);
+      assert((*targs)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*targs)[i]->global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    for (size_t i = 0; i < n_tint; ++i) {
+      assert((*tint)[i] != nullptr);
+      assert((*tint)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*tint)[i]->global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    for (size_t i = 0; i < n_sint; ++i) {
+      assert((*sint)[i] != nullptr);
+      assert((*sint)[i]->global_addx != HPX_NULL);
+      hpx_call_when((*sint)[i]->global_addx, done, hpx_lco_set_action,
+                    HPX_NULL, nullptr, 0);
+    }
+
+    return HPX_SUCCESS;
+  }
+
+  static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes) {
+    // We could add more parallelism here if needed.
+
+    // Some of these might be remote, so we use async delete on these LCOs.
+    hpx_addr_t alldel = hpx_lco_and_new(n_nodes);
+    assert(alldel != HPX_NULL);
+
+    for (size_t i = 0; i < n_nodes; ++i) {
+      assert(nodes[i]->global_addx != HPX_NULL);
+      hpx_lco_delete(nodes[i]->global_addx, alldel);
+    }
+
+    hpx_lco_wait(alldel);
+    hpx_lco_delete_sync(alldel);
+
+    return HPX_SUCCESS;
+  }
+
   //
   // Now for the data members
   //
@@ -2038,6 +2310,11 @@ class DualTree {
   static hpx_action_t send_points_;
   static hpx_action_t create_dual_tree_;
   static hpx_action_t finalize_partition_;
+  static hpx_action_t source_apply_method_;
+  static hpx_action_t source_apply_method_child_done_;
+  static hpx_action_t target_apply_method_;
+  static hpx_action_t destroy_DAG_LCOs_;
+  static hpx_action_t termination_detection_;
 };
 
 template <typename S, typename T,
@@ -2103,5 +2380,47 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t DualTree<S, T, E, M, D>::finalize_partition_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::source_apply_method_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::source_apply_method_child_done_ =
+    HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::target_apply_method_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::destroy_DAG_LCOs_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t DualTree<S, T, E, M, D>::termination_detection_ = HPX_ACTION_NULL;
+
 
 #endif
