@@ -23,6 +23,25 @@ class Stub {
 template <typename A, typename B, template <typename, typename> class C,
           typename D>
 class Stump {
+ public:
+  using source_t = A;
+  using target_t = B;
+  using expansion_t = C<A, B>;
+  using method_t = Stump<A, B, C, D>;
+  using sourcenode_t = Node<A>;
+  using targetnode_t = Node<B>;
+
+  void generate(sourcenode_t *curr, DomainGeometry *domain) const { }
+  void aggregate(sourcenode_t *curr, DomainGeometry *domain) const { }
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const { }
+  void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
+               bool curr_is_leaf, DomainGeometry *domain) const { }
+  bool refine_test(bool same_sources_and_targets,
+                   const targetnode_t *curr,
+                   const std::vector<sourcenode_t *> &consider) const {
+    return true;
+  }
 };
 
 

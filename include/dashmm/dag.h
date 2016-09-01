@@ -39,7 +39,7 @@ struct DAGEdge {
   DAGNode *source;          /// Source node of the edge
   DAGNode *target;          /// Target node of the edge
   Operation op;             /// Operation to perform along edge
-  int weight;               /// estimate of communication cost if it occurs 
+  int weight;               /// estimate of communication cost if it occurs
 
   DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop}, weight{0} {}
   DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
@@ -55,16 +55,16 @@ struct DAGNode {
 
   int locality;                  /// the locality where this will be placed
   hpx_addr_t global_addx;        /// global address of object serving this node
-  size_t n_parts;                /// number of points stored in a target lco 
+  size_t n_parts;                /// number of points stored in a target lco
                                  /// or a source ref
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-    n_parts{0} {} 
+    n_parts{0} {}
   void add_out_edge(DAGNode *end, Operation op, int weight) {
-    out_edges.push_back(DAGEdge{this, end, op, weight});  
+    out_edges.push_back(DAGEdge{this, end, op, weight});
   }
   void add_in_edge(DAGNode *start, Operation op, int weight) {
-    in_edges.push_back(DAGEdge{start, this, op, weight}); 
+    in_edges.push_back(DAGEdge{start, this, op, weight});
   }
 };
 
@@ -133,6 +133,13 @@ class DAG {
 class DAGInfo {
  public:
   /// Construct the DAGInfo
+  DAGInfo()
+      : idx_{0, 0, 0, 0}, normal_{nullptr}, interm_{nullptr}, parts_{nullptr} {
+    lock_ = hpx_lco_sema_new(1);
+    assert(lock_ != HPX_NULL);
+  }
+
+  /// Construct the DAGInfo
   ///
   /// This will add the normal DAGNode, but not the particle or intermediate
   /// nodes.
@@ -166,18 +173,21 @@ class DAGInfo {
     }
   }
 
+  Index index() const {return idx_;}
+  void set_index(const Index &index) {idx_ = index;}
+
   /// Add the normal node
   ///
   /// This will add a normal DAG node for the tree node owning this object.
   bool add_normal() {
-    bool retval = false; 
-    lock(); 
+    bool retval = false;
+    lock();
     if (normal_ == nullptr) {
-      normal_ = new DAGNode{idx_}; 
+      normal_ = new DAGNode{idx_};
       retval = true;
     }
-    unlock(); 
-    return retval; 
+    unlock();
+    return retval;
   }
 
   /// Add an intermediate node
@@ -185,13 +195,13 @@ class DAGInfo {
   /// This will add an intermediate DAG node for the tree node associated
   /// with this object.
   bool add_interm() {
-    bool retval = false; 
-    lock(); 
+    bool retval = false;
+    lock();
     if (interm_ == nullptr) {
-      interm_ = new DAGNode{idx_}; 
+      interm_ = new DAGNode{idx_};
       retval = true;
     }
-    unlock(); 
+    unlock();
     return retval;
   }
 
@@ -267,7 +277,7 @@ class DAGInfo {
     assert(parts_ != nullptr);
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
-      parts_->n_parts = num; 
+      parts_->n_parts = num;
     }
   }
 
@@ -311,7 +321,7 @@ class DAGInfo {
   void StoM(DAGInfo *source, int weight) {
     assert(source->has_parts());
     assert(has_normal());
-    link_nodes(source, source->parts_, this, normal_, Operation::StoM, weight); 
+    link_nodes(source, source->parts_, this, normal_, Operation::StoM, weight);
   }
 
   /// Create an S->L link in the DAG
@@ -323,7 +333,7 @@ class DAGInfo {
   /// \param weight - estimate of communication cost if it occurs
   void StoL(DAGInfo *source, int weight) {
     assert(source->has_parts());
-    assert(has_normal()); 
+    assert(has_normal());
     link_nodes(source, source->parts_, this, normal_, Operation::StoL, weight);
   }
 
@@ -337,8 +347,8 @@ class DAGInfo {
   void MtoM(DAGInfo *source, int weight) {
     assert(source->has_normal());
     assert(has_normal());
-    link_nodes(source, source->normal_, this, normal_, Operation::MtoM,  
-               weight);  
+    link_nodes(source, source->normal_, this, normal_, Operation::MtoM,
+               weight);
   }
 
   /// Create an M->L link in the DAG
@@ -351,8 +361,8 @@ class DAGInfo {
   void MtoL(DAGInfo *source, int weight) {
     assert(source->has_normal());
     assert(has_normal());
-    link_nodes(source, source->normal_, this, normal_, Operation::MtoL, 
-               weight); 
+    link_nodes(source, source->normal_, this, normal_, Operation::MtoL,
+               weight);
   }
 
   /// Create an L->L link in the DAG
@@ -365,8 +375,8 @@ class DAGInfo {
   void LtoL(DAGInfo *source, int weight) {
     assert(source->has_normal());
     assert(has_normal());
-    link_nodes(source, source->normal_, this, normal_, Operation::LtoL, 
-               weight); 
+    link_nodes(source, source->normal_, this, normal_, Operation::LtoL,
+               weight);
   }
 
   /// Create an M->T link in the DAG
@@ -380,7 +390,7 @@ class DAGInfo {
   void MtoT(DAGInfo *target, int weight) {
     assert(has_normal());
     assert(target->has_parts());
-    link_nodes(this, normal_, target, target->parts_, Operation::MtoT, 
+    link_nodes(this, normal_, target, target->parts_, Operation::MtoT,
                weight);
   }
 
@@ -395,8 +405,8 @@ class DAGInfo {
   void LtoT(DAGInfo *target, int weight) {
     assert(has_normal());
     assert(target->has_parts());
-    link_nodes(this, normal_, target, target->parts_, Operation::LtoT, 
-               weight); 
+    link_nodes(this, normal_, target, target->parts_, Operation::LtoT,
+               weight);
   }
 
   /// Create an S->T link in the DAG
@@ -410,8 +420,8 @@ class DAGInfo {
   void StoT(DAGInfo *source, int weight) {
     assert(source->has_parts());
     assert(has_parts());
-    link_nodes(source, source->parts_, this, parts_, Operation::StoT, 
-               weight); 
+    link_nodes(source, source->parts_, this, parts_, Operation::StoT,
+               weight);
   }
 
   /// Create an M->I link in the DAG
@@ -425,7 +435,7 @@ class DAGInfo {
   void MtoI(DAGInfo *source, int weight) {
     assert(source->has_normal());
     assert(has_interm());
-    link_nodes(source, source->normal_, this, interm_, Operation::MtoI, 
+    link_nodes(source, source->normal_, this, interm_, Operation::MtoI,
                weight);
   }
 
@@ -440,8 +450,8 @@ class DAGInfo {
   void ItoI(DAGInfo *source, int weight) {
     assert(has_interm());
     assert(source->has_interm());
-    link_nodes(source, source->interm_, this, interm_, Operation::ItoI, 
-               weight); 
+    link_nodes(source, source->interm_, this, interm_, Operation::ItoI,
+               weight);
   }
 
   /// Create an I->L link in the DAG
@@ -455,8 +465,8 @@ class DAGInfo {
   void ItoL(DAGInfo *source, int weight) {
     assert(source->has_interm());
     assert(has_normal());
-    link_nodes(source, source->interm_, this, normal_, Operation::ItoL, 
-               weight); 
+    link_nodes(source, source->interm_, this, normal_, Operation::ItoL,
+               weight);
   }
 
   /// Collect the DAG nodes from this object
@@ -490,7 +500,7 @@ class DAGInfo {
   /// \param op - the operation to perform along the edge
   /// \param weight - the weight of the operation to perform along the edge
   static void link_nodes(DAGInfo *src_info, DAGNode *source,
-                         DAGInfo *dest_info, DAGNode *dest, 
+                         DAGInfo *dest_info, DAGNode *dest,
                          Operation op, int weight) {
     dest_info->lock();
     dest->add_in_edge(source, op, weight);

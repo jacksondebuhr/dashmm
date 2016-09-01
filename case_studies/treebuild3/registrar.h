@@ -135,6 +135,28 @@ class Registrar {
                         dualtree_t::finalize_partition_,
                         dualtree_t::finalize_partition_handler,
                         HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        dualtree_t::source_apply_method_,
+                        dualtree_t::source_apply_method_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        dualtree_t::source_apply_method_child_done_,
+                        dualtree_t::source_apply_method_child_done_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        dualtree_t::target_apply_method_,
+                        dualtree_t::target_apply_method_handler,
+                        HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_INT,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        dualtree_t::destroy_DAG_LCOs_,
+                        dualtree_t::destroy_DAG_LCOs_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        dualtree_t::termination_detection_,
+                        dualtree_t::termination_detection_handler,
+                        HPX_ADDR, HPX_POINTER, HPX_SIZE_T, HPX_POINTER,
+                        HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
   }
 
 private:

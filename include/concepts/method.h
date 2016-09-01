@@ -42,8 +42,6 @@ class Method {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
-                                      DistroPolicy>;
   using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method,
                                 DistroPolicy>;
   using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,

@@ -1,7 +1,6 @@
 So there are some things left to take care of with this. In no particular
 order:
 
- * Make the tree able to handle same source and target records
  * Start adding the DAG stuff in - in particular, the application of the
    method ought to be pretty straightforward. This is just what we have
    adapted mildly to the new structure.
