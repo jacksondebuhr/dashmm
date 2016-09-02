@@ -166,16 +166,20 @@ DO THESE THINGS
 
 INTEGRATING TREEBUILD3
 
- * Move files about, including putting rankwise into include/dashmm
- * Replace registrar with evaluator
- * Update any action registration lines
- * Finish create_expansions_from_DAG
- * Finish setup_edge_lists
- * Finish start_DAG_evaluation
+DONE * Move files about, including putting rankwise into include/dashmm
+DONE * Replace registrar with evaluator
+DONE * Update any action registration lines
+DONE * Finish create_expansions_from_DAG
+DONE * Finish setup_edge_lists
+DONE * Finish start_DAG_evaluation
+DONE * Workign on Evaluator made me realize that I have more to do in tree.
  * Deal with the return messages about the addresses of the remote LCOs
     (Do we even want to do this? There is an issue with termination detection
      here.)
- * Have Evaluator use the new interface for the DualTree
+DONE * Have Evaluator use the new interface for the DualTree
+DONE * Has Shared Data use gone away? If so, drop it. I think so.
+ * Consider changing ExpansionLCO to only contain the needed info from the
+    DomainGeometry. The use is very simple, getting box sizes and so on.
 
 
 

@@ -20,7 +20,6 @@
 #include "dashmm/array.h"
 #include "dashmm/evaluator.h"
 #include "dashmm/initfini.h"
-#include "dashmm/shareddata.h"
 #include "dashmm/types.h"
 
 // The built in methods

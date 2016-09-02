@@ -32,7 +32,6 @@
 #include "dashmm/domaingeometry.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
-#include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/types.h"
 #include "dashmm/viewset.h"
@@ -48,7 +47,7 @@ template <typename Source, typename Target,
                     template <typename, typename> class,
                     typename> class Method,
           typename DistroPolicy>
-class Evaluator;
+class ExpansionLCORegistrar;
 
 
 /// Expansion LCO
@@ -86,7 +85,7 @@ class ExpansionLCO {
                                       DistroPolicy>;
 
   /// Construct the expansion from a given global address.
-  ExpansionLCO(hpx_addr_t addr) : data_{addr} {} 
+  ExpansionLCO(hpx_addr_t addr) : data_{addr} {}
 
   /// Construct the expansion LCO from expansion data
   ///
@@ -102,7 +101,7 @@ class ExpansionLCO {
   /// \param expand - initial data for the expansion object
   /// \param where - an addess at the locality where the expansion LCO should be
   ///                created
-  ExpansionLCO(int n_in, int n_out, SharedData<DomainGeometry> domain,
+  ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
                Index index, std::unique_ptr<expansion_t> expand,
                hpx_addr_t where) {
     assert(expand != nullptr);
@@ -131,7 +130,7 @@ class ExpansionLCO {
     // setup the out edge action
     assert(data_ != HPX_NULL);
     if (n_out != 0) {
-      int unused = 0; 
+      int unused = 0;
       hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &unused);
     }
   }
@@ -167,7 +166,7 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
     double scale = expansion_t::compute_scale(idx);
-    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_M(center, sources, &sources[n_src]);
     contribute(std::move(multi));
@@ -190,8 +189,8 @@ class ExpansionLCO {
   /// \param sources - the source data
   /// \param n_src - the number of sources
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
-    double scale = expansion_t::compute_scale(idx);     
-    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale}; 
+    double scale = expansion_t::compute_scale(idx);
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));
@@ -293,8 +292,9 @@ class ExpansionLCO {
   }
 
  private:
-  // Give the evaluator access so that it might register our actions
-  friend class Evaluator<Source, Target, Expansion, Method, DistroPolicy>;
+  // Give the registrar access so that it might register our actions
+  friend class ExpansionLCORegistrar<Source, Target, Expansion, Method,
+                                     DistroPolicy>;
 
   ///////////////////////////////////////////////////////////////////
   // Types used internally
@@ -307,7 +307,7 @@ class ExpansionLCO {
   struct Header {
     int yet_to_arrive;
     size_t expansion_size;
-    SharedData<DomainGeometry> domain;
+    DomainGeometry domain;
     Index index;
     int out_edge_count;
     char payload[];
@@ -465,7 +465,7 @@ class ExpansionLCO {
 
       // Now send the parcel or do the work
       if (curr_rank == my_rank) {
-        spawn_out_edges_work(scratch); 
+        spawn_out_edges_work(scratch);
       } else {
         size_t message_size = sizeof(Header) + scratch->expansion_size
                                            + send_edges_size;
@@ -504,7 +504,7 @@ class ExpansionLCO {
     // TODO: decide if this is a continuation action, or a return action
     // sent from here
 
-    spawn_out_edges_work(head); 
+    spawn_out_edges_work(head);
 
     return HPX_SUCCESS;
   }
@@ -530,16 +530,16 @@ class ExpansionLCO {
           m_to_m_out_edge(head, views, out_edges[i].target);
           break;
         case Operation::MtoL:
-          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx); 
+          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
           break;
         case Operation::LtoL:
           l_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
           break;
         case Operation::MtoT:
-          m_to_t_out_edge(head, out_edges[i].target); 
+          m_to_t_out_edge(head, out_edges[i].target);
           break;
         case Operation::LtoT:
-          l_to_t_out_edge(head, out_edges[i].target); 
+          l_to_t_out_edge(head, out_edges[i].target);
           break;
         case Operation::MtoI:
           m_to_i_out_edge(head, views, out_edges[i].target);
@@ -559,8 +559,7 @@ class ExpansionLCO {
 
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double s_size = geo->size_from_level(head->index.level());
+    double s_size = head->domain.size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
     expansion_t lexp{views};
@@ -573,8 +572,7 @@ class ExpansionLCO {
 
   static void m_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double s_size = geo->size_from_level(head->index.level());
+    double s_size = head->domain.size_from_level(head->index.level());
 
     // translate the source expansion
     expansion_t lexp{views};
@@ -588,8 +586,7 @@ class ExpansionLCO {
   static void l_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
     int to_child = tidx.which_child();
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double t_size = geo->size_from_level(tidx.level());
+    double t_size = head->domain.size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
@@ -602,15 +599,15 @@ class ExpansionLCO {
   static void m_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
-    targetlco_t destination{target, 0}; 
-    destination.contribute_M_to_T(head->expansion_size, head->payload);  
+    targetlco_t destination{target, 0};
+    destination.contribute_M_to_T(head->expansion_size, head->payload);
   }
 
   static void l_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_L_to_T(head->expansion_size, head->payload); 
+    destination.contribute_L_to_T(head->expansion_size, head->payload);
   }
 
   static void m_to_i_out_edge(Header *head, const ViewSet &views,
@@ -625,8 +622,7 @@ class ExpansionLCO {
 
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double s_size = geo->size_from_level(head->index.level());
+    double s_size = head->domain.size_from_level(head->index.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_I(head->index, s_size, tidx);
@@ -638,8 +634,7 @@ class ExpansionLCO {
 
   static void i_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    LocalData<DomainGeometry> geo = head->domain.value();
-    double t_size = geo->size_from_level(tidx.level());
+    double t_size = head->domain.size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_L(tidx, t_size);

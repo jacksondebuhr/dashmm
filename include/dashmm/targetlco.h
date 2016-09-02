@@ -38,7 +38,7 @@ template <typename Source, typename Target,
                     template <typename, typename> class,
                     typename> class Method,
           typename DistroPolicy>
-class Evaluator;
+class TargetLCORegistrar;
 
 
 /// Target LCO
@@ -150,8 +150,9 @@ class TargetLCO {
   }
 
  private:
-  /// Make Evaluator a friend -- it handles action registration
-  friend class Evaluator<Source, Target, Expansion, Method, DistroPolicy>;
+  /// Become friends with TargetLCORegistrar
+  friend class TargetLCORegistrar<Source, Target, Expansion, Method,
+                                  DistroPolicy>;
 
   /// LCO data type
   struct Data {
@@ -220,7 +221,7 @@ class TargetLCO {
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kMtoT) {
-      // TODO: take a look at this MtoT type. We use nothing but the code here. 
+      // TODO: take a look at this MtoT type. We use nothing but the code here.
       readbuf.interpret<MtoT>();
 
       // The LCO data contains the reference to the targets, which must be
@@ -238,8 +239,8 @@ class TargetLCO {
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
-      // TODO: take a look at this LtoT type. We use nothing but the code here. 
-      readbuf.interpret<LtoT>(); 
+      // TODO: take a look at this LtoT type. We use nothing but the code here.
+      readbuf.interpret<LtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
