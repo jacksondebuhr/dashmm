@@ -1,197 +1,34 @@
-The basic idea for the distributed execution:
+THIS BRANCH TODO
 
-Bo is working on this bit as a stand alone test case for creating the tree.
-We shall likely write up the tree creation scheme and the resulting scaling
-and performance.
- * Each locality will create its own copy of the tree
- * Each locality will start with some (unsorted) set of the S/T locations
- * First, each locality will create a uniform tree to a certain level,
-   partitioning the particles owned into the maximum level.
- * Then, each will share the counts of particles at those max level nodes
-   with all other localities.
- * The totals will then be used to perform a rough split of those nodes with
-   among the localities. This algorithm will be deterministic, so that each
-   locality will compute the same distribution.
- * Then each locality will send their exported particles to the correct
-   locality.
- * At each locality, when all have arrived, the branches of the tree are
-   refined to the limit.
- * Then, each locality will share the list of leaves with all other localities.
- * Each locality ends up with the same tree built in local memory, though only
-   certain S/T are local.
-
-At this point, each tree can then build a DAG locally using the user's selected
-Method.
-
-Then, each locality can then use the selected Distribution policy to compute
-the localities of the nodes of the DAG (this will be only the non-terminal
-DAG nodes).
-
-Then, each locality can create those LCOs that are owned by that locality and
-can then populate the relevant edge information. DAG nodes that are remote
-would be given HPX_THERE(loc) as an address.
-
-Then each locality can setup the dependent out edge actions.
-
-Then each locality can start the work on the sources it owns.
-
-The out edge spawn action will have to be ready to either do the current thing,
-or send an action to the remote locality that will first look up the address
-before doing the set. This remote action should continue the result of the
-lookup back to the original LCO where an action will get the user data, and
-update the line in the out edge table inside the LCO.
-  NOTE: The return should only happen if the DAG is going to be reused.
-        Otherwise, this is overkill.
-  NOTE: This creates a possible problem for the termination detection. If the
-        LCOs start to get deleted on the last iteration, a return message
-        could arrive at a destroyed LCO. This bears some thinking.
-
-
-
-THE NEW ARRAY
-
-The new layout for Array is going to be through a cyclic allocation of
-meta data, and then each local segment implemented as a single block in GAS.
-
-Each record in the cyclic meta data will have the GAS address of the local
-part of the data, the number of local records, the number of records, and
-the size of the record in bytes. Two of these are constant over the localities,
-but to keep extra copies is not a terrible burden.
-
-The array should support the same main operations, but the get and put should
-perhaps get and put on a rank by rank basis. That is how the user will use the
-thing in any event, so why not bake it into the interface. And then, if the
-user wishes, they can go ahead and only load on one rank or so on.
-  Though, this will complicate the error comparison thing...
-
-
-I think array ref does not need to change. It can only refer to data in a local
-chunk. So an array ref that spans localities is not possible.
-
-
-
-
-DO THESE THINGS
- * include
-   - dashmm
-  D : array.h
-        Largely speaking, the interface should not change too much for this.
-        The existing things will still be needed when fully distributed, but
-        their implementation should likely change. Further, we shall need to
-        extend the interface with some new things, even if only for internal
-        user.
-  D : arraymapaction.h
-        Once again, to the extent possible, this should keep its interface.
-        Once again, the implementation will need to be updated.
-  D : arraymetadata.h
-        This will need to change, but those are tied in with the overall change
-        to how the Array works internally.
-  D : arrayref.h
-        This too will need to change. The distribution of the data will mean
-        that this will have to become more complicated.
-            This is actually just as it was, but the reference now can only
-            apply to the data at a single locality. Revisit if more is needed.
-            But I don't think it will be.
-    : evaluator.h
-        There is some work needed for dealing with the source references that
-        will need to wait on working out Array, but mostly this is written
-        at a higher level. So this should be pretty easy to get ready. One
-        good place to start here would be to start defining the broken down
-        API for the evaluation. Then we can just use that.
-    : expansionlco.h
-      D * to be able to handle resets, we do not want to explicitly copy the
-          out edge record stuff, even though currently nothing was provided
-          there. When it is reset, we do not want the existing information
-          in the out edges to be scrubbed.
-      D * We shall need to add an "empty" set out edge data mode for the set
-          operation. This is for subsequent uses. Probably extend
-          set_out_edge_data with a boolean to indicate reset or not.
-        * The spawn_out_edges_handler will need to detect if the edge data
-          is just the HPX_THERE address and send the result to the correct
-          locality where it might look up the correct global address.
-          Though, the work will likely be complete on the sender side still as
-          we will have access to the indices and so on.
-            This has to wait on the new style of tree creation, the simple
-            early distribution will know all addresses from the start.
-      D * We also want to send the expansion data across the network only a
-          single time for each locality. So we want to first sort the out edges
-          by the target locality. Then the expansion data is sent across the
-          network. At the far side it will go ahead and perform the translations
-          and then the local lco sets. -- further, the ->T operations should
-          be performed last
-              Okay - sorting is done
-              This is implemented, but is not tested. Currently, there is no
-              distribution possible. Perhaps I will get everything ready,
-              and then run with some nonsense distribution just to test it.
-  D : targetlco.h
-        The change in Array and ArrayRef will impact here also.
-        Otherwise, this should be fine provided the LCO is always colocated
-        with the Target data it is representing.
-
-        Actually, this might not change that much, if at all. I think the
-        same interface on the reference means this does not need any update.
-        It is only in things that create ArrayRef from an Array that needs to
-        worry about the change.
-    : tree.h
-        * The array reference type will impact this.
-      D * The tree will no longer partition at the same time as it generates
-          the DAG.
-        * Largely speaking, the tree is still going to live in local memory. It
-          is just that there are stages in the construction when the various
-          trees speak with one another.
-        * So yeah, this is likely to change significantly. I think I should
-          first work out how the interface will want to look. And then go from
-          there.
-      D * For the spawn of the S->?, we want to sort the out edges by locality
-          and send to each locality only once, and then do the set of edges
-          on the far side. Further, the ->T operations should be performed last
-              Okay - sorting is done
-
-              This one is not as clean. This can be rearranged so that the
-              sources are sent to each locality only once, but is that a win
-              compared to setting the expansion? If there are lots of edges
-              then this is a win. But otherwise, it might not be.
-
-              S->M should never be remote, so that is not really a concern
-              S->L could very well be remote. So perhaps we just make sure
-              that we do not multiple send the sources to the same locality
-              for S->T operations?
- * src
-  D : array.cc
-        This whole thing will need an update. We do not yet have the Array
-        implementation worked out for the distributed case. There is likely to
-        be significant change to how it works internally.
-
-
-
-INTEGRATING TREEBUILD3
-
-DONE * Move files about, including putting rankwise into include/dashmm
-DONE * Replace registrar with evaluator
-DONE * Update any action registration lines
-DONE * Finish create_expansions_from_DAG
-DONE * Finish setup_edge_lists
-DONE * Finish start_DAG_evaluation
-DONE * Workign on Evaluator made me realize that I have more to do in tree.
- * Deal with the return messages about the addresses of the remote LCOs
+TODO: Think about the following issue
+  The out edge spawn action will have to be ready to either do the current thing,
+  or send an action to the remote locality that will first look up the address
+  before doing the set. This remote action should continue the result of the
+  lookup back to the original LCO where an action will get the user data, and
+  update the line in the out edge table inside the LCO.
+    NOTE: The return should only happen if the DAG is going to be reused.
+          Otherwise, this is overkill.
+    NOTE: This creates a possible problem for the termination detection. If the
+          LCOs start to get deleted on the last iteration, a return message
+          could arrive at a destroyed LCO. This bears some thinking.
+TODO: Deal with the return messages about the addresses of the remote LCOs
     (Do we even want to do this? There is an issue with termination detection
      here.)
-DONE * Have Evaluator use the new interface for the DualTree
-DONE * Has Shared Data use gone away? If so, drop it. I think so.
- * Consider changing ExpansionLCO to only contain the needed info from the
+
+TODO: Consider changing ExpansionLCO to only contain the needed info from the
     DomainGeometry. The use is very simple, getting box sizes and so on.
 
-
-
-
-THIS BRANCH TODO
 
 TODO: Remove the offset in the array map action.
 TODO: demo/basic should also report the kernel used
 
+TODO: Allow for the array map action to have a couple integer template
+      parameters. One to indicate the overdecomposition. The other to indicate
+      how many threads should deal with each segment.
+
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
-TODO: We need to update the comments in the dag.h file.
+TODO: We need to update the comments throughout
 
 TODO: decide if I want to add assertions around the calls to the Expansion
       operations to make sure the Expansion Role is correct.
@@ -211,8 +48,6 @@ TODO: Improve the way that we optionally put out the DAG information. Perhaps
         can call whatever methods they want on it.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
-TODO: Decide if we should move setup_termination_detection, setup_edge_lists
-      and destroy_DAG_LCOs into evaluator
 TODO: Decode if we should also test Hilbert ordering on the top level distrib
       of the tree. This might have some better locality.
 TODO: Further, should we allow for a non-space-filling curve distribution.
@@ -222,46 +57,30 @@ TODO: Further, should we allow for a non-space-filling curve distribution.
 
 
 Overall Plan to 1.0
-
- * DONE Split DAG from Tree
- * DONE Kernel Parameters and Table generation - this is perhaps via another
-     method added to the expansion concept. This will be called at a certain
-     point during the evaluation (once the domain is available)
-        This was added to the evaluation process. The kernel parameters are
-        passed into evaluate, and they are stored in the table. The table is
-        now updated after the domain is known. This will potentially get a mild
-        update once the distributed tree creation is merged into the mainline
-        code.
- * DONE Make intermediate expansions possible
-    This is provisionally DONE. This did not break the current operation of
-    all existing examples. However, a specific example was not created to test
-    this. Instead, the full Merge-And-Shift FMM will be implemented. If there
-    are problems, then these can be easily addressed in whatever state the
-    code is in.
-
-
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those
       particles as needed)
     - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
 
-
- * Split Evaluate into pieces and expose more interface to users
-    - Enable repeat use of a DAG
-    - Potentially provide objects representing the tree and so on to the user
-      and some utility routines to use the resulting objects
- * Finish interface
-    - Make it so that an advanced user could call all the needed stuff directly
-      from an HPX thread.
-    - As a corollary to that, add assertions to routines that have
-      inside / outside HPX restrictions
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
     - consider placing the user-facing heads into a different directory than
       the internal stuff
+
+ * Split Evaluate into pieces and expose more interface to users
+    - NOTE: This is not a vital thing to accomplish for 1.0.0
+    - Enable repeat use of a DAG
+    - Potentially provide objects representing the tree and so on to the user
+      and some utility routines to use the resulting objects
+ * Finish interface
+    - NOTE: this is not a vital thing to accomplish for 1.0.0
+    - Make it so that an advanced user could call all the needed stuff directly
+      from an HPX thread.
+    - As a corollary to that, add assertions to routines that have
+      inside / outside HPX restrictions
  * As there is time, work on performance
     - Time various parts of the code
 
