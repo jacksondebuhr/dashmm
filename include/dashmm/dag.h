@@ -57,6 +57,7 @@ struct DAGNode {
   hpx_addr_t global_addx;        /// global address of object serving this node
   size_t n_parts;                /// number of points stored in a target lco
                                  /// or a source ref
+  int color; 
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
     n_parts{0} {}
