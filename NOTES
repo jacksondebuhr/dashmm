@@ -28,6 +28,8 @@ TODO: Allow for the array map action to have a couple integer template
 
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
+TODO: In tree, privatize anything possible
+TODO: The same is true everywhere I guess.
 TODO: We need to update the comments throughout
 
 TODO: decide if I want to add assertions around the calls to the Expansion
@@ -53,6 +55,10 @@ TODO: Decode if we should also test Hilbert ordering on the top level distrib
 TODO: Further, should we allow for a non-space-filling curve distribution.
       This might be a way to make a non-contiguous chunk on the SFC a better
       overall distribution.
+TODO: separate the include directories into dashmm and libdashmm, patterned
+      after HPX. This will make it 'clear' which are to be used by the casual
+      user, and which are not part of the public interface. This will also be
+      important for dealing with a complete specification.
 
 
 
@@ -69,6 +75,11 @@ Overall Plan to 1.0
     - actually build the documentation with DoxyGen to see if it is done
     - consider placing the user-facing heads into a different directory than
       the internal stuff
+
+ * Decide if we are changing the license
+    - Look into GPL vs LGPL
+    - Doublecheck with Bo that he is still down
+    - Update all files everywhere
 
  * Split Evaluate into pieces and expose more interface to users
     - NOTE: This is not a vital thing to accomplish for 1.0.0
@@ -105,9 +116,6 @@ TODO: currently it is impossible to use the same tree for different Evaluators.
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
         (Cool idea; no use case. Delay)
-TODO: Do we want to decouple the registration from the evaluation? Two objects?
-      Some kind of template function?
-        (Not sure. It is not too onerous to do as we have been.)
 TODO: There is an overdecomposition factor in ArrayMapAction that is hard
       coded. Explore this and pick one that performs well.
 
@@ -123,9 +131,6 @@ sensible error where possible instead of just being assertions that fail.
 
 
 Interface Ideas
-
- * Provide C bindings before too long
-      (Useful for people stuck back in the day, but might be of little utility.)
 
  * We should also in the near term get a base nearest neighbor search. This will
    be essential for SPH and Phil's MFV methods.

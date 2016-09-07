@@ -154,7 +154,7 @@ class DualTreeRegistrar {
  public:
   using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
 
-  Registrar() : sreg_{}, treg_{}, streg_{}, ttreg_{} {
+  DualTreeRegistrar() {
     // DualTree actions
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::set_domain_geometry_,
@@ -224,12 +224,12 @@ class DualTreeRegistrar {
                         dualtree_t::edge_lists_handler,
                         HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        tree_t::instigate_dag_eval_,
-                        tree_t::instigate_dag_eval_handler,
+                        dualtree_t::instigate_dag_eval_,
+                        dualtree_t::instigate_dag_eval_handler,
                         HPX_ADDR, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        tree_t::instigate_dag_eval_remote_,
-                        tree_t::instigate_dag_eval_remote_handler,
+                        dualtree_t::instigate_dag_eval_remote_,
+                        dualtree_t::instigate_dag_eval_remote_handler,
                         HPX_POINTER, HPX_SIZE_T);
   }
 };

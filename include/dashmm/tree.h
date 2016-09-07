@@ -67,7 +67,7 @@ template <typename Source, typename Target,
                     template <typename, typename> class,
                     typename> class Method,
           typename DistroPolicy>
-class Registrar;
+class DualTreeRegistrar;
 
 
 /// A Node of a tree.
@@ -1176,6 +1176,10 @@ class DualTree {
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
+                                      DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
+                                DistroPolicy>;
   using method_t = Method<Source, Target, Expansion, DistroPolicy>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
@@ -1287,7 +1291,7 @@ class DualTree {
   /// This will allocate and collect the DAG nodes into the returned object.
   ///
   /// \returns - the resulting DAG.
-  DAG create_DAG() {
+  DAG *create_DAG() {
     // Do work on the source tree
     hpx_addr_t sdone = hpx_lco_future_new(0);
     assert(sdone != HPX_NULL);
@@ -1300,18 +1304,19 @@ class DualTree {
     hpx_lco_delete_sync(sdone);
 
     // Do work on the target tree
-    hpx_addr_t tdone = hpx_lco_future_new(0);
+    hpx_addr_t tdone = hpx_lco_and_new(1);
     assert(tdone != HPX_NULL);
 
     std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
     consider->push_back(source_tree_->root_);
+    targetnode_t *trgaddx = target_tree_->root_;
     hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
-             &thetree, &target_tree_->root_, &consider, &same_sandt_, &tdone);
+             &thetree, &trgaddx, &consider, &same_sandt_, &tdone);
 
     hpx_lco_wait(tdone);
     hpx_lco_delete_sync(tdone);
 
-    DAG retval{};
+    DAG *retval = new DAG{};
     collect_DAG_nodes(retval);
     return retval;
   }
@@ -1326,11 +1331,11 @@ class DualTree {
   /// This is a synchronous operation.
   ///
   /// \param dag - a DAG object to be populated
-  void collect_DAG_nodes(DAG &dag) {
-    collect_DAG_nodes_from_S_node(source_tree_->root_, dag.source_leaves,
-                                  dag.source_nodes);
-    collect_DAG_nodes_from_T_node(target_tree_->root_, dag.target_leaves,
-                                  dag.target_nodes);
+  void collect_DAG_nodes(DAG *dag) {
+    collect_DAG_nodes_from_S_node(source_tree_->root_, dag->source_leaves,
+                                  dag->source_nodes);
+    collect_DAG_nodes_from_T_node(target_tree_->root_, dag->target_leaves,
+                                  dag->target_nodes);
   }
 
   /// Create the LCOs from the DAG
@@ -1341,21 +1346,20 @@ class DualTree {
   ///
   /// This is a synchronous operation.
   void create_expansions_from_DAG() {
-    int rank = hpx_get_my_rank();
-    int b = first(rank);
-    int e = last(rank);
-    int range = e - b + 1;
-
-    hpx_addr_t done = hpx_lco_and_new(2 * range);
+    hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
 
+    // TODO: There is an issue here. The following is not a great idea to
+    // begin with. What if the distribution policy splits up the stuff on a
+    // given tree node.
+
     dualtree_t *argthis = this;
-    for (int i = b; i <= e; ++i) {
-      hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-               &done, &argthis, &source_tree_->unif_grid_[i]);
-      hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-               &done, &argthis, &target_tree_->unif_grid_[i]);
-    }
+    sourcenode_t *srcaddx = source_tree_->root_;
+    hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
+             &done, &argthis, &srcaddx);
+    targetnode_t *trgaddx = target_tree_->root_;
+    hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
+             &done, &argthis, &trgaddx);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -1371,17 +1375,17 @@ class DualTree {
   ///
   /// \returns - LCO that will signal that all targets have completed their
   ///            computation.
-  hpx_addr_t setup_termination_detection(DAG &dag) {
-    size_t n_targs = dag.target_leaves.size();
-    size_t n_tinternal = dag.target_nodes.size();
-    size_t n_sinternal = dag.source_nodes.size();
+  hpx_addr_t setup_termination_detection(DAG *dag) {
+    size_t n_targs = dag->target_leaves.size();
+    size_t n_tinternal = dag->target_nodes.size();
+    size_t n_sinternal = dag->source_nodes.size();
 
     hpx_addr_t retval = hpx_lco_and_new(n_targs + n_tinternal + n_sinternal);
     assert(retval != HPX_NULL);
 
-    std::vector<DAGNode *> *argaddx = &dag.target_leaves;
-    std::vector<DAGNode *> *tinternalsaddx = &dag.target_nodes;
-    std::vector<DAGNode *> *sinternalsaddx = &dag.source_nodes;
+    std::vector<DAGNode *> *argaddx = &dag->target_leaves;
+    std::vector<DAGNode *> *tinternalsaddx = &dag->target_nodes;
+    std::vector<DAGNode *> *sinternalsaddx = &dag->source_nodes;
     hpx_call(HPX_HERE, termination_detection_, HPX_NULL, &retval,
              &argaddx, &n_targs, &tinternalsaddx, &n_tinternal,
              &sinternalsaddx, &n_sinternal);
@@ -1401,11 +1405,11 @@ class DualTree {
   /// as the termination detection cannot trigger before this is done.
   ///
   /// \param dag - DAG object
-  void setup_edge_lists(DAG &dag) {
-    DAGNode **sdata = dag.source_nodes.data();
-    size_t n_snodes = dag.source_nodes.size();
-    DAGNode **tdata = dag.target_nodes.data();
-    size_t n_tnodes = dag.target_nodes.size();
+  void setup_edge_lists(DAG *dag) {
+    DAGNode **sdata = dag->source_nodes.data();
+    size_t n_snodes = dag->source_nodes.size();
+    DAGNode **tdata = dag->target_nodes.data();
+    size_t n_tnodes = dag->target_nodes.size();
     hpx_call(HPX_HERE, edge_lists_, HPX_NULL,
              &sdata, &n_snodes, &tdata, &n_tnodes);
   }
@@ -1419,15 +1423,9 @@ class DualTree {
   /// possibly trigger before this is completed, so waiting on the termination
   /// of the full evaluation implicitly waits on this operation.
   void start_DAG_evaluation(RankWise<dualtree_t> &global_tree) {
-    int rank = hpx_get_my_rank();
-    int b = first(rank);
-    int e = last(rank);
-
     hpx_addr_t rwaddr = global_tree.data();
-    for (int i = b; i <= e; ++i) {
-      hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
-               &rwaddr, &source_tree_->root_);
-    }
+    hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
+             &rwaddr, &source_tree_->root_);
   }
 
   /// Destroys the LCOs associated with the DAG
@@ -2221,7 +2219,6 @@ class DualTree {
   static int finalize_partition_handler(hpx_addr_t rwtree) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
-    tree->destroy_DAG_LCOs();
     tree->clear_data();
     return HPX_SUCCESS;
   }
@@ -2253,8 +2250,11 @@ class DualTree {
         hpx_addr_t done, dualtree_t *tree, sourcenode_t *node) {
     Point n_center = tree->domain_.center_from_index(node->idx);
 
+    // TODO: Is this better? We could also do an action argument here.
+    int myrank = hpx_get_my_rank();
+
     // create the normal expansion if needed
-    if (node->dag.has_normal()) {
+    if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
         new expansion_t{n_center, expansion_t::compute_scale(node->idx),
                         kSourcePrimary}
@@ -2267,7 +2267,7 @@ class DualTree {
     }
 
     // If there is to be an intermediate expansion, create that
-    if (node->dag.has_interm()) {
+    if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
         new expansion_t{n_center, expansion_t::compute_scale(node->idx),
                         kSourceIntermediate}
@@ -2289,8 +2289,9 @@ class DualTree {
 
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
+          sourcenode_t *srcaddx = node->child[i];
           hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &tree, &node->child[i]);
+                   &cdone, &tree, &srcaddx);
         }
       }
 
@@ -2311,8 +2312,10 @@ class DualTree {
         hpx_addr_t done, dualtree_t *tree, targetnode_t *node) {
     Point n_center = tree->domain_.center_from_index(node->idx);
 
+    int myrank = hpx_get_my_rank();
+
     // create the normal expansion if needed
-    if (node->dag.has_normal()) {
+    if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
         new expansion_t{n_center, expansion_t::compute_scale(node->idx),
                         kTargetPrimary}
@@ -2325,7 +2328,7 @@ class DualTree {
     }
 
     // If there is to be an intermediate expansion, create that
-    if (node->dag.has_interm()) {
+    if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
         new expansion_t{n_center, expansion_t::compute_scale(node->idx),
                         kTargetIntermediate}
@@ -2343,7 +2346,7 @@ class DualTree {
     // If so, this branch is done, and we need not spawn more.
 
     // Here is where we make the target lco if needed
-    if (node->dag.has_parts()) {
+    if (node->dag.has_parts() && node->dag.parts()->locality == myrank) {
       targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
                        HPX_THERE(node->dag.parts()->locality)};
       node->dag.set_targetlco(tlco.lco(), tlco.n());
@@ -2355,8 +2358,9 @@ class DualTree {
 
       for (int i = 0; i < 8; ++i) {
         if (node->child[i] != nullptr) {
+          targetnode_t *trgaddx = node->child[i];
           hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &tree, &node->child[i]);
+                   &cdone, &tree, &trgaddx);
         }
       }
 
@@ -2374,13 +2378,13 @@ class DualTree {
     // TODO If this is a bottleneck, we can easily make this parallel
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_snodes; ++i) {
-      if (snodes[i].locality == myrank) {
+      if (snodes[i]->locality == myrank) {
         expansionlco_t expand{snodes[i]->global_addx};
         expand.set_out_edge_data(snodes[i]->out_edges);
       }
     }
     for (size_t i = 0; i < n_tnodes; ++i) {
-      if (tnodes[i].locality == myrank) {
+      if (tnodes[i]->locality == myrank) {
         expansionlco_t expand{tnodes[i]->global_addx};
         expand.set_out_edge_data(tnodes[i]->out_edges);
       }
@@ -2392,6 +2396,8 @@ class DualTree {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
 
+    DAGNode *parts{nullptr};
+
     int n_children{node->n_children()};
     if (n_children > 0) {
       for (int i = 0; i < 8; ++i) {
@@ -2402,8 +2408,14 @@ class DualTree {
       }
     } else {
       // At a leaf, we do actual work
-      DAGNode *parts = node->dag.parts();
+      parts = node->dag.parts();
       assert(parts != nullptr);
+      if (parts->locality != hpx_get_my_rank()) {
+        parts = nullptr;
+      }
+    }
+
+    if (parts) {
       sourceref_t sources = node->parts;
 
       // We first sort the out edges by locality
@@ -2433,9 +2445,6 @@ class DualTree {
         assert(headdata.write(rwtree));
       }
 
-      // loop over the sorted edges
-      //  send parcel or do work
-      // advance
       int my_rank = hpx_get_my_rank();
       auto begin = parts->out_edges.begin();
       auto end = parts->out_edges.end();
@@ -2514,7 +2523,6 @@ class DualTree {
 
     // Detect if the edges have unknown target addresses and lookup the
     // correct address
-    hpx_addr_t compare = HPX_HERE();
     for (size_t i = 0; i < n_edges; ++i) {
       if (edges[i].target == HPX_NULL) {
         edges[i].target = local_tree->target_tree_->lookup_lco_addx(
@@ -2617,7 +2625,9 @@ class DualTree {
                                          std::vector<sourcenode_t *> *consider,
                                          int same_sandt, hpx_addr_t done) {
     bool refine = false;
-    if (node->parts.n() > (size_t)tree->refinement_limit_) {
+    if (node->idx.level() < tree->unif_level_) {
+      refine = true;
+    } else if (node->parts.n() > (size_t)tree->refinement_limit_) {
       refine = tree->method_.refine_test((bool)same_sandt, node, *consider);
     }
 

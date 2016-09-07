@@ -86,16 +86,14 @@ class Evaluator {
                                 DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
                                       DistroPolicy>;
-  using sourcenode_t = Node<Source, Target, Source, Expansion, Method,
-                                DistroPolicy>;
-  using targetnode_t = Node<Source, Target, Target, Expansion, Method,
-                                DistroPolicy>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
   using distropolicy_t = DistroPolicy;
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
-  Evaluator() : tlcoreg_{}, elocreg_{}, snodereg_{}, tnodereg_{},
+  Evaluator() : tlcoreg_{}, elcoreg_{}, snodereg_{}, tnodereg_{},
                 streereg_{}, ttreereg_{}, dtreereg_{} {
     // Actions for the evaluation
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
@@ -104,6 +102,9 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         evaluate_rank_local_, evaluate_rank_local_handler,
                         HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        evaluate_cleanup_DAG_, evaluate_cleanup_DAG_handler,
+                        HPX_ADDR, HPX_POINTER, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         evaluate_cleanup_, evaluate_cleanup_handler,
                         HPX_ADDR, HPX_ADDR);
@@ -190,6 +191,7 @@ class Evaluator {
   // The actions for evaluate
   static hpx_action_t evaluate_;
   static hpx_action_t evaluate_rank_local_;
+  static hpx_action_t evaluate_cleanup_DAG_;
   static hpx_action_t evaluate_cleanup_;
 
   /// Parameters to evaluations
@@ -208,7 +210,10 @@ class Evaluator {
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
                            parms->targets);
-    dualtree_t::partition(global_tree, sources, targets);
+    hpx_addr_t partitiondone =
+        dualtree_t::partition(global_tree, parms->sources, parms->targets);
+    hpx_lco_wait(partitiondone);
+    hpx_lco_delete_sync(partitiondone);
 
     // Allocate space for message buffer
     size_t bcast_size = total_size + sizeof(hpx_addr_t) * 2;
@@ -227,7 +232,7 @@ class Evaluator {
     hpx_bcast_lsync(evaluate_rank_local_, HPX_NULL, data, bcast_size);
 
     // set up dependent call on the broadcast to do evaluate cleanup
-    hpx_call_when(alldone, HPX_HERE, evaluate_cleanup_,
+    hpx_call_when(preargs[0], HPX_HERE, evaluate_cleanup_, HPX_NULL,
                   &preargs[1], &preargs[0]);
 
     delete [] data;
@@ -246,15 +251,16 @@ class Evaluator {
     // difficult thing to arrange.
     RankWise<dualtree_t> global_tree{preargs[1]};
     auto tree = global_tree.here();
-    double domain_size = tree->domain_.size();
-    size_t n_params = (total_size - sizeof(EvaluateParams)) / sizeof(double);
+    double domain_size = tree->domain()->size();
+    size_t n_params = (msg_size - sizeof(EvaluateParams)) / sizeof(double);
     std::vector<double> kernel_params(parms->kernelparams,
                                       &parms->kernelparams[n_params]);
     expansion_t::update_table(parms->n_digits, domain_size, kernel_params);
+    tree->set_method(parms->method);
 
     // Get ready to evaluate
-    DAG dag = tree->create_DAG();
-    parms->distro.compute_distribution(dag);
+    DAG *dag = tree->create_DAG();
+    parms->distro.compute_distribution(*dag);
     tree->create_expansions_from_DAG();
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -262,15 +268,27 @@ class Evaluator {
     // get their work going when they come to it and then they return.
 
     tree->setup_edge_lists(dag);
-    tree->start_DAG_evaluation();
+    tree->start_DAG_evaluation(global_tree);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
 
-    // When the local work finished, delete the gate, and then set the
-    // global completion LCO.
-    hpx_call_when_with_continuation(heredone, heredone, hpx_lco_delete_action,
-                                    &preargs[0], hpx_lco_set_action,
-                                    nullptr, 0);
+    // When the local work finishes, call a routine to delete the LCOs in the
+    // DAG, and then continue on to destroying the tree.
+    //
+    // NOTE: Consider that this will be a problem when we return the looked-up
+    // remote addresses.
+    hpx_call_when_with_continuation(heredone, HPX_HERE, evaluate_cleanup_DAG_,
+                                    preargs[0], hpx_lco_set_action,
+                                    &preargs[1], &dag, &heredone);
 
+    return HPX_SUCCESS;
+  }
+
+  static int evaluate_cleanup_DAG_handler(hpx_addr_t rwaddr, DAG *dag,
+                                          hpx_addr_t heredone) {
+    RankWise<dualtree_t> global_tree{rwaddr};
+    auto tree = global_tree.here();
+    tree->destroy_DAG_LCOs(*dag);
+    hpx_lco_delete_sync(heredone);
     return HPX_SUCCESS;
   }
 
@@ -302,6 +320,14 @@ template <typename S, typename T,
                     typename> class M,
           typename D>
 hpx_action_t Evaluator<S, T, E, M, D>::evaluate_rank_local_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class M,
+          typename D>
+hpx_action_t Evaluator<S, T, E, M, D>::evaluate_cleanup_DAG_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

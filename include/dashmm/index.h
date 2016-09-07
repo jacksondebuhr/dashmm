@@ -97,6 +97,14 @@ class Index {
     return (xval + yval + zval);
   }
 
+  /// Equality operator
+  bool operator==(const Index &other) {
+    return (level_ == other.level_
+              && idx_[0] == other.idx_[0]
+              && idx_[1] == other.idx_[1]
+              && idx_[2] == other.idx_[2]);
+  }
+
  private:
   int idx_[3];
   int level_;

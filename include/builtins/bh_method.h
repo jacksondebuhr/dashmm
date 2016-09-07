@@ -55,10 +55,8 @@ class BH {
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH,
                                       DistroPolicy>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, BH, DistroPolicy>;
-  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, BH,
-                                DistroPolicy>;
-  using targetnode_t = TreeNode<Source, Target, Target, Expansion, BH,
-                                DistroPolicy>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using sourceref_t = ArrayRef<Source>;
 
   BH() : theta_{0.0} { }
@@ -73,7 +71,7 @@ class BH {
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
     assert(curr->dag.add_normal() == true);
-    curr->dag.StoM(&curr->dag, 
+    curr->dag.StoM(&curr->dag,
                    expansion_t::weight_estimate(Operation::StoM));
   }
 
@@ -84,7 +82,7 @@ class BH {
     for (size_t i = 0; i < 8; ++i) {
       sourcenode_t *kid = curr->child[i];
       if (kid != nullptr) {
-        curr->dag.MtoM(&kid->dag, 
+        curr->dag.MtoM(&kid->dag,
                        expansion_t::weight_estimate(Operation::MtoM));
       }
     }
@@ -116,12 +114,12 @@ class BH {
           if (!curr_is_leaf) {
             newcons.push_back(*i);
           } else {
-            (*i)->dag.MtoT(&curr->dag, 
+            (*i)->dag.MtoT(&curr->dag,
                            expansion_t::weight_estimate(Operation::MtoT));
           }
         } else if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            curr->dag.StoT(&(*i)->dag, 
+            curr->dag.StoT(&(*i)->dag,
                            expansion_t::weight_estimate(Operation::StoT));
           } else {
             newcons.push_back(*i);

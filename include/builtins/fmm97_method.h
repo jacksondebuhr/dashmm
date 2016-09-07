@@ -15,7 +15,7 @@
 #define __DASHMM_FMM97_METHOD_H__
 
 /// \file include/builtins/fmm97_method.h
-/// \brief Declaration of FMM method with merge and shift 
+/// \brief Declaration of FMM method with merge and shift
 
 #include "dashmm/arrayref.h"
 #include "dashmm/defaultpolicy.h"
@@ -40,33 +40,31 @@ class FMM97 {
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM97,
                                       DistroPolicy>;
   using sourceref_t = ArrayRef<Source>;
-  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, FMM97,
-                                DistroPolicy>;
-  using targetnode_t = TreeNode<Source, Target, Target, Expansion, FMM97,
-                                DistroPolicy>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM97, DistroPolicy>;
 
-  FMM97() {} 
+  FMM97() {}
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
     if (curr->idx.level() >= 2) {
       // If \p curr is of level 0 or 1, \p curr is not well separated
       // from any target node. As a result, there is no need to create
-      // the normal expansion. 
-      assert(curr->dag.add_normal() == true); 
-      curr->dag.StoM(&curr->dag, 
-                     expansion_t::weight_estimate(Operation::StoM));  
+      // the normal expansion.
+      assert(curr->dag.add_normal() == true);
+      curr->dag.StoM(&curr->dag,
+                     expansion_t::weight_estimate(Operation::StoM));
     }
   }
 
   void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
     if (curr->idx.level() >= 2) {
-      assert(curr->dag.add_normal() == true); 
+      assert(curr->dag.add_normal() == true);
       for (size_t i = 0; i < 8; ++i) {
-        sourcenode_t *child = curr->child[i]; 
+        sourcenode_t *child = curr->child[i];
         if (child != nullptr) {
-          curr->dag.MtoM(&child->dag, 
+          curr->dag.MtoM(&child->dag,
                          expansion_t::weight_estimate(Operation::MtoM));
         }
       }
@@ -75,38 +73,40 @@ class FMM97 {
 
   void inherit(targetnode_t *curr, DomainGeometry *domain,
                bool curr_is_leaf) const {
-    if (curr_is_leaf) 
-      curr->dag.add_parts(); 
+    if (curr_is_leaf) {
+      curr->dag.add_parts();
+    }
 
     if (curr->idx.level() >= 2) {
-      assert(curr->dag.add_normal() == true); 
-      curr->dag.ItoL(&curr->parent->dag, 
-                     expansion_t::weight_estimate(Operation::ItoL)); 
+      assert(curr->dag.add_normal() == true);
+      curr->dag.ItoL(&curr->parent->dag,
+                     expansion_t::weight_estimate(Operation::ItoL));
 
-      if (curr->idx.level() >= 3) 
-        curr->dag.LtoL(&curr->parent->dag, 
-                       expansion_t::weight_estimate(Operation::LtoL)); 
+      if (curr->idx.level() >= 3) {
+        curr->dag.LtoL(&curr->parent->dag,
+                       expansion_t::weight_estimate(Operation::LtoL));
+      }
     }
   }
 
   void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                bool curr_is_leaf, DomainGeometry *domain) const {
     Index t_index = curr->idx;
-    int StoL = expansion_t::weight_estimate(Operation::StoL); 
-    int StoT = expansion_t::weight_estimate(Operation::StoT); 
-    int LtoT = expansion_t::weight_estimate(Operation::LtoT); 
-    int MtoI = expansion_t::weight_estimate(Operation::MtoI); 
+    int StoL = expansion_t::weight_estimate(Operation::StoL);
+    int StoT = expansion_t::weight_estimate(Operation::StoT);
+    int LtoT = expansion_t::weight_estimate(Operation::LtoT);
+    int MtoI = expansion_t::weight_estimate(Operation::MtoI);
 
     // If a source node S is at the same level as \p curr and is well separated
     // from \p curr, skip S as its contribution to \p curr has been processed by
-    // the parent of \p curr. 
+    // the parent of \p curr.
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag, StoL); 
+            curr->dag.StoL(&(*S)->dag, StoL);
           } else {
-            curr->dag.StoT(&(*S)->dag, StoT); 
+            curr->dag.StoT(&(*S)->dag, StoT);
           }
         } else {
           if (!well_sep_test((*S)->idx, t_index)) {
@@ -115,53 +115,57 @@ class FMM97 {
         }
       }
 
-      if (curr->idx.level() >= 2) 
-        curr->dag.LtoT(&curr->dag, LtoT); 
+      if (curr->idx.level() >= 2) {
+        curr->dag.LtoT(&curr->dag, LtoT);
+      }
     } else {
-      if (curr->idx.level() >= 1) 
-        assert(curr->dag.add_interm() == true); 
+      if (curr->idx.level() >= 1) {
+        assert(curr->dag.add_interm() == true);
+      }
 
       std::vector<sourcenode_t *> newcons{};
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag, StoL); 
+            curr->dag.StoL(&(*S)->dag, StoL);
           } else {
             newcons.push_back(*S);
           }
         } else {
           if (!well_sep_test((*S)->idx, t_index)) {
-            bool do_I2I = (curr->idx.level() >= 1 && 
-                           ((*S)->idx.x() != t_index.x() || 
+            bool do_I2I = (curr->idx.level() >= 1 &&
+                           ((*S)->idx.x() != t_index.x() ||
                             (*S)->idx.y() != t_index.y() ||
-                            (*S)->idx.z() != t_index.z())); 
+                            (*S)->idx.z() != t_index.z()));
 
-            bool S_is_leaf = true; 
+            bool S_is_leaf = true;
 
             for (size_t i = 0; i < 8; ++i) {
-              sourcenode_t *child = (*S)->child[i]; 
+              sourcenode_t *child = (*S)->child[i];
               if (child != nullptr) {
-                newcons.push_back(child); 
-                S_is_leaf = false; 
+                newcons.push_back(child);
+                S_is_leaf = false;
                 if (do_I2I) {
-                  if (child->dag.add_interm()) 
-                    child->dag.MtoI(&child->dag, MtoI); 
-                  curr->dag.ItoI(&child->dag, 
-                                 expansion_t::weight_estimate(Operation::ItoI, 
-                                                              (*S)->idx, 
-                                                              t_index)); 
+                  if (child->dag.add_interm()) {
+                    child->dag.MtoI(&child->dag, MtoI);
+                  }
+                  curr->dag.ItoI(&child->dag,
+                                 expansion_t::weight_estimate(Operation::ItoI,
+                                                              (*S)->idx,
+                                                              t_index));
                 }
               }
             }
 
-            if (S_is_leaf) 
-              newcons.push_back(*S); 
+            if (S_is_leaf) {
+              newcons.push_back(*S);
+            }
           }
         }
-      } 
+      }
 
-      consider = std::move(newcons);              
+      consider = std::move(newcons);
     }
   }
 
@@ -209,10 +213,10 @@ class FMM97 {
     int MtoT = expansion_t::weight_estimate(Operation::MtoT);
     int StoT = expansion_t::weight_estimate(Operation::StoT);
     if (well_sep_test_asymmetric(S->idx, T->idx)) {
-      S->dag.MtoT(&T->dag, MtoT); 
+      S->dag.MtoT(&T->dag, MtoT);
     } else {
       if (S->is_leaf()) {
-        T->dag.StoT(&S->dag, StoT); 
+        T->dag.StoT(&S->dag, StoT);
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];
