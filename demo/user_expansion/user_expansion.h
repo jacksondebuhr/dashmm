@@ -89,16 +89,13 @@ class User {
   //
   // DASHMM expects that the data provided by release() will have been allocated
   // using new char [].
-  User(dashmm::Point center, int n_digits, double scale,
-       dashmm::ExpansionRole role) {
+  User(dashmm::Point center, double scale, dashmm::ExpansionRole role) {
     // If there was more complication to UserData, this next line would need to
     // be modified.
     bytes_ = sizeof(UserData);
-    acc_ = n_digits;
     role_ = role;
     data_ = reinterpret_cast<UserData *>(new char [bytes_]);
     assert(valid(dashmm::ViewSet{}));
-    data_->acc = acc_;
     data_->center = center;
   }
 
@@ -116,7 +113,6 @@ class User {
   User(const dashmm::ViewSet &views) {
     assert(views.count() < 2);
     bytes_ = sizeof(UserData);
-    acc_ = views.n_digits();
     role_ = views.role();
     if (views.count() == 1) {
       data_ = reinterpret_cast<UserData *>(views.view_data(0));
@@ -172,7 +168,6 @@ class User {
       view.set_bytes(0, sizeof(UserData));
       view.set_data(0, (char *)data_);
     }
-    view.set_n_digits(acc_);
     view.set_role(role_);
   }
 
@@ -182,9 +177,6 @@ class User {
     get_views(retval);
     return retval;
   }
-
-  // This returns the accuracy paramter with which the object was constructed.
-  int accuracy() const  {return acc_;}
 
   dashmm::ExpansionRole role() const {return role_;}
 
@@ -199,8 +191,7 @@ class User {
 
   // This gives the number of terms in the expansion.
   //
-  // Currently, User does not have any terms. Typically, the result of this
-  // function will depend on acc_.
+  // Currently, User does not have any terms.
   size_t view_size(int view) const {
     return 0;
   }
@@ -219,18 +210,18 @@ class User {
   // This routine will set this expansion to the multipole moments generated
   // by the given sources.
   std::unique_ptr<User> S_to_M(dashmm::Point center, Source *first,
-              Source *last, double scale) const {
+                               Source *last) const {
     fprintf(stdout, "S->M for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_, 1.0,
+    return std::unique_ptr<User>{new User{center, 1.0,
                                           dashmm::kSourcePrimary}};
   }
 
   // This will generate a local expansion at the given center for the
   // given points.
   std::unique_ptr<User> S_to_L(dashmm::Point center, Source *first,
-                               Source *last, double scale) const {
+                               Source *last) const {
     fprintf(stdout, "S->L for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, acc_, 1.0,
+    return std::unique_ptr<User>{new User{center, 1.0,
                                           dashmm::kTargetPrimary}};
   }
 
@@ -241,7 +232,7 @@ class User {
     double px = data_->center.x() + (from_child % 2 == 0 ? h : -h);
     double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = data_->center.z() + (from_child < 4 ? h : -h);
-    return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz}, acc_,
+    return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz},
                                           1.0, dashmm::kSourcePrimary}};
   }
 
@@ -255,7 +246,7 @@ class User {
     double tx = data_->center.x() - t2s_x * s_size;
     double ty = data_->center.y() - t2s_y * s_size;
     double tz = data_->center.z() - t2s_z * s_size;
-    return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz}, acc_,
+    return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz},
                                           1.0, dashmm::kTargetPrimary}};
   }
 
@@ -267,21 +258,19 @@ class User {
     double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
     double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = data_->center.z() + (to_child < 4 ? -h : h);
-    return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz}, acc_,
+    return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz},
                                           1.0, dashmm::kTargetPrimary}};
   }
 
   // This will compute the effect of a multipole expansion on a set of
   // target points.
-  void M_to_T(target_t *first, target_t *last,
-              double scale) const {
+  void M_to_T(target_t *first, target_t *last) const {
     fprintf(stdout, "M->T for %ld targets\n", last - first);
   }
 
   // This will compute the effect of a local expansion on a set of target
   // points.
-  void L_to_T(target_t *first, target_t *last,
-              double scale) const {
+  void L_to_T(target_t *first, target_t *last) const {
     fprintf(stdout, "L->T for %ld targets\n", last - first);
   }
 
@@ -318,6 +307,12 @@ class User {
 
   static double compute_scale(dashmm::Index index) {return 1.0;}
 
+  static int weight_estimate(dashmm::Operation op,
+                             dashmm::Index s = dashmm::Index{},
+                             dashmm::Index t = dashmm::Index{}) {
+    return 1;
+  }
+
  private:
   // This object acts as a handle to some other piece of memory. The details
   // of the UserData type can be found in user_expansion.cc.
@@ -325,10 +320,6 @@ class User {
 
   // This stores the size (in bytes) of data_.
   size_t bytes_;
-
-  // This stores the accuracy parameter passed into the constuctor for this
-  // object.
-  int acc_;
 
   dashmm::ExpansionRole role_;
 };

@@ -192,8 +192,8 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first, 
-                                      source_t *last) const; 
+  std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first,
+                                      source_t *last) const;
 
   /// Change center of a multipole expansion
   ///
@@ -337,6 +337,6 @@ class Expansion {
   /// \param op - Type of operation
   ///
   /// \returns - estimate of the work unit of the operation
-  static int weight_estiate(Operation op, 
-                            Index s = Index{}, Index t = Index{});
+  static int weight_estimate(Operation op,
+                             Index s = Index{}, Index t = Index{});
 };
