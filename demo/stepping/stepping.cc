@@ -64,7 +64,7 @@ void print_usage(char *progname) {
 "  --nsources=num               number of source points to generate (10000)\n"
 "  --threshold=num              source and target tree partition refinement\n"
 "                                 limit (40)\n"
-"  --nsteps=num                 number of steps to take (100)\n"
+"  --nsteps=num                 number of steps to take (20)\n"
 "  --output=file                specify file for output (disabled)\n",
           progname);
 }
@@ -74,7 +74,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   // Set defaults
   retval.count = 10000;
   retval.refinement_limit = 40;
-  retval.steps = 100;
+  retval.steps = 20;
   retval.output.clear();
 
   int opt = 0;
@@ -212,6 +212,9 @@ void update_particles(Particle *P, const size_t count, const size_t offset,
       // NOTE: we work in units where G = 1.
       // NOTE: the point of this demo is not the time integrator, hence the
       // simplistic update.
+      // NOTE: Also, the forces are not softened, and so close encounters
+      // can lead to very bad results. So please be aware that running this
+      // code for too many steps will cause trouble.
       x[j] += P[i].velocity[j] * (*dt)
               - 0.5 * P[i].acceleration[j] * (*dt) * (*dt);
       P[i].velocity[j] -= P[i].acceleration[j] * (*dt);
@@ -228,8 +231,7 @@ void perform_time_stepping(InputArguments args) {
   Particle *sources{nullptr};
   double m_tot{1.0}; // This is given a value to avoid divbyzero below
   if (args.count) {
-    sources = reinterpret_cast<Particle *>(
-      new char [sizeof(Particle) * args.count]);
+    sources = new Particle[args.count];
     m_tot = set_sources(sources, args.count);
   }
 
@@ -239,12 +241,13 @@ void perform_time_stepping(InputArguments args) {
   assert(err == dashmm::kSuccess);
   err = source_handle.put(0, args.count, sources);
   assert(err == dashmm::kSuccess);
+  delete [] sources;
 
   // Compute a reasonable dt:
   // This is chosen so that one dynamical time is roughly 200 steps.
-  // NOTE: this will only be correct on rank 0, but it will also only be used
-  // by rank zero.
+  // NOTE: this will only be correct on rank 0, so we broadcast the value.
   double dt{sqrt(1.0 / m_tot) / 200.0};
+  dashmm::broadcast(&dt);
 
   // Clear timing information
   double t_eval{0.0};
@@ -276,9 +279,9 @@ void perform_time_stepping(InputArguments args) {
 
   // Output if the user has selected this option
   if (!args.output.empty()) {
-    err = source_handle.get(0, args.count, sources);
-    assert(err == dashmm::kSuccess);
-    output_results(args.output, sources, args.count);
+    size_t total_count = source_handle.length();
+    Particle *final_data = source_handle.collect();
+    output_results(args.output, final_data, total_count);
   }
 
   // free up resources

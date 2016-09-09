@@ -18,6 +18,7 @@
 
 // The basic interface
 #include "dashmm/array.h"
+#include "dashmm/broadcast.h"
 #include "dashmm/evaluator.h"
 #include "dashmm/initfini.h"
 #include "dashmm/types.h"
