@@ -28,6 +28,46 @@
 namespace dashmm {
 
 
+struct AddrMergeArgs {
+  int rank;
+  hpx_addr_t addx;
+};
+
+
+// Operations for the address sharing
+void init_handler(hpx_addr_t *head, size_t bytes,
+                  hpx_addr_t *init, size_t init_bytes) {
+  int count = bytes / sizeof(hpx_addr_t);
+  for (int i = 0; i < count; ++i) {
+    head[i] = HPX_NULL;
+  }
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, init_action, init_handler,
+           HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
+
+void op_handler(hpx_addr_t *lhs, AddrMergeArgs *rhs, size_t bytes) {
+  assert(bytes == sizeof(AddrMergeArgs));
+  assert(rhs->rank < hpx_get_num_ranks());
+  lhs[rhs->rank] = rhs->addx;
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, op_action, op_handler,
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+
+bool pred_handler(hpx_addr_t *lhs, size_t bytes) {
+  int count = bytes / sizeof(hpx_addr_t);
+  bool retval = true;
+  for (int i = 0; i < count; ++i) {
+    if (lhs[i] == HPX_NULL) {
+      retval = false;
+      break;
+    }
+  }
+  return retval;
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, pred_action, pred_handler,
+           HPX_POINTER, HPX_SIZE_T);
+
+
 // allocate the array meta data
 int allocate_array_meta_handler(void *UNUSED, size_t UNWANTED) {
   ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
@@ -295,5 +335,87 @@ int array_total_count_handler(hpx_addr_t data) {
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_total_count_action, array_total_count_handler,
            HPX_ADDR);
+
+
+int array_collect_prep_handler(hpx_addr_t UNUSED) {
+  // This is used to signal that prep is done
+  hpx_addr_t retval[2];
+  int n_ranks = hpx_get_num_ranks();
+  retval[0] = hpx_lco_reduce_new(n_ranks, sizeof(size_t) * n_ranks,
+                                 size_sum_ident, size_sum_op);
+  int nonsense{0};
+  retval[1] = hpx_lco_user_new(sizeof(hpx_addr_t) * n_ranks, init_action,
+                               op_action, pred_action, &nonsense,
+                               sizeof(nonsense));
+  hpx_exit(sizeof(hpx_addr_t) * 2, &retval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_collect_prep_action, array_collect_prep_handler,
+           HPX_ADDR);
+
+
+int array_collect_handler(hpx_addr_t data, hpx_addr_t offsets,
+                          hpx_addr_t addxes) {
+  // get local meta data
+  int my_rank = hpx_get_my_rank();
+  int n_ranks = hpx_get_num_ranks();
+
+  hpx_addr_t global = hpx_addr_add(data,
+                                   sizeof(ArrayMetaData) * my_rank,
+                                   sizeof(ArrayMetaData));
+  ArrayMetaData *local{nullptr};
+  assert(hpx_gas_try_pin(global, (void **)&local));
+
+  // Reduce the offsets
+  size_t *contrib = new size_t[n_ranks];
+  for (int i = 0; i < n_ranks; ++i) {
+    if (i >= my_rank) {
+      contrib[i] = local->local_count;
+    } else {
+      contrib[i] = 0;
+    }
+  }
+  hpx_lco_set_lsync(offsets, sizeof(size_t) * n_ranks, contrib, HPX_NULL);
+
+  // reduce the data locations
+  AddrMergeArgs args{my_rank, local->data};
+  hpx_lco_set_lsync(addxes, sizeof(args), &args, HPX_NULL);
+
+  // Rank zero will then collect the information
+  char *retval{nullptr};
+  if (my_rank == 0) {
+    retval = new char[local->size * local->total_count];
+
+    // compute offsets
+    hpx_lco_get(offsets, sizeof(size_t) * n_ranks, contrib);
+    size_t *counts = new size_t[n_ranks];
+    counts[0] = contrib[0];
+    for (int i = 1; i < n_ranks; ++i) {
+      counts[i] = contrib[i] - contrib[i - 1];
+    }
+
+    // loop over ranks memget
+    hpx_addr_t *where = new hpx_addr_t[n_ranks];
+    hpx_lco_get(addxes, sizeof(hpx_addr_t) * n_ranks, where);
+
+    hpx_gas_memget_sync(retval, where[0], local->size * counts[0]);
+    for (int i = 1; i < n_ranks; ++i) {
+      hpx_gas_memget_sync(&retval[contrib[i-1] * local->size],
+                          where[i],
+                          local->size * counts[i]);
+    }
+
+    delete [] counts;
+    delete [] where;
+  }
+
+  delete [] contrib;
+  hpx_gas_unpin(global);
+  hpx_exit(sizeof(retval), &retval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_collect_action, array_collect_handler,
+           HPX_ADDR, HPX_ADDR, HPX_ADDR);
+
 
 } // namespace dashmm

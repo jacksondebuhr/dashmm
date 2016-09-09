@@ -214,11 +214,11 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::create_S_expansions_from_DAG_,
                         dualtree_t::create_S_expansions_from_DAG_handler,
-                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER, HPX_POINTER, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::create_T_expansions_from_DAG_,
                         dualtree_t::create_T_expansions_from_DAG_handler,
-                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER, HPX_POINTER, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::edge_lists_,
                         dualtree_t::edge_lists_handler,

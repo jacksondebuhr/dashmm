@@ -101,6 +101,13 @@ class Method {
   /// target tree before the specified refinement limit is reached. This
   /// operation performs that test.
   ///
+  /// NOTE: In the distributed case, the nodes may not have information about
+  /// the number of sources or targets in the node. So any refinement test
+  /// cannot depend on those data.
+  ///
+  /// TODO: This is actually no longer an appropriate name for this. This is
+  /// not about refinement, but rather about where the DAG discovery will stop.
+  ///
   /// \param same_sources_and_targets - are the source and target points the
   ///                                   same
   /// \param curr - the target node being examined

@@ -190,8 +190,10 @@ class WriteBuffer : public Buffer {
 
     size_t inputleft = input.remain();
     size_t towrite = (inputleft <= remain_) ? inputleft : remain_;
-    bool e = input.read(offset_, towrite);
-    assert(e);
+    if (towrite) {
+      bool e = input.read(offset_, towrite);
+      assert(e);
+    }
 
     offset_ += towrite;
     remain_ -= towrite;

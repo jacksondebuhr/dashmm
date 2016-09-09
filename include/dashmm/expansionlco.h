@@ -32,6 +32,7 @@
 #include "dashmm/domaingeometry.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
+#include "dashmm/rankwise.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/types.h"
 #include "dashmm/viewset.h"
@@ -40,7 +41,19 @@
 namespace dashmm {
 
 
-/// Forward declaration of Evaluator so that we can become friends
+// NOTE: the following is not an elegant solution. This likely relies on the
+// inclusion order to make this work out. I will want to look at this some.
+/// Forward declaration of tree.
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename,
+                    template <typename, typename> class,
+                    typename> class Method,
+          typename DistroPolicy>
+class DualTree;
+
+
+/// Forward declaration of registrar so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -80,9 +93,12 @@ class ExpansionLCO {
   using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
                                 DistroPolicy>;
+  using dualtree_t =
+      DualTree<Source, Target, Expansion, Method, DistroPolicy>;
 
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
                                       DistroPolicy>;
+
 
   /// Construct the expansion from a given global address.
   ExpansionLCO(hpx_addr_t addr) : data_{addr} {}
@@ -103,7 +119,7 @@ class ExpansionLCO {
   ///                created
   ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
                Index index, std::unique_ptr<expansion_t> expand,
-               hpx_addr_t where) {
+               hpx_addr_t where, hpx_addr_t rwtree) {
     assert(expand != nullptr);
 
     ViewSet views = expand->get_all_views();
@@ -115,6 +131,7 @@ class ExpansionLCO {
     input_data->expansion_size = bytes;
     input_data->domain = domain;
     input_data->index = index;
+    input_data->rwaddr = rwtree;
     input_data->out_edge_count = n_out;
 
     WriteBuffer inbuf{input_data->payload, bytes};
@@ -309,6 +326,7 @@ class ExpansionLCO {
     size_t expansion_size;
     DomainGeometry domain;
     Index index;
+    hpx_addr_t rwaddr;
     int out_edge_count;
     char payload[];
   };
@@ -495,7 +513,19 @@ class ExpansionLCO {
                                                  size_t msg_size) {
     // Detect if the edges have unknown target addresses and lookup the
     // correct edges
-    // TODO: this is currently not something that will need to happen
+    // TODO: We need to be able to look up the actual targets of the
+    // edges. This requires the tree. Which means we need to send along
+    // the address of the tree.
+    RankWise<dualtree_t> global_tree{head->rwaddr};
+    auto tree = global_tree.here();
+    OutEdgeRecord *out_edges =
+      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+    for (int i = 0; i < head->out_edge_count; ++i) {
+      if (out_edges[i].target == HPX_NULL) {
+        out_edges[i].target = tree->lookup_lco_addx(out_edges[i].tidx,
+                                                    out_edges[i].op);
+      }
+    }
 
     // Send the response message if any lookups were performed
     // TODO: this is not needed just yet. NOTE: the return message will need

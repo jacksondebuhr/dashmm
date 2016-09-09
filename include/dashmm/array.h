@@ -57,6 +57,12 @@ extern hpx_action_t array_local_count_action;
 /// Action for getting total count
 extern hpx_action_t array_total_count_action;
 
+/// Action for collection prep
+extern hpx_action_t array_collect_prep_action;
+
+/// Action for collection
+extern hpx_action_t array_collect_action;
+
 
 struct ArrayMetaAllocRunReturn {
   hpx_addr_t meta;
@@ -344,6 +350,28 @@ class Array {
   ReturnCode map(const ArrayMapAction<T, E> &act, const E *env) {
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
+  }
+
+  /// Collect all of an array's data into a single local array
+  ///
+  /// This will return a newly allocated array containing all of the records
+  /// in the global address space that are represented by this object. The
+  /// ordering of the records is not guaranteed, and so users should track
+  /// record identity in some way.
+  ///
+  /// The caller assumes ownership of the returned data. Further, only rank
+  /// zero will return data. All other ranks will receive nullptr from this
+  /// routine.
+  ///
+  /// \returns - address of local memory holding a copy of the records if this
+  ///            is rank zero; nullptr otherwise
+  T *collect() {
+    hpx_addr_t lcos[2];
+    hpx_run(&array_collect_prep_action, lcos, &data_);
+
+    T *retval{nullptr};
+    hpx_run_spmd(&array_collect_action, &retval, &data_, &lcos[0], &lcos[1]);
+    return retval;
   }
 
  private:

@@ -107,7 +107,7 @@ class Evaluator {
                         HPX_ADDR, HPX_POINTER, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         evaluate_cleanup_, evaluate_cleanup_handler,
-                        HPX_ADDR, HPX_ADDR);
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
   }
 
   /// Perform a multipole moment evaluation
@@ -171,6 +171,8 @@ class Evaluator {
       return kRuntimeError;
     }
 
+    delete [] args;
+
     return kSuccess;
   }
 
@@ -216,24 +218,29 @@ class Evaluator {
     hpx_lco_delete_sync(partitiondone);
 
     // Allocate space for message buffer
-    size_t bcast_size = total_size + sizeof(hpx_addr_t) * 2;
+    size_t bcast_size = total_size + sizeof(hpx_addr_t) * 3;
     char *data = new char[bcast_size];
     assert(data != nullptr);
     hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
     EvaluateParams *postargs
-        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 2);
+        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
 
     // Setup message
+    // The first is the alldone LCO
     preargs[0] = hpx_lco_and_new(hpx_get_num_ranks());
     assert(preargs[0] != HPX_NULL);
+    // The second is the tree global address
     preargs[1] = global_tree.data();
     memcpy(postargs, parms, total_size);
+    // The third is the expansion creation done LCO
+    preargs[2] = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(preargs[2] != HPX_NULL);
 
     hpx_bcast_lsync(evaluate_rank_local_, HPX_NULL, data, bcast_size);
 
     // set up dependent call on the broadcast to do evaluate cleanup
     hpx_call_when(preargs[0], HPX_HERE, evaluate_cleanup_, HPX_NULL,
-                  &preargs[1], &preargs[0]);
+                  &preargs[1], &preargs[0], &preargs[2]);
 
     delete [] data;
 
@@ -244,7 +251,7 @@ class Evaluator {
   static int evaluate_rank_local_handler(char *data, size_t msg_size) {
     hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
     EvaluateParams *parms
-        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 2);
+        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
 
     // Generate the table - TODO: In principle, this can begin as soon as
     // the domain geometry is ready. However, starting it then might be a
@@ -261,11 +268,14 @@ class Evaluator {
     // Get ready to evaluate
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
-    tree->create_expansions_from_DAG();
+    tree->create_expansions_from_DAG(preargs[1]);
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
     // get their work going when they come to it and then they return.
+    hpx_lco_and_set(preargs[2], HPX_NULL);
+    hpx_lco_wait(preargs[2]);
+
 
     tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation(global_tree);
@@ -288,12 +298,15 @@ class Evaluator {
     RankWise<dualtree_t> global_tree{rwaddr};
     auto tree = global_tree.here();
     tree->destroy_DAG_LCOs(*dag);
+    delete dag;
     hpx_lco_delete_sync(heredone);
     return HPX_SUCCESS;
   }
 
-  static int evaluate_cleanup_handler(hpx_addr_t rwaddr, hpx_addr_t alldone) {
+  static int evaluate_cleanup_handler(hpx_addr_t rwaddr, hpx_addr_t alldone,
+                                      hpx_addr_t middone) {
     hpx_lco_delete_sync(alldone);
+    hpx_lco_delete_sync(middone);
 
     // clean up tree and table
     RankWise<dualtree_t> global_tree{rwaddr};

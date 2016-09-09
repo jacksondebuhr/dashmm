@@ -36,13 +36,17 @@ class ArrayData {
   ArrayData() : data_{HPX_NULL}, local_{nullptr} { }
 
   explicit ArrayData(hpx_addr_t data) : data_{data}, local_{nullptr} {
-    assert(data_ != HPX_NULL);
-    assert(hpx_gas_try_pin(data_, (void **)&local_));
+    //assert(data_ != HPX_NULL);
+    if (data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
   }
 
   ArrayData(const ArrayData<Record> &other) {
     data_ = other.data_;
-    assert(hpx_gas_try_pin(data_, (void **)&local_));
+    if (data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
   }
 
   ArrayData(ArrayData<Record> &&other) {

@@ -1,5 +1,11 @@
 THIS BRANCH TODO
 
+
+TODO: The merger of the treebuild3 has created somewhat of a monster. That
+  really ought to be sorted out. It is pretty gnarly, and the code is at
+  a high risk of being hard to maintain.
+
+
 TODO: Think about the following issue
   The out edge spawn action will have to be ready to either do the current thing,
   or send an action to the remote locality that will first look up the address
@@ -20,7 +26,6 @@ TODO: Consider changing ExpansionLCO to only contain the needed info from the
 
 
 TODO: Remove the offset in the array map action.
-TODO: demo/basic should also report the kernel used
 
 TODO: Allow for the array map action to have a couple integer template
       parameters. One to indicate the overdecomposition. The other to indicate

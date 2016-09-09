@@ -48,6 +48,7 @@ enum class NodeType {
   Multipole,
   Target,
   Local,
+  Intermediate,
   Unknown
 };
 
@@ -84,6 +85,9 @@ std::string node_type_to_print(NodeType type) {
     break;
   case NodeType::Local:
     return std::string("local");
+    break;
+  case NodeType::Intermediate:
+    return std::string("Intermediate");
     break;
   case NodeType::Unknown:
     return std::string("ERROR");
@@ -132,6 +136,11 @@ std::string edge_code_to_print(Operation op) {
     break;
   }
   return std::string("ERROR");
+}
+
+
+bool is_edge_from_intermediate(Operation op) {
+  return (op == Operation::ItoI || op == Operation::ItoL);
 }
 
 
@@ -195,11 +204,19 @@ std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
         = dag.source_leaves[i]->locality;
   }
   for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
-    retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
+    if (is_edge_from_intermediate(dag.source_nodes[i]->out_edges[0].op)) {
+      retval[dtoi[dag.source_nodes[i]]].type = NodeType::Intermediate;
+    } else {
+      retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
+    }
     retval[dtoi[dag.source_nodes[i]]].locality = dag.source_nodes[i]->locality;
   }
   for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
-    retval[dtoi[dag.target_nodes[i]]].type = NodeType::Local;
+    if (is_edge_from_intermediate(dag.target_nodes[i]->out_edges[0].op)) {
+      retval[dtoi[dag.target_nodes[i]]].type = NodeType::Intermediate;
+    } else {
+      retval[dtoi[dag.target_nodes[i]]].type = NodeType::Local;
+    }
     retval[dtoi[dag.target_nodes[i]]].locality = dag.target_nodes[i]->locality;
   }
   for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
@@ -233,6 +250,7 @@ void create_unique_node_ids(std::vector<Node> &nodes) {
   int n_multi{0};
   int n_local{0};
   int n_target{0};
+  int n_interm{0};
 
   for (size_t i = 0; i < nodes.size(); ++i) {
     switch (nodes[i].type) {
@@ -247,6 +265,9 @@ void create_unique_node_ids(std::vector<Node> &nodes) {
       break;
     case NodeType::Target:
       nodes[i].id = std::string("T") + std::to_string(n_target++);
+      break;
+    case NodeType::Intermediate:
+      nodes[i].id = std::string("I") + std::to_string(n_interm++);
       break;
     case NodeType::Unknown:
       assert(0);
@@ -291,8 +312,8 @@ void print_json_links(FILE *ofd, std::vector<Edge> &edges) {
 
 
 void print_json(std::vector<Node> &nodes, std::vector<Edge> &edges,
-                int ns, int nt) {
-  FILE *ofd = fopen("dag.json", "w");
+                int ns, int nt, const std::string &fname) {
+  FILE *ofd = fopen(fname.c_str(), "w");
   assert(ofd);
 
   fprintf(ofd, "{\n");
@@ -326,7 +347,7 @@ void DAG::toJSON(std::string fname) {
   create_unique_node_ids(N);
 
   // output
-  print_json(N, E, n_s, n_t);
+  print_json(N, E, n_s, n_t, fname);
 }
 
 

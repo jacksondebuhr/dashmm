@@ -39,19 +39,19 @@ struct TargetData {
 // Here we create the three evaluator objects that we shall need in this demo.
 // These must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::LaplaceCOM, dashmm::BH> laplace_bh{}; 
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::LaplaceCOM, dashmm::Direct> laplace_direct{}; 
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Laplace, dashmm::FMM> laplace_fmm{}; 
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Laplace, dashmm::FMM97> laplace_fmm97{}; 
-dashmm::Evaluator<SourceData, TargetData, 
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::LaplaceCOM, dashmm::BH> laplace_bh{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::LaplaceCOM, dashmm::Direct> laplace_direct{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Laplace, dashmm::FMM> laplace_fmm{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Laplace, dashmm::FMM97> laplace_fmm97{};
+dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{}; 
-                  
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
+
 struct InputArguments {
   int source_count;
   std::string source_type;
@@ -59,7 +59,7 @@ struct InputArguments {
   std::string target_type;
   int refinement_limit;
   std::string method;
-  std::string kernel; 
+  std::string kernel;
   bool verify;
   int accuracy;
 };
@@ -95,7 +95,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   retval.target_type = std::string{"cube"};
   retval.refinement_limit = 40;
   retval.method = std::string{"fmm97"};
-  retval.kernel = std::string{"laplace"}; 
+  retval.kernel = std::string{"laplace"};
   retval.verify = true;
   retval.accuracy = 3;
 
@@ -109,7 +109,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     {"threshold", required_argument, 0, 'l'},
     {"verify", required_argument, 0, 'v'},
     {"accuracy", required_argument, 0, 'a'},
-    {"kernel", required_argument, 0, 'k'}, 
+    {"kernel", required_argument, 0, 'k'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
@@ -144,9 +144,9 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     case 'a':
       retval.accuracy = atoi(optarg);
       break;
-    case 'k': 
-      retval.kernel = optarg; 
-      break; 
+    case 'k':
+      retval.kernel = optarg;
+      break;
     case 'h':
       print_usage(argv[0]);
       return -1;
@@ -190,19 +190,19 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   if (retval.kernel == "laplace" && retval.method == "fmm97") {
     if (retval.accuracy != 3 && retval.accuracy != 6) {
       fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
-              " for laplace kernel using fmm97\n"); 
+              " for laplace kernel using fmm97\n");
       return -1;
     }
   }
 
   if (retval.kernel == "yukawa") {
     if (retval.method != "fmm97") {
-      fprintf(stderr, "Usage ERROR: yukawa kernel must use fmm97\n"); 
+      fprintf(stderr, "Usage ERROR: yukawa kernel must use fmm97\n");
       return -1;
     } else if (retval.accuracy != 3 && retval.accuracy != 6) {
       fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
               " for yukawa kernel using fmm97\n");
-      return -1; 
+      return -1;
     }
   }
 
@@ -214,7 +214,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stdout, "%d targets in a %s distribution\n",
             retval.target_count, retval.target_type.c_str());
     fprintf(stdout, "method: %s \nthreshold: %d\nkernel: %s\n\n",
-            retval.method.c_str(), retval.refinement_limit, 
+            retval.method.c_str(), retval.refinement_limit,
             retval.kernel.c_str());
   } else {
     // Only have rank 0 create data
@@ -306,6 +306,28 @@ void set_sources(SourceData *sources, int source_count,
   }
 }
 
+dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
+  SourceData *sources{nullptr};
+  if (args.source_count) {
+    sources = new SourceData[args.source_count];
+    //reinterpret_cast<SourceData *>(
+    //    new char [sizeof(SourceData) * args.source_count]);
+    set_sources(sources, args.source_count, args.source_type, args.method);
+  }
+
+  dashmm::Array<SourceData> retval{};
+  int err = retval.allocate(args.source_count);
+  assert(err == dashmm::kSuccess);
+  err = retval.put(0, args.source_count, sources);
+  assert(err == dashmm::kSuccess);
+
+  if (args.source_count) {
+    delete [] sources;
+  }
+
+  return retval;
+}
+
 void set_targets(TargetData *targets, int target_count,
                  std::string target_type) {
   if (target_type == std::string{"cube"}) {
@@ -332,11 +354,33 @@ void set_targets(TargetData *targets, int target_count,
   }
 }
 
+dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
+  TargetData *targets{nullptr};
+  if (args.target_count) {
+    targets = new TargetData[args.target_count];
+    //reinterpret_cast<TargetData *>(
+     //   new char [sizeof(TargetData) * args.target_count]);
+    set_targets(targets, args.target_count, args.target_type);
+  }
+
+  dashmm::Array<TargetData> retval{};
+  int err = retval.allocate(args.target_count);
+  assert(err == dashmm::kSuccess);
+  err = retval.put(0, args.target_count, targets);
+  assert(err == dashmm::kSuccess);
+
+  if (args.target_count) {
+    delete [] targets;
+  }
+
+  return retval;
+}
+
 void compare_results(TargetData *targets, int target_count,
                      TargetData *exacts, int exact_count) {
   if (hpx_get_my_rank()) return;
 
-  //create a map from index into offset fort targets
+  //create a map from index into offset for targets
   std::map<int, int> offsets{};
   for (int i = 0; i < target_count; ++i) {
     offsets[targets[i].index] = i;
@@ -364,68 +408,21 @@ void compare_results(TargetData *targets, int target_count,
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
-  //create some arrays
-  SourceData *sources{nullptr};
-  TargetData *targets{nullptr};
-  if (args.source_count) {
-    sources = reinterpret_cast<SourceData *>(
-        new char [sizeof(SourceData) * args.source_count]);
-    set_sources(sources, args.source_count, args.source_type, args.method);
-  }
-
-  if (args.target_count) {
-    targets = reinterpret_cast<TargetData *>(
-        new char [sizeof(TargetData) * args.target_count]);
-    set_targets(targets, args.target_count, args.target_type);
-  }
-
-  //prep sources
-  dashmm::Array<SourceData> source_handle{};
-  int err = source_handle.allocate(args.source_count);
-  assert(err == dashmm::kSuccess);
-  err = source_handle.put(0, args.source_count, sources);
-  assert(err == dashmm::kSuccess);
-
-  //prep targets
-  dashmm::Array<TargetData> target_handle{};
-  err = target_handle.allocate(args.target_count);
-  assert(err == dashmm::kSuccess);
-  err = target_handle.put(0, args.target_count, targets);
-  assert(err == dashmm::kSuccess);
-
-  //save a few targets in case of direct comparison
-  int test_count{0};
-  if (hpx_get_my_rank() == 0) {
-    test_count = 400;
-  }
-
-  if (test_count > args.target_count) {
-    test_count = args.target_count;
-  }
-
-  TargetData *test_targets{nullptr};
-  if (test_count) {
-    test_targets = reinterpret_cast<TargetData *>(
-          new char [sizeof(TargetData) * test_count]);
-
-    for (int i = 0; i < test_count; ++i) {
-      int idx = i * (args.target_count / test_count);
-      assert(idx < args.target_count);
-      test_targets[i] = targets[idx];
-    }
-  }
+  dashmm::Array<SourceData> source_handle = prepare_sources(args);
+  dashmm::Array<TargetData> target_handle = prepare_targets(args);
 
   //Perform the evaluation
   double t0{};
   double tf{};
+  int err{0};
 
   if (args.kernel == std::string{"laplace"}) {
     if (args.method == std::string{"bh"}) {
       dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
       t0 = getticks();
-      err = laplace_bh.evaluate(source_handle, target_handle, 
-                                args.refinement_limit, method, 
+      err = laplace_bh.evaluate(source_handle, target_handle,
+                                args.refinement_limit, method,
                                 args.accuracy, std::vector<double>{});
       assert(err == dashmm::kSuccess);
       tf = getticks();
@@ -433,31 +430,31 @@ void perform_evaluation_test(InputArguments args) {
       dashmm::FMM<SourceData, TargetData, dashmm::Laplace> method{};
 
       t0 = getticks();
-      err = laplace_fmm.evaluate(source_handle, target_handle, 
-                                 args.refinement_limit, method, 
+      err = laplace_fmm.evaluate(source_handle, target_handle,
+                                 args.refinement_limit, method,
                                  args.accuracy, std::vector<double>{});
       assert(err == dashmm::kSuccess);
       tf = getticks();
     } else if (args.method == std::string{"fmm97"}) {
       dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{};
-      
+
       t0 = getticks();
       err = laplace_fmm97.evaluate(source_handle, target_handle,
-                                   args.refinement_limit, method, 
+                                   args.refinement_limit, method,
                                    args.accuracy, std::vector<double>{});
       assert(err == dashmm::kSuccess);
       tf = getticks();
     }
   } else if (args.kernel == std::string{"yukawa"}) {
     if (args.method == std::string{"fmm97"}) {
-      dashmm::FMM97<SourceData, TargetData, dashmm::Yukawa> method{}; 
-      std::vector<double> kernelparms(1, 0.1); 
+      dashmm::FMM97<SourceData, TargetData, dashmm::Yukawa> method{};
+      std::vector<double> kernelparms(1, 0.1);
 
-      t0 = getticks(); 
-      err = yukawa_fmm97.evaluate(source_handle, target_handle, 
-                                  args.refinement_limit, method, 
-                                  args.accuracy, kernelparms); 
-      assert(err == dashmm::kSuccess); 
+      t0 = getticks();
+      err = yukawa_fmm97.evaluate(source_handle, target_handle,
+                                  args.refinement_limit, method,
+                                  args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
       tf = getticks();
     }
   }
@@ -465,34 +462,58 @@ void perform_evaluation_test(InputArguments args) {
   fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
 
   if (args.verify) {
+    // Save a few targets for the direct comparison
+    int test_count{0};
+    if (hpx_get_my_rank() == 0) {
+      test_count = 400;
+    }
+    if (test_count > args.target_count) {
+      test_count = args.target_count;
+    }
+
+    //Get the results from the global address space
+    args.target_count = target_handle.length();
+    TargetData *targets = target_handle.collect();
+
+    // Copy the test particles into test_targets
+    TargetData *test_targets{nullptr};
+    if (test_count) {
+      test_targets = new TargetData[test_count];
+
+      for (int i = 0; i < test_count; ++i) {
+        int idx = i * (args.target_count / test_count);
+        assert(idx < args.target_count);
+        test_targets[i] = targets[idx];
+        test_targets[i].phi = std::complex<double>{0.0, 0.0};
+      }
+    }
+
     // Create array for test targets
     dashmm::Array<TargetData> test_handle{};
     err = test_handle.allocate(test_count);
     assert(err == dashmm::kSuccess);
     err = test_handle.put(0, test_count, test_targets);
     assert(err == dashmm::kSuccess);
+    delete [] test_targets;
 
     //do direct evaluation
     if (args.kernel == "laplace") {
       dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
-      err = laplace_direct.evaluate(source_handle, test_handle, 
-                                    args.refinement_limit, direct, 
+      err = laplace_direct.evaluate(source_handle, test_handle,
+                                    args.refinement_limit, direct,
                                     args.accuracy, std::vector<double>{});
       assert(err == dashmm::kSuccess);
     } else if (args.kernel == "yukawa") {
-      dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{}; 
-      std::vector<double> kernelparms(1, 0.1); 
-      err = yukawa_direct.evaluate(source_handle, test_handle, 
-                                   args.refinement_limit, direct, 
-                                   args.accuracy, kernelparms); 
-      assert(err == dashmm::kSuccess); 
+      dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{};
+      std::vector<double> kernelparms(1, 0.1);
+      err = yukawa_direct.evaluate(source_handle, test_handle,
+                                   args.refinement_limit, direct,
+                                   args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
     }
 
-    //Get the results from the global address space
-    err = target_handle.get(0, args.target_count, targets);
-    assert(err == dashmm::kSuccess);
-    err = test_handle.get(0, test_count, test_targets);
-    assert(err == dashmm::kSuccess);
+    // Retrieve the test results
+    test_targets = test_handle.collect();
 
     //Test error
     compare_results(targets, args.target_count, test_targets, test_count);
@@ -500,6 +521,7 @@ void perform_evaluation_test(InputArguments args) {
     err = test_handle.destroy();
     assert(err == dashmm::kSuccess);
     delete [] test_targets;
+    delete [] targets;
   }
 
   //free up resources
@@ -507,9 +529,6 @@ void perform_evaluation_test(InputArguments args) {
   assert(err == dashmm::kSuccess);
   err = target_handle.destroy();
   assert(err == dashmm::kSuccess);
-
-  delete [] sources;
-  delete [] targets;
 }
 
 int main(int argc, char **argv) {

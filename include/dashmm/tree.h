@@ -39,6 +39,7 @@
 // DASHMM
 #include "dashmm/array.h"
 #include "dashmm/dag.h"
+#include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/domaingeometry.h"
@@ -1038,11 +1039,20 @@ class Tree {
     return key;
   }
 
+  static int get_unif_grid_index(const Index &idx, int uniflevel) {
+    int delta = idx.level() - uniflevel;
 
-private:
-  friend class DualTree<Source, Target, Expansion, Method, DistroPolicy>;
-  friend class TreeRegistrar<Source, Target, Record, Expansion, Method,
-                             DistroPolicy>;
+    if (delta < 0) {
+      return -1;
+    }
+
+    if (delta > 0) {
+      Index tester = idx.parent(delta);
+      return morton_key(tester.x(), tester.y(), tester.z());
+    } else {
+      return morton_key(idx.x(), idx.y(), idx.z());
+    }
+  }
 
   hpx_addr_t lookup_lco_addx(Index idx, Operation op) {
     // This should walk to the node containing the LCO we care about
@@ -1060,17 +1070,44 @@ private:
     }
     assert(curr->idx == idx);
 
-    if (op == Operation::StoM) {
-      assert(0 && "This should not need to happen");
-    } else if (op == Operation::StoL) {
-      return curr->dag.normal()->global_addx;
-    } else if (op == Operation::StoT) {
-      return curr->dag.parts()->global_addx;
-    } else {
-      assert(0 && "This too should not happen");
-      return HPX_NULL;
+    hpx_addr_t retval{HPX_NULL};
+    switch (op) {
+      case Operation::Nop:
+        assert(0 && "problem in lookup");
+        break;
+      case Operation::StoM:  // NOTE: fallthrough here
+      case Operation::StoL:
+      case Operation::MtoM:
+      case Operation::MtoL:
+      case Operation::LtoL:
+        assert(curr->dag.has_normal());
+        retval = curr->dag.normal()->global_addx;
+        break;
+      case Operation::MtoT: // NOTE: fallthrough here
+      case Operation::LtoT:
+      case Operation::StoT:
+        assert(curr->dag.has_parts());
+        retval = curr->dag.parts()->global_addx;
+        break;
+      case Operation::MtoI: // NOTE: fallthrough
+      case Operation::ItoI:
+        assert(curr->dag.has_interm());
+        retval = curr->dag.interm()->global_addx;
+        break;
+      case Operation::ItoL:
+        assert(curr->dag.has_normal());
+        retval = curr->dag.normal()->global_addx;
+        break;
     }
+
+    return retval;
   }
+
+
+private:
+  friend class DualTree<Source, Target, Expansion, Method, DistroPolicy>;
+  friend class TreeRegistrar<Source, Target, Record, Expansion, Method,
+                             DistroPolicy>;
 
   node_t *root_;            /// Root of the tree
   node_t *unif_grid_;       /// The uniform grid
@@ -1253,6 +1290,52 @@ class DualTree {
   /// Set the method this object will use for DAG operations.
   void set_method(const method_t &method) {method_ = method;}
 
+  /// Lookup target LCO address
+  hpx_addr_t lookup_lco_addx(Index idx, Operation op) {
+    bool search_source{true};
+    switch(op) {
+      case Operation::Nop:
+        assert(0 && "Problem in address search");
+        break;
+      case Operation::StoM:
+        break;
+      case Operation::StoL:
+        search_source = false;
+        break;
+      case Operation::MtoM:
+        break;
+      case Operation::MtoL:
+        search_source = false;
+        break;
+      case Operation::LtoL:
+        search_source = false;
+        break;
+      case Operation::MtoT:
+        search_source = false;
+        break;
+      case Operation::LtoT:
+        search_source = false;
+        break;
+      case Operation::StoT:
+        search_source = false;
+        break;
+      case Operation::MtoI:
+        break;
+      case Operation::ItoI:
+        search_source = false;
+        break;
+      case Operation::ItoL:
+        search_source = false;
+        break;
+    }
+
+    if (search_source) {
+      return source_tree_->lookup_lco_addx(idx, op);
+    } else {
+      return target_tree_->lookup_lco_addx(idx, op);
+    }
+  }
+
   /// Destroy any allocated memory associated with this DualTree.
   void clear_data() {
     int rank = hpx_get_my_rank();
@@ -1278,6 +1361,7 @@ class DualTree {
     delete target_tree_;
 
     delete [] distribute_;
+    delete [] rank_map_;
   }
 
   /// Return the first uniform grid node owned by the given rank.
@@ -1285,6 +1369,9 @@ class DualTree {
 
   /// Return the last uniform grid node owned by the given rank.
   int last(int rank) const {return distribute_[rank];}
+
+  /// Return the rank owning the given unif grid node
+  int rank_of_unif_grid(int idx) const {return rank_map_[idx];}
 
   /// Create the DAG for this tree using the method specified for this object.
   ///
@@ -1345,7 +1432,7 @@ class DualTree {
   /// tree.
   ///
   /// This is a synchronous operation.
-  void create_expansions_from_DAG() {
+  void create_expansions_from_DAG(hpx_addr_t rwtree) {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
 
@@ -1356,10 +1443,10 @@ class DualTree {
     dualtree_t *argthis = this;
     sourcenode_t *srcaddx = source_tree_->root_;
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-             &done, &argthis, &srcaddx);
+             &done, &argthis, &srcaddx, &rwtree);
     targetnode_t *trgaddx = target_tree_->root_;
     hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-             &done, &argthis, &trgaddx);
+             &done, &argthis, &trgaddx, &rwtree);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -1806,6 +1893,19 @@ class DualTree {
     return ret;
   }
 
+  void generate_rank_map(int num_ranks) {
+    rank_map_ = new int [dim3_];
+    assert(rank_map_);
+
+    for (int i = 0; i < num_ranks; ++i) {
+      int b = first(i);
+      int e = last(i);
+      for (int j = b; j <= e; ++j) {
+        rank_map_[j] = i;
+      }
+    }
+  }
+
   /// Count and sort the local points
   ///
   /// This will assign the local points to the uniform grid, and it will also
@@ -2104,6 +2204,7 @@ class DualTree {
     tree->distribute_ = distribute_points(num_ranks,
                                           tree->unif_count_src(),
                                           tree->dim3_);
+    tree->generate_rank_map(num_ranks);
 
     // Exchange points
     sourcenode_t *ns = tree->source_tree_->unif_grid_;
@@ -2197,10 +2298,14 @@ class DualTree {
 
     // Replace segment in the array
     hpx_addr_t old_src_data = sources.replace(tree->source_tree_->sorted_);
-    hpx_gas_free_sync(old_src_data);
+    if (old_src_data != HPX_NULL) {
+      hpx_gas_free_sync(old_src_data);
+    }
     if (!tree->same_sandt_) {
       hpx_addr_t old_tar_data = targets.replace(tree->target_tree_->sorted_);
-      hpx_gas_free_sync(old_tar_data);
+      if (old_tar_data != HPX_NULL) {
+        hpx_gas_free_sync(old_tar_data);
+      }
     }
 
     delete [] local_count;
@@ -2246,8 +2351,10 @@ class DualTree {
     root->dag.collect_DAG_nodes(targets, internals);
   }
 
-  static int create_S_expansions_from_DAG_handler(
-        hpx_addr_t done, dualtree_t *tree, sourcenode_t *node) {
+  static int create_S_expansions_from_DAG_handler(hpx_addr_t done,
+                                                  dualtree_t *tree,
+                                                  sourcenode_t *node,
+                                                  hpx_addr_t rwtree) {
     Point n_center = tree->domain_.center_from_index(node->idx);
 
     // TODO: Is this better? We could also do an action argument here.
@@ -2262,7 +2369,8 @@ class DualTree {
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
-                            HPX_THERE(node->dag.normal()->locality));
+                            HPX_THERE(node->dag.normal()->locality),
+                            rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
 
@@ -2276,7 +2384,8 @@ class DualTree {
                                 node->dag.interm()->out_edges.size(),
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
-                                HPX_THERE(node->dag.interm()->locality));
+                                HPX_THERE(node->dag.interm()->locality),
+                                rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
 
@@ -2291,7 +2400,7 @@ class DualTree {
         if (node->child[i] != nullptr) {
           sourcenode_t *srcaddx = node->child[i];
           hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &tree, &srcaddx);
+                   &cdone, &tree, &srcaddx, &rwtree);
         }
       }
 
@@ -2308,8 +2417,10 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-  static int create_T_expansions_from_DAG_handler(
-        hpx_addr_t done, dualtree_t *tree, targetnode_t *node) {
+  static int create_T_expansions_from_DAG_handler(hpx_addr_t done,
+                                                  dualtree_t *tree,
+                                                  targetnode_t *node,
+                                                  hpx_addr_t rwtree) {
     Point n_center = tree->domain_.center_from_index(node->idx);
 
     int myrank = hpx_get_my_rank();
@@ -2323,7 +2434,8 @@ class DualTree {
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
-                            HPX_THERE(node->dag.normal()->locality));
+                            HPX_THERE(node->dag.normal()->locality),
+                            rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
 
@@ -2337,7 +2449,8 @@ class DualTree {
                                 node->dag.interm()->out_edges.size(),
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
-                                HPX_THERE(node->dag.interm()->locality));
+                                HPX_THERE(node->dag.interm()->locality),
+                                rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
 
@@ -2360,7 +2473,7 @@ class DualTree {
         if (node->child[i] != nullptr) {
           targetnode_t *trgaddx = node->child[i];
           hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
-                   &cdone, &tree, &trgaddx);
+                   &cdone, &tree, &trgaddx, &rwtree);
         }
       }
 
@@ -2438,6 +2551,9 @@ class DualTree {
       {
         WriteBuffer headdata(scratch, header_size);
         assert(headdata.write(sources.n()));
+
+        // TODO: there are times that this has zero particles to write.
+        // Is that correct? Should that happen?
 
         ReadBuffer sourcedata((char *)sref.value(), source_size);
         assert(headdata.write(sourcedata));
@@ -2597,8 +2713,14 @@ class DualTree {
     int n_children = node->n_children();
     if (n_children == 0) {
       tree->method_.generate(node, &tree->domain_);
-      node->dag.set_parts_locality(hpx_get_my_rank());
-      node->dag.set_normal_locality(hpx_get_my_rank());
+      // TODO decide if this would do better as something passed down to nodes
+      // during construction
+      int dag_idx = sourcetree_t::get_unif_grid_index(node->idx,
+                                                      tree->unif_level_);
+      assert(dag_idx >= 0);
+      int dag_rank = tree->rank_of_unif_grid(dag_idx);
+      node->dag.set_parts_locality(dag_rank);
+      node->dag.set_normal_locality(dag_rank);
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
       return HPX_SUCCESS;
     }
@@ -2627,16 +2749,27 @@ class DualTree {
     bool refine = false;
     if (node->idx.level() < tree->unif_level_) {
       refine = true;
-    } else if (node->parts.n() > (size_t)tree->refinement_limit_) {
+    } else if (node->n_children()) {
       refine = tree->method_.refine_test((bool)same_sandt, node, *consider);
     }
 
     tree->method_.inherit(node, &tree->domain_, !refine);
     tree->method_.process(node, *consider, !refine, &tree->domain_);
-    node->dag.set_parts_locality(hpx_get_my_rank());
-    node->dag.set_normal_locality(hpx_get_my_rank());
 
-    if (refine) {
+    if (!refine) {
+      // If we are not refining, then we are at a target leaf. This means
+      // we should set the particle and normal DAG nodes to have this locality.
+
+      // TODO decide if this would do better as something passed down to nodes
+      // during construction
+      int dag_idx = targettree_t::get_unif_grid_index(node->idx,
+                                                      tree->unif_level_);
+      int dag_rank = tree->rank_of_unif_grid(dag_idx);
+      node->dag.set_parts_locality(dag_rank);
+      node->dag.set_normal_locality(dag_rank);
+
+      hpx_lco_set_lsync(done, 0, nullptr, HPX_NULL);
+    } else {
       int n_children = node->n_children();
       hpx_addr_t cdone = hpx_lco_and_new(n_children);
       assert(cdone);
@@ -2653,8 +2786,6 @@ class DualTree {
       assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
-    } else {
-      hpx_lco_set_lsync(done, 0, nullptr, HPX_NULL);
     }
 
     delete consider;
@@ -2671,6 +2802,8 @@ class DualTree {
                                            size_t n_sint) {
     // If this is insufficiently parallel, we can always make this action
     // call itself with smaller and smaller chunks of the array.
+    int nskip{0};
+
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_targs; ++i) {
       assert((*targs)[i] != nullptr);
@@ -2678,6 +2811,8 @@ class DualTree {
         assert((*targs)[i]->global_addx != HPX_NULL);
         hpx_call_when((*targs)[i]->global_addx, done, hpx_lco_set_action,
                       HPX_NULL, nullptr, 0);
+      } else {
+        ++nskip;
       }
     }
 
@@ -2687,6 +2822,8 @@ class DualTree {
         assert((*tint)[i]->global_addx != HPX_NULL);
         hpx_call_when((*tint)[i]->global_addx, done, hpx_lco_set_action,
                       HPX_NULL, nullptr, 0);
+      } else {
+        ++nskip;
       }
     }
 
@@ -2696,8 +2833,12 @@ class DualTree {
         assert((*sint)[i]->global_addx != HPX_NULL);
         hpx_call_when((*sint)[i]->global_addx, done, hpx_lco_set_action,
                       HPX_NULL, nullptr, 0);
+      } else {
+        ++nskip;
       }
     }
+
+    hpx_lco_and_set_num(done, nskip, HPX_NULL);
 
     return HPX_SUCCESS;
   }
@@ -2727,6 +2868,7 @@ class DualTree {
   hpx_addr_t unif_count_;     /// LCO reducing the uniform counts
   int *unif_count_value_;     /// local data storing the uniform counts
   int *distribute_;           /// the computed distribution of the nodes
+  int *rank_map_;             /// map unif grid index to rank
   method_t method_;           /// method used during DAG discovery
 
   sourcetree_t *source_tree_; /// The source tree
