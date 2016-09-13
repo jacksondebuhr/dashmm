@@ -1826,9 +1826,6 @@ class DualTree {
 
   // TODO: Note that this would be a target for a second member of the
   // Distribution Policy
-  // TODO: can this be simplified? In particular, use the same target for each
-  // rather than a changing target.
-  //
   /// Partition the available points among the localities
   ///
   /// Given the uniform counts, this will provide a good guess at a
@@ -1845,50 +1842,34 @@ class DualTree {
     const int *s = global; // Source counts
     const int *t = &global[len]; // Target counts
 
-    int total = 0;
-    for (int i = 0; i < len; ++i) {
-      total += s[i] + t[i];
+    int *cumulative = new int[len + 1];
+    cumulative[0] = 0;
+    for (int i = 1; i <= len; ++i) {
+      cumulative[i] = s[i-1] + t[i-1] + cumulative[i - 1];
     }
 
-    int rank = 0;
-    int iterator = 0;
+    int target_share = cumulative[len] / num_ranks;
 
-    while (rank < num_ranks && total > 0) {
-      if (rank == num_ranks - 1) {
-        // Take the remaining grids
-        ret[rank++] = len - 1;
-      } else {
-        int avg = total / (num_ranks - rank);
-        int sum = 0;
-        int sum1 = 0;
+    for (int split = 1; split < num_ranks; ++split) {
+      int my_target = target_share * split;
+      auto fcn = [&my_target] (const int &a) -> bool {return a < my_target;};
+      int *splitter = std::partition_point(cumulative, &cumulative[len + 1],
+                                           fcn);
+      int upper_delta = *splitter - my_target;
+      assert(upper_delta >= 0);
+      int lower_delta = my_target - *(splitter - 1);
+      assert(lower_delta >= 0);
+      int split_index = upper_delta < lower_delta
+                          ? splitter - cumulative
+                          : (splitter - cumulative) - 1;
+      --split_index;
+      assert(split_index >= 0);
 
-        for (int i = iterator; i < len; ++i) {
-          sum += s[i] + t[i];
-          if (i == len - 1) {
-            // There will be ranks left without grids assigned.
-            delete [] ret;
-            return nullptr;
-          } else {
-            sum1 = sum + s[i + 1] + t[i + 1];
-          }
-
-          if (sum <= avg && avg <= sum1) {
-            // Check which is closer to avg
-            if (avg - sum <= sum1 - avg) {
-              iterator = i;
-            } else {
-              iterator = i + 1;
-              sum = sum1;
-            }
-            break;
-          }
-        }
-
-        ret[rank++] = iterator;
-        total -= sum;
-        iterator++;
-      }
+      ret[split - 1] = split_index;
     }
+    ret[num_ranks - 1] = len - 1;
+
+    delete [] cumulative;
 
     return ret;
   }
@@ -2033,7 +2014,9 @@ class DualTree {
         }
       }
     } else {
-      hpx_lco_and_set_num(done, range, HPX_NULL);
+      if (range) {
+        hpx_lco_and_set_num(done, range, HPX_NULL);
+      }
     }
 
     if (recv_nt) {
@@ -2049,7 +2032,7 @@ class DualTree {
         }
       }
     } else {
-      if (local_tree->same_sandt_) {
+      if (local_tree->same_sandt_ && recv_ns) {
         // S == T means do a special version of merge.
         for (int i = first; i <= last; ++i) {
           int incoming_nt = count_s[i - first];
@@ -2063,7 +2046,9 @@ class DualTree {
           }
         }
       } else {
-        hpx_lco_and_set_num(done, range, HPX_NULL);
+        if (range) {
+          hpx_lco_and_set_num(done, range, HPX_NULL);
+        }
       }
     }
 
@@ -2522,8 +2507,7 @@ class DualTree {
     } else {
       // At a leaf, we do actual work
       parts = node->dag.parts();
-      assert(parts != nullptr);
-      if (parts->locality != hpx_get_my_rank()) {
+      if (parts != nullptr && parts->locality != hpx_get_my_rank()) {
         parts = nullptr;
       }
     }

@@ -64,6 +64,9 @@ TODO: separate the include directories into dashmm and libdashmm, patterned
       after HPX. This will make it 'clear' which are to be used by the casual
       user, and which are not part of the public interface. This will also be
       important for dealing with a complete specification.
+TODO: Recall that the usage pattern of the DAG routines will want to change
+      if we ever have multiple threads working on a single node for the DAG.
+      That might not be likely, but it bears some more careful thought.
 
 
 

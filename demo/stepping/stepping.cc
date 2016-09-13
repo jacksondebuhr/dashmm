@@ -229,7 +229,7 @@ void perform_time_stepping(InputArguments args) {
 
   // create some arrays
   Particle *sources{nullptr};
-  double m_tot{1.0}; // This is given a value to avoid divbyzero below
+  double m_tot{1.0};
   if (args.count) {
     sources = new Particle[args.count];
     m_tot = set_sources(sources, args.count);
@@ -258,12 +258,14 @@ void perform_time_stepping(InputArguments args) {
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
+fprintf(stdout, "Before step %d\n", step);fflush(stdout);
     double t0 = getticks();
     err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
                           method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
+fprintf(stdout, "Before update %d\n", step);fflush(stdout);
     // Now update the positions based on the velocity
     source_handle.map(update_action, &dt);
     double t2 = getticks();
@@ -282,13 +284,12 @@ void perform_time_stepping(InputArguments args) {
     size_t total_count = source_handle.length();
     Particle *final_data = source_handle.collect();
     output_results(args.output, final_data, total_count);
+    delete [] final_data;
   }
 
   // free up resources
   err = source_handle.destroy();
   assert(err == dashmm::kSuccess);
-
-  delete [] sources;
 }
 
 

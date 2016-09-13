@@ -112,7 +112,9 @@ class TargetLCO {
     assert(input);
     input->code = kStoT;
     input->count = n;
-    memcpy(input->sources, sources, sizeof(source_t) * n);
+    if (n != 0) {
+      memcpy(input->sources, sources, sizeof(source_t) * n);
+    }
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
 
@@ -204,22 +206,28 @@ class TargetLCO {
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
+    if (lhs->targets.data() == HPX_NULL) {
+      return;
+    }
+
     if (*code == kStoT) {
       // The input contains the sources
       StoT *input = static_cast<StoT *>(rhs);
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      if (input->count) {
+        // The LCO data contains the reference to the targets, which must be
+        // pinned.
+        target_t *targets{nullptr};
+        // NOTE: This should succeed because we place the LCO at the same
+        // locality as the actual target data.
+        assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand(ViewSet{});
-      expand.S_to_T(input->sources, &input->sources[input->count],
-                     targets, &targets[lhs->targets.n()]);
+        expansion_t expand(ViewSet{});
+        expand.S_to_T(input->sources, &input->sources[input->count],
+                       targets, &targets[lhs->targets.n()]);
 
-      hpx_gas_unpin(lhs->targets.data());
+        hpx_gas_unpin(lhs->targets.data());
+      }
     } else if (*code == kMtoT) {
       // TODO: take a look at this MtoT type. We use nothing but the code here.
       readbuf.interpret<MtoT>();

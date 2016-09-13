@@ -310,8 +310,6 @@ dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
   SourceData *sources{nullptr};
   if (args.source_count) {
     sources = new SourceData[args.source_count];
-    //reinterpret_cast<SourceData *>(
-    //    new char [sizeof(SourceData) * args.source_count]);
     set_sources(sources, args.source_count, args.source_type, args.method);
   }
 
@@ -474,6 +472,12 @@ void perform_evaluation_test(InputArguments args) {
     //Get the results from the global address space
     args.target_count = target_handle.length();
     TargetData *targets = target_handle.collect();
+    if (targets) {
+      std::sort(targets, &targets[args.target_count],
+                [] (const TargetData &a, const TargetData &b) -> bool {
+                  return (a.index < b.index);
+                });
+    }
 
     // Copy the test particles into test_targets
     TargetData *test_targets{nullptr};
@@ -485,6 +489,7 @@ void perform_evaluation_test(InputArguments args) {
         assert(idx < args.target_count);
         test_targets[i] = targets[idx];
         test_targets[i].phi = std::complex<double>{0.0, 0.0};
+fprintf(stdout, "%d %d\n", idx, targets[idx].index);
       }
     }
 
@@ -497,6 +502,7 @@ void perform_evaluation_test(InputArguments args) {
     delete [] test_targets;
 
     //do direct evaluation
+    //*
     if (args.kernel == "laplace") {
       dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
       err = laplace_direct.evaluate(source_handle, test_handle,
@@ -511,6 +517,7 @@ void perform_evaluation_test(InputArguments args) {
                                    args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
     }
+    //*/
 
     // Retrieve the test results
     test_targets = test_handle.collect();

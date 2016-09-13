@@ -27,6 +27,10 @@
 
 namespace dashmm {
 
+struct AddrMergeData {
+  int count;
+  hpx_addr_t addr[];
+};
 
 struct AddrMergeArgs {
   int rank;
@@ -35,34 +39,27 @@ struct AddrMergeArgs {
 
 
 // Operations for the address sharing
-void init_handler(hpx_addr_t *head, size_t bytes,
-                  hpx_addr_t *init, size_t init_bytes) {
-  int count = bytes / sizeof(hpx_addr_t);
-  for (int i = 0; i < count; ++i) {
-    head[i] = HPX_NULL;
+void init_handler(AddrMergeData *head, size_t bytes,
+                  AddrMergeData *init, size_t init_bytes) {
+  head->count = (bytes - sizeof(AddrMergeData)) / sizeof(hpx_addr_t);
+  for (int i = 0; i < head->count; ++i) {
+    head->addr[i] = HPX_NULL;
   }
 }
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, init_action, init_handler,
            HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
 
-void op_handler(hpx_addr_t *lhs, AddrMergeArgs *rhs, size_t bytes) {
+void op_handler(AddrMergeData *lhs, AddrMergeArgs *rhs, size_t bytes) {
   assert(bytes == sizeof(AddrMergeArgs));
   assert(rhs->rank < hpx_get_num_ranks());
-  lhs[rhs->rank] = rhs->addx;
+  lhs->addr[rhs->rank] = rhs->addx;
+  lhs->count -= 1;
 }
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, op_action, op_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
-bool pred_handler(hpx_addr_t *lhs, size_t bytes) {
-  int count = bytes / sizeof(hpx_addr_t);
-  bool retval = true;
-  for (int i = 0; i < count; ++i) {
-    if (lhs[i] == HPX_NULL) {
-      retval = false;
-      break;
-    }
-  }
-  return retval;
+bool pred_handler(AddrMergeData *lhs, size_t bytes) {
+  return lhs->count == 0;
 }
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, pred_action, pred_handler,
            HPX_POINTER, HPX_SIZE_T);
@@ -344,9 +341,9 @@ int array_collect_prep_handler(hpx_addr_t UNUSED) {
   retval[0] = hpx_lco_reduce_new(n_ranks, sizeof(size_t) * n_ranks,
                                  size_sum_ident, size_sum_op);
   int nonsense{0};
-  retval[1] = hpx_lco_user_new(sizeof(hpx_addr_t) * n_ranks, init_action,
-                               op_action, pred_action, &nonsense,
-                               sizeof(nonsense));
+  retval[1] = hpx_lco_user_new(
+        sizeof(hpx_addr_t) * n_ranks + sizeof(AddrMergeData), init_action,
+        op_action, pred_action, &nonsense, sizeof(nonsense));
   hpx_exit(sizeof(hpx_addr_t) * 2, &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
@@ -395,13 +392,15 @@ int array_collect_handler(hpx_addr_t data, hpx_addr_t offsets,
     }
 
     // loop over ranks memget
-    hpx_addr_t *where = new hpx_addr_t[n_ranks];
-    hpx_lco_get(addxes, sizeof(hpx_addr_t) * n_ranks, where);
+    size_t datasize = sizeof(AddrMergeData) + sizeof(hpx_addr_t) * n_ranks;
+    AddrMergeData *where =
+        reinterpret_cast<AddrMergeData *>(new char[datasize]);
+    hpx_lco_get(addxes, datasize, where);
 
-    hpx_gas_memget_sync(retval, where[0], local->size * counts[0]);
+    hpx_gas_memget_sync(retval, where->addr[0], local->size * counts[0]);
     for (int i = 1; i < n_ranks; ++i) {
       hpx_gas_memget_sync(&retval[contrib[i-1] * local->size],
-                          where[i],
+                          where->addr[i],
                           local->size * counts[i]);
     }
 
