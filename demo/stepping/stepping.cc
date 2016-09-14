@@ -22,6 +22,8 @@
 #include <memory>
 #include <string>
 
+#include <fenv.h>
+
 #include "dashmm/dashmm.h"
 
 
@@ -256,16 +258,20 @@ void perform_time_stepping(InputArguments args) {
   // Prototypes for the method
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
+feenableexcept(FE_ALL_EXCEPT);
+
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
-fprintf(stdout, "Before step %d\n", step);fflush(stdout);
+    if (hpx_get_my_rank() == 0) {
+      fprintf(stdout, "Starting step %d...\n", step);
+    }
+
     double t0 = getticks();
     err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
                           method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
-fprintf(stdout, "Before update %d\n", step);fflush(stdout);
     // Now update the positions based on the velocity
     source_handle.map(update_action, &dt);
     double t2 = getticks();
@@ -276,7 +282,7 @@ fprintf(stdout, "Before update %d\n", step);fflush(stdout);
   }
 
   // Report on loop
-  fprintf(stdout, "Evaluation took %lg [us]\n", t_eval);
+  fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
   fprintf(stdout, "Update took %lg [us]\n", t_update);
 
   // Output if the user has selected this option
@@ -300,7 +306,6 @@ int main(int argc, char **argv) {
 
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
-
 
   if (!usage_error) {
     perform_time_stepping(inputargs);

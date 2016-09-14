@@ -356,8 +356,6 @@ dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
   TargetData *targets{nullptr};
   if (args.target_count) {
     targets = new TargetData[args.target_count];
-    //reinterpret_cast<TargetData *>(
-     //   new char [sizeof(TargetData) * args.target_count]);
     set_targets(targets, args.target_count, args.target_type);
   }
 
@@ -489,7 +487,6 @@ void perform_evaluation_test(InputArguments args) {
         assert(idx < args.target_count);
         test_targets[i] = targets[idx];
         test_targets[i].phi = std::complex<double>{0.0, 0.0};
-fprintf(stdout, "%d %d\n", idx, targets[idx].index);
       }
     }
 

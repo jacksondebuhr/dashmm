@@ -2219,7 +2219,6 @@ class DualTree {
                  &p_s, &p_t, &rwtree);
       }
     }
-
     hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
     assert(dual_tree_complete != HPX_NULL);
 

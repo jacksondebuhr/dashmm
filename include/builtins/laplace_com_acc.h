@@ -158,7 +158,7 @@ class LaplaceCOMAcc {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
@@ -168,7 +168,7 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
@@ -295,9 +295,11 @@ class LaplaceCOMAcc {
     double Mprime = data_->mtot + M2;
 
     double Dprime[3] { };
-    Dprime[0] = (data_->mtot * data_->xcom[0] + M2 * D2[0]) / Mprime;
-    Dprime[1] = (data_->mtot * data_->xcom[1] + M2 * D2[1]) / Mprime;
-    Dprime[2] = (data_->mtot * data_->xcom[2] + M2 * D2[2]) / Mprime;
+    if (Mprime != 0.0) {
+      Dprime[0] = (data_->mtot * data_->xcom[0] + M2 * D2[0]) / Mprime;
+      Dprime[1] = (data_->mtot * data_->xcom[1] + M2 * D2[1]) / Mprime;
+      Dprime[2] = (data_->mtot * data_->xcom[2] + M2 * D2[2]) / Mprime;
+    }
 
     double diff1[3] = {data_->xcom[0] - Dprime[0], data_->xcom[1] - Dprime[1],
                        data_->xcom[2] - Dprime[2]};
@@ -336,7 +338,7 @@ class LaplaceCOMAcc {
 
   static double compute_scale(Index index) {return 1.0;}
 
-  static int weight_estimate(Operation op, 
+  static int weight_estimate(Operation op,
                              Index s = Index{}, Index t = Index{}) {
     return 1;
   }
