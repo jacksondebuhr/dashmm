@@ -25,8 +25,6 @@ TODO: Consider changing ExpansionLCO to only contain the needed info from the
     DomainGeometry. The use is very simple, getting box sizes and so on.
 
 
-TODO: Remove the offset in the array map action.
-
 TODO: Allow for the array map action to have a couple integer template
       parameters. One to indicate the overdecomposition. The other to indicate
       how many threads should deal with each segment.

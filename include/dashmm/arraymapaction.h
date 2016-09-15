@@ -75,7 +75,7 @@ template <typename T, typename E>
 class ArrayMapAction {
  public:
   /// The function type for functions mapped onto Array elements.
-  using map_function_t = void (*)(T *, const size_t, const size_t, const E *);
+  using map_function_t = void (*)(T *, const size_t, const E *);
 
   /// Construct the ArrayMapAction
   ///
@@ -90,7 +90,7 @@ class ArrayMapAction {
       HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_DEFAULT, root_, root_handler,
                           HPX_ACTION_T, HPX_POINTER, HPX_ADDR);
       HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_DEFAULT, spawn_, spawn_handler,
-                          HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T,
+                          HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T,
                           HPX_ADDR, HPX_ACTION_T, HPX_POINTER, HPX_ADDR);
       registered_ = 1;
     }
@@ -144,9 +144,8 @@ class ArrayMapAction {
     // Completion detection LCO
     hpx_addr_t alldone = hpx_lco_and_new(n_chunks);
 
-    size_t offset = 0;
     hpx_call(HPX_HERE, spawn_, HPX_NULL, &total_count, &total_count,
-             &offset, &n_per_chunk, &alldone, &leaf, &env, &data);
+             &n_per_chunk, &alldone, &leaf, &env, &data);
 
     hpx_lco_wait(alldone);
     hpx_lco_delete_sync(alldone);
@@ -154,14 +153,14 @@ class ArrayMapAction {
     hpx_exit(0, nullptr);
   }
 
-  static int spawn_handler(size_t count, size_t total_count, size_t offset,
+  static int spawn_handler(size_t count, size_t total_count,
                            size_t chunk_size, hpx_addr_t alldone,
                            hpx_action_t leaf, const E *env, hpx_addr_t data) {
     if (count <= chunk_size) {
       map_function_t lfunc = (map_function_t)hpx_action_get_handler(leaf);
       T *local{nullptr};
       assert(hpx_gas_try_pin(data, (void **)&local));
-      lfunc(local, count, offset, env);
+      lfunc(local, count, env);
       hpx_gas_unpin(data);
       hpx_lco_set_lsync(alldone, 0, nullptr, HPX_NULL);
     } else {
@@ -173,14 +172,13 @@ class ArrayMapAction {
       size_t num_left = num_chunks / 2;
       size_t count_left = num_left * chunk_size;
       size_t count_right = count - count_left;
-      size_t offset_right = offset + count_left;
       hpx_addr_t data_right = hpx_addr_add(data, sizeof(T) * count_left,
                                            sizeof(T) * total_count);
 
-      hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_left, &total_count, &offset,
+      hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_left, &total_count,
                &chunk_size, &alldone, &leaf, &env, &data);
       hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_right, &total_count,
-               &offset_right, &chunk_size, &alldone, &leaf, &env, &data_right);
+               &chunk_size, &alldone, &leaf, &env, &data_right);
     }
 
     return HPX_SUCCESS;

@@ -45,8 +45,7 @@ struct InputArguments {
 };
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt);
+void update_particles(Particle *P, const size_t count, const double *dt);
 
 
 // Here we create the evaluator objects that we shall need in this demo.
@@ -204,8 +203,7 @@ void output_results(const std::string &fname, const Particle *sources,
 }
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt) {
+void update_particles(Particle *P, const size_t count, const double *dt) {
   for (size_t i = 0; i < count; ++i) {
     double x[3] = {P[i].position[0], P[i].position[1], P[i].position[2]};
     for (int j = 0; j < 3; ++j) {
