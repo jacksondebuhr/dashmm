@@ -73,7 +73,7 @@ TODO: Recall that the usage pattern of the DAG routines will want to change
 Overall Plan to 1.0
  * Full distribution of data and work
     - build one locality tree from distributed particle data (and sort those
-      particles as needed)
+      particles as needed) (DONE)
     - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
 
