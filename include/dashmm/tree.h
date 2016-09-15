@@ -856,51 +856,51 @@ class Tree {
     int range = last - first + 1;
     arrayref_t sorted_ref{};
 
-    // Compute global_offset
-    int *global_offset = new int[range]();
-    size_t num_points = global_count[first];
-    for (int i = first + 1; i <= last; ++i) {
-      num_points += global_count[i];
-      global_offset[i - first] = global_offset[i - first - 1] +
-                                 global_count[i - 1];
-    }
+    if (range > 0) {
+      // Compute global_offset
+      int *global_offset = new int[range]();
+      size_t num_points = global_count[first];
+      for (int i = first + 1; i <= last; ++i) {
+        num_points += global_count[i];
+        global_offset[i - first] = global_offset[i - first - 1] +
+                                   global_count[i - 1];
+      }
 
-    if (num_points > 0) {
-      hpx_addr_t sorted_gas = hpx_gas_alloc_local(
-          1, sizeof(record_t) * num_points, 0);
-      assert(sorted_gas != HPX_NULL);
-      sorted_ref = arrayref_t{sorted_gas, num_points, num_points};
+      if (num_points > 0) {
+        hpx_addr_t sorted_gas = hpx_gas_alloc_local(
+            1, sizeof(record_t) * num_points, 0);
+        assert(sorted_gas != HPX_NULL);
+        sorted_ref = arrayref_t{sorted_gas, num_points, num_points};
 
-      for (int i = first; i <= last; ++i) {
-        node_t *curr = &n[i];
-        curr->parts = sorted_ref.slice(global_offset[i - first],
-                                       global_count[i]);
+        for (int i = first; i <= last; ++i) {
+          node_t *curr = &n[i];
+          curr->parts = sorted_ref.slice(global_offset[i - first],
+                                         global_count[i]);
 
-        if (local_count[i]) {
-          // Copy local points before merging remote points
-          curr->lock();
-          auto sorted = curr->parts.pin();
-          memcpy(sorted.value() + curr->first(),
-                 &temp[local_offset[i]],
-                 sizeof(record_t) * local_count[i]);
+          if (local_count[i]) {
+            // Copy local points before merging remote points
+            curr->lock();
+            auto sorted = curr->parts.pin();
+            memcpy(sorted.value() + curr->first(),
+                   &temp[local_offset[i]],
+                   sizeof(record_t) * local_count[i]);
 
-          if (curr->increment_first(local_count[i])) {
-            // This grid does not expect remote points.
-            // Spawn adaptive partitioning
-            int ssat = 0;
-            hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-                     &curr, &geo, &threshold, &ssat);
+            if (curr->increment_first(local_count[i])) {
+              // This grid does not expect remote points.
+              // Spawn adaptive partitioning
+              int ssat = 0;
+              hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
+                       &curr, &geo, &threshold, &ssat);
+            }
+            curr->unlock();
           }
-          curr->unlock();
         }
       }
+      delete [] global_offset;
     }
 
     tree->sorted_ = sorted_ref;
-
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
-
-    delete [] global_offset;
   }
 
   static void init_point_exchange_same_s_and_t(
@@ -911,49 +911,49 @@ class Tree {
     int range = last - first + 1;
     arrayref_t sorted_ref{};
 
-    // Compute global_offset
-    int *global_offset = new int[range]();
-    size_t num_points = global_count[first];
-    for (int i = first + 1; i <= last; ++i) {
-      num_points += global_count[i];
-      global_offset[i - first] = global_offset[i - first - 1] +
-                                 global_count[i - 1];
-    }
+    if (range > 0) {
+      // Compute global_offset
+      int *global_offset = new int[range]();
+      size_t num_points = global_count[first];
+      for (int i = first + 1; i <= last; ++i) {
+        num_points += global_count[i];
+        global_offset[i - first] = global_offset[i - first - 1] +
+                                   global_count[i - 1];
+      }
 
-    if (num_points > 0) {
-      for (int i = first; i <= last; ++i) {
-        // When S == T, we need to set the parts on the target to be the
-        // parts on the equivalent source node
-        node_t *curr = &n[i];
-        sourcenode_t *curr_source = &snodes[i];
-        ArrayRef<Source> sparts = curr_source->parts;
-        curr->parts = arrayref_t{sparts.data(), sparts.n(), sparts.n_tot()};
+      if (num_points > 0) {
+        for (int i = first; i <= last; ++i) {
+          // When S == T, we need to set the parts on the target to be the
+          // parts on the equivalent source node
+          node_t *curr = &n[i];
+          sourcenode_t *curr_source = &snodes[i];
+          ArrayRef<Source> sparts = curr_source->parts;
+          curr->parts = arrayref_t{sparts.data(), sparts.n(), sparts.n_tot()};
 
-        if (local_count[i]) {
-          curr->lock();
-          // still need to increment first, and still need to partition
-          // if things are ready. The only catch is that we have to wait for
-          // the equivalent source node to be ready before we start.
-          if (curr->increment_first(local_count[i])) {
-            // This grid does not expect remote points.
-            // Spawn adaptive partitioning
-            int ssat = 1;
-            hpx_call_when(curr_source->complete(), HPX_HERE,
-                          node_t::partition_node_, HPX_NULL,
-                          &curr, &geo, &threshold, &ssat);
+          if (local_count[i]) {
+            curr->lock();
+            // still need to increment first, and still need to partition
+            // if things are ready. The only catch is that we have to wait for
+            // the equivalent source node to be ready before we start.
+            if (curr->increment_first(local_count[i])) {
+              // This grid does not expect remote points.
+              // Spawn adaptive partitioning
+              int ssat = 1;
+              hpx_call_when(curr_source->complete(), HPX_HERE,
+                            node_t::partition_node_, HPX_NULL,
+                            &curr, &geo, &threshold, &ssat);
+            }
+            curr->unlock();
           }
-          curr->unlock();
         }
       }
+      delete [] global_offset;
     }
 
     // Again, the target tree reuses the data from the source tree
     ArrayRef<Source> ssort = source_tree->sorted();
     tree->sorted_ = arrayref_t{ssort.data(), ssort.n(), ssort.n_tot()};
-
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
-
-    delete [] global_offset;
   }
 
   /// Merge incoming points into the local array
