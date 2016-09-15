@@ -346,8 +346,8 @@ class Array {
   /// \param env - the environment to use in the action.
   ///
   /// \return - kSuccess
-  template <typename E>
-  ReturnCode map(const ArrayMapAction<T, E> &act, const E *env) {
+  template <typename E, int F>
+  ReturnCode map(const ArrayMapAction<T, E, F> &act, const E *env) {
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
   }

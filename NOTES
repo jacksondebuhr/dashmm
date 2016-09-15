@@ -25,10 +25,6 @@ TODO: Consider changing ExpansionLCO to only contain the needed info from the
     DomainGeometry. The use is very simple, getting box sizes and so on.
 
 
-TODO: Allow for the array map action to have a couple integer template
-      parameters. One to indicate the overdecomposition. The other to indicate
-      how many threads should deal with each segment.
-
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible

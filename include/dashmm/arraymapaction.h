@@ -16,7 +16,7 @@
 #define __DASHMM_ARRAY_MAP_ACTION_H__
 
 
-/// \file include/dashmm/arraymapaction.h
+/// \file
 /// \brief Definitions for actions mappable over an array.
 
 
@@ -36,9 +36,10 @@ class Array;
 /// ArrayMapAction
 ///
 /// A class that represents an action that can be invoked on the elements of
-/// a DASHMM array. It is a template requiring both the type for the array
-/// records as well as an environment that is passed to each invocation of the
-/// associated action.
+/// a DASHMM array. It is a template requiring the type for the array
+/// records, an environment that is passed to each invocation of the
+/// associated action and an integer specifying how parallel to make the mapped
+/// action.
 ///
 /// To specify the action, the user will provide a function pointer with the
 /// following signature: void func(T *, const size_t, const size_t, const E *),
@@ -49,31 +50,41 @@ class Array;
 ///   which the action will act.
 /// * The second is the total count of records to be examined in the current
 ///   call of the function.
-/// * The third is the offset of the provided pointer in the overall array.
-///   NOTE: This does not mean that one should begin indexing the provided
-///   array at the value of the third argument. Instead, this is provided in
-///   case there is some reason that it is important to know the overall offset
-///   in the array.
 /// * The final is the environment passed into the Array<T>::map() function
 ///   call.
 ///
 /// As an example, the following function might perform the position update for
 /// a time-stepping code:
 ///
-/// void update_position(T *data, const size_t count, const size_t offset,
-///                     const E *env) {
-///   for (size_t i = 0; i < count; ++i) {
-///     data[i].position += data[i].velocity * env->delta_t;
-///   }
-/// }
+/// ~~~{.cc}
+///     void update_position(T *data, const size_t count, const E *env) {
+///       for (size_t i = 0; i < count; ++i) {
+///         data[i].position += data[i].velocity * env->delta_t;
+///       }
+///     }
+/// ~~~
 ///
 /// For each action to be applied to a given sort of array, the user will need
 /// to create another instance of an ArrayMapAction. These objects manage
 /// registration of the action with the HPX-5 runtime, which means these objects
 /// must be created before the call to dashmm::init().
-template <typename T, typename E>
+///
+/// The final template parameter gives the degree of parallelism to employ in
+/// the resulting mapping of the action to the array. If the parameter is given
+/// the value zero, a single thread will process the entire array. If the
+/// parameter is positive, then the array segment will be split into a number
+/// of chunks equal to the number of HPX-5 scheduler threads times this factor.
+/// Certain situations will decrease the number of chunks: if the system is
+/// running with 1 thread, it will use only one chunk to avoid pointless
+/// overhead; if there are too few records, a number of chunks will be created
+/// equal to the number of records. This parameter has a default value of 1;
+/// unless the amount of work per record is very non-uniform, there should be
+/// little need to use another value.
+template <typename T, typename E, int factor = 1>
 class ArrayMapAction {
  public:
+  static_assert(factor >= 0, "Decomposition factor must be non-negative");
+
   /// The function type for functions mapped onto Array elements.
   using map_function_t = void (*)(T *, const size_t, const E *);
 
@@ -118,15 +129,17 @@ class ArrayMapAction {
       hpx_exit(0, nullptr);
     }
 
-    // NOTE: Initially, for maximal "easiness" the library should pick the
-    // decomposition factor. In the future, this should be extended and refined
-    // in some way, where the user might give hints, or explicit instructions.
-    size_t over_factor = 4;
-    if (hpx_get_num_threads() == 1) {
+    size_t over_factor = factor;
+    if (factor == 0) {
+      // Use only one chunk
+      over_factor = 1;
+    } else if (hpx_get_num_threads() == 1) {
       // Avoid pointless overhead for 1 thread
       over_factor = 1;
+    } else {
+      over_factor = hpx_get_num_threads() * factor;
     }
-    size_t n_per_chunk = total_count / (hpx_get_num_threads() * over_factor);
+    size_t n_per_chunk = total_count / over_factor;
     size_t n_chunks{0};
 
     if (n_per_chunk == 0) {
@@ -190,14 +203,14 @@ class ArrayMapAction {
   hpx_action_t leaf_;
 };
 
-template <typename T, typename E>
-int ArrayMapAction<T, E>::registered_ = 0;
+template <typename T, typename E, int factor>
+int ArrayMapAction<T, E, factor>::registered_ = 0;
 
-template <typename T, typename E>
-hpx_action_t ArrayMapAction<T, E>::root_ = HPX_ACTION_NULL;
+template <typename T, typename E, int factor>
+hpx_action_t ArrayMapAction<T, E, factor>::root_ = HPX_ACTION_NULL;
 
-template <typename T, typename E>
-hpx_action_t ArrayMapAction<T, E>::spawn_ = HPX_ACTION_NULL;
+template <typename T, typename E, int factor>
+hpx_action_t ArrayMapAction<T, E, factor>::spawn_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm
