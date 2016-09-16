@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -21,15 +32,15 @@
 
 namespace dashmm {
 
-std::unique_ptr<LaplaceTable> builtin_laplace_table_; 
+std::unique_ptr<LaplaceTable> builtin_laplace_table_;
 
 LaplaceTable::LaplaceTable(int n_digits, double size) {
-  scale_ = 1.0 / size; 
+  scale_ = 1.0 / size;
   int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29,
                         33, 36, 40, 43, 46};
   p_ = expan_length[n_digits];
-  generate_sqf(); 
-  generate_sqbinom(); 
+  generate_sqf();
+  generate_sqbinom();
   dmat_plus_ = new laplace_map_t;
   dmat_minus_ = new laplace_map_t;
   generate_wigner_dmatrix(dmat_plus_, dmat_minus_);
@@ -112,12 +123,12 @@ LaplaceTable::LaplaceTable(int n_digits, double size) {
   default:
     break;
   }
-  
-  generate_xs(); 
-  generate_ys(); 
-  generate_zs(); 
-  generate_lambdaknm(); 
-  generate_ealphaj(); 
+
+  generate_xs();
+  generate_ys();
+  generate_zs();
+  generate_lambdaknm();
+  generate_ealphaj();
 }
 
 
@@ -406,11 +417,11 @@ void update_laplace_table(int n_digits, double size) {
 
   // Need to add the capability to check if \p n_digits is the same as the one
   // stored. If not, delete the current table and generate one with the updated
-  // accuracy requirement.  
+  // accuracy requirement.
 
-  if (builtin_laplace_table_ == nullptr) 
-    builtin_laplace_table_ = 
-      std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits, size}}; 
+  if (builtin_laplace_table_ == nullptr)
+    builtin_laplace_table_ =
+      std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits, size}};
 }
 
 

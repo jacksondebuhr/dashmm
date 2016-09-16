@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -60,16 +71,16 @@ class Laplace {
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Laplace<Source, Target>;
-  
+
   Laplace(Point center, double scale, ExpansionRole role)
     : views_{ViewSet{role, center, scale}} {
 
     // View size for each spherical harmonic expansion
-    int p = builtin_laplace_table_->p(); 
+    int p = builtin_laplace_table_->p();
     int nsh = (p + 1) * (p + 2) / 2;
 
     // View size for each exponential expansion
-    int nexp = builtin_laplace_table_->nexp(); 
+    int nexp = builtin_laplace_table_->nexp();
 
     if (role == kSourcePrimary || role == kTargetPrimary) {
       size_t bytes = sizeof(dcomplex_t) * nsh;
@@ -141,11 +152,11 @@ class Laplace {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
-    double scale = views_.scale(); 
+    double scale = views_.scale();
     expansion_t *retval{new expansion_t{center, 1.0, kSourcePrimary}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    int p = builtin_laplace_table_->p(); 
-    const double *sqf = builtin_laplace_table_->sqf(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqf = builtin_laplace_table_->sqf();
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -194,12 +205,12 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last) const { 
-    double scale = views_.scale(); 
+                                      Source *last) const {
+    double scale = views_.scale();
     expansion_t *retval{new expansion_t{center, 1.0, kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    int p = builtin_laplace_table_->p(); 
-    const double *sqf = builtin_laplace_table_->sqf(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqf = builtin_laplace_table_->sqf();
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -250,28 +261,28 @@ class Laplace {
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
-    // The function is called on the expansion of the child box and 
+    // The function is called on the expansion of the child box and
     // \p s_size is the child box's size.
     double h = s_size / 2;
     Point center = views_.center();
-    double scale = views_.scale() / 2; 
+    double scale = views_.scale() / 2;
     double px = center.x() + (from_child % 2 == 0 ? h : -h);
     double py = center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = center.z() + (from_child < 4 ? h : -h);
 
-    expansion_t *retval{new expansion_t{Point{px, py, pz}, 
+    expansion_t *retval{new expansion_t{Point{px, py, pz},
           scale, kSourcePrimary}};
 
-    int p = builtin_laplace_table_->p(); 
-    const double *sqbinom = builtin_laplace_table_->sqbinom(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqbinom = builtin_laplace_table_->sqbinom();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (from_child < 4 ?
-                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) : 
+                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) :
                         builtin_laplace_table_->dmat_plus(-1.0 / sqrt(3.0)));
     const double *d2 = (from_child < 4 ?
-                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) : 
-                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0))); 
+                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) :
+                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0)));
 
     // Shift distance along the z-axis, combined with Y_n^0(pi, 0)
     const double rho = -sqrt(3) / 2;
@@ -340,14 +351,14 @@ class Laplace {
     int t2s_y = s_index.y() - t_index.y();
     int t2s_z = s_index.z() - t_index.z();
     Point center = views_.center();
-    double scale = views_.scale(); 
+    double scale = views_.scale();
     double tx = center.x() - t2s_x * s_size;
     double ty = center.y() - t2s_y * s_size;
     double tz = center.z() - t2s_z * s_size;
 
-    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, scale, 
+    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, scale,
                                         kTargetPrimary}};
-    int p = builtin_laplace_table_->p(); 
+    int p = builtin_laplace_table_->p();
 
     // Shifting distance
     double rho = sqrt(t2s_x * t2s_x + t2s_y * t2s_y + t2s_z * t2s_z);
@@ -384,8 +395,8 @@ class Laplace {
       }
 
       // Get precomputed Wigner d-matrix for rotation about y-axis
-      const double *d1 = builtin_laplace_table_->dmat_plus(t2s_z / rho); 
-      const double *d2 = builtin_laplace_table_->dmat_minus(t2s_z / rho); 
+      const double *d1 = builtin_laplace_table_->dmat_plus(t2s_z / rho);
+      const double *d2 = builtin_laplace_table_->dmat_minus(t2s_z / rho);
       rotate_sph_z(M, beta, W1);
       rotate_sph_y(W1, d1, W2);
       M_to_L_zp(W2, powers_rho, W1);
@@ -405,21 +416,21 @@ class Laplace {
     double cx = center.x() + (to_child % 2 == 0 ? -h : h);
     double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = center.z() + (to_child < 4 ? -h : h);
-    double scale = views_.scale() * 2; 
+    double scale = views_.scale() * 2;
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale, 
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale,
                                         kTargetPrimary}};
 
-    int p = builtin_laplace_table_->p(); 
-    const double *sqbinom = builtin_laplace_table_->sqbinom(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqbinom = builtin_laplace_table_->sqbinom();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (to_child < 4 ?
-                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) : 
-                        builtin_laplace_table_->dmat_plus(-1.0 / sqrt(3.0))); 
+                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) :
+                        builtin_laplace_table_->dmat_plus(-1.0 / sqrt(3.0)));
     const double *d2 = (to_child < 4 ?
-                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) : 
-                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0))); 
+                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) :
+                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0)));
 
     // Shift distance along the z-axis, combined with Y_n^0(pi, 0)
     const double rho = -sqrt(3) / 4;
@@ -484,9 +495,9 @@ class Laplace {
   }
 
   void M_to_T(Target *first, Target *last) const {
-    double scale = views_.scale();    
-    int p = builtin_laplace_table_->p(); 
-    const double *sqf = builtin_laplace_table_->sqf(); 
+    double scale = views_.scale();
+    int p = builtin_laplace_table_->p();
+    const double *sqf = builtin_laplace_table_->sqf();
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -542,9 +553,9 @@ class Laplace {
   }
 
   void L_to_T(Target *first, Target *last) const {
-    int p = builtin_laplace_table_->p(); 
-    double scale = views_.scale(); 
-    const double *sqf = builtin_laplace_table_->sqf(); 
+    int p = builtin_laplace_table_->p();
+    double scale = views_.scale();
+    const double *sqf = builtin_laplace_table_->sqf();
 
     double *legendre = new double[(p + 1) * (p + 2) / 2];
     double *powers_r = new double[p + 1];
@@ -615,8 +626,8 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
-    double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{views_.center(), scale, 
+    double scale = views_.scale();
+    expansion_t *retval{new expansion_t{views_.center(), scale,
                                         kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
@@ -639,8 +650,8 @@ class Laplace {
     // Addresses of exponential expansions in the negative axis direction
     dcomplex_t *EM[3] = {E_mx, E_my, E_mz};
 
-    int p = builtin_laplace_table_->p(); 
-    int s = builtin_laplace_table_->s(); 
+    int p = builtin_laplace_table_->p();
+    int s = builtin_laplace_table_->s();
     int nsh = (p + 1) * (p + 2) / 2;
     const double *weight_ = builtin_laplace_table_->weight();
     const int *m_ = builtin_laplace_table_->m();
@@ -650,8 +661,8 @@ class Laplace {
     const double *d2 = builtin_laplace_table_->dmat_minus(0.0);
     const double *lambdaknm = builtin_laplace_table_->lambdaknm();
     const dcomplex_t *ealphaj = builtin_laplace_table_->ealphaj();
-    
-    // Allocate scratch space to handle x- and y-direction 
+
+    // Allocate scratch space to handle x- and y-direction
     // exponential expansions
     dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2];
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
@@ -668,7 +679,7 @@ class Laplace {
     rotate_sph_y(M, d1, W1);
 
     // Addresses of the spherical harmonic expansions
-    const dcomplex_t *SH[3] = {W1, W2, M}; 
+    const dcomplex_t *SH[3] = {W1, W2, M};
 
     for (int dir = 0; dir <= 2; ++dir) {
       int offset = 0;
@@ -752,7 +763,7 @@ class Laplace {
     double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
-    int nexp = builtin_laplace_table_->nexp(); 
+    int nexp = builtin_laplace_table_->nexp();
     const dcomplex_t *S_px =
       reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     const dcomplex_t *S_mx =
@@ -766,7 +777,7 @@ class Laplace {
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    double scale = views_.scale() / 2; 
+    double scale = views_.scale() / 2;
     ViewSet views{kTargetIntermediate, Point{px, py, pz}, scale};
 
     // Each S is going to generate between 1 and 3 views of the exponential
@@ -778,39 +789,39 @@ class Laplace {
     char *C1 = reinterpret_cast<char *>(T1);
     char *C2 = reinterpret_cast<char *>(T2);
     char *C3 = reinterpret_cast<char *>(T3);
-    dcomplex_t *T[3] = {T1, T2, T3}; 
-    char *C[3] = {C1, C2, C3}; 
-    bool used[3] = {false, false, false}; 
+    dcomplex_t *T[3] = {T1, T2, T3};
+    char *C[3] = {C1, C2, C3};
+    bool used[3] = {false, false, false};
 
     for (int i = 0; i < 3; ++i) {
-      int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i]; 
-      
-      if (tag == -1) 
-        break; 
+      int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
 
-      if (tag <= 1) { 
-        e2e(T[i], S_mz, dx, dy, 0); 
+      if (tag == -1)
+        break;
+
+      if (tag <= 1) {
+        e2e(T[i], S_mz, dx, dy, 0);
       } else if (tag <= 5) {
-        e2e(T[i], S_my, dz, dx, 0); 
+        e2e(T[i], S_my, dz, dx, 0);
       } else if (tag <= 13) {
-        e2e(T[i], S_mx, -dz, dy, 0); 
+        e2e(T[i], S_mx, -dz, dy, 0);
       } else if (tag <= 15) {
-        e2e(T[i], S_pz, -dx, -dy, 0); 
+        e2e(T[i], S_pz, -dx, -dy, 0);
       } else if (tag <= 19) {
-        e2e(T[i], S_py, -dz, -dx, 0); 
+        e2e(T[i], S_py, -dz, -dx, 0);
       } else {
-        e2e(T[i], S_px, dz, -dy, 0); 
+        e2e(T[i], S_px, dz, -dy, 0);
       }
-     
-      views.add_view(tag, view_size, C[i]); 
-      used[i] = true; 
+
+      views.add_view(tag, view_size, C[i]);
+      used[i] = true;
     }
 
-    if (used[1] == false) 
-      delete [] T2; 
+    if (used[1] == false)
+      delete [] T2;
 
-    if (used[2] == false) 
-      delete [] T3; 
+    if (used[2] == false)
+      delete [] T3;
 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
@@ -827,12 +838,12 @@ class Laplace {
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
-    double scale = views_.scale() * 2; 
+    double scale = views_.scale() * 2;
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale, 
+    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale,
                                         kTargetPrimary}};
 
-    int nexp = builtin_laplace_table_->nexp(); 
+    int nexp = builtin_laplace_table_->nexp();
 
     dcomplex_t *E[28]{nullptr};
     for (int i = 0; i < 28; ++i)
@@ -1010,7 +1021,7 @@ class Laplace {
 
   static void update_table(int n_digits, double domain_size,
                            const std::vector<double> &kernel_params) {
-    update_laplace_table(n_digits, domain_size); 
+    update_laplace_table(n_digits, domain_size);
   }
 
   static void delete_table() { }
@@ -1019,26 +1030,26 @@ class Laplace {
     return builtin_laplace_table_->scale(index.level());
   }
 
-  static int weight_estimate(Operation op, 
+  static int weight_estimate(Operation op,
                              Index s = Index{}, Index t = Index{}) {
-    int weight = 0; 
+    int weight = 0;
     if (op == Operation::MtoI) {
-      weight = 6; 
+      weight = 6;
     } else if (op == Operation::ItoI) {
-      int weight = 0; 
-      int dx = s.x() - 2 * t.x(); 
-      int dy = s.y() - 2 * t.y(); 
-      int dz = s.z() - 2 * t.z(); 
+      int weight = 0;
+      int dx = s.x() - 2 * t.x();
+      int dy = s.y() - 2 * t.y();
+      int dz = s.z() - 2 * t.z();
       for (int i = 0; i < 3; ++i) {
-        int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i]; 
+        int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
         if (tag == -1)
-          break; 
+          break;
         weight++;
       }
     } else {
-      weight = 1; 
-    } 
-    return weight; 
+      weight = 1;
+    }
+    return weight;
   }
 
 
@@ -1046,7 +1057,7 @@ class Laplace {
   ViewSet views_;
 
   void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) const {
-    int p = builtin_laplace_table_->p(); 
+    int p = builtin_laplace_table_->p();
 
     // Compute exp(i * alpha)
     dcomplex_t ealpha{cos(alpha), sin(alpha)};
@@ -1071,7 +1082,7 @@ class Laplace {
 
   void rotate_sph_y(const dcomplex_t *M, const double *d,
                     dcomplex_t *MR) const {
-    int p = builtin_laplace_table_->p(); 
+    int p = builtin_laplace_table_->p();
 
     int offset = 0;
     for (int n = 0; n <= p; ++n) {
@@ -1095,9 +1106,9 @@ class Laplace {
   }
 
   void M_to_L_zp(const dcomplex_t *M, const double *rho, dcomplex_t *L) const {
-    int p = builtin_laplace_table_->p(); 
-    const double *sqbinom = builtin_laplace_table_->sqbinom(); 
-    double scale = views_.scale(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqbinom = builtin_laplace_table_->sqbinom();
+    double scale = views_.scale();
 
     int offset = 0;
     for (int j = 0; j <= p; ++j) {
@@ -1114,9 +1125,9 @@ class Laplace {
   }
 
   void M_to_L_zm(const dcomplex_t *M, const double *rho, dcomplex_t *L) const {
-    int p = builtin_laplace_table_->p(); 
-    const double *sqbinom = builtin_laplace_table_->sqbinom(); 
-    double scale = views_.scale(); 
+    int p = builtin_laplace_table_->p();
+    const double *sqbinom = builtin_laplace_table_->sqbinom();
+    double scale = views_.scale();
 
     int offset = 0;
     for (int j = 0; j <= p; ++j) {
@@ -1133,12 +1144,12 @@ class Laplace {
   }
 
   void e2e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z) const {
-    const dcomplex_t *xs = builtin_laplace_table_->xs(); 
-    const dcomplex_t *ys = builtin_laplace_table_->ys(); 
-    const double *zs = builtin_laplace_table_->zs(); 
-    int s = builtin_laplace_table_->s(); 
-    const int *m = builtin_laplace_table_->m(); 
-    const int *sm = builtin_laplace_table_->sm(); 
+    const dcomplex_t *xs = builtin_laplace_table_->xs();
+    const dcomplex_t *ys = builtin_laplace_table_->ys();
+    const double *zs = builtin_laplace_table_->zs();
+    int s = builtin_laplace_table_->s();
+    const int *m = builtin_laplace_table_->m();
+    const int *sm = builtin_laplace_table_->sm();
 
     int offset = 0;
     for (int k = 0; k < s; ++k) {
@@ -1157,15 +1168,15 @@ class Laplace {
   }
 
   void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) const {
-    const double *sqf = builtin_laplace_table_->sqf(); 
-    const dcomplex_t *ealphaj = builtin_laplace_table_->ealphaj(); 
-    const double *lambda = builtin_laplace_table_->lambda(); 
-    const int *m_ = builtin_laplace_table_->m(); 
-    const int *sm_ = builtin_laplace_table_->sm(); 
-    const int *f_ = builtin_laplace_table_->f(); 
-    const int *smf_ = builtin_laplace_table_->smf(); 
-    int p = builtin_laplace_table_->p(); 
-    int s = builtin_laplace_table_->s(); 
+    const double *sqf = builtin_laplace_table_->sqf();
+    const dcomplex_t *ealphaj = builtin_laplace_table_->ealphaj();
+    const double *lambda = builtin_laplace_table_->lambda();
+    const int *m_ = builtin_laplace_table_->m();
+    const int *sm_ = builtin_laplace_table_->sm();
+    const int *f_ = builtin_laplace_table_->f();
+    const int *smf_ = builtin_laplace_table_->smf();
+    int p = builtin_laplace_table_->p();
+    int s = builtin_laplace_table_->s();
 
     dcomplex_t *contrib = nullptr;
     dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2];
@@ -1241,12 +1252,12 @@ class Laplace {
     if (dir == 'z') {
       contrib = W1;
     } else if (dir == 'y') {
-      const double *d = builtin_laplace_table_->dmat_plus(0.0); 
+      const double *d = builtin_laplace_table_->dmat_plus(0.0);
       rotate_sph_y(W1, d, W2);
       rotate_sph_z(W2, M_PI / 2, W1);
       contrib = W1;
     } else if (dir == 'x') {
-      const double *d = builtin_laplace_table_->dmat_minus(0.0); 
+      const double *d = builtin_laplace_table_->dmat_minus(0.0);
       rotate_sph_y(W1, d, W2);
       contrib = W2;
     }

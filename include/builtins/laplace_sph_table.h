@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -55,7 +66,7 @@ class LaplaceTable {
   int p() const {return p_;}
   int s() const {return s_;}
   int nexp() const {return nexp_;}
-  double scale(int lev) const {return scale_ * pow(2, lev);} 
+  double scale(int lev) const {return scale_ * pow(2, lev);}
   const double *sqf() const {return sqf_;}
   const double *sqbinom() const {return sqbinom_;}
   const double *dmat_plus(double v) const {return dmat_plus_->at(v);}
@@ -80,34 +91,34 @@ class LaplaceTable {
   laplace_map_t *dmat_plus_;
   laplace_map_t *dmat_minus_;
 
-  int s_; 
-  int nexp_; 
-  double *lambda_; 
-  double *weight_; 
-  int *m_; 
-  int *sm_; 
-  int *f_; 
-  int *smf_; 
-  dcomplex_t *xs_; 
-  dcomplex_t *ys_; 
-  double *zs_; 
-  double *lambdaknm_; 
-  dcomplex_t *ealphaj_; 
+  int s_;
+  int nexp_;
+  double *lambda_;
+  double *weight_;
+  int *m_;
+  int *sm_;
+  int *f_;
+  int *smf_;
+  dcomplex_t *xs_;
+  dcomplex_t *ys_;
+  double *zs_;
+  double *lambdaknm_;
+  dcomplex_t *ealphaj_;
 
   void generate_sqf();
   void generate_sqbinom();
   void generate_wigner_dmatrix(laplace_map_t *&dp, laplace_map_t *&dm);
   void generate_dmatrix_of_beta(double beta, double *dp, double *dm);
-  void generate_xs(); 
-  void generate_ys(); 
-  void generate_zs(); 
-  void generate_lambdaknm(); 
-  void generate_ealphaj(); 
+  void generate_xs();
+  void generate_ys();
+  void generate_zs();
+  void generate_lambdaknm();
+  void generate_ealphaj();
 };
 
-extern std::unique_ptr<LaplaceTable> builtin_laplace_table_; 
+extern std::unique_ptr<LaplaceTable> builtin_laplace_table_;
 
-void update_laplace_table(int n_digits, double size); 
+void update_laplace_table(int n_digits, double size);
 
 } // namespace dashmm
 

@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -159,8 +170,8 @@ class LaplaceCOM {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
-                                      Source *last) const { 
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
+                                      Source *last) const {
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
     temp->calc_mtot(first, last);
@@ -169,7 +180,7 @@ class LaplaceCOM {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
@@ -221,7 +232,7 @@ class LaplaceCOM {
     }
   }
 
-  void L_to_T(Target *first, Target *last) const {} 
+  void L_to_T(Target *first, Target *last) const {}
 
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {
@@ -310,7 +321,7 @@ class LaplaceCOM {
 
   static double compute_scale(Index index) {return 1.0;}
 
-  static int weight_estimate(Operation op, 
+  static int weight_estimate(Operation op,
                              Index s = Index{}, Index t = Index{}) {
     return 1;
   }

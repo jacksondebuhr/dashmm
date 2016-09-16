@@ -78,11 +78,6 @@ Overall Plan to 1.0
     - consider placing the user-facing heads into a different directory than
       the internal stuff
 
- * Decide if we are changing the license
-    - Look into GPL vs LGPL
-    - Doublecheck with Bo that he is still down
-    - Update all files everywhere
-
  * Split Evaluate into pieces and expose more interface to users
     - NOTE: This is not a vital thing to accomplish for 1.0.0
     - Enable repeat use of a DAG
