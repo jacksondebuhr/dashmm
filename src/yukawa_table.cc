@@ -326,8 +326,8 @@ void YukawaTable::generate_sqf() {
 }
 
 void YukawaTable::generate_scaled_wigner_dmat() {
-  dmat_plus_ = new yukawa_map_t;
-  dmat_minus_ = new yukawa_map_t;
+  dmat_plus_ = new builtin_map_t; 
+  dmat_minus_ = new builtin_map_t; 
 
   double cbeta[3] = {sqrt(3) / 3, -sqrt(3) / 3, 0};
   int nd = (p_ + 1) * (4 * p_ * p_ + 11 * p_ + 6) / 6;
