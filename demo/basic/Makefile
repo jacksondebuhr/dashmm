@@ -6,7 +6,7 @@ LIBS = -L../../lib -ldashmm $(shell pkg-config --libs hpx)
 SRC = testmain.cc
 OBJ = $(SRC:.cc=.o)
 
-EXEC = testdashmm
+EXEC = basic
 
 all: $(EXEC)
 

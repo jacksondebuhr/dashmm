@@ -37,18 +37,23 @@
 
 #include "dashmm/dashmm.h"
 
+// The type used for source data. This meets all the requiremenets of the
+// various expansions used in this demo.
 struct SourceData {
   dashmm::Point position;
   double charge;
 };
 
+// The type used for target data. This meets all the requirements of the
+// various expansions used in this demo. Additionally, an index is stored
+// to make it easy to compare with the exact result.
 struct TargetData {
   dashmm::Point position;
   std::complex<double> phi;    //real, imag
   int index;
 };
 
-// Here we create the three evaluator objects that we shall need in this demo.
+// Here we create the evaluator objects that we shall need in this demo.
 // These must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
 dashmm::Evaluator<SourceData, TargetData,
@@ -64,6 +69,7 @@ dashmm::Evaluator<SourceData, TargetData,
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
 
+// This type collects the input arguments to the program.
 struct InputArguments {
   int source_count;
   std::string source_type;
@@ -76,6 +82,7 @@ struct InputArguments {
   int accuracy;
 };
 
+// Print usage information.
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
           "Options available: [possible/values] (default value)\n"
@@ -99,6 +106,8 @@ void print_usage(char *progname) {
           , progname);
 }
 
+// Parse the command line arguments, overiding any defaults at the request of
+// the user.
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
   retval.source_count = 10000;
@@ -237,7 +246,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   return 0;
 }
 
-
+// Used to time the execution
 inline double getticks(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -248,6 +257,7 @@ inline double elapsed(double t1, double t0) {
   return (double) (t1 - t0);
 }
 
+// Pick the positions in a cube with a uniform distribution
 dashmm::Point pick_cube_position() {
   double pos[3];
   pos[0] = (double)rand() / RAND_MAX - 0.5;
@@ -256,6 +266,7 @@ dashmm::Point pick_cube_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
+// Pick a point from the surface of the sphere, with a uniform distribution
 dashmm::Point pick_sphere_position() {
   double r = 1.0;
   double ctheta = 2.0 * (double)rand() / RAND_MAX - 1.0;
@@ -268,7 +279,8 @@ dashmm::Point pick_sphere_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-double pick_mass(bool use_negative) {
+// Pick a random charge vale
+double pick_charge(bool use_negative) {
   double retval = (double)rand() / RAND_MAX + 1.0;
   if (use_negative && (rand() % 2)) {
     retval *= -1.0;
@@ -276,6 +288,7 @@ double pick_mass(bool use_negative) {
   return retval;
 }
 
+// Pick a position in the plummer distribution
 dashmm::Point pick_plummer_position() {
   //NOTE: This is using a = 1
   double unif = (double)rand() / RAND_MAX;
@@ -290,34 +303,40 @@ dashmm::Point pick_plummer_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-double pick_plummer_mass(int count) {
+// Set the charges in the plummer case to be constant, and consistent with the
+// distribution.
+double pick_plummer_charge(int count) {
   //We take the total mass to be 100
   return 100.0 / count;
 }
 
+// Set the source data
 void set_sources(SourceData *sources, int source_count,
                  std::string source_type, std::string method) {
   bool use_negative = (method != std::string{"bh"});
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_cube_position();
-      sources[i].charge = pick_mass(use_negative);
+      sources[i].charge = pick_charge(use_negative);
     }
   } else if (source_type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_sphere_position();
-      sources[i].charge = pick_mass(use_negative);
+      sources[i].charge = pick_charge(use_negative);
     }
   } else {
     //Plummer
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_plummer_position();
-      sources[i].charge = pick_plummer_mass(source_count);
+      sources[i].charge = pick_plummer_charge(source_count);
     }
   }
 }
 
+// Prepare the source data. This means both allocate the dashmm::Array,
+// as well as creating the source data, and putting the source data into the
+// global address space.
 dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
   SourceData *sources{nullptr};
   if (args.source_count) {
@@ -338,6 +357,7 @@ dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
   return retval;
 }
 
+// Set the target data
 void set_targets(TargetData *targets, int target_count,
                  std::string target_type) {
   if (target_type == std::string{"cube"}) {
@@ -364,6 +384,9 @@ void set_targets(TargetData *targets, int target_count,
   }
 }
 
+// Prepare the target data. This means both allocate the dashmm::Array,
+// as well as creating the target data, and putting the target data into the
+// global address space.
 dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
   TargetData *targets{nullptr};
   if (args.target_count) {
@@ -384,6 +407,8 @@ dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
   return retval;
 }
 
+// Compute an error characteristic for the values computed with a multipole
+// method, and the values computed with direct summation.
 void compare_results(TargetData *targets, int target_count,
                      TargetData *exacts, int exact_count) {
   if (hpx_get_my_rank()) return;
@@ -413,6 +438,7 @@ void compare_results(TargetData *targets, int target_count,
                   exact_count, sqrt(numerator / denominator), maxrel);
 }
 
+// The main driver routine that performes the test of evaluate()
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
@@ -547,6 +573,7 @@ void perform_evaluation_test(InputArguments args) {
   assert(err == dashmm::kSuccess);
 }
 
+// Program entrypoint
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);

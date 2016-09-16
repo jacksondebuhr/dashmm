@@ -6,7 +6,7 @@ LIBS = -L../../lib -ldashmm $(shell pkg-config --libs hpx)
 SRC = usermain.cc
 OBJ = $(SRC:.cc=.o)
 
-EXEC = userdemo
+EXEC = user
 
 all: $(EXEC)
 

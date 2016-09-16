@@ -34,12 +34,14 @@
 #include <memory>
 #include <string>
 
-#include <fenv.h>
-
 #include "dashmm/dashmm.h"
 
 
 // NOTE: We are working in units where G = 1.
+
+
+// The Particle type will serve as both the Source and Target types for the
+// evaluation. This is a common use-case for time-stepping codes.
 struct Particle {
   dashmm::Point position;
   double charge;
@@ -49,6 +51,7 @@ struct Particle {
 };
 
 
+// The arguments to the command line
 struct InputArguments {
   int count;
   int refinement_limit;
@@ -57,10 +60,12 @@ struct InputArguments {
 };
 
 
+// We make the prototype of this function available so that we might use this
+// function in an ArrayMapAction. See below.
 void update_particles(Particle *P, const size_t count, const double *dt);
 
 
-// Here we create the evaluator objects that we shall need in this demo.
+// Here we create the evaluator object that we need in this demo.
 // This must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
 dashmm::Evaluator<Particle, Particle,
@@ -71,6 +76,7 @@ dashmm::Evaluator<Particle, Particle,
 dashmm::ArrayMapAction<Particle, double> update_action{update_particles};
 
 
+// Print out help for the program.
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
 "Options available: [possible/values] (default value)\n"
@@ -83,6 +89,7 @@ void print_usage(char *progname) {
 }
 
 
+// Parse the command line
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   // Set defaults
   retval.count = 10000;
@@ -147,6 +154,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
 }
 
 
+// Use to collect timing information
 inline double getticks(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -158,6 +166,7 @@ inline double elapsed(double t1, double t0) {
 }
 
 
+// Pick a position uniformly distributed in the 3-ball.
 dashmm::Point pick_sphere_position() {
   double r = (double)rand() / RAND_MAX;
   double ctheta = 2.0 * (double)rand() / RAND_MAX - 1.0;
@@ -170,13 +179,13 @@ dashmm::Point pick_sphere_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-
+// Select a mass at random
 double pick_mass() {
   double retval = (double)rand() / RAND_MAX + 1.0;
   return retval;
 }
 
-
+// Set the source data
 double set_sources(Particle *sources, int count) {
   double m_tot{0.0};
   for (int i = 0; i < count; ++i) {
@@ -194,7 +203,7 @@ double set_sources(Particle *sources, int count) {
   return m_tot;
 }
 
-
+// Output the data at the final timestep, if directed to do so by the user
 void output_results(const std::string &fname, const Particle *sources,
                     int count) {
   if (hpx_get_my_rank()) return;
@@ -215,12 +224,17 @@ void output_results(const std::string &fname, const Particle *sources,
 }
 
 
+// This function serves the action for the ArrayMapAction that will update the
+// positions of the particles given the computed acceleration. This function
+// is called on the particle data between each step, and allows the user to
+// perform updates in parallel without having to explicitly use parallel
+// constructs.
 void update_particles(Particle *P, const size_t count, const double *dt) {
   for (size_t i = 0; i < count; ++i) {
     double x[3] = {P[i].position[0], P[i].position[1], P[i].position[2]};
     for (int j = 0; j < 3; ++j) {
       // NOTE: the minus sign is because the output of LaplaceCOMAcc is for
-      // a positive potential. So we add the minus sign here.
+      // a repulsive force. So we add the minus sign here.
       // NOTE: we work in units where G = 1.
       // NOTE: the point of this demo is not the time integrator, hence the
       // simplistic update.
@@ -236,6 +250,9 @@ void update_particles(Particle *P, const size_t count, const double *dt) {
 }
 
 
+// The main driver routine for the demo. This will set up the particles,
+// take the requested number of timesteps, and then (optionally) output the
+// results to a file.
 void perform_time_stepping(InputArguments args) {
   srand(123456);
 
@@ -267,8 +284,6 @@ void perform_time_stepping(InputArguments args) {
 
   // Prototypes for the method
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
-
-feenableexcept(FE_ALL_EXCEPT);
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
@@ -309,6 +324,7 @@ feenableexcept(FE_ALL_EXCEPT);
 }
 
 
+// Program entrypoint
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);
