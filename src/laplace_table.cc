@@ -27,7 +27,7 @@
 /// \brief Implementation of precomputed tables for Laplace
 
 
-#include "builtins/laplace_sph_table.h"
+#include "builtins/laplace_table.h"
 
 
 namespace dashmm {

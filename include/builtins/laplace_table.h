@@ -28,7 +28,7 @@
 
 
 /// \file include/builtins/laplace_table.h
-/// \brief Declaration of precomputed tables for LaplaceSPH
+/// \brief Declaration of precomputed tables for Laplace
 
 
 #include <cmath>
