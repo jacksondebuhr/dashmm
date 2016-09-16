@@ -31,8 +31,6 @@ TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
 TODO: We need to update the comments throughout
 
-TODO: decide if I want to add assertions around the calls to the Expansion
-      operations to make sure the Expansion Role is correct.
 
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
@@ -49,15 +47,11 @@ TODO: Improve the way that we optionally put out the DAG information. Perhaps
         can call whatever methods they want on it.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
-TODO: Decode if we should also test Hilbert ordering on the top level distrib
+TODO: Decide if we should also test Hilbert ordering on the top level distrib
       of the tree. This might have some better locality.
 TODO: Further, should we allow for a non-space-filling curve distribution.
       This might be a way to make a non-contiguous chunk on the SFC a better
       overall distribution.
-TODO: separate the include directories into dashmm and libdashmm, patterned
-      after HPX. This will make it 'clear' which are to be used by the casual
-      user, and which are not part of the public interface. This will also be
-      important for dealing with a complete specification.
 TODO: Recall that the usage pattern of the DAG routines will want to change
       if we ever have multiple threads working on a single node for the DAG.
       That might not be likely, but it bears some more careful thought.
@@ -70,6 +64,21 @@ Overall Plan to 1.0
       particles as needed) (DONE)
     - Array needs to be updated accordingly (DONE)
     - Introduce more distribution policies
+        Also, implement a type that maps methods to best default type.
+        Basically
+
+        template <typename M>
+        class DefaultDistro {
+         public:
+          using distro_t = RandomDistro;
+        };
+
+        template <>
+        class DefaultDistro<BH> {
+         public:
+          using distro_t = SomeGreatDistro;
+        };
+      Actually, this might not work. This will take more thought.
 
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
