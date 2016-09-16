@@ -1,1 +1,3 @@
 *.json
+doc/docsource/latex
+doc/docsource/html
