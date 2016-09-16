@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "dashmm/index.h"
-#include "builtins/laplace_sph_table.h"
+#include "builtins/laplace_table.h"
 #include "builtins/merge_shift.h"
 #include "dashmm/point.h"
 #include "dashmm/types.h"

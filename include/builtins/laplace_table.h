@@ -28,7 +28,7 @@
 
 
 /// \file include/builtins/laplace_table.h
-/// \brief Declaration of precomputed tables for LaplaceSPH
+/// \brief Declaration of precomputed tables for Laplace
 
 
 #include <cmath>
@@ -38,25 +38,9 @@
 #include <vector>
 #include "dashmm/types.h"
 #include "builtins/special_function.h"
+#include "builtins/builtin_table.h" 
 
 namespace dashmm {
-
-
-struct laplace_cmp {
-  bool operator()(const double &a, const double &b) const {
-    // The smallest gap between key values in the Laplace rotation matrix map is
-    // 0.01. The operator compares the first 6 digits and that should be
-    // enough.
-    double aa = floor(a * 1000000.0) / 100000.0;
-    double bb = floor(b * 1000000.0) / 100000.0;
-    if (aa == bb)
-      return false;
-    return aa < bb;
-  }
-};
-
-
-using laplace_map_t = std::map<double, double *, laplace_cmp>;
 
 class LaplaceTable {
  public:
@@ -88,8 +72,8 @@ class LaplaceTable {
   double scale_; // scaling factor of level 0 to normalize box size to 1
   double *sqf_;
   double *sqbinom_;
-  laplace_map_t *dmat_plus_;
-  laplace_map_t *dmat_minus_;
+  builtin_map_t *dmat_plus_; 
+  builtin_map_t *dmat_minus_; 
 
   int s_;
   int nexp_;
@@ -107,7 +91,7 @@ class LaplaceTable {
 
   void generate_sqf();
   void generate_sqbinom();
-  void generate_wigner_dmatrix(laplace_map_t *&dp, laplace_map_t *&dm);
+  void generate_wigner_dmatrix(); 
   void generate_dmatrix_of_beta(double beta, double *dp, double *dm);
   void generate_xs();
   void generate_ys();

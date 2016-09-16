@@ -27,7 +27,7 @@
 /// \brief Implementation of precomputed tables for Laplace
 
 
-#include "builtins/laplace_sph_table.h"
+#include "builtins/laplace_table.h"
 
 
 namespace dashmm {
@@ -41,9 +41,7 @@ LaplaceTable::LaplaceTable(int n_digits, double size) {
   p_ = expan_length[n_digits];
   generate_sqf();
   generate_sqbinom();
-  dmat_plus_ = new laplace_map_t;
-  dmat_minus_ = new laplace_map_t;
-  generate_wigner_dmatrix(dmat_plus_, dmat_minus_);
+  generate_wigner_dmatrix(); 
 
   switch (n_digits) {
   case 3:
@@ -192,8 +190,10 @@ void LaplaceTable::generate_sqbinom() {
   }
 }
 
-void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
-                                           laplace_map_t *&dm) {
+void LaplaceTable::generate_wigner_dmatrix() {
+  dmat_plus_ = new builtin_map_t; 
+  dmat_minus_ = new builtin_map_t; 
+
   double cbeta[24] = {1.0 / sqrt(5.0), 1.0 / sqrt(6.0), 1.0 / sqrt(9.0),
                       1.0 / sqrt(10.0), 1.0 / sqrt(11.0), 1.0 / sqrt(14.0),
                       1.0 / sqrt(19.0), 2.0 / sqrt(5.0), sqrt(2.0 / 3.0),
@@ -208,8 +208,8 @@ void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
     double *dp_data = new double[nd];
     double *dm_data = new double[nd];
     generate_dmatrix_of_beta(beta, dp_data, dm_data);
-    (*dp)[cbeta[i]] = dp_data;
-    (*dm)[cbeta[i]] = dm_data;
+    (*dmat_plus_)[cbeta[i]] = dp_data;
+    (*dmat_minus_)[cbeta[i]] = dm_data;
   }
 
   for (int i = 0; i < 23; i++) {
@@ -217,8 +217,8 @@ void LaplaceTable::generate_wigner_dmatrix(laplace_map_t *&dp,
     double *dp_data = new double[nd];
     double *dm_data = new double[nd];
     generate_dmatrix_of_beta(beta, dp_data, dm_data);
-    (*dp)[-cbeta[i]] = dp_data;
-    (*dm)[-cbeta[i]] = dm_data;
+    (*dmat_plus_)[-cbeta[i]] = dp_data;
+    (*dmat_minus_)[-cbeta[i]] = dm_data;
   }
 }
 

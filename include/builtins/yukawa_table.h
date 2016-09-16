@@ -38,23 +38,9 @@
 #include <vector>
 #include "dashmm/types.h"
 #include "builtins/special_function.h"
+#include "builtins/builtin_table.h"
 
 namespace dashmm {
-
-struct yukawa_cmp {
-  bool operator()(const double &a, const double &b) const {
-    // The smallest gap between key values in the Yukawa rotation matrix map is
-    // 0.01. The operator compares the first 6 digits and that should be
-    // enough.
-    double aa = floor(a * 1000000.0) / 100000.0;
-    double bb = floor(b * 1000000.0) / 100000.0;
-    if (aa == bb)
-      return false;
-    return aa < bb;
-  }
-};
-
-using yukawa_map_t = std::map<double, double *, yukawa_cmp>;
 
 class YukawaTable {
  public:
@@ -94,8 +80,8 @@ private:
   double size_;
   double scale_; // scaling factor of level 0 to avoid under-/over-flow
   double *sqf_;
-  yukawa_map_t *dmat_plus_;
-  yukawa_map_t *dmat_minus_;
+  builtin_map_t *dmat_plus_; 
+  builtin_map_t *dmat_minus_; 
   double *m2m_;
   double *l2l_;
   double *x_;

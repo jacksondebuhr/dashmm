@@ -22,33 +22,30 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+#ifndef __DASHMM_BUILTIN_TABLE_H__
+#define __DASHMM_BUILTIN_TABLE_H__
 
-#ifndef __DASHMM_USER_INTERFACE_H__
-#define __DASHMM_USER_INTERFACE_H__
-
-
-// The basic interface
-#include "dashmm/array.h"
-#include "dashmm/broadcast.h"
-#include "dashmm/evaluator.h"
-#include "dashmm/initfini.h"
-#include "dashmm/types.h"
-
-// The built in methods
-#include "builtins/bh_method.h"
-#include "builtins/direct_method.h"
-#include "builtins/fmm_method.h"
-#include "builtins/fmm97_method.h"
-
-// The built in expansions
-#include "builtins/laplace_com.h"
-#include "builtins/laplace_com_acc.h"
-#include "builtins/laplace.h"
-#include "builtins/yukawa.h"
-
-// The built in distribution policies
-#include "builtins/singlelocdistro.h"
-#include "builtins/randomdistro.h"
+/// \file include/builtins/builtin_table.h
+/// \brief Declaration of comparator for builtin tables 
 
 
-#endif // __DASHMM_USER_INTERFACE_H__
+namespace dashmm {
+
+struct builtin_cmp {
+  bool operator()(const double &a, const double &b) const {
+    // For builtin kernels, the smallest gap between key values of the
+    // rotation matrix map is 0.01. This operator compares the first 6
+    // digits and should be sufficient. 
+    double aa = floor(a * 1000000.0) / 100000.0;
+    double bb = floor(b * 1000000.0) / 100000.0;
+    if (aa == bb)
+      return false;
+    return aa < bb;
+  }
+};
+
+using builtin_map_t = std::map<double, double *, builtin_cmp>; 
+
+} // namespace dashmm
+
+#endif // __DASHMM_BUILTIN_TABLE_H__
