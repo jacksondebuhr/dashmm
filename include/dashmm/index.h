@@ -35,7 +35,7 @@ namespace dashmm {
 class Index {
  public:
   /// Construct the index from components and level
-  Index(int ix, int iy, int iz, int level)
+  Index(int ix = 0, int iy = 0, int iz = 0, int level = 0)
       : idx_{ix, iy, iz}, level_{level} { }
 
   /// Return the x index.
@@ -95,6 +95,14 @@ class Index {
     int yval = (idx_[1] % 2) << 1;
     int zval = (idx_[2] % 2) << 2;
     return (xval + yval + zval);
+  }
+
+  /// Equality operator
+  bool operator==(const Index &other) {
+    return (level_ == other.level_
+              && idx_[0] == other.idx_[0]
+              && idx_[1] == other.idx_[1]
+              && idx_[2] == other.idx_[2]);
   }
 
  private:

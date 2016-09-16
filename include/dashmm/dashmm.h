@@ -18,23 +18,26 @@
 
 // The basic interface
 #include "dashmm/array.h"
+#include "dashmm/broadcast.h"
 #include "dashmm/evaluator.h"
 #include "dashmm/initfini.h"
-#include "dashmm/shareddata.h"
 #include "dashmm/types.h"
 
 // The built in methods
 #include "builtins/bh_method.h"
 #include "builtins/direct_method.h"
 #include "builtins/fmm_method.h"
+#include "builtins/fmm97_method.h"
 
 // The built in expansions
 #include "builtins/laplace_com.h"
 #include "builtins/laplace_com_acc.h"
 #include "builtins/laplace_sph.h"
+#include "builtins/yukawa.h"
 
 // The built in distribution policies
 #include "builtins/singlelocdistro.h"
+#include "builtins/randomdistro.h"
 
 
 #endif // __DASHMM_USER_INTERFACE_H__

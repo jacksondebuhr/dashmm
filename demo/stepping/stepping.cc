@@ -22,6 +22,8 @@
 #include <memory>
 #include <string>
 
+#include <fenv.h>
+
 #include "dashmm/dashmm.h"
 
 
@@ -43,8 +45,7 @@ struct InputArguments {
 };
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt);
+void update_particles(Particle *P, const size_t count, const double *dt);
 
 
 // Here we create the evaluator objects that we shall need in this demo.
@@ -64,7 +65,7 @@ void print_usage(char *progname) {
 "  --nsources=num               number of source points to generate (10000)\n"
 "  --threshold=num              source and target tree partition refinement\n"
 "                                 limit (40)\n"
-"  --nsteps=num                 number of steps to take (100)\n"
+"  --nsteps=num                 number of steps to take (20)\n"
 "  --output=file                specify file for output (disabled)\n",
           progname);
 }
@@ -74,7 +75,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   // Set defaults
   retval.count = 10000;
   retval.refinement_limit = 40;
-  retval.steps = 100;
+  retval.steps = 20;
   retval.output.clear();
 
   int opt = 0;
@@ -119,11 +120,15 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   // print out summary
-  fprintf(stdout, "Testing DASHMM:\n");
-  fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
-  fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
-  if (!retval.output.empty()) {
-    fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+  if (hpx_get_my_rank() == 0) {
+    fprintf(stdout, "Testing DASHMM:\n");
+    fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
+    fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
+    if (!retval.output.empty()) {
+      fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+    }
+  } else {
+    retval.count = 0;
   }
 
   return 0;
@@ -180,6 +185,8 @@ double set_sources(Particle *sources, int count) {
 
 void output_results(const std::string &fname, const Particle *sources,
                     int count) {
+  if (hpx_get_my_rank()) return;
+
   FILE *ofd = fopen(fname.c_str(), "w");
   assert(ofd != nullptr);
 
@@ -196,8 +203,7 @@ void output_results(const std::string &fname, const Particle *sources,
 }
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt) {
+void update_particles(Particle *P, const size_t count, const double *dt) {
   for (size_t i = 0; i < count; ++i) {
     double x[3] = {P[i].position[0], P[i].position[1], P[i].position[2]};
     for (int j = 0; j < 3; ++j) {
@@ -206,6 +212,9 @@ void update_particles(Particle *P, const size_t count, const size_t offset,
       // NOTE: we work in units where G = 1.
       // NOTE: the point of this demo is not the time integrator, hence the
       // simplistic update.
+      // NOTE: Also, the forces are not softened, and so close encounters
+      // can lead to very bad results. So please be aware that running this
+      // code for too many steps will cause trouble.
       x[j] += P[i].velocity[j] * (*dt)
               - 0.5 * P[i].acceleration[j] * (*dt) * (*dt);
       P[i].velocity[j] -= P[i].acceleration[j] * (*dt);
@@ -219,9 +228,12 @@ void perform_time_stepping(InputArguments args) {
   srand(123456);
 
   // create some arrays
-  Particle *sources = reinterpret_cast<Particle *>(
-    new char [sizeof(Particle) * args.count]);
-  double m_tot = set_sources(sources, args.count);
+  Particle *sources{nullptr};
+  double m_tot{1.0};
+  if (args.count) {
+    sources = new Particle[args.count];
+    m_tot = set_sources(sources, args.count);
+  }
 
   // prep source Array
   dashmm::Array<Particle> source_handle{ };
@@ -229,26 +241,32 @@ void perform_time_stepping(InputArguments args) {
   assert(err == dashmm::kSuccess);
   err = source_handle.put(0, args.count, sources);
   assert(err == dashmm::kSuccess);
+  delete [] sources;
 
   // Compute a reasonable dt:
   // This is chosen so that one dynamical time is roughly 200 steps.
+  // NOTE: this will only be correct on rank 0, so we broadcast the value.
   double dt{sqrt(1.0 / m_tot) / 200.0};
+  dashmm::broadcast(&dt);
 
   // Clear timing information
   double t_eval{0.0};
   double t_update{0.0};
 
-  // Prototypes for the expansion and method
-  dashmm::LaplaceCOMAcc<Particle, Particle> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded
-  };
+  // Prototypes for the method
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
+
+feenableexcept(FE_ALL_EXCEPT);
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
+    if (hpx_get_my_rank() == 0) {
+      fprintf(stdout, "Starting step %d...\n", step);
+    }
+
     double t0 = getticks();
     err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
-                          method, expansion);
+                          method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
@@ -262,21 +280,20 @@ void perform_time_stepping(InputArguments args) {
   }
 
   // Report on loop
-  fprintf(stdout, "Evaluation took %lg [us]\n", t_eval);
+  fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
   fprintf(stdout, "Update took %lg [us]\n", t_update);
 
   // Output if the user has selected this option
   if (!args.output.empty()) {
-    err = source_handle.get(0, args.count, sources);
-    assert(err == dashmm::kSuccess);
-    output_results(args.output, sources, args.count);
+    size_t total_count = source_handle.length();
+    Particle *final_data = source_handle.collect();
+    output_results(args.output, final_data, total_count);
+    delete [] final_data;
   }
 
   // free up resources
   err = source_handle.destroy();
   assert(err == dashmm::kSuccess);
-
-  delete [] sources;
 }
 
 
@@ -287,7 +304,6 @@ int main(int argc, char **argv) {
 
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
-
 
   if (!usage_error) {
     perform_time_stepping(inputargs);

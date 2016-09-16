@@ -70,7 +70,7 @@ class LaplaceCOMAcc {
   using target_t = Target;
   using expansion_t = LaplaceCOMAcc<Source, Target>;
 
-  LaplaceCOMAcc(Point center, int n_digits, ExpansionRole role) {
+  LaplaceCOMAcc(Point center, double scale, ExpansionRole role) {
     bytes_ = sizeof(LaplaceCOMAccData);
     data_ = reinterpret_cast<LaplaceCOMAccData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -123,7 +123,6 @@ class LaplaceCOMAcc {
       view.set_bytes(0, sizeof(LaplaceCOMAccData));
       view.set_data(0, (char *)data_);
     }
-    view.set_n_digits(-1);
     view.set_role(kSourcePrimary);
   }
 
@@ -159,9 +158,9 @@ class LaplaceCOMAcc {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, Source *last,
-                                      double scale) const {
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
+                                      Source *last) const {
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
@@ -169,16 +168,15 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center,
-                                      Source *first, Source *last,
-                                      double scale) const {
+  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
+                                      Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
     assert(valid(ViewSet{}));
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 0,
+    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
@@ -196,7 +194,7 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  void M_to_T(Target *first, Target *last, double scale) const {
+  void M_to_T(Target *first, Target *last) const {
     assert(valid(ViewSet{}));
     for (auto i = first; i != last; ++i) {
       Point pos{i->position};
@@ -244,7 +242,7 @@ class LaplaceCOMAcc {
     }
   }
 
-  void L_to_T(Target *first, Target *last, double scale) const { }
+  void L_to_T(Target *first, Target *last) const { }
 
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {
@@ -273,11 +271,12 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
+                                      Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
@@ -296,9 +295,11 @@ class LaplaceCOMAcc {
     double Mprime = data_->mtot + M2;
 
     double Dprime[3] { };
-    Dprime[0] = (data_->mtot * data_->xcom[0] + M2 * D2[0]) / Mprime;
-    Dprime[1] = (data_->mtot * data_->xcom[1] + M2 * D2[1]) / Mprime;
-    Dprime[2] = (data_->mtot * data_->xcom[2] + M2 * D2[2]) / Mprime;
+    if (Mprime != 0.0) {
+      Dprime[0] = (data_->mtot * data_->xcom[0] + M2 * D2[0]) / Mprime;
+      Dprime[1] = (data_->mtot * data_->xcom[1] + M2 * D2[1]) / Mprime;
+      Dprime[2] = (data_->mtot * data_->xcom[2] + M2 * D2[2]) / Mprime;
+    }
 
     double diff1[3] = {data_->xcom[0] - Dprime[0], data_->xcom[1] - Dprime[1],
                        data_->xcom[2] - Dprime[2]};
@@ -328,6 +329,18 @@ class LaplaceCOMAcc {
     set_mtot(Mprime);
     set_xcom(Dprime);
     set_Q(Qprime);
+  }
+
+  static void update_table(int n_digits, double domain_size,
+                           const std::vector<double> &kernel_params) { }
+
+  static void delete_table() { }
+
+  static double compute_scale(Index index) {return 1.0;}
+
+  static int weight_estimate(Operation op,
+                             Index s = Index{}, Index t = Index{}) {
+    return 1;
   }
 
   /// Set the total mass of the expansion

@@ -16,11 +16,7 @@
 #define __DASHMM_SINGLE_LOC_DISTRO_H__
 
 
-#include <vector>
-
 #include "dashmm/dag.h"
-#include "dashmm/domaingeometry.h"
-#include "dashmm/shareddata.h"
 
 
 namespace dashmm {

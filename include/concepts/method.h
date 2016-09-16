@@ -42,8 +42,6 @@ class Method {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
-                                      DistroPolicy>;
   using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method,
                                 DistroPolicy>;
   using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,
@@ -102,6 +100,13 @@ class Method {
   /// In some advanced methods, it can be desirable to halt refinement of the
   /// target tree before the specified refinement limit is reached. This
   /// operation performs that test.
+  ///
+  /// NOTE: In the distributed case, the nodes may not have information about
+  /// the number of sources or targets in the node. So any refinement test
+  /// cannot depend on those data.
+  ///
+  /// TODO: This is actually no longer an appropriate name for this. This is
+  /// not about refinement, but rather about where the DAG discovery will stop.
   ///
   /// \param same_sources_and_targets - are the source and target points the
   ///                                   same

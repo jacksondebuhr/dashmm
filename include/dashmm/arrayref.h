@@ -28,6 +28,75 @@
 namespace dashmm {
 
 
+// TODO: does this make sense?
+// TODO: If we keep it, we should add something with the length perhaps
+template <typename Record>
+class ArrayData {
+ public:
+  ArrayData() : data_{HPX_NULL}, local_{nullptr} { }
+
+  explicit ArrayData(hpx_addr_t data) : data_{data}, local_{nullptr} {
+    //assert(data_ != HPX_NULL);
+    if (data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
+  }
+
+  ArrayData(const ArrayData<Record> &other) {
+    data_ = other.data_;
+    if (data_ != HPX_NULL) {
+      assert(hpx_gas_try_pin(data_, (void **)&local_));
+    }
+  }
+
+  ArrayData(ArrayData<Record> &&other) {
+    data_ = other.data_;
+    local_ = other.local_;
+    other.local_ = nullptr;
+    other.data_ = HPX_NULL;
+  }
+
+  ~ArrayData() {
+    if (data_ != HPX_NULL) {
+      hpx_gas_unpin(data_);
+    }
+  }
+
+  ArrayData<Record> &operator=(const ArrayData<Record> &other) {
+    if (data_ != HPX_NULL) {
+      hpx_gas_unpin(data_);
+      local_ = nullptr;
+    }
+
+    data_ = other.data_;
+    assert(hpx_gas_try_pin(data_, (void **)&local_));
+
+    return *this;
+  }
+
+  ArrayData<Record> &operator=(ArrayData<Record> &&other) {
+    if (data_ != HPX_NULL) {
+      hpx_gas_unpin(data_);
+      local_ = nullptr;
+    }
+
+    data_ = other.data_;
+    local_ = other.local_;
+
+    other.data_ = HPX_NULL;
+    other.local_ = nullptr;
+
+    return *this;
+  }
+
+  Record *value() const {return local_;}
+
+ private:
+  hpx_addr_t data_;
+  Record *local_;
+};
+
+
 /// Reference to a set of records in a dashmm::Array object
 ///
 /// This is a reference object, meaning that it refers to the Record data in
@@ -88,6 +157,11 @@ class ArrayRef {
 
   /// Returns the global address of the referred to data.
   hpx_addr_t data() const {return data_;}
+
+  /// Return a local reference
+  ArrayData<Record> pin() const {
+    return ArrayData<Record>(data_);
+  }
 
  private:
   /// Address of the first Record referred to by this object

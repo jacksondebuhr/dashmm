@@ -50,13 +50,13 @@ class Direct {
   using method_t = Direct<Source, Target, Expansion, DistroPolicy>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct,
                                       DistroPolicy>;
-  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Direct,
-                                  DistroPolicy>;
-  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Direct,
-                                  DistroPolicy>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Direct,
                                 DistroPolicy>;
   using sourceref_t = ArrayRef<Source>;
+
+  Direct() { }
 
   /// In generate, Direct does nothing.
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
@@ -82,7 +82,8 @@ class Direct {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
         if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            curr->dag.StoT(&(*i)->dag);
+            curr->dag.StoT(&(*i)->dag,
+                           expansion_t::weight_estimate(Operation::StoT));
           } else {
             newcons.push_back(*i);
           }

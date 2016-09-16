@@ -20,6 +20,9 @@
 ///
 /// DistroPolicy objects should be trivially copyable.
 
+/// Some incoming nodes of the DAG will already have a locality set. Only
+/// those nodes that have locality of -1 initially should be given a
+/// locality during the distribution computation.
 
 class DistroPolicy {
 public:

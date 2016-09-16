@@ -123,10 +123,15 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   //print out summary
-  fprintf(stdout, "Testing User expansion:\n");
-  fprintf(stdout, "%d sources\n", retval.source_count);
-  fprintf(stdout, "%d targets\n", retval.target_count);
-  fprintf(stdout, "threshold: %d\n\n", retval.refinement_limit);
+  if (hpx_get_my_rank() == 0) {
+    fprintf(stdout, "Testing User expansion:\n");
+    fprintf(stdout, "%d sources\n", retval.source_count);
+    fprintf(stdout, "%d targets\n", retval.target_count);
+    fprintf(stdout, "threshold: %d\n\n", retval.refinement_limit);
+  } else {
+    retval.source_count = 0;
+    retval.target_count = 0;
+  }
 
   return 0;
 }
@@ -169,13 +174,18 @@ void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
   //create some arrays
-  SourceData *sources = reinterpret_cast<SourceData *>(
-        new char [sizeof(SourceData) * args.source_count]);
-  TargetData *targets = reinterpret_cast<TargetData *>(
-        new char [sizeof(TargetData) * args.target_count]);
-
-  set_sources(sources, args.source_count);
-  set_targets(targets, args.target_count);
+  SourceData *sources{nullptr};
+  if (args.source_count) {
+    sources = reinterpret_cast<SourceData *>(
+          new char [sizeof(SourceData) * args.source_count]);
+    set_sources(sources, args.source_count);
+  }
+  TargetData *targets{nullptr};
+  if (args.target_count) {
+    targets = reinterpret_cast<TargetData *>(
+          new char [sizeof(TargetData) * args.target_count]);
+    set_targets(targets, args.target_count);
+  }
 
   //prep sources
   dashmm::Array<SourceData> source_handle{};
@@ -196,16 +206,9 @@ void perform_evaluation_test(InputArguments args) {
   // the method might propagate through the evaluation.
   dashmm::FMM<SourceData, TargetData, User> method{};
 
-  // We create a specific expansion that will be passed into evaluate so that
-  // the requested number of digits can be propagated through the evaluation.
-  User<SourceData, TargetData> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded
-  };
-
-
   // All that is left is to call evaluate from the Evaluator object.
   err = usereval.evaluate(source_handle, target_handle, args.refinement_limit,
-                          method, expansion);
+                          method, args.accuracy, std::vector<double>{});
 
   // Clean up resources
   err = source_handle.destroy();

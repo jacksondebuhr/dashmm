@@ -33,8 +33,14 @@
 namespace dashmm {
 
 
-/// Action for Array allocation
-extern hpx_action_t allocate_array_action;
+/// Action for Array meta data allocation
+extern hpx_action_t allocate_array_meta_action;
+
+/// Action for local portions of Array allocation
+extern hpx_action_t allocate_local_work_action;
+
+/// Action to delete organizational stucture for Array allocation
+extern hpx_action_t allocate_array_destroy_reducer_action;
 
 /// Action for Array deallocation
 extern hpx_action_t deallocate_array_action;
@@ -44,6 +50,25 @@ extern hpx_action_t array_put_action;
 
 /// Action for getting data from an Array
 extern hpx_action_t array_get_action;
+
+/// Action for getting local counts
+extern hpx_action_t array_local_count_action;
+
+/// Action for getting total count
+extern hpx_action_t array_total_count_action;
+
+/// Action for collection prep
+extern hpx_action_t array_collect_prep_action;
+
+/// Action for collection
+extern hpx_action_t array_collect_action;
+
+
+struct ArrayMetaAllocRunReturn {
+  hpx_addr_t meta;
+  hpx_addr_t reducer;
+  int code;
+};
 
 
 /// Array class
@@ -84,9 +109,40 @@ class Array {
   /// \returns - the global address of the Array meta data.
   hpx_addr_t data() const {return data_;}
 
+  /// Return the number of records in the local portion of this object
+  ///
+  /// This is a SPMD style operation; it is collective, but each rank will
+  /// receive a different value giving the local portion on the calling rank.
+  ///
+  /// \returns - the number of records owned by this rank,
+  size_t count() const {
+    size_t retval{0};
+    hpx_run_spmd(&array_local_count_action, &retval, &data_);
+    return retval;
+  }
+
+  /// Return the number of records in the entire array
+  ///
+  /// This is a SPMD style operation; it is collective, and all ranks will
+  /// receive the same result.
+  ///
+  /// \returns - the total number of records in all ranks.
+  size_t length() const {
+    size_t retval{0};
+    hpx_run_spmd(&array_total_count_action, &retval, &data_);
+    return retval;
+  }
+
   /// This creates an array object
   ///
-  /// \param record_count - the number of records that will be in the array.
+  /// This is called from the SPMD user-application. This cannot be used
+  /// inside an HPX-5 thread. Each rank of the user application will provide
+  /// its own record count. The resulting array will be created with the
+  /// provided distribution of records. One or more of these counts can be
+  /// zero provided there is at least one non-zero count from some rank.
+  ///
+  /// \param record_count - the number of records that will be in the array
+  ///                       for this locality.
   ///
   /// \returns - kDomainError if the object already has an allocation;
   ///            kAllocationError if the global memory cannot be allocated;
@@ -97,18 +153,44 @@ class Array {
       // If the object already has data, do not allocate new data.
       return kDomainError;
     }
-    hpx_addr_t *dataout = &data_; //YIKES!
-    int runcode;
-    int *arg = &runcode;
-    size_t size = sizeof(T);
-    int err = hpx_run(&allocate_array_action, &record_count,
-                      &size, &dataout, &arg);
-    if (HPX_SUCCESS == err) {
-      return kSuccess;
-    } else {
-      return static_cast<ReturnCode>(runcode);
+
+    ArrayMetaAllocRunReturn metadata{HPX_NULL, HPX_NULL, 0};
+    hpx_run(&allocate_array_meta_action, &metadata, nullptr, 0);
+    if (metadata.code != kSuccess) {
+      return static_cast<ReturnCode>(metadata.code);
     }
+    data_ = metadata.meta;
+
+    ReturnCode retval{kSuccess};
+
+    size_t size = sizeof(T);
+    int runcode{0};
+    hpx_run_spmd(&allocate_local_work_action, &runcode,
+                 &metadata.meta, &metadata.reducer, &size, &record_count);
+    if (runcode != kSuccess) {
+      // NOTE: If this branch is triggered, only some ranks will do this.
+      //  so there is an issue to sort out about cleaning up the resulting
+      //  mess.
+      // We can likely just get another reduction, and send it back, and
+      //  reduce on it before we leave the local work action. Then everyone
+      //  would agree on the result.
+      // TODO; probably do that...
+      retval = kAllocationError;
+    }
+
+    hpx_run(&allocate_array_destroy_reducer_action, nullptr, &metadata.reducer);
+
+    return retval;
   }
+
+
+  // TODO: Do we want an allocate method that also takes an action and an
+  // environment, which will allocate, and then call the action on each
+  // segment. This would avoid the generate and then copy into GAS thing.
+  //
+  // Or perhaps what this means is we need to make map more flexible. It could
+  // be one action per rank, or it could be otherwise.
+
 
   /// Destroy the Array
   ///
@@ -118,10 +200,7 @@ class Array {
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
-    if (data_ == HPX_NULL) {
-      return kSuccess;
-    }
-    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, &data_)) {
+    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, nullptr, &data_)) {
       data_ = HPX_NULL;
       return kSuccess;
     } else {
@@ -136,6 +215,11 @@ class Array {
   /// indices into the array, with the final index indicating one past the
   /// end of the range of interest.
   ///
+  /// This routine is performed on a rank-by-rank basis, meaning that the
+  /// input arguments can be different from rank to rank. Also, this routine
+  /// will only get data from the portion of the array that is local to the
+  /// rank. The indices given are relative to the start of the local portion.
+  ///
   /// \param first - the first index of the range of interest
   /// \param last - one past the last index of the range of interest
   /// \param out_data - buffer into which the data will be placed
@@ -144,9 +228,10 @@ class Array {
   ///            the runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
-    int runcode;
-    int *arg = &runcode;
-    hpx_run(&array_get_action, &data_, &first, &last, &arg, &out_data);
+    int runcode = kSuccess;
+    // TODO: the error handling with this is now strange. Each rank can
+    // have a different runcode here...
+    hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data);
     return static_cast<ReturnCode>(runcode);
   }
 
@@ -154,8 +239,13 @@ class Array {
   ///
   /// This puts data from 'normal' memory into the specified range of records
   /// in the global address space. The range is specified with indices into the
-  /// array, with the final index indicatign one past the end of the range of
+  /// array, with the final index indicating one past the end of the range of
   /// interest.
+  ///
+  /// This routine is performed on a rank-by-rank basis, meaning that the
+  /// input arguments can be different from rank to rank. Also, this routine
+  /// will only put data into the portion of the array that is local to the
+  /// rank. The indices given are relative to the start of the local portion.
   ///
   /// \param first - the first index of the range of interest
   /// \param last - one past the last index of the range of interest
@@ -165,26 +255,82 @@ class Array {
   ///            runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
-    int runcode;
-    int *arg = &runcode;
-    hpx_run(&array_put_action, &data_, &first, &last, &arg, &in_data);
+    int runcode = kSuccess;
+    // TODO: the error handling with this is now strange. Each rank can
+    // have a different runcode here...
+    hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data);
     return static_cast<ReturnCode>(runcode);
   }
 
   /// Produce an ArrayRef from the Array
   ///
   /// Largely speaking, this will not be needed by DASHMM users. This array
-  /// reference will refer to the entirety of the array.
+  /// reference will refer to the entirety of the local part at the given
+  /// locality
   ///
   /// NOTE: This routine cannot be called outside of an HPX-5 thread.
   ///
+  /// \param rank - the rank to get a reference to. Provide -1 to indicate
+  ///               whatever is the caller's rank.
+  ///
   /// \returns - an ArrayRef indicating the entirety of this array.
-  ArrayRef<T> ref() const {
-    ArrayMetaData meta{};
-    hpx_gas_memget_sync(&meta, data_, sizeof(meta));
-    return ArrayRef<T>{meta.data, meta.count, meta.count};
+  ArrayRef<T> ref(int rank = -1) const {
+    if (rank == -1) {
+      rank = hpx_get_my_rank();
+    }
+    hpx_addr_t global = hpx_addr_add(data_,
+                                     sizeof(ArrayMetaData) * rank,
+                                     sizeof(ArrayMetaData));
+    ArrayMetaData *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+    ArrayRef<T> retval{local->data, local->local_count, local->local_count};
+    hpx_gas_unpin(global);
+    return retval;
   }
 
+  // Replace the local segment. If these change the overall total number of
+  // records, that will have to be fixed with a call to resum().
+  //
+  // This can be called from an HPX thread -- and can only be done that way
+  // at the moment
+  //
+  // NOTE: It is suggested that the casual user not use this routine.
+  hpx_addr_t replace(ArrayRef<T> ref) {
+    int rank = hpx_get_my_rank();
+    hpx_addr_t global = hpx_addr_add(data_,
+                                     sizeof(ArrayMetaData) * rank,
+                                     sizeof(ArrayMetaData));
+    ArrayMetaData *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    hpx_addr_t retval = local->data;
+    local->data = ref.data();
+    local->local_count = ref.n_tot();
+
+    hpx_gas_unpin(global);
+    return retval;
+  }
+
+  // TODO: The previous suggests that perhaps there should be some way to
+  // create an array from an unknown number of things. Basically create an
+  // empty array. Each rank then creates an ArrayRef object that gets filled
+  // somehow. (This would be new functionality for ArrayRef), and then each
+  // rank will call replace. And then there would need to be the collective
+  // operation of resum(), which is not implemented yet.
+  //
+  // This would want to be worked out to have a nice interface that someone
+  // might actually want to use.
+
+
+  // TODO: I think we want to add a couple extra arguments, or template
+  // parameters or something. The first is if the work should map on each
+  // rank into one segment per thread, or just as one large segment. Then
+  // if we are mapping onto threads, we pick an overdecomposition factor.
+  // both of these would have defaults.
+  //
+  // TODO: Can we make this a little better using something more like a normal
+  // functor?
+  //
   /// Map an action onto each record in the Array
   ///
   /// This will cause the action represented by the given argument, to be
@@ -192,14 +338,40 @@ class Array {
   /// on segments of the array. The environment is provided unmodified to each
   /// segment. Please see the ArrayMapAction for more details.
   ///
+  /// This acts on a rank-by-rank basis. Each rank will participate, and will
+  /// handle the records in the array owned by the rank. In principle, the
+  /// environment passed to each rank might have a different value.
+  ///
   /// \param act - the action to perform on the entries of the array.
   /// \param env - the environment to use in the action.
   ///
   /// \return - kSuccess
-  template <typename E>
-  ReturnCode map(const ArrayMapAction<T, E> &act, const E *env) {
-    hpx_run(&act.root_, &act.leaf_, &env, &data_);
+  template <typename E, int F>
+  ReturnCode map(const ArrayMapAction<T, E, F> &act, const E *env) {
+    hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
+  }
+
+  /// Collect all of an array's data into a single local array
+  ///
+  /// This will return a newly allocated array containing all of the records
+  /// in the global address space that are represented by this object. The
+  /// ordering of the records is not guaranteed, and so users should track
+  /// record identity in some way.
+  ///
+  /// The caller assumes ownership of the returned data. Further, only rank
+  /// zero will return data. All other ranks will receive nullptr from this
+  /// routine.
+  ///
+  /// \returns - address of local memory holding a copy of the records if this
+  ///            is rank zero; nullptr otherwise
+  T *collect() {
+    hpx_addr_t lcos[2];
+    hpx_run(&array_collect_prep_action, lcos, &data_);
+
+    T *retval{nullptr};
+    hpx_run_spmd(&array_collect_action, &retval, &data_, &lcos[0], &lcos[1]);
+    return retval;
   }
 
  private:

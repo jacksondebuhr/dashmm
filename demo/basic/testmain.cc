@@ -25,7 +25,6 @@
 
 #include "dashmm/dashmm.h"
 
-
 struct SourceData {
   dashmm::Point position;
   double charge;
@@ -37,18 +36,21 @@ struct TargetData {
   int index;
 };
 
-
 // Here we create the three evaluator objects that we shall need in this demo.
 // These must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::LaplaceCOM, dashmm::BH> bheval{};
+                  dashmm::LaplaceCOM, dashmm::BH> laplace_bh{};
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::LaplaceSPH, dashmm::FMM> fmmeval{};
+                  dashmm::LaplaceCOM, dashmm::Direct> laplace_direct{};
 dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::LaplaceCOM, dashmm::Direct> directeval{};
-
-
+                  dashmm::Laplace, dashmm::FMM> laplace_fmm{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Laplace, dashmm::FMM97> laplace_fmm97{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
 
 struct InputArguments {
   int source_count;
@@ -56,29 +58,34 @@ struct InputArguments {
   int target_count;
   std::string target_type;
   int refinement_limit;
-  std::string test_case;
+  std::string method;
+  std::string kernel;
   bool verify;
   int accuracy;
 };
 
-
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
-"Options available: [possible/values] (default value)\n"
-"  --method=[fmm/bh]            method to use (fmm)\n"
-"  --nsources=num               number of source points to generate (10000)\n"
-"  --sourcedata=[cube/sphere/plummer]\n"
-"                               source distribution type (cube)\n"
-"  --ntargets=num               number of target points to generate (10000)\n"
-"  --targetdata=[cube/sphere/plummer]\n"
-"                               target distribution type (cube)\n"
-"  --threshold=num              source and target tree partition refinement\n"
-"                                 limit (40)\n"
-"  --accuracy=num               number of digits of accuracy for fmm (3)\n"
-"  --verify=[yes/no]            perform an accuracy test comparing to direct\n"
-"                                 summation (yes)\n", progname);
+          "Options available: [possible/values] (default value)\n"
+          "--method=[fmm/fmm97/bh]     method to use (fmm)\n"
+          "--nsources=num              "
+          "number of source points to generate (10000)\n"
+          "--sourcedata=[cube/sphere/plummer]\n"
+          "                            source distribution type (cube)\n"
+          "--ntargets=num              "
+          "number of target points to generate (10000)\n"
+          "--targetdata=[cube/sphere/plummer]\n"
+          "                            target distribution type (cube)\n"
+          "--threshold=num             "
+          "source and target tree partition refinement limit (40)\n"
+          "--accuracy=num              "
+          "number of digits of accuracy for fmm (3)\n"
+          "--verify=[yes/no]           "
+          "perform an accuracy test comparing to direct summation (yes)\n"
+          "--kernel=[laplace/yukawa]   "
+          "particle interaction type (laplace)\n"
+          , progname);
 }
-
 
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
@@ -87,7 +94,8 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   retval.target_count = 10000;
   retval.target_type = std::string{"cube"};
   retval.refinement_limit = 40;
-  retval.test_case = std::string{"fmm"};
+  retval.method = std::string{"fmm97"};
+  retval.kernel = std::string{"laplace"};
   retval.verify = true;
   retval.accuracy = 3;
 
@@ -101,17 +109,18 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     {"threshold", required_argument, 0, 'l'},
     {"verify", required_argument, 0, 'v'},
     {"accuracy", required_argument, 0, 'a'},
+    {"kernel", required_argument, 0, 'k'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
 
   int long_index = 0;
-  while ((opt = getopt_long(argc, argv, "m:s:w:t:g:l:v:a:h",
+  while ((opt = getopt_long(argc, argv, "m:s:w:t:g:l:v:a:k:h",
                             long_options, &long_index)) != -1) {
     std::string verifyarg{};
     switch (opt) {
     case 'm':
-      retval.test_case = optarg;
+      retval.method = optarg;
       break;
     case 's':
       retval.source_count = atoi(optarg);
@@ -135,6 +144,9 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     case 'a':
       retval.accuracy = atoi(optarg);
       break;
+    case 'k':
+      retval.kernel = optarg;
+      break;
     case 'h':
       print_usage(argv[0]);
       return -1;
@@ -148,21 +160,26 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stderr, "Usage ERROR: nsources must be positive.\n");
     return -1;
   }
+
   if (retval.target_count < 1) {
     fprintf(stderr, "Usage ERROR: ntargets must be positive\n");
     return -1;
   }
-  if (retval.test_case != "bh" && retval.test_case != "fmm") {
+
+  if (retval.method != "bh" && retval.method != "fmm"
+      && retval.method != "fmm97") {
     fprintf(stderr, "Usage ERROR: unknown method '%s'\n",
-            retval.test_case.c_str());
+            retval.method.c_str());
     return -1;
   }
+
   if (retval.source_type != "cube" && retval.source_type != "sphere"
         && retval.source_type != "plummer") {
     fprintf(stderr, "Usage ERROR: unknown source type '%s'\n",
             retval.source_type.c_str());
     return -1;
   }
+
   if (retval.target_type != "cube" && retval.target_type != "sphere"
         && retval.target_type != "plummer") {
     fprintf(stderr, "Usage ERROR: unknown target type '%s'\n",
@@ -170,14 +187,40 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     return -1;
   }
 
+  if (retval.kernel == "laplace" && retval.method == "fmm97") {
+    if (retval.accuracy != 3 && retval.accuracy != 6) {
+      fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
+              " for laplace kernel using fmm97\n");
+      return -1;
+    }
+  }
+
+  if (retval.kernel == "yukawa") {
+    if (retval.method != "fmm97") {
+      fprintf(stderr, "Usage ERROR: yukawa kernel must use fmm97\n");
+      return -1;
+    } else if (retval.accuracy != 3 && retval.accuracy != 6) {
+      fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
+              " for yukawa kernel using fmm97\n");
+      return -1;
+    }
+  }
+
   //print out summary
-  fprintf(stdout, "Testing DASHMM:\n");
-  fprintf(stdout, "%d sources in a %s distribution\n",
-          retval.source_count, retval.source_type.c_str());
-  fprintf(stdout, "%d targets in a %s distribution\n",
-          retval.target_count, retval.target_type.c_str());
-  fprintf(stdout, "method: %s \nthreshold: %d\n\n",
-          retval.test_case.c_str(), retval.refinement_limit);
+  if (hpx_get_my_rank() == 0) {
+    fprintf(stdout, "Testing DASHMM:\n");
+    fprintf(stdout, "%d sources in a %s distribution\n",
+            retval.source_count, retval.source_type.c_str());
+    fprintf(stdout, "%d targets in a %s distribution\n",
+            retval.target_count, retval.target_type.c_str());
+    fprintf(stdout, "method: %s \nthreshold: %d\nkernel: %s\n\n",
+            retval.method.c_str(), retval.refinement_limit,
+            retval.kernel.c_str());
+  } else {
+    // Only have rank 0 create data
+    retval.source_count = 0;
+    retval.target_count = 0;
+  }
 
   return 0;
 }
@@ -193,15 +236,13 @@ inline double elapsed(double t1, double t0) {
   return (double) (t1 - t0);
 }
 
-
 dashmm::Point pick_cube_position() {
   double pos[3];
-  pos[0] = (double)rand() / RAND_MAX;
-  pos[1] = (double)rand() / RAND_MAX;
-  pos[2] = (double)rand() / RAND_MAX;
+  pos[0] = (double)rand() / RAND_MAX - 0.5;
+  pos[1] = (double)rand() / RAND_MAX - 0.5;
+  pos[2] = (double)rand() / RAND_MAX - 0.5;
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
-
 
 dashmm::Point pick_sphere_position() {
   double r = 1.0;
@@ -215,7 +256,6 @@ dashmm::Point pick_sphere_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-
 double pick_mass(bool use_negative) {
   double retval = (double)rand() / RAND_MAX + 1.0;
   if (use_negative && (rand() % 2)) {
@@ -223,7 +263,6 @@ double pick_mass(bool use_negative) {
   }
   return retval;
 }
-
 
 dashmm::Point pick_plummer_position() {
   //NOTE: This is using a = 1
@@ -239,16 +278,14 @@ dashmm::Point pick_plummer_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-
 double pick_plummer_mass(int count) {
   //We take the total mass to be 100
   return 100.0 / count;
 }
 
-
 void set_sources(SourceData *sources, int source_count,
-                 std::string source_type, std::string test_case) {
-  bool use_negative = test_case == std::string{"fmm"};
+                 std::string source_type, std::string method) {
+  bool use_negative = (method != std::string{"bh"});
   if (source_type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_cube_position();
@@ -269,6 +306,25 @@ void set_sources(SourceData *sources, int source_count,
   }
 }
 
+dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
+  SourceData *sources{nullptr};
+  if (args.source_count) {
+    sources = new SourceData[args.source_count];
+    set_sources(sources, args.source_count, args.source_type, args.method);
+  }
+
+  dashmm::Array<SourceData> retval{};
+  int err = retval.allocate(args.source_count);
+  assert(err == dashmm::kSuccess);
+  err = retval.put(0, args.source_count, sources);
+  assert(err == dashmm::kSuccess);
+
+  if (args.source_count) {
+    delete [] sources;
+  }
+
+  return retval;
+}
 
 void set_targets(TargetData *targets, int target_count,
                  std::string target_type) {
@@ -296,10 +352,31 @@ void set_targets(TargetData *targets, int target_count,
   }
 }
 
+dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
+  TargetData *targets{nullptr};
+  if (args.target_count) {
+    targets = new TargetData[args.target_count];
+    set_targets(targets, args.target_count, args.target_type);
+  }
+
+  dashmm::Array<TargetData> retval{};
+  int err = retval.allocate(args.target_count);
+  assert(err == dashmm::kSuccess);
+  err = retval.put(0, args.target_count, targets);
+  assert(err == dashmm::kSuccess);
+
+  if (args.target_count) {
+    delete [] targets;
+  }
+
+  return retval;
+}
 
 void compare_results(TargetData *targets, int target_count,
                      TargetData *exacts, int exact_count) {
-  //create a map from index into offset fort targets
+  if (hpx_get_my_rank()) return;
+
+  //create a map from index into offset for targets
   std::map<int, int> offsets{};
   for (int i = 0; i < target_count; ++i) {
     offsets[targets[i].index] = i;
@@ -320,99 +397,127 @@ void compare_results(TargetData *targets, int target_count,
       maxrel = relerr / exacts[i].phi.real();
     }
   }
-  fprintf(stdout, "Error for %d test points: %lg (max %lg)\n",
+  fprintf(stdout, "Error for %d test points: %4.3e (max %4.3e)\n",
                   exact_count, sqrt(numerator / denominator), maxrel);
 }
-
 
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
-  //create some arrays
-  SourceData *sources = reinterpret_cast<SourceData *>(
-        new char [sizeof(SourceData) * args.source_count]);
-  TargetData *targets = reinterpret_cast<TargetData *>(
-        new char [sizeof(TargetData) * args.target_count]);
-
-  set_sources(sources, args.source_count, args.source_type, args.test_case);
-  set_targets(targets, args.target_count, args.target_type);
-
-  //prep sources
-  dashmm::Array<SourceData> source_handle{};
-  int err = source_handle.allocate(args.source_count);
-  assert(err == dashmm::kSuccess);
-  err = source_handle.put(0, args.source_count, sources);
-  assert(err == dashmm::kSuccess);
-
-  //prep targets
-  dashmm::Array<TargetData> target_handle{};
-  err = target_handle.allocate(args.target_count);
-  assert(err == dashmm::kSuccess);
-  err = target_handle.put(0, args.target_count, targets);
-  assert(err == dashmm::kSuccess);
-
-  //save a few targets in case of direct comparison
-  int test_count = 400;
-  if (test_count > args.target_count) {
-    test_count = args.target_count;
-  }
-  TargetData *test_targets = reinterpret_cast<TargetData *>(
-        new char [sizeof(TargetData) * test_count]);
-  for (int i = 0; i < test_count; ++i) {
-    int idx = i * (args.target_count / test_count);
-    assert(idx < args.target_count);
-    test_targets[i] = targets[idx];
-  }
+  dashmm::Array<SourceData> source_handle = prepare_sources(args);
+  dashmm::Array<TargetData> target_handle = prepare_targets(args);
 
   //Perform the evaluation
   double t0{};
   double tf{};
-  if (args.test_case == std::string{"bh"}) {
-    dashmm::LaplaceCOM<SourceData, TargetData> expansion{
-        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
-    dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
+  int err{0};
 
-    t0 = getticks();
-    err = bheval.evaluate(source_handle, target_handle, args.refinement_limit,
-                          method, expansion);
-    assert(err == dashmm::kSuccess);
-    tf = getticks();
-  } else if (args.test_case == std::string{"fmm"}) {
-    dashmm::laplace_sph_precompute(args.accuracy);
-    dashmm::LaplaceSPH<SourceData, TargetData> expansion{
-          dashmm::Point{0.0, 0.0, 0.0}, args.accuracy, dashmm::kNoRoleNeeded};
-    dashmm::FMM<SourceData, TargetData, dashmm::LaplaceSPH> method{};
+  if (args.kernel == std::string{"laplace"}) {
+    if (args.method == std::string{"bh"}) {
+      dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
-    t0 = getticks();
-    err = fmmeval.evaluate(source_handle, target_handle, args.refinement_limit,
-                           method, expansion);
-    assert(err == dashmm::kSuccess);
-    tf = getticks();
+      t0 = getticks();
+      err = laplace_bh.evaluate(source_handle, target_handle,
+                                args.refinement_limit, method,
+                                args.accuracy, std::vector<double>{});
+      assert(err == dashmm::kSuccess);
+      tf = getticks();
+    } else if (args.method == std::string{"fmm"}) {
+      dashmm::FMM<SourceData, TargetData, dashmm::Laplace> method{};
+
+      t0 = getticks();
+      err = laplace_fmm.evaluate(source_handle, target_handle,
+                                 args.refinement_limit, method,
+                                 args.accuracy, std::vector<double>{});
+      assert(err == dashmm::kSuccess);
+      tf = getticks();
+    } else if (args.method == std::string{"fmm97"}) {
+      dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{};
+
+      t0 = getticks();
+      err = laplace_fmm97.evaluate(source_handle, target_handle,
+                                   args.refinement_limit, method,
+                                   args.accuracy, std::vector<double>{});
+      assert(err == dashmm::kSuccess);
+      tf = getticks();
+    }
+  } else if (args.kernel == std::string{"yukawa"}) {
+    if (args.method == std::string{"fmm97"}) {
+      dashmm::FMM97<SourceData, TargetData, dashmm::Yukawa> method{};
+      std::vector<double> kernelparms(1, 0.1);
+
+      t0 = getticks();
+      err = yukawa_fmm97.evaluate(source_handle, target_handle,
+                                  args.refinement_limit, method,
+                                  args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
+      tf = getticks();
+    }
   }
+
   fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
 
-
   if (args.verify) {
+    // Save a few targets for the direct comparison
+    int test_count{0};
+    if (hpx_get_my_rank() == 0) {
+      test_count = 400;
+    }
+    if (test_count > args.target_count) {
+      test_count = args.target_count;
+    }
+
+    //Get the results from the global address space
+    args.target_count = target_handle.length();
+    TargetData *targets = target_handle.collect();
+    if (targets) {
+      std::sort(targets, &targets[args.target_count],
+                [] (const TargetData &a, const TargetData &b) -> bool {
+                  return (a.index < b.index);
+                });
+    }
+
+    // Copy the test particles into test_targets
+    TargetData *test_targets{nullptr};
+    if (test_count) {
+      test_targets = new TargetData[test_count];
+
+      for (int i = 0; i < test_count; ++i) {
+        int idx = i * (args.target_count / test_count);
+        assert(idx < args.target_count);
+        test_targets[i] = targets[idx];
+        test_targets[i].phi = std::complex<double>{0.0, 0.0};
+      }
+    }
+
     // Create array for test targets
     dashmm::Array<TargetData> test_handle{};
     err = test_handle.allocate(test_count);
     assert(err == dashmm::kSuccess);
     err = test_handle.put(0, test_count, test_targets);
     assert(err == dashmm::kSuccess);
+    delete [] test_targets;
 
     //do direct evaluation
-    dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
-    dashmm::LaplaceCOM<SourceData, TargetData> direxp{
-        dashmm::Point{0.0, 0.0, 0.0}, 0, dashmm::kNoRoleNeeded};
-    err = directeval.evaluate(source_handle, test_handle, args.refinement_limit,
-                              direct, direxp);
-    assert(err == dashmm::kSuccess);
+    //*
+    if (args.kernel == "laplace") {
+      dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
+      err = laplace_direct.evaluate(source_handle, test_handle,
+                                    args.refinement_limit, direct,
+                                    args.accuracy, std::vector<double>{});
+      assert(err == dashmm::kSuccess);
+    } else if (args.kernel == "yukawa") {
+      dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{};
+      std::vector<double> kernelparms(1, 0.1);
+      err = yukawa_direct.evaluate(source_handle, test_handle,
+                                   args.refinement_limit, direct,
+                                   args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
+    }
+    //*/
 
-    //Get the results from the global address space
-    err = target_handle.get(0, args.target_count, targets);
-    assert(err == dashmm::kSuccess);
-    err = test_handle.get(0, test_count, test_targets);
-    assert(err == dashmm::kSuccess);
+    // Retrieve the test results
+    test_targets = test_handle.collect();
 
     //Test error
     compare_results(targets, args.target_count, test_targets, test_count);
@@ -420,6 +525,7 @@ void perform_evaluation_test(InputArguments args) {
     err = test_handle.destroy();
     assert(err == dashmm::kSuccess);
     delete [] test_targets;
+    delete [] targets;
   }
 
   //free up resources
@@ -427,25 +533,18 @@ void perform_evaluation_test(InputArguments args) {
   assert(err == dashmm::kSuccess);
   err = target_handle.destroy();
   assert(err == dashmm::kSuccess);
-
-  delete [] sources;
-  delete [] targets;
 }
-
 
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);
 
-
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
-
 
   if (!usage_error) {
     perform_evaluation_test(inputargs);
   }
-
 
   err = dashmm::finalize();
   assert(err == dashmm::kSuccess);

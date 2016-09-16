@@ -1,0 +1,14 @@
+So there are some things left to take care of with this. In no particular
+order:
+
+ * Start adding the DAG stuff in - in particular, the application of the
+   method ought to be pretty straightforward. This is just what we have
+   adapted mildly to the new structure.
+
+ * Go back through and privatize anything you can
+ * See what you can do about the int vs. size_t thing here
+ * Clean it all up.
+
+ * Add the remaining functionality from dashmm::Tree to the DualTree
+ * Plug it into dashmm proper.
+ * Debug, rinse, repeat

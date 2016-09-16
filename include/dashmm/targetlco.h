@@ -38,7 +38,7 @@ template <typename Source, typename Target,
                     template <typename, typename> class,
                     typename> class Method,
           typename DistroPolicy>
-class Evaluator;
+class TargetLCORegistrar;
 
 
 /// Target LCO
@@ -106,13 +106,15 @@ class TargetLCO {
   ///
   /// \param n - the number of sources
   /// \param sources - the sources themselves
-  void contribute_S_to_T(int n, source_t *sources) const {
+  void contribute_S_to_T(size_t n, source_t *sources) const {
     size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);
     input->code = kStoT;
     input->count = n;
-    memcpy(input->sources, sources, sizeof(source_t) * n);
+    if (n != 0) {
+      memcpy(input->sources, sources, sizeof(source_t) * n);
+    }
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
 
@@ -123,16 +125,11 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  /// \param n_digits - accuracy of the expansion
-  /// \param scale - scaling factor
-  void contribute_M_to_T(size_t bytes, void *data,
-                         int n_digits, double scale) const {
+  void contribute_M_to_T(size_t bytes, void *data) const {
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
     assert(input);
     input->code = kMtoT;
-    input->n_digits = n_digits;
-    input->scale = scale;
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -143,16 +140,11 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  /// \param n_digits - accuracy of the expansion
-  /// \param scale - scaling factor
-  void contribute_L_to_T(size_t bytes, void *data,
-                         int n_digits, double scale) const {
+  void contribute_L_to_T(size_t bytes, void *data) const {
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
     assert(input);
     input->code = kLtoT;
-    input->n_digits = n_digits;
-    input->scale = scale;
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -160,8 +152,9 @@ class TargetLCO {
   }
 
  private:
-  /// Make Evaluator a friend -- it handles action registration
-  friend class Evaluator<Source, Target, Expansion, Method, DistroPolicy>;
+  /// Become friends with TargetLCORegistrar
+  friend class TargetLCORegistrar<Source, Target, Expansion, Method,
+                                  DistroPolicy>;
 
   /// LCO data type
   struct Data {
@@ -172,15 +165,13 @@ class TargetLCO {
   /// S->T parameters type
   struct StoT {
     int code;
-    int count;
+    size_t count;
     source_t sources[];
   };
 
   /// M->T parameters type
   struct MtoT {
     int code;
-    int n_digits;
-    double scale;
     size_t bytes;
     char data[];
   };
@@ -188,8 +179,6 @@ class TargetLCO {
   /// L->T parameters type
   struct LtoT {
     int code;
-    int n_digits;
-    double scale;
     size_t bytes;
     char data[];
   };
@@ -217,24 +206,31 @@ class TargetLCO {
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
+    if (lhs->targets.data() == HPX_NULL) {
+      return;
+    }
+
     if (*code == kStoT) {
       // The input contains the sources
       StoT *input = static_cast<StoT *>(rhs);
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      if (input->count) {
+        // The LCO data contains the reference to the targets, which must be
+        // pinned.
+        target_t *targets{nullptr};
+        // NOTE: This should succeed because we place the LCO at the same
+        // locality as the actual target data.
+        assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand(ViewSet{});
-      expand.S_to_T(input->sources, &input->sources[input->count],
-                     targets, &targets[lhs->targets.n()]);
+        expansion_t expand(ViewSet{});
+        expand.S_to_T(input->sources, &input->sources[input->count],
+                       targets, &targets[lhs->targets.n()]);
 
-      hpx_gas_unpin(lhs->targets.data());
+        hpx_gas_unpin(lhs->targets.data());
+      }
     } else if (*code == kMtoT) {
-      MtoT *input = readbuf.interpret<MtoT>();
+      // TODO: take a look at this MtoT type. We use nothing but the code here.
+      readbuf.interpret<MtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -246,12 +242,13 @@ class TargetLCO {
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
-      expand.M_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      expand.M_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
-      LtoT *input = readbuf.interpret<LtoT>();
+      // TODO: take a look at this LtoT type. We use nothing but the code here.
+      readbuf.interpret<LtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -263,7 +260,7 @@ class TargetLCO {
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
-      expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());

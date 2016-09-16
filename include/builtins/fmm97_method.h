@@ -11,14 +11,11 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+#ifndef __DASHMM_FMM97_METHOD_H__
+#define __DASHMM_FMM97_METHOD_H__
 
-#ifndef __DASHMM_FMM_METHOD_H__
-#define __DASHMM_FMM_METHOD_H__
-
-
-/// \file include/builtins/fmm_method.h
-/// \brief Declaration of FMM Method
-
+/// \file include/builtins/fmm97_method.h
+/// \brief Declaration of FMM method with merge and shift
 
 #include "dashmm/arrayref.h"
 #include "dashmm/defaultpolicy.h"
@@ -27,36 +24,34 @@
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
-
 namespace dashmm {
 
-
-/// A Method to implement classic FMM
+/// A Method to implement FMM with merge and shift
 ///
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           typename DistroPolicy = DefaultDistributionPolicy>
-class FMM {
+class FMM97 {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = FMM<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM,
+  using method_t = FMM97<Source, Target, Expansion, DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM97,
                                       DistroPolicy>;
   using sourceref_t = ArrayRef<Source>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM, DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM97, DistroPolicy>;
 
-  FMM() { }
+  FMM97() {}
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
     if (curr->idx.level() >= 2) {
       // If \p curr is of level 0 or 1, \p curr is not well separated
-      // from any node. As a result, there is no need to create the
-      // normal expansion.
+      // from any target node. As a result, there is no need to create
+      // the normal expansion.
       assert(curr->dag.add_normal() == true);
       curr->dag.StoM(&curr->dag,
                      expansion_t::weight_estimate(Operation::StoM));
@@ -67,9 +62,9 @@ class FMM {
     if (curr->idx.level() >= 2) {
       assert(curr->dag.add_normal() == true);
       for (size_t i = 0; i < 8; ++i) {
-        sourcenode_t *kid = curr->child[i];
-        if (kid != nullptr) {
-          curr->dag.MtoM(&kid->dag,
+        sourcenode_t *child = curr->child[i];
+        if (child != nullptr) {
+          curr->dag.MtoM(&child->dag,
                          expansion_t::weight_estimate(Operation::MtoM));
         }
       }
@@ -84,10 +79,13 @@ class FMM {
 
     if (curr->idx.level() >= 2) {
       assert(curr->dag.add_normal() == true);
+      curr->dag.ItoL(&curr->parent->dag,
+                     expansion_t::weight_estimate(Operation::ItoL));
 
-      if (curr->idx.level() >= 3)
+      if (curr->idx.level() >= 3) {
         curr->dag.LtoL(&curr->parent->dag,
                        expansion_t::weight_estimate(Operation::LtoL));
+      }
     }
   }
 
@@ -97,8 +95,11 @@ class FMM {
     int StoL = expansion_t::weight_estimate(Operation::StoL);
     int StoT = expansion_t::weight_estimate(Operation::StoT);
     int LtoT = expansion_t::weight_estimate(Operation::LtoT);
-    int MtoL = expansion_t::weight_estimate(Operation::MtoL);
+    int MtoI = expansion_t::weight_estimate(Operation::MtoI);
 
+    // If a source node S is at the same level as \p curr and is well separated
+    // from \p curr, skip S as its contribution to \p curr has been processed by
+    // the parent of \p curr.
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -108,18 +109,21 @@ class FMM {
             curr->dag.StoT(&(*S)->dag, StoT);
           }
         } else {
-          if (well_sep_test((*S)->idx, t_index)) {
-            curr->dag.MtoL(&(*S)->dag, MtoL);
-          } else {
+          if (!well_sep_test((*S)->idx, t_index)) {
             proc_coll_recur(curr, *S);
           }
         }
       }
 
-      if (curr->idx.level() >= 2)
+      if (curr->idx.level() >= 2) {
         curr->dag.LtoT(&curr->dag, LtoT);
+      }
     } else {
-      std::vector<sourcenode_t *> newcons{ };
+      if (curr->idx.level() >= 1) {
+        assert(curr->dag.add_interm() == true);
+      }
+
+      std::vector<sourcenode_t *> newcons{};
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -129,15 +133,28 @@ class FMM {
             newcons.push_back(*S);
           }
         } else {
-          if (well_sep_test((*S)->idx, t_index)) {
-            curr->dag.MtoL(&(*S)->dag, MtoL);
-          } else {
+          if (!well_sep_test((*S)->idx, t_index)) {
+            bool do_I2I = (curr->idx.level() >= 1 &&
+                           ((*S)->idx.x() != t_index.x() ||
+                            (*S)->idx.y() != t_index.y() ||
+                            (*S)->idx.z() != t_index.z()));
+
             bool S_is_leaf = true;
+
             for (size_t i = 0; i < 8; ++i) {
               sourcenode_t *child = (*S)->child[i];
               if (child != nullptr) {
                 newcons.push_back(child);
                 S_is_leaf = false;
+                if (do_I2I) {
+                  if (child->dag.add_interm()) {
+                    child->dag.MtoI(&child->dag, MtoI);
+                  }
+                  curr->dag.ItoI(&child->dag,
+                                 expansion_t::weight_estimate(Operation::ItoI,
+                                                              (*S)->idx,
+                                                              t_index));
+                }
               }
             }
 
@@ -195,7 +212,6 @@ class FMM {
   void proc_coll_recur(targetnode_t *T, sourcenode_t *S) const {
     int MtoT = expansion_t::weight_estimate(Operation::MtoT);
     int StoT = expansion_t::weight_estimate(Operation::StoT);
-
     if (well_sep_test_asymmetric(S->idx, T->idx)) {
       S->dag.MtoT(&T->dag, MtoT);
     } else {

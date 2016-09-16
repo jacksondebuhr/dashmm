@@ -11,26 +11,24 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+#ifndef __DASHMM_FMM97_DISTRO_H__
+#define __DASHMM_FMM97_DISTRO_H__
 
-/// \file include/laplace_sph.h
-/// \brief Implementation of laplace_sph_precompute()
-
-
-#include "builtins/laplace_sph.h"
-
+#include "dashmm/dag.h"
 
 namespace dashmm {
 
+class FMM97Distro {
+public: 
+  FMM97Distro() { }
+  void compute_distribution(DAG &dag);
 
-void laplace_sph_precompute(int n_digits) {
-  // If we are not running on SMP, the following needs to be wrapped and
-  // broadcasted inside an hpx_run
-  LaplaceSPHTableIterator entry = builtin_laplace_table_.find(n_digits);
-  if (entry == builtin_laplace_table_.end()) {
-    builtin_laplace_table_[n_digits] =
-      std::unique_ptr<LaplaceSPHTable>{new LaplaceSPHTable{n_digits}};
-  }
-}
+private: 
+  void color(DAGNode *n); 
+  void confine(DAGNode *n, char type); 
+  void assign(DAGNode *n); 
+}; 
 
+} // dashmm
 
-} // namespace dashmm
+#endif // __DASHMM_FMM97_DISTRO_H__

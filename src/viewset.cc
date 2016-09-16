@@ -6,7 +6,7 @@ namespace dashmm {
 
 void ViewSet::clear() {
   views_.clear();
-  n_digits_ = -1;
+  //n_digits_ = -1;
   role_ = kNoRoleNeeded;
 }
 
@@ -28,6 +28,7 @@ size_t ViewSet::bytes() const {
   }
 
   retval += 3 * sizeof(int);  // for count and n_digits and role
+  retval += 4 * sizeof(double); // for the center and the scale
   retval += views_.size() * sizeof(int);
   retval += views_.size() * sizeof(size_t);
 
@@ -36,11 +37,20 @@ size_t ViewSet::bytes() const {
 
 
 void ViewSet::serialize(WriteBuffer &buffer) {
-  bool e = buffer.write((char *)&n_digits_, sizeof(n_digits_));
-  assert(e);
-  e = buffer.write((char *)&role_, sizeof(role_));
+  bool e = buffer.write((char *)&role_, sizeof(role_));
   assert(e);
   e = buffer.write(count());
+  assert(e);
+  double oval = center_.x();
+  e = buffer.write(oval);
+  assert(e);
+  oval = center_.y();
+  e = buffer.write(oval);
+  assert(e);
+  oval = center_.z();
+  e = buffer.write(oval);
+  assert(e);
+  e = buffer.write(scale_);
   assert(e);
 
   // then the view index and size for each
@@ -63,14 +73,23 @@ void ViewSet::interpret(ReadBuffer &buffer) {
   // NOTE: this clears out the ViewSet
   views_.clear();
 
-  bool e = buffer.read(&n_digits_);
-  assert(e);
-
-  e = buffer.read(&role_);
+  bool e = buffer.read(&role_);
   assert(e);
 
   int ct{0};
   e = buffer.read((char *)&ct, sizeof(ct));
+  assert(e);
+
+  double ival[3];
+  e = buffer.read(&ival[0]);
+  assert(e);
+  e = buffer.read(&ival[1]);
+  assert(e);
+  e = buffer.read(&ival[2]);
+  assert(e);
+  center_ = Point{ival[0], ival[1], ival[2]};
+
+  e = buffer.read(&scale_);
   assert(e);
 
   for (int i = 0; i < ct; ++i) {
