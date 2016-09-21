@@ -401,7 +401,7 @@ void print_edges_to_file(std::vector<CSVEdge> &edges, std::string fname) {
 }
 
 
-bool csvedge_comp(const CSVEdge &a, const CSVEdge &b) {
+bool csvedge_comp(CSVEdge a, CSVEdge b) {
   if (a.s_idx.level() < b.s_idx.level()) return true;
   if (a.s_idx.x() < b.s_idx.x()) return true;
   if (a.s_idx.y() < b.s_idx.y()) return true;
@@ -411,6 +411,8 @@ bool csvedge_comp(const CSVEdge &a, const CSVEdge &b) {
   if (a.t_idx.x() < b.t_idx.x()) return true;
   if (a.t_idx.y() < b.t_idx.y()) return true;
   if (a.t_idx.z() < b.t_idx.z()) return true;
+
+  if (a.op < b.op) return true;
 
   return false;
 }
@@ -440,7 +442,7 @@ void DAG::toJSON(std::string fname) {
 
 void DAG::toEdgeCSV(std::string fname) {
   std::vector<CSVEdge> edges = create_csv_edges(*this);
-  std::sort(edges.begin(), edges.end(), csvedge_comp);
+  std::stable_sort(edges.begin(), edges.end(), csvedge_comp);
   print_edges_to_file(edges, fname);
 }
 
