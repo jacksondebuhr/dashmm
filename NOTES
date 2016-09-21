@@ -1,6 +1,13 @@
 THIS BRANCH TODO
 
 
+TODO: Update tutorial
+TODO: Update User Expansion documentation; in particular ViewSet needs to be
+      explained.
+TODO: make the default distro part of the method concept instead of the
+      template
+
+
 TODO: The merger of the treebuild3 has created somewhat of a monster. That
   really ought to be sorted out. It is pretty gnarly, and the code is at
   a high risk of being hard to maintain.
@@ -79,13 +86,11 @@ Overall Plan to 1.0
           using distro_t = SomeGreatDistro;
         };
       Actually, this might not work. This will take more thought.
-
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
-    - consider placing the user-facing heads into a different directory than
-      the internal stuff
+
 
  * Split Evaluate into pieces and expose more interface to users
     - NOTE: This is not a vital thing to accomplish for 1.0.0
@@ -115,15 +120,9 @@ TODO: Make the Array type work from inside HPX-5 threads also
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
         (This is not a bad idea, but it can wait, as long as the docs warn
          users.)
-TODO: currently it is impossible to use the same tree for different Evaluators.
-      Do we want to decouple the tree?
-        (This might be harder to do. The handles to the DAG make the tree for
-         one specific evaluation.)
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
         (Cool idea; no use case. Delay)
-TODO: There is an overdecomposition factor in ArrayMapAction that is hard
-      coded. Explore this and pick one that performs well.
 
 
 

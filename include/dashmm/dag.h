@@ -71,7 +71,7 @@ struct DAGNode {
   int color;
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-    n_parts{0} {}
+      n_parts{0}, color{0} {}
   void add_out_edge(DAGNode *end, Operation op, int weight) {
     out_edges.push_back(DAGEdge{this, end, op, weight});
   }
@@ -108,6 +108,8 @@ class DAG {
   /// information to that file is JSON format. See the implementation for
   /// details about what is included.
   void toJSON(std::string fname);
+
+  void toEdgeCSV(std::string fname);
 
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
     return (a.target->locality < b.target->locality);

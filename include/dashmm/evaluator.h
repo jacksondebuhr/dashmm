@@ -279,6 +279,7 @@ class Evaluator {
     // Get ready to evaluate
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
+dag->toEdgeCSV("dag" + std::to_string(hpx_get_my_rank()) + ".txt");
     tree->create_expansions_from_DAG(preargs[1]);
 
     // NOTE: the previous has to finish for the following. So the previous

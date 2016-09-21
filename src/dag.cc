@@ -42,6 +42,7 @@
 
 #include <cstdio>
 
+#include <algorithm>
 #include <map>
 #include <string>
 
@@ -68,6 +69,7 @@ class Edge {
  public:
   int source;
   int target;
+  int weight;
   Operation op;
 };
 
@@ -185,7 +187,7 @@ void append_out_edges(std::map<const DAGNode *, int> &dtoi,
     std::vector<DAGEdge> &out = nodes[i]->out_edges;
     for (size_t j = 0; j < out.size(); ++j) {
       edges.emplace_back(
-        Edge{dtoi[out[j].source], dtoi[out[j].target], out[j].op}
+        Edge{dtoi[out[j].source], dtoi[out[j].target], out[j].weight, out[j].op}
       );
     }
   }
@@ -215,7 +217,9 @@ std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
         = dag.source_leaves[i]->locality;
   }
   for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
-    if (is_edge_from_intermediate(dag.source_nodes[i]->out_edges[0].op)) {
+    if (dag.source_nodes[i]->out_edges.size() == 0) {
+      retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
+    } else if (is_edge_from_intermediate(dag.source_nodes[i]->out_edges[0].op)) {
       retval[dtoi[dag.source_nodes[i]]].type = NodeType::Intermediate;
     } else {
       retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
@@ -314,8 +318,8 @@ void print_json_links(FILE *ofd, std::vector<Edge> &edges) {
       fprintf(ofd, ",\n");
     }
     std::string oper = edge_code_to_print(edges[i].op);
-    fprintf(ofd, "    {\"source\": %d, \"target\": %d, \"operation\": \"%s\"}",
-            edges[i].source, edges[i].target, oper.c_str());
+    fprintf(ofd, "    {\"source\": %d, \"target\": %d, \"operation\": \"%s\", \"weight\": %d}",
+            edges[i].source, edges[i].target, oper.c_str(), edges[i].weight);
   }
 
   fprintf(ofd, "\n  ]\n");
@@ -340,6 +344,78 @@ void print_json(std::vector<Node> &nodes, std::vector<Edge> &edges,
 }
 
 
+struct CSVEdge {
+  Index s_idx;
+  int s_loc;
+  Operation op;
+  Index t_idx;
+  int t_loc;
+};
+
+
+void add_out_edges_from_node(DAGNode *node, std::vector<CSVEdge> &edges) {
+  for (size_t i = 0; i < node->out_edges.size(); ++i) {
+    edges.emplace_back(CSVEdge{node->idx, node->locality,
+                               node->out_edges[i].op,
+                               node->out_edges[i].target->idx,
+                               node->out_edges[i].target->locality});
+  }
+}
+
+
+std::vector<CSVEdge> create_csv_edges(DAG &dag) {
+  std::vector<CSVEdge> retval{};
+
+  for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
+    add_out_edges_from_node(dag.source_leaves[i], retval);
+  }
+
+  for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
+    add_out_edges_from_node(dag.source_nodes[i], retval);
+  }
+
+  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
+    add_out_edges_from_node(dag.target_nodes[i], retval);
+  }
+
+  // No need for targets, as they have no out edges
+
+  return retval;
+}
+
+
+void print_edges_to_file(std::vector<CSVEdge> &edges, std::string fname) {
+  FILE *ofd = fopen(fname.c_str(), "w");
+  assert(ofd);
+
+  for (size_t i = 0; i < edges.size(); ++i) {
+    std::string opstr = edge_code_to_print(edges[i].op);
+    fprintf(ofd, "%d %d %d %d - %d - %s - %d %d %d %d - %d\n",
+            edges[i].s_idx.x(), edges[i].s_idx.y(), edges[i].s_idx.z(),
+            edges[i].s_idx.level(), edges[i].s_loc, opstr.c_str(),
+            edges[i].t_idx.x(), edges[i].t_idx.y(), edges[i].t_idx.z(),
+            edges[i].t_idx.level(), edges[i].t_loc);
+  }
+
+  fclose(ofd);
+}
+
+
+bool csvedge_comp(const CSVEdge &a, const CSVEdge &b) {
+  if (a.s_idx.level() < b.s_idx.level()) return true;
+  if (a.s_idx.x() < b.s_idx.x()) return true;
+  if (a.s_idx.y() < b.s_idx.y()) return true;
+  if (a.s_idx.z() < b.s_idx.z()) return true;
+
+  if (a.t_idx.level() < b.t_idx.level()) return true;
+  if (a.t_idx.x() < b.t_idx.x()) return true;
+  if (a.t_idx.y() < b.t_idx.y()) return true;
+  if (a.t_idx.z() < b.t_idx.z()) return true;
+
+  return false;
+}
+
+
 } // unnamed namespace
 
 
@@ -359,6 +435,13 @@ void DAG::toJSON(std::string fname) {
 
   // output
   print_json(N, E, n_s, n_t, fname);
+}
+
+
+void DAG::toEdgeCSV(std::string fname) {
+  std::vector<CSVEdge> edges = create_csv_edges(*this);
+  std::sort(edges.begin(), edges.end(), csvedge_comp);
+  print_edges_to_file(edges, fname);
 }
 
 
