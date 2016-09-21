@@ -70,31 +70,46 @@ void FMM97Distro::color(DAGNode *s) {
 }
 
 void FMM97Distro::confine(DAGNode *n, char type) {
-  if (n->locality != -1)
-    return;
-
   assert(type == 's' || type == 't');
+
+  // Note: there may be multiple times \param n is visited. 
 
   if (type == 's') {
     for (size_t i = 0; i < n->out_edges.size(); ++i) {
       DAGNode *target = n->out_edges[i].target;
       Operation op = n->out_edges[i].op;
+      bool terminate = true; 
 
-      if (op == Operation::StoM || op == Operation::MtoM ||
-          op == Operation::MtoI) {
-        target->locality = n->locality;
-        confine(target, type);
-      }
+      if (target->locality == -1) {
+        if (op == Operation::MtoM || op == Operation::MtoI) 
+          target->locality = n->locality; 
+
+        if (op == Operation::MtoM) 
+          terminate = false; 
+      } else if (op == Operation::StoM) {
+        terminate = false; 
+      } 
+
+      if (terminate == false) 
+        confine(target, type); 
     }
   } else {
     for (size_t i = 0; i < n->in_edges.size(); ++i) {
       DAGNode *source = n->in_edges[i].source;
       Operation op = n->in_edges[i].op;
+      bool terminate = true; 
 
-      if (op == Operation::LtoT || op == Operation::LtoL) {
-        source->locality = n->locality;
-        confine(source, type);
-      }
+      if (source->locality == -1) {
+        if (op == Operation::LtoL) {
+          source->locality = n->locality; 
+          terminate = false; 
+        } 
+      } else if (op == Operation::LtoT) {
+        terminate = false; 
+      } 
+
+      if (terminate == false) 
+        confine(source, type); 
     }
   }
 }
@@ -143,6 +158,7 @@ void FMM97Distro::assign(DAGNode *n) {
   }
 
   n->locality = locality;
+  assert(locality != -1); 
 }
 
 } // dashmm
