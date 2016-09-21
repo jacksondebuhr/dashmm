@@ -22,6 +22,7 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+#include <hpx/hpx.h>
 
 #include "builtins/fmm97distro.h"
 
@@ -45,6 +46,14 @@ void FMM97Distro::compute_distribution(DAG &dag) {
     assert(n->locality != -1);
     confine(n, 's');
   }
+  
+  // Assert all the source nodes have their locality fixed 
+  for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
+    DAGNode *n = dag.source_nodes[i]; 
+    if (n->idx.level() < 3) 
+      n->locality = 0; 
+    assert(n->locality != -1); 
+  }
 
   // Confine L of the target tree
   for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
@@ -53,11 +62,25 @@ void FMM97Distro::compute_distribution(DAG &dag) {
     confine(n, 't');
   }
 
+  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
+    DAGNode *n = dag.target_nodes[i];
+    if (n->idx.level() < 3) 
+      n->locality = 0; 
+    assert(n->locality != -1); 
+  }
+  
   // Make decision on I of the target tree
   for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
     DAGNode *n = dag.target_nodes[i];
     if (n->locality == -1)
       assign(n);
+  }
+
+
+  // Assert all the target nodes have their locality fixed 
+  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
+    DAGNode *n = dag.target_nodes[i]; 
+    assert(n->locality != -1); 
   }
 }
 
@@ -73,6 +96,7 @@ void FMM97Distro::confine(DAGNode *n, char type) {
   assert(type == 's' || type == 't');
 
   // Note: there may be multiple times \param n is visited. 
+
 
   if (type == 's') {
     for (size_t i = 0; i < n->out_edges.size(); ++i) {
@@ -112,6 +136,54 @@ void FMM97Distro::confine(DAGNode *n, char type) {
         confine(source, type); 
     }
   }
+  
+
+
+  /*
+  if (type == 's') {
+    for (size_t i = 0; i < n->out_edges.size(); ++i) {
+      DAGNode *target = n->out_edges[i].target; 
+      Operation op = n->out_edges[i].op; 
+      bool terminate = true; 
+
+      if (op == Operation::MtoI) {
+        target->locality = n->locality; 
+      } 
+
+      if (op == Operation::MtoM) {
+        if (n->locality > target->locality) {
+          target->locality = n->locality; 
+          terminate = false;
+        }
+      }
+
+      if (op == Operation::StoM) 
+        terminate = false; 
+
+      if (terminate == false) 
+        confine(target, type); 
+    }
+  } else {
+    for (size_t i = 0; i < n->in_edges.size(); ++i) {
+      DAGNode *source = n->in_edges[i].source; 
+      Operation op = n->in_edges[i].op; 
+      bool terminate = true; 
+
+      if (op == Operation::LtoT) 
+        terminate = false; 
+
+      if (op == Operation::LtoL) {
+        if (n->locality > source->locality) {
+          source->locality = n->locality; 
+          terminate = false; 
+        }
+      }
+
+      if (terminate == false) 
+        confine(source, type); 
+    }
+  }
+  */
 }
 
 void FMM97Distro::assign(DAGNode *n) {
