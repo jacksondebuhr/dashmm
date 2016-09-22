@@ -82,25 +82,21 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy = DefaultDistributionPolicy>
+                    template <typename, typename> class> class Method>
 class Evaluator {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
+  using method_t = Method<Source, Target, Expansion>;
   using sourceref_t = ArrayRef<Source>;
   using targetref_t = ArrayRef<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
-                                DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
-                                      DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
-  using distropolicy_t = DistroPolicy;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
+  using distropolicy_t = typename method_t::distropolicy_t;
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
@@ -189,17 +185,13 @@ class Evaluator {
 
  private:
   /// Registrars that will be needed for evaluate to operate.
-  TargetLCORegistrar<Source, Target, Expansion, Method,
-                     DistroPolicy> tlcoreg_;
-  ExpansionLCORegistrar<Source, Target, Expansion, Method,
-                        DistroPolicy> elcoreg_;
+  TargetLCORegistrar<Source, Target, Expansion, Method> tlcoreg_;
+  ExpansionLCORegistrar<Source, Target, Expansion, Method> elcoreg_;
   NodeRegistrar<Source> snodereg_;
   NodeRegistrar<Target> tnodereg_;
-  TreeRegistrar<Source, Target, Source, Expansion, Method,
-                DistroPolicy> streereg_;
-  TreeRegistrar<Source, Target, Target, Expansion, Method,
-                DistroPolicy> ttreereg_;
-  DualTreeRegistrar<Source, Target, Expansion, Method, DistroPolicy> dtreereg_;
+  TreeRegistrar<Source, Target, Source, Expansion, Method> streereg_;
+  TreeRegistrar<Source, Target, Target, Expansion, Method> ttreereg_;
+  DualTreeRegistrar<Source, Target, Expansion, Method> dtreereg_;
 
   // The actions for evaluate
   static hpx_action_t evaluate_;
@@ -279,7 +271,6 @@ class Evaluator {
     // Get ready to evaluate
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
-dag->toEdgeCSV("dag" + std::to_string(hpx_get_my_rank()) + ".txt");
     tree->create_expansions_from_DAG(preargs[1]);
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -333,34 +324,26 @@ dag->toEdgeCSV("dag" + std::to_string(hpx_get_my_rank()) + ".txt");
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Evaluator<S, T, E, M, D>::evaluate_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Evaluator<S, T, E, M>::evaluate_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Evaluator<S, T, E, M, D>::evaluate_rank_local_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Evaluator<S, T, E, M>::evaluate_rank_local_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Evaluator<S, T, E, M, D>::evaluate_cleanup_DAG_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Evaluator<S, T, E, M>::evaluate_cleanup_DAG_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Evaluator<S, T, E, M, D>::evaluate_cleanup_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Evaluator<S, T, E, M>::evaluate_cleanup_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

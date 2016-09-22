@@ -41,9 +41,7 @@ namespace dashmm {
 
 /// The default distribution policy to be used by Methods. This represents the
 /// best all around policy that is available in DASHMM.
-///
-/// Currently, DASHMM is specialized to SMP, so the defauly policy assigns all
-/// nodes to the same locality.
+
 //using DefaultDistributionPolicy = SingleLocality;
 //using DefaultDistributionPolicy = RandomDistro;
 //using DefaultDistributionPolicy = BHDistro;

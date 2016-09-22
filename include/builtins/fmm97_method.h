@@ -36,25 +36,27 @@
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
+#include "builtins/fmm97distro.h"
+
 namespace dashmm {
 
 /// A Method to implement FMM with merge and shift
 ///
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion,
-          typename DistroPolicy = DefaultDistributionPolicy>
+          template <typename, typename> class Expansion>
 class FMM97 {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = FMM97<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM97,
-                                      DistroPolicy>;
+  using method_t = FMM97<Source, Target, Expansion>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM97>;
   using sourceref_t = ArrayRef<Source>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM97, DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM97>;
+
+  using distropolicy_t = FMM97Distro;
 
   FMM97() {}
 

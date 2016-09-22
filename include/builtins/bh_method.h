@@ -42,6 +42,8 @@
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
+#include "builtins/bhdistro.h"
+
 
 namespace dashmm {
 
@@ -55,20 +57,20 @@ namespace dashmm {
 /// theta_c is the critical angle supplied when an instance of this method
 /// is constructed.
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion,
-          typename DistroPolicy = DefaultDistributionPolicy>
+          template <typename, typename> class Expansion>
 class BH {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = BH<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH,
-                                      DistroPolicy>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, BH, DistroPolicy>;
+  using method_t = BH<Source, Target, Expansion>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, BH>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
   using sourceref_t = ArrayRef<Source>;
+
+  using distropolicy_t = BHDistro;
 
   BH() : theta_{0.0} { }
 

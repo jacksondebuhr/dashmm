@@ -69,17 +69,13 @@ class NodeRegistrar;
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class TreeRegistrar;
 
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class DualTreeRegistrar;
 
 
@@ -490,9 +486,7 @@ hpx_action_t Node<R>::partition_node_ = HPX_ACTION_NULL;
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class DualTree;
 
 
@@ -510,9 +504,7 @@ class DualTree;
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class Tree {
  public:
   using record_t = Record;
@@ -520,10 +512,9 @@ class Tree {
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
   using arrayref_t = ArrayRef<Record>;
-  using tree_t = Tree<Source, Target, Record, Expansion, Method, DistroPolicy>;
-  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method,
-                            DistroPolicy>;
-  using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
+  using tree_t = Tree<Source, Target, Record, Expansion, Method>;
+  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method>;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   /// Tree construction just default initializes the object
   Tree() : root_{nullptr}, unif_grid_{nullptr}, unif_done_{HPX_NULL},
@@ -1117,9 +1108,8 @@ class Tree {
 
 
 private:
-  friend class DualTree<Source, Target, Expansion, Method, DistroPolicy>;
-  friend class TreeRegistrar<Source, Target, Record, Expansion, Method,
-                             DistroPolicy>;
+  friend class DualTree<Source, Target, Expansion, Method>;
+  friend class TreeRegistrar<Source, Target, Record, Expansion, Method>;
 
   node_t *root_;            /// Root of the tree
   node_t *unif_grid_;       /// The uniform grid
@@ -1141,66 +1131,50 @@ private:
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::setup_basics_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::setup_basics_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::delete_tree_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::delete_tree_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::recv_node_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::recv_node_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::send_node_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::send_node_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::assign_points_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::assign_points_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::group_points_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::group_points_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::merge_points_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::merge_points_ = HPX_ACTION_NULL;
 
 template <typename S, typename T, typename R,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t Tree<S, T, R, E, M, D>::merge_points_same_s_and_t_ =
+                    template <typename, typename> class> class M>
+hpx_action_t Tree<S, T, R, E, M>::merge_points_same_s_and_t_ =
                                                           HPX_ACTION_NULL;
 
 
@@ -1217,30 +1191,24 @@ hpx_action_t Tree<S, T, R, E, M, D>::merge_points_same_s_and_t_ =
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class DualTree {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
-                                      DistroPolicy>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
-                                DistroPolicy>;
-  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
+  using method_t = Method<Source, Target, Expansion>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
   using sourceref_t = ArrayRef<Source>;
   using sourcearraydata_t = ArrayData<Source>;
   using targetref_t = ArrayRef<Target>;
   using targetarraydata_t = ArrayData<Target>;
-  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method,
-                            DistroPolicy>;
-  using targettree_t = Tree<Source, Target, Target, Expansion, Method,
-                            DistroPolicy>;
-  using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
+  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method>;
+  using targettree_t = Tree<Source, Target, Target, Expansion, Method>;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   /// Construction is always default
   DualTree()
@@ -1636,8 +1604,7 @@ class DualTree {
 
 
  private:
-  friend class DualTreeRegistrar<Source, Target, Expansion, Method,
-                                 DistroPolicy>;
+  friend class DualTreeRegistrar<Source, Target, Expansion, Method>;
 
   /// Edge record for DAG instigation
   struct DAGInstigationRecord {
@@ -1771,9 +1738,9 @@ class DualTree {
     tree->unif_count_ = count;
     tree->refinement_limit_ = limit;
     tree->source_tree_ =
-      new Tree<Source, Target, Source, Expansion, Method, DistroPolicy>{};
+      new Tree<Source, Target, Source, Expansion, Method>{};
     tree->target_tree_ =
-      new Tree<Source, Target, Target, Expansion, Method, DistroPolicy>{};
+      new Tree<Source, Target, Target, Expansion, Method>{};
     tree->same_sandt_ = same_sandt;
 
     // Call out to tree setup stuff
@@ -2895,149 +2862,113 @@ class DualTree {
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::domain_geometry_init_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::domain_geometry_init_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::domain_geometry_op_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::domain_geometry_op_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::set_domain_geometry_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::set_domain_geometry_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::init_partition_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::init_partition_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::recv_points_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::recv_points_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::send_points_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::send_points_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::create_dual_tree_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::create_dual_tree_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::finalize_partition_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::finalize_partition_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::source_apply_method_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::source_apply_method_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::source_apply_method_child_done_ =
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::source_apply_method_child_done_ =
     HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::target_apply_method_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::target_apply_method_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::destroy_DAG_LCOs_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::destroy_DAG_LCOs_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::termination_detection_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::termination_detection_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::create_S_expansions_from_DAG_ =
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::create_S_expansions_from_DAG_ =
     HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::create_T_expansions_from_DAG_ =
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::create_T_expansions_from_DAG_ =
     HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::edge_lists_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::edge_lists_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::instigate_dag_eval_ = HPX_ACTION_NULL;
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::instigate_dag_eval_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class M,
-          typename D>
-hpx_action_t DualTree<S, T, E, M, D>::instigate_dag_eval_remote_ =
+                    template <typename, typename> class> class M>
+hpx_action_t DualTree<S, T, E, M>::instigate_dag_eval_remote_ =
     HPX_ACTION_NULL;
 
 

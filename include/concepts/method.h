@@ -37,14 +37,10 @@
 /// When creating a user-defined Method, the name Method in the following
 /// should be replaced by the name of the new Method type.
 ///
-/// If desired, the implementer should indicate a default DistroPolicy.
-/// The best choice is the default policy for Evaluator objects.
-///
 /// Methods operate on the DAG which is explicitly represented in the DAGInfo
 /// and DAGNode objects. See their documentation for more details.
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion,
-          typename DistroPolicy>
+          template <typename, typename> class Expansion>
 class Method {
  public:
   /// These are all useful aliases to define, given the heavily templated
@@ -52,11 +48,18 @@ class Method {
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Method<Source, Target, Expansion, DistroPolicy>;
-  using sourcenode_t = TreeNode<Source, Target, Source, Expansion, Method,
-                                DistroPolicy>;
-  using targetnode_t = TreeNode<Source, Target, Target, Expansion, Method,
-                                DistroPolicy>;
+  using method_t = Method<Source, Target, Expansion>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
+
+  /// Each method requires the specification of a distribution policy aliased
+  /// to distropolicy_t. The best all around distribution policy included with
+  /// DASHMM will be made available through dashmm/defaultpolicy.h as
+  /// DefaultDistributionPolicy. If the implemented of a method has a better
+  /// notion about how to distribute the nodes of the DAG for the particlar
+  /// method, then a policy can be defined, and set as the new method's
+  /// policy here.
+  using distropolicy_t = DefaultDistributionPolicy;
 
   /// Methods require a default constructor.
   Method();

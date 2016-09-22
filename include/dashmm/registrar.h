@@ -39,13 +39,10 @@ namespace dashmm {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class TargetLCORegistrar {
 public:
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Method,
-                                DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
 
   TargetLCORegistrar() {
     HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
@@ -69,13 +66,10 @@ public:
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class ExpansionLCORegistrar {
 public:
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method,
-                                      DistroPolicy>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
 
   ExpansionLCORegistrar() {
     HPX_REGISTER_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
@@ -122,12 +116,10 @@ class NodeRegistrar {
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class TreeRegistrar {
  public:
-  using tree_t = Tree<Source, Target, Record, Expansion, Method, DistroPolicy>;
+  using tree_t = Tree<Source, Target, Record, Expansion, Method>;
 
   TreeRegistrar() {
     // Tree actions
@@ -172,12 +164,10 @@ class TreeRegistrar {
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
-                    template <typename, typename> class,
-                    typename> class Method,
-          typename DistroPolicy>
+                    template <typename, typename> class> class Method>
 class DualTreeRegistrar {
  public:
-  using dualtree_t = DualTree<Source, Target, Expansion, Method, DistroPolicy>;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   DualTreeRegistrar() {
     // DualTree actions

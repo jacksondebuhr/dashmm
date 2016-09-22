@@ -41,6 +41,7 @@
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
+#include "builtins/bhdistro.h"
 
 
 namespace dashmm {
@@ -51,21 +52,20 @@ namespace dashmm {
 /// This is an O(N^2) method, so it should be used for only small numbers
 /// of targets.
 template <typename Source, typename Target,
-          template <typename, typename> class Expansion,
-          typename DistroPolicy = DefaultDistributionPolicy>
+          template <typename, typename> class Expansion>
 class Direct {
  public:
   using source_t = Source;
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
-  using method_t = Direct<Source, Target, Expansion, DistroPolicy>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct,
-                                      DistroPolicy>;
+  using method_t = Direct<Source, Target, Expansion>;
+  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Direct,
-                                DistroPolicy>;
+  using targetlco_t = TargetLCO<Source, Target, Expansion, Direct>;
   using sourceref_t = ArrayRef<Source>;
+
+  using distropolicy_t = BHDistro;
 
   Direct() { }
 
