@@ -4,8 +4,6 @@ THIS BRANCH TODO
 TODO: Update tutorial
 TODO: Update User Expansion documentation; in particular ViewSet needs to be
       explained.
-TODO: make the default distro part of the method concept instead of the
-      template
 
 
 TODO: The merger of the treebuild3 has created somewhat of a monster. That
@@ -66,26 +64,7 @@ TODO: Recall that the usage pattern of the DAG routines will want to change
 
 
 Overall Plan to 1.0
- * Full distribution of data and work
-    - build one locality tree from distributed particle data (and sort those
-      particles as needed) (DONE)
-    - Array needs to be updated accordingly (DONE)
-    - Introduce more distribution policies
-        Also, implement a type that maps methods to best default type.
-        Basically
-
-        template <typename M>
-        class DefaultDistro {
-         public:
-          using distro_t = RandomDistro;
-        };
-
-        template <>
-        class DefaultDistro<BH> {
-         public:
-          using distro_t = SomeGreatDistro;
-        };
-      Actually, this might not work. This will take more thought.
+ * Work on good distribution policies for all methods (Direct, who cares)
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
