@@ -38,7 +38,7 @@
 
 namespace dashmm {
 
-.
+
 /// This class represents a pinned copy of a reference to an Array
 ///
 /// An Array object represents data that lives in the global address space.

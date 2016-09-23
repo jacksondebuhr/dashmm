@@ -53,7 +53,7 @@ extern hpx_action_t broadcast_value_action;
 ///                address will store the resulting value.
 template <typename T>
 void broadcast(T *value) {
-  if (hpx_get_my_ranks() > 1) {
+  if (hpx_get_num_ranks() > 1) {
     hpx_run(&broadcast_value_action, value, value, sizeof(T));
   }
 }
