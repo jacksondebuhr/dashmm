@@ -23,7 +23,7 @@
 // =============================================================================
 
 
-/// \file src/initfini.cc
+/// \file
 /// \brief Implemention of DASHMM initialization and finalization
 
 

@@ -47,8 +47,10 @@
 #include "builtins/yukawa.h"
 
 // The built in distribution policies
+#include "builtins/bhdistro.h"
+#include "builtins/fmm97distro.h"
 #include "builtins/singlelocdistro.h"
 #include "builtins/randomdistro.h"
-#include "builtins/fmm97distro.h"
+
 
 #endif // __DASHMM_USER_INTERFACE_H__

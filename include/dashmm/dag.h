@@ -27,7 +27,7 @@
 #define __DASHMM_DAG_H__
 
 
-/// \file include/dashmm/dag.h
+/// \file
 /// \brief Interface for intermediate representation of DAG
 
 
@@ -38,6 +38,7 @@
 
 #include "dashmm/index.h"
 #include "dashmm/types.h"
+
 
 namespace dashmm {
 
@@ -72,9 +73,13 @@ struct DAGNode {
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
       n_parts{0}, color{0} {}
+
+  /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
     out_edges.push_back(DAGEdge{this, end, op, weight});
   }
+
+  /// Utility routine to add an edge to the DAG
   void add_in_edge(DAGNode *start, Operation op, int weight) {
     in_edges.push_back(DAGEdge{start, this, op, weight});
   }
@@ -85,7 +90,7 @@ struct DAGNode {
 ///
 /// This is the explicit representation of the DAG for the particular
 /// evaluation. This object is constructed on a single locality, and so does
-/// not inhabit the global address space. The DAG object is a template from
+/// not inhabit the global address space. The DAG object is a scaffold from
 /// which the particular evaluation will be created. The distribution policy
 /// will operate on the DAG object to compute a distribution of the work
 /// around the system.
@@ -107,14 +112,21 @@ class DAG {
   /// This will open a file with the given name, and write out the DAG
   /// information to that file is JSON format. See the implementation for
   /// details about what is included.
+  ///
+  /// NOTE: This is an experimental interface
   void toJSON(std::string fname);
 
+  /// Print the DAG out in a simpler text format.
+  ///
+  /// NOTE: This is an experimental interface
   void toEdgeCSV(std::string fname);
 
+  /// Comparison routine that will used to sort edges by locality
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
     return (a.target->locality < b.target->locality);
   }
 
+  /// Determine if an edghe is to a target Node
   static bool operation_to_target(Operation op) {
     return op == Operation::MtoT || op == Operation::LtoT
                                  || op == Operation::StoT;
@@ -155,9 +167,6 @@ class DAGInfo {
 
   /// Construct the DAGInfo
   ///
-  /// This will add the normal DAGNode, but not the particle or intermediate
-  /// nodes.
-  ///
   /// This cannot be used outside of an HPX-5 thread.
   DAGInfo(Index idx) : idx_{idx} {
     normal_ = nullptr;
@@ -187,12 +196,17 @@ class DAGInfo {
     }
   }
 
+  /// Return the index of the associated Tree Node
   Index index() const {return idx_;}
+
+  /// Set the index of the DAGInfo object
   void set_index(const Index &index) {idx_ = index;}
 
   /// Add the normal node
   ///
   /// This will add a normal DAG node for the tree node owning this object.
+  ///
+  /// \returns - true is DAGNode was allocated; false otherwise
   bool add_normal() {
     bool retval = false;
     lock();
@@ -208,6 +222,8 @@ class DAGInfo {
   ///
   /// This will add an intermediate DAG node for the tree node associated
   /// with this object.
+  ///
+  /// \returns - true is the node was allocated; false otherwsie
   bool add_interm() {
     bool retval = false;
     lock();
@@ -526,10 +542,12 @@ class DAGInfo {
   }
 
  private:
+  /// Lock the node
   void lock() {
     hpx_lco_sema_p(lock_);
   }
 
+  /// Unlock the node
   void unlock() {
     hpx_lco_sema_v(lock_, HPX_NULL);
   }

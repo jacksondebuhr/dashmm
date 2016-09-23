@@ -27,7 +27,7 @@
 #define __DASHMM_REDUCTION_OPS_H__
 
 
-/// \file include/dashmm/reductionops.h
+/// \file
 /// \brief Action identifiers for common reduction operations
 
 

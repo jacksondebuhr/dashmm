@@ -27,24 +27,18 @@
 #define __DASHMM_DEFAULT_POLICY_H__
 
 
-/// \file include/dashmm/defaulypolicy.h
+/// \file
 /// \brief Specify default policies for use in the Library
 
 
-#include "builtins/singlelocdistro.h"
-#include "builtins/randomdistro.h"
-#include "builtins/bhdistro.h"
 #include "builtins/fmm97distro.h"
+
 
 namespace dashmm {
 
 
 /// The default distribution policy to be used by Methods. This represents the
 /// best all around policy that is available in DASHMM.
-
-//using DefaultDistributionPolicy = SingleLocality;
-//using DefaultDistributionPolicy = RandomDistro;
-//using DefaultDistributionPolicy = BHDistro;
 using DefaultDistributionPolicy = FMM97Distro;
 
 

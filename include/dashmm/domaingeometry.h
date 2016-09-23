@@ -27,7 +27,7 @@
 #define __DASHMM_DOMAIN_GEOMETRY_H__
 
 
-/// \file include/dashmm/domaingeometry.h
+/// \file
 /// \brief Object to represent the top-level domain
 
 
@@ -44,6 +44,7 @@ namespace dashmm {
 /// and target trees.
 class DomainGeometry {
  public:
+  /// Default constructor
   DomainGeometry() : low_{Point{0.0, 0.0, 0.0}}, size_{0.0} { }
 
   /// Constructor from low corner and side length

@@ -27,11 +27,10 @@
 #define __DASHMM_TREE_H__
 
 
-/// \file include/dashmm/tree.h
+/// \file
 /// \brief DualTree related types
 
 
-// TODO make sure all of these are actually needed
 // C library
 #include <cstdlib>
 #include <cmath>
@@ -42,7 +41,6 @@
 // C++ library
 #include <algorithm>
 #include <functional>
-#include <iostream>
 #include <vector>
 
 // HPX-5
@@ -61,8 +59,7 @@
 
 namespace dashmm {
 
-
-
+// Forward declare Registrars for the objects in this file
 template <typename Record>
 class NodeRegistrar;
 
@@ -101,6 +98,8 @@ class Node {
 
   /// Constuct with a known index. This will set the index of the node,
   /// and will allocate the completion detection LCO.
+  ///
+  /// \param idx - the index of the node
   Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, dag{idx}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
@@ -112,6 +111,10 @@ class Node {
   /// Construct with an index, a particle segment and a parent
   ///
   /// This will also create the completion detection LCO.
+  ///
+  /// \param idx - the node index
+  /// \param parts - the particles inside the volume represented by this node
+  /// \param parent - the parent of this node
   Node(Index idx, arrayref_t parts, node_t *parent)
       : idx{idx}, parts{parts}, parent{parent}, dag{idx}, first_{0} {
     for (int i = 0; i < 8; ++i) {
@@ -199,7 +202,7 @@ class Node {
   /// create the needed children and schedule the work of partitioning for
   /// those children.
   ///
-  /// same_sandt will be nonzero only for target nodes, and only sometimes.
+  /// @p same_sandt will be nonzero only for target nodes, and only sometimes.
   /// In this case, the following does not sort the records, but merely finds
   /// the split point, which will have been established already by the source
   /// tree partioning.
@@ -211,7 +214,6 @@ class Node {
   void partition(int threshold, DomainGeometry *geo, int same_sandt) {
     size_t num_points = num_parts();
     assert(num_points >= 1);
-    // TODO perhaps change the argument type to avoid this cast
     bool is_leaf = num_points <= (size_t)threshold;
 
     if (parent && parent->complete() != HPX_NULL) {
@@ -528,6 +530,9 @@ class Tree {
   /// the tree is set up in this action. The most important of which is the
   /// allocation of the top portions of the tree containing the root, and
   /// extending to the finest uniform level of partitioning.
+  ///
+  /// \param tree - the address of the tree on which to act
+  /// \param unif_level - the uniform partitioning level
   static int setup_basics_handler(tree_t *tree, int unif_level) {
     tree->unif_done_ = hpx_lco_and_new(1);
     assert(tree->unif_done_ != HPX_NULL);
@@ -585,6 +590,11 @@ class Tree {
   /// This will delete the local branches of the tree as well as destroying
   /// any locks allocated for the uniform grid, and will free the remote
   /// branches.
+  ///
+  /// \param tree - the tree on which to act
+  /// \param ndim - the size of the uniform grid
+  /// \param first - the first owned node of the uniform grid
+  /// \param last - the last (inclusive) owned node of the uniform grid
   static int delete_tree_handler(tree_t *tree, int ndim, int first, int last) {
     // NOTE: The difference here is that there are two different allocation
     // schemes for the nodes.
@@ -642,6 +652,15 @@ class Tree {
   /// and it will count the numbers in each box. This is a key first step to
   /// computing the distribution of the sources and targets during tree
   /// construction.
+  ///
+  /// \param P - the records
+  /// \param npts - the number of records
+  /// \param geo - the overall domain geometry
+  /// \param unif_level - the uniform partitioning level
+  /// \param gid [out] - the morton key for each record
+  /// \param count [out] - the number of points per uniform grid node
+  ///
+  /// \return HPX_SUCCESS
   static int assign_points_to_unif_grid(const record_t *P, int npts,
                                          const DomainGeometry *geo,
                                          int unif_level, int *gid,
@@ -649,8 +668,6 @@ class Tree {
     Point corner = geo->low();
     double scale = 1.0 / geo->size();
 
-    // TODO: This is serial processing; is there some way to parallelize this?
-    //   This would perhaps be worth timing.
     int dim = pow(2, unif_level);
     for (int i = 0; i < npts; ++i) {
       const record_t *p = &P[i];
@@ -674,9 +691,15 @@ class Tree {
   ///
   /// This routine is adapted from a routine in the publicly available code
   /// GADGET-2 (http://wwwmpa.mpa-garching.mpg.de/gadget/).
-  //
-  // TODO: Note that this too is a serial operation. Could we do some on-rank
-  // parallelism here?
+  ///
+  /// \param p_in - the input records; will be sorted
+  /// \param npts - the number of records
+  /// \param dim3 - the size of the uniform grid
+  /// \param gid_of_points - the morton key for the records
+  /// \param count - the number of records per bin
+  /// \param retval [out] - offsets into the record list for each
+  ///
+  /// \returns - HPX_SUCCESS
   static int *group_points_on_unif_grid(record_t *p_in, int npts,
                                         int dim3, int *gid_of_points,
                                         const int *count, int **retval) {
@@ -744,6 +767,11 @@ class Tree {
   /// the correct portion of the tree at this locality. In general, there will
   /// be one such message per uniform grid node not owned by this locality, per
   /// tree.
+  ///
+  /// \param message_buffer - the message
+  /// \param UNUSED - the size of the buffer
+  ///
+  /// \returns - HPX_SUCCESS
   static int recv_node_handler(char *message_buffer, size_t UNUSED) {
     hpx_addr_t *rwdata = reinterpret_cast<hpx_addr_t *>(message_buffer);
     int *compressed_tree = reinterpret_cast<int *>(
@@ -784,6 +812,14 @@ class Tree {
   /// This action sends compressed node representation to remote localities.
   ///
   /// This action is called once the individual grids are done.
+  ///
+  /// \param n - the uniform grid nodes
+  /// \param sorted - the sorted records
+  /// \param id - the uniform grid node in question
+  /// \param rwaddr - global address of the DualTree
+  /// \param type - indicates source or target tree
+  ///
+  /// \returns - HPX_SUCCESS
   static int send_node_handler(node_t *n, record_t *sorted,
                                int id, hpx_addr_t rwaddr, int type) {
     node_t *curr = &n[id];
@@ -906,6 +942,27 @@ class Tree {
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
   }
 
+  /// Initialize point exchange between ranks for S == T case
+  ///
+  /// This is largely just a setup procedure to compute a few things that are
+  /// needed for point exchanges. The most important of which is the global
+  /// offset in this rank's data where each incoming batch of points will be
+  /// stored in the sorted array. Also, this allocates the segment of memory
+  /// that will store the sorted data.
+  ///
+  /// \param tree - the tree object
+  /// \param first - the first node of the uniform grid owned by this rank
+  /// \param last - the last node of the uniform grid owned by this rank
+  /// \param global_count - the global counts in each node of the uniform grid
+  /// \param local_count - the local counts in each node of the uniform grid
+  /// \param local_offset - where in the local data are the points for each node
+  ///                       of the uniform grid
+  /// \param geo - the domain geometry for the tree
+  /// \param threshold - the partitioning threshold for the tree
+  /// \param temp - the local point data
+  /// \param n - the uniform grid nodes
+  /// \param snodes - the source nodes in the uniform grid
+  /// \param source_tree - the source tree
   static void init_point_exchange_same_s_and_t(
       tree_t *tree, int first, int last, const int *global_count,
       const int *local_count, const int *local_offset,
@@ -969,6 +1026,8 @@ class Tree {
   /// \param n - the uniform grid node
   /// \param n_arrived - the number arriving in this message
   /// \param rwgas - the address of the rankwise dual tree
+  ///
+  /// \returns - HPX_SUCCESS
   static int merge_points_handler(record_t *temp, node_t *n, int n_arrived,
                                   hpx_addr_t rwgas) {
     RankWise<dualtree_t> global_tree{rwgas};
@@ -1005,6 +1064,8 @@ class Tree {
   /// \param n - the uniform grid node
   /// \param n_arrived - the number arriving in this message
   /// \param rwgas - the address of the rankwise dual tree
+  ///
+  /// \returns - HPX_SUCCESS
   static int merge_points_same_s_and_t_handler(targetnode_t *target_node,
       int n_arrived, sourcenode_t *source_node, hpx_addr_t rwgas) {
     RankWise<dualtree_t> global_tree{rwgas};
@@ -1042,6 +1103,13 @@ class Tree {
     return key;
   }
 
+  /// Compute the uniform grid index for a given Index
+  ///
+  /// \param idx - the index of the node
+  /// \param uniflevel - the uniform level of the tree
+  ///
+  /// \returns - the index in the uniform grid that gives the ancestor of
+  ///            the given Index
   static int get_unif_grid_index(const Index &idx, int uniflevel) {
     int delta = idx.level() - uniflevel;
 
@@ -1057,6 +1125,12 @@ class Tree {
     }
   }
 
+  /// Find the LCO address for a given index and a given operation
+  ///
+  /// \param idx - the Index of the node in question
+  /// \param op - the edge type connecting to the index in question
+  ///
+  /// \returns - global address of the LCO serving as target of the edge
   hpx_addr_t lookup_lco_addx(Index idx, Operation op) {
     // This should walk to the node containing the LCO we care about
     node_t *curr = root_;
@@ -1221,21 +1295,18 @@ class DualTree {
   DualTree(const dualtree_t &other) = delete;
   dualtree_t &operator=(const dualtree_t &other) = delete;
 
-  // TODO define move construction and assignment?
-  // Is this needed?
-
   /// Return the number of source points in the uniform grid
   ///
   /// This routine returns the address of the given information,
   ///
-  /// \parma i - the uniform grid node in question
+  /// \param i - the uniform grid node in question
   int *unif_count_src(size_t i = 0) const {return &unif_count_value_[i];}
 
   /// Return the number of target points in the uniform grid
   ///
   /// This routine returns the address of the given information,
   ///
-  /// \parma i - the uniform grid node in question
+  /// \param i - the uniform grid node in question
   int *unif_count_tar(size_t i = 0) const {
     return &unif_count_value_[i + dim3_];
   }
@@ -1271,6 +1342,11 @@ class DualTree {
   void set_method(const method_t &method) {method_ = method;}
 
   /// Lookup target LCO address
+  ///
+  /// \param idx - index of LCO to look up
+  /// \param op - operation of the edge leading to the LCO in question
+  ///
+  /// \returns - global address of LCO
   hpx_addr_t lookup_lco_addx(Index idx, Operation op) {
     bool search_source{true};
     switch(op) {
@@ -1416,10 +1492,6 @@ class DualTree {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
 
-    // TODO: There is an issue here. The following is not a great idea to
-    // begin with. What if the distribution policy splits up the stuff on a
-    // given tree node.
-
     dualtree_t *argthis = this;
     sourcenode_t *srcaddx = source_tree_->root_;
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
@@ -1489,6 +1561,8 @@ class DualTree {
   /// This is an asynchronous operation. The termination detection cannot
   /// possibly trigger before this is completed, so waiting on the termination
   /// of the full evaluation implicitly waits on this operation.
+  ///
+  /// \param global_tree - the Dual Tree
   void start_DAG_evaluation(RankWise<dualtree_t> &global_tree) {
     hpx_addr_t rwaddr = global_tree.data();
     hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
@@ -1500,8 +1574,7 @@ class DualTree {
   /// This is a synchronous operation. This destroys not only the expansion
   /// LCOs, but also the target LCOs.
   ///
-  /// \param targets - the target nodes of the DAG
-  /// \param internal - the internal nodes of the DAG
+  /// \param dag - the DAG
   void destroy_DAG_LCOs(DAG &dag) {
     hpx_addr_t done = hpx_lco_and_new(3);
     assert(done != HPX_NULL);
@@ -1623,6 +1696,8 @@ class DualTree {
   /// \param sources_gas - the global address of the source data
   /// \param targets_gas - the global address of the target data
   /// \param domain_geometry - a reduction LCO to which the local domain is sent
+  ///
+  /// \returns HPX_SUCCESS
   static int set_domain_geometry_handler(hpx_addr_t sources_gas,
                                          hpx_addr_t targets_gas,
                                          hpx_addr_t domain_geometry,
@@ -1634,7 +1709,6 @@ class DualTree {
 
     double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50};
 
-    // TODO: add more parallelism
     for (size_t i = 0; i < src_ref.n(); ++i) {
       var[0] = fmin(var[0], s[i].position.x());
       var[1] = fmax(var[1], s[i].position.x());
@@ -1667,6 +1741,9 @@ class DualTree {
   }
 
   /// Operation implementing the identity for the domain reduction
+  ///
+  /// \param values - the LCO's data
+  /// \param UNUSED - the size of the data
   static void domain_geometry_init_handler(double *values,
                                            const size_t UNUSED) {
     values[0] = 1e50; // xmin
@@ -1678,6 +1755,10 @@ class DualTree {
   }
 
   /// Operation implementing the reduction for the domain reduction
+  ///
+  /// \param lhs - the LCO data
+  /// \param rhs - the set data
+  /// \param UNUSED - the size of the set data
   static void domain_geometry_op_handler(double *lhs, double *rhs,
                                          size_t UNUSED) {
     lhs[0] = fmin(lhs[0], rhs[0]);
@@ -1696,6 +1777,7 @@ class DualTree {
   ///
   /// \param sources - the source array
   /// \param targets - the target array
+  /// \param same_sandt - is S == T for this tree
   ///
   /// \returns - address of an LCO containing the reduced domain
   static hpx_addr_t compute_domain_geometry(Array<Source> sources,
@@ -1726,6 +1808,9 @@ class DualTree {
   /// \param count - an LCO in which the uniform grid counting is reduced
   /// \param limit - the partitioning threshold for the tree
   /// \param domain_geometry - the LCO in which the domain is reduced
+  /// \param same_sandt - is S == T for this tree
+  ///
+  /// \returns - HPX_SUCCESS
   static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
                                     int limit, hpx_addr_t domain_geometry,
                                     int same_sandt) {
@@ -1778,6 +1863,9 @@ class DualTree {
   ///
   /// \param threshold - the partitioning threshold
   /// \param domain_geometry - an LCO into which the domain is reduced
+  /// \param same_sandt - is S == T for this tree
+  ///
+  /// \returns - the Dual Tree
   static RankWise<dualtree_t> setup_basic_data(int threshold,
                                                hpx_addr_t domain_geometry,
                                                bool same_sandt) {
@@ -1803,8 +1891,6 @@ class DualTree {
     return retval;
   }
 
-  // TODO: Note that this would be a target for a second member of the
-  // Distribution Policy
   /// Partition the available points among the localities
   ///
   /// Given the uniform counts, this will provide a good guess at a
@@ -1815,6 +1901,8 @@ class DualTree {
   /// \param num_ranks - the number of localities to divide between
   /// \param global - the global counts
   /// \param len - the number of unform grid nodes
+  ///
+  /// \returns - the distribution
   static int *distribute_points(int num_ranks, const int *global, int len) {
     int *ret = new int[num_ranks]();
 
@@ -1853,6 +1941,9 @@ class DualTree {
     return ret;
   }
 
+  /// Generate the mapping from uniform grid node to locality
+  ///
+  /// \param num_ranks - the number of localities
   void generate_rank_map(int num_ranks) {
     rank_map_ = new int [dim3_];
     assert(rank_map_);
@@ -1960,8 +2051,6 @@ class DualTree {
     hpx_lco_wait(stree->unif_done_);
     hpx_lco_wait(ttree->unif_done_);
 
-    // TODO: This bit where the message is interpreted might be made easier with
-    // ReadBuffer
     int *meta = reinterpret_cast<int *>(static_cast<char *>(args)
                                         + sizeof(hpx_addr_t));
     int first = meta[0];
@@ -2132,6 +2221,8 @@ class DualTree {
   /// \param rwtree - the global address of the dual tree
   /// \param sources_gas - the source data
   /// \param targets_gas - the target data
+  ///
+  /// \return HPX_SUCCESS
   static int create_dual_tree_handler(hpx_addr_t rwtree,
                                       hpx_addr_t sources_gas,
                                       hpx_addr_t targets_gas) {
@@ -2284,6 +2375,8 @@ class DualTree {
   /// tree.
   ///
   /// \param rwtree - global address of the dual tree
+  ///
+  /// \returns - HPX_SUCCESS
   static int finalize_partition_handler(hpx_addr_t rwtree) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
@@ -2291,7 +2384,11 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-
+  /// Collect DAG nodes from source Tree Nodes
+  ///
+  /// \param root - tree node
+  /// \param sources [out] - DAG nodes that are sources
+  /// \param internals [out] - other source tree DAG nodes
   void collect_DAG_nodes_from_S_node(sourcenode_t *root,
                                      std::vector<DAGNode *> &sources,
                                      std::vector<DAGNode *> &internals) {
@@ -2303,6 +2400,11 @@ class DualTree {
     root->dag.collect_DAG_nodes(sources, internals);
   }
 
+  /// Collect DAG nodes from target Tree Nodes
+  ///
+  /// \param root - tree node
+  /// \param targets [out] - DAG nodes that are targets
+  /// \param internals [out] - other target tree DAG nodes
   void collect_DAG_nodes_from_T_node(targetnode_t *root,
                                      std::vector<DAGNode *> &targets,
                                      std::vector<DAGNode *> &internals) {
@@ -2314,13 +2416,24 @@ class DualTree {
     root->dag.collect_DAG_nodes(targets, internals);
   }
 
+  /// Action to create LCOs from the DAG
+  ///
+  /// This will walk through the source tree and create the Expansion LCOs
+  /// needed by @p node. This will spawns recursively as HPX-5 actions the
+  /// full tree.
+  ///
+  /// \param done - LCO address for indicating completion of LCO creation
+  /// \param tree - the DualTree
+  /// \param node - the node under examination
+  /// \param rwtree - the global address of the DualTree
+  ///
+  /// \returns - HPX_SUCCESS
   static int create_S_expansions_from_DAG_handler(hpx_addr_t done,
                                                   dualtree_t *tree,
                                                   sourcenode_t *node,
                                                   hpx_addr_t rwtree) {
     Point n_center = tree->domain_.center_from_index(node->idx);
 
-    // TODO: Is this better? We could also do an action argument here.
     int myrank = hpx_get_my_rank();
 
     // create the normal expansion if needed
@@ -2380,6 +2493,18 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to create LCOs from the DAG
+  ///
+  /// This will walk through the target tree and create the Expansion LCOs
+  /// needed by @p node. This will spawns recursively as HPX-5 actions the
+  /// full tree.
+  ///
+  /// \param done - LCO address for indicating completion of LCO creation
+  /// \param tree - the DualTree
+  /// \param node - the node under examination
+  /// \param rwtree - the global address of the DualTree
+  ///
+  /// \returns - HPX_SUCCESS
   static int create_T_expansions_from_DAG_handler(hpx_addr_t done,
                                                   dualtree_t *tree,
                                                   targetnode_t *node,
@@ -2449,9 +2574,16 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to set the edge lists of the LCOs
+  ///
+  /// \param snodes - source DAG nodes
+  /// \param n_snodes - the number of source nodes
+  /// \param tnodes - target DAG nodes
+  /// \param n_tnodes - the number of target nodes
+  ///
+  /// \returns - HPX_SUCCESS
   static int edge_lists_handler(DAGNode **snodes, size_t n_snodes,
                                 DAGNode **tnodes, size_t n_tnodes) {
-    // TODO If this is a bottleneck, we can easily make this parallel
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_snodes; ++i) {
       if (snodes[i]->locality == myrank) {
@@ -2468,6 +2600,16 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to start DAG evaluation work
+  ///
+  /// This is a recursove spawn through the source tree to begin the work of
+  /// the DAG evaluation. This will cause the source DAG nodes to begin their
+  /// out edges.
+  ///
+  /// \param rwtree - the global address of the DualTree
+  /// \param node - the node being worked on for this action
+  ///
+  /// \returns - HPX_SUCCESS
   static int instigate_dag_eval_handler(hpx_addr_t rwtree, sourcenode_t *node) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
@@ -2514,9 +2656,6 @@ class DualTree {
         WriteBuffer headdata(scratch, header_size);
         assert(headdata.write(sources.n()));
 
-        // TODO: there are times that this has zero particles to write.
-        // Is that correct? Should that happen?
-
         ReadBuffer sourcedata((char *)sref.value(), source_size);
         assert(headdata.write(sourcedata));
 
@@ -2551,16 +2690,10 @@ class DualTree {
         }
 
         // Send parcel or do the work
-        // TODO: currently this will send remotes, and then stop to do the
-        // local stuff as it gets to it, even if there are remotes to send
-        // after the current rank. Consider changing this, do this rank last
-        // or something.
         if (curr_rank == my_rank) {
           instigate_dag_eval_work(sources.n(), sref.value(), tree->domain_,
                                   *edgecount, edgerecords);
         } else {
-          // TODO: Make sure the change to the parcel size is correct. This had
-          // been total_size.
           size_t parcel_size = header_size + sizeof(size_t)
                                + sizeof(DAGInstigationRecord) * (*edgecount);
           hpx_parcel_t *parc = hpx_parcel_acquire(scratch, parcel_size);
@@ -2581,6 +2714,17 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action on remote side for DAG instigation
+  ///
+  /// Similar to the out edges for the Expansion LCOs, the edges out of the
+  /// source nodes are sorted and the data is sent across the network once to
+  /// each locality. This action handles the fan out once the data reaches
+  /// the target locality.
+  ///
+  /// \param message - the message data
+  /// \param bytes - the message size
+  ///
+  /// \returns - HPX_SUCCESS
   static int instigate_dag_eval_remote_handler(char *message, size_t bytes) {
     // unpack message into arguments to the local work function
     auto input = ReadBuffer(message, bytes);
@@ -2615,6 +2759,13 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Perform the actual work of DAG instigation
+  ///
+  /// \param n_src - the number of sources
+  /// \param sources - the source records
+  /// \param domain - the domain geometry
+  /// \param n_edges - the number of edges to process
+  /// \param edge - the edge data
   static void instigate_dag_eval_work(size_t n_src, Source *sources,
                                       DomainGeometry &domain,
                                       size_t n_edges,
@@ -2662,6 +2813,16 @@ class DualTree {
     }
   }
 
+  /// Action to apply Method::aggregate
+  ///
+  /// This is an action that is called dependent on the children of this
+  /// node all completing their Method application work.
+  ///
+  /// \param tree - the DualTree
+  /// \param node - the node of the source tree
+  /// \param done - the completion detection LCO that is deleted by this action
+  ///
+  /// \returns - HPX_SUCCESS
   static int source_apply_method_child_done_handler(dualtree_t *tree,
                                                     sourcenode_t *node,
                                                     hpx_addr_t done) {
@@ -2670,13 +2831,21 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to apply Method::generate
+  ///
+  /// This is a recursive spawn through the source tree.
+  ///
+  /// \param tree - the DualTree
+  /// \param node - the node of the source tree
+  /// \param done - LCO to signal when application of the method is complete
+  ///
+  /// \returns - HPX_SUCCESS
   static int source_apply_method_handler(dualtree_t *tree, sourcenode_t *node,
                                          hpx_addr_t done) {
     int n_children = node->n_children();
     if (n_children == 0) {
       tree->method_.generate(node, &tree->domain_);
-      // TODO decide if this would do better as something passed down to nodes
-      // during construction
+
       int dag_idx = sourcetree_t::get_unif_grid_index(node->idx,
                                                       tree->unif_level_);
       assert(dag_idx >= 0);
@@ -2705,6 +2874,18 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to apply Method::inherit and Method::process
+  ///
+  /// This is a parallel spawn through the tree to apply the method to the
+  /// given tree. This will generate the DAG.
+  ///
+  /// \param tree - the DualTree
+  /// \param node - the target node in question
+  /// \param consider - the list of source nodes to consider in process
+  /// \param same_sandt - is S == T for this evaluation
+  /// \param done - LCO to signal with completion
+  ///
+  /// \returns - HPX_SUCCESS
   static int target_apply_method_handler(dualtree_t *tree, targetnode_t *node,
                                          std::vector<sourcenode_t *> *consider,
                                          int same_sandt, hpx_addr_t done) {
@@ -2722,8 +2903,6 @@ class DualTree {
       // If we are not refining, then we are at a target leaf. This means
       // we should set the particle and normal DAG nodes to have this locality.
 
-      // TODO decide if this would do better as something passed down to nodes
-      // during construction
       int dag_idx = targettree_t::get_unif_grid_index(node->idx,
                                                       tree->unif_level_);
       int dag_rank = tree->rank_of_unif_grid(dag_idx);
@@ -2755,6 +2934,17 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Actinon to set up termination detection for the DAG evaluation
+  ///
+  /// \param done - LCO for termination detection
+  /// \param targs - target DAG nodes
+  /// \param n_targs - number of target DAG nodes
+  /// \param tint - internal target DAG nodes
+  /// \param n_tint - number of internal target DAG nodes
+  /// \param sint - internal source DAG nodes
+  /// \param n_sint - number of internal source DAG nodes
+  ///
+  /// \returns - HPX_SUCCESS
   static int termination_detection_handler(hpx_addr_t done,
                                            std::vector<DAGNode *> *targs,
                                            size_t n_targs,
@@ -2805,9 +2995,13 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// Action to destroy the DAG LCOs
+  ///
+  /// \param nodes - the DAG nodes
+  /// \param n_nodes - the number of nodes
+  ///
+  /// \returns - HPX_SUCCESS
   static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes) {
-    // TODO We could add more parallelism here if needed.
-
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_nodes; ++i) {
       if (nodes[i]->locality == myrank) {

@@ -27,7 +27,7 @@
 #define __DASHMM_VIEW_SET_H__
 
 
-/// \file include/dashmm/viewset.h
+/// \file
 /// \brief Implementation of ViewSet
 
 
@@ -53,6 +53,19 @@ struct View {
 /// This object is intended to be used to set up subsets of the available
 /// views in a given expansion, or to select a subset of the available views
 /// for use in the DASHMM library.
+///
+/// The primary use of the ViewSet is to serialize Expansions. The format of
+/// the serialized data is as follows:
+///
+/// ExpansionRole
+/// int - view count
+/// double [3] - center
+/// double - scale
+/// [int, size_t] - view index and view bytes for each view
+/// [char] - the buffer of data for each view
+///
+/// The final portion is up to the expansion writers. The ViewSet does not
+/// care the format of the expansion data, just how large it is.
 class ViewSet {
  public:
   /// Create an empty ViewSet
@@ -62,6 +75,8 @@ class ViewSet {
   /// Create an empty ViewSet, while setting some vitals
   ///
   /// \param role - the role of the represented views
+  /// \param center - the center point of the expansion
+  /// \param scale - the scale of the expansion
   ViewSet(ExpansionRole role, const Point &center, double scale)
     : views_{}, role_{role}, center_{center}, scale_{scale} { }
 
@@ -127,6 +142,8 @@ class ViewSet {
   ///
   /// This includes not only the sizes of the views themselves, but also the
   /// meta data used during serialization of that data.
+  ///
+  /// \returns - total size of the represented data when serialized
   size_t bytes() const;
 
   /// Serialize the represented data into a buffer
@@ -134,6 +151,8 @@ class ViewSet {
   /// This is used predominantly for packing a set of Expansion Views into a
   /// parcel to send around the system by HPX-5. As such, this will likely
   /// never be used by DASHMM users.
+  ///
+  /// \param buffer - buffer into which the data will be serialized
   void serialize(WriteBuffer &buffer);
 
   /// Interpret from a buffer a ViewSet
@@ -142,6 +161,8 @@ class ViewSet {
   /// operation that is paired with serialize. The use case for this does
   /// not require a copy be made, and so this data is interpreted rather than
   /// read. See Buffer for the distinction.
+  ///
+  /// \param buffer - the buffer from which the data will be interpreted
   void interpret(ReadBuffer &buffer);
 
  private:

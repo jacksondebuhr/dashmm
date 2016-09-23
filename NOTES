@@ -25,6 +25,15 @@ TODO: Think about the following issue
 TODO: Deal with the return messages about the addresses of the remote LCOs
     (Do we even want to do this? There is an issue with termination detection
      here.)
+TODO: Related to the above: If we are not using AGAS, and probably never will,
+      is there any reason to bind the expansion data into the LCO? That might
+      simplify things quite a bit. It is worth thinking about. We might be
+      able to obviate the need for the ViewSet and all of that crap.
+TODO: Another thing might be to send this to the tree and not the LCO. Then the
+      tree can eventually build up a complete list over the iterations.
+      Again, there is a termination problem with this, but it is a different
+      perspective.
+
 
 TODO: Consider changing ExpansionLCO to only contain the needed info from the
     DomainGeometry. The use is very simple, getting box sizes and so on.
@@ -34,7 +43,6 @@ TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
-TODO: We need to update the comments throughout
 
 
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
@@ -85,6 +93,15 @@ Overall Plan to 1.0
  * As there is time, work on performance
     - Time various parts of the code
 
+
+Future feature TODO pulled from the source
+ * Have a mechanism to build an array up from parts on each rank. The overall
+   organizational thing might be collective, but each rank then replaces with
+   an ArrayRef. This would then need ArrayRef to have an allocation form.
+   Then, a new resum() or something method would need to bind the whole thing
+   together. No use yet, but could be nice.
+ * Array::allocate() ::get() and ::put() all can now return different codes on
+   different ranks.
 
 
 OPEN QUESTIONS and TODO

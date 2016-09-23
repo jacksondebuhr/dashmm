@@ -27,7 +27,7 @@
 #define __DASHMM_ARRAY_META_DATA_H__
 
 
-/// \file include/dashmm/arraymetadata.h
+/// \file
 /// \brief Definition of ArrayMetaData.
 
 
@@ -40,7 +40,7 @@ namespace dashmm {
 /// Meta data for the array object
 ///
 /// Array objects in DASHMM are two part objects in the global address space.
-/// The ObjectHandle points to the meta data which is the information below.
+/// The Array points to the meta data which is the information below.
 /// Somewhere else in the global address space will be the data itself.
 struct ArrayMetaData {
   hpx_addr_t data;      /// global address of the array data

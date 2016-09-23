@@ -23,7 +23,7 @@
 // =============================================================================
 
 
-/// \file src/dag.cc
+/// \file
 /// \brief Implementation of JSON format DAG output
 ///
 /// The intent of this file it to make an easily digestible form of the
@@ -34,8 +34,8 @@
 /// NOTE: This is not as robust as other portions of DASHMM, and should be
 /// considered to be experimental. The default mode of operation of DASHMM
 /// will not even call into these routines, and must be manually enabled
-/// by defining the correct symbol at compile time. Note that this is left
-/// vague on purpose.
+/// by modifying the source code of the library. Please note the intentional
+/// vagueness.
 
 
 #include "dashmm/dag.h"
@@ -447,4 +447,4 @@ void DAG::toEdgeCSV(std::string fname) {
 }
 
 
-} // namespace dashmm
+} // dashmm

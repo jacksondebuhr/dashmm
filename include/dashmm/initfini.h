@@ -27,7 +27,7 @@
 #define __DASHMM_INIT_FINI_H__
 
 
-/// \file include/dashmm/basic.h
+/// \file
 /// \brief The basic interface to DASHMM.
 
 

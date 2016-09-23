@@ -23,7 +23,7 @@
 // =============================================================================
 
 
-/// \file src/array.cc
+/// \file
 /// \brief Implementation of DASHMM Array actions.
 
 
@@ -38,18 +38,21 @@
 
 namespace dashmm {
 
+
+/// Data stored in the address merge reduction LCO
 struct AddrMergeData {
   int count;
   hpx_addr_t addr[];
 };
 
+/// Data required for set in the address merge reduction LCO
 struct AddrMergeArgs {
   int rank;
   hpx_addr_t addx;
 };
 
 
-// Operations for the address sharing
+/// Initialization operation for address merge reduction LCO
 void init_handler(AddrMergeData *head, size_t bytes,
                   AddrMergeData *init, size_t init_bytes) {
   head->count = (bytes - sizeof(AddrMergeData)) / sizeof(hpx_addr_t);
@@ -60,6 +63,7 @@ void init_handler(AddrMergeData *head, size_t bytes,
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, init_action, init_handler,
            HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
 
+/// Reduction operation for address merge reduction LCO
 void op_handler(AddrMergeData *lhs, AddrMergeArgs *rhs, size_t bytes) {
   assert(bytes == sizeof(AddrMergeArgs));
   assert(rhs->rank < hpx_get_num_ranks());
@@ -69,6 +73,7 @@ void op_handler(AddrMergeData *lhs, AddrMergeArgs *rhs, size_t bytes) {
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, op_action, op_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
+/// Predicate operation for address merge reduction LCO
 bool pred_handler(AddrMergeData *lhs, size_t bytes) {
   return lhs->count == 0;
 }
@@ -76,7 +81,16 @@ HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, pred_action, pred_handler,
            HPX_POINTER, HPX_SIZE_T);
 
 
-// allocate the array meta data
+/// Action for allocating Array metadata
+///
+/// This action is called on a single rank to allocate some collective
+/// data that is needed to allocate an array. The returned information is
+/// broadcast back to every rank during hpx_exit().
+///
+/// \param UNUSED - an unused argument
+/// \param UNWANTED - an unwanted argument
+///
+/// \returns - HPX_SUCCESS
 int allocate_array_meta_handler(void *UNUSED, size_t UNWANTED) {
   ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
 
@@ -102,7 +116,19 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
            HPX_POINTER, HPX_SIZE_T);
 
 
-// the local part of the allocation work
+/// Action for allocation rank-local segments of an Array
+///
+/// This action, called in a SPMD fashion on all ranks, will both participate
+/// in a reduction to count the total size of the array and will allocate the
+/// local segment when that reduction is complete.
+///
+/// \param data - the global address of the ArrayMetaData
+/// \param reducer - the address of the reduction LCO used to compute the
+///                   total array length
+/// \param record_size - the size of each record
+/// \param record_count - the number of records for this rank
+///
+/// \returns - HPX_SUCCESS
 int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
                                 size_t record_size, size_t record_count) {
   int ranks = hpx_get_num_ranks();
@@ -149,7 +175,11 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T);
 
 
-// delete the reducer
+/// Action to deallocate the reduction LCO used during Array allocation
+///
+/// \param reducer - the global address of the reduction LCO
+///
+/// \returns - HPX_SUCCESS
 int allocate_array_destroy_reducer_handler(hpx_addr_t reducer) {
   hpx_lco_delete_sync(reducer);
   hpx_exit(0, nullptr);
@@ -160,7 +190,14 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
-// Delete the local portion of the array
+/// Action that deletes the local portion of an Array
+///
+/// This action is the target of a broadcast. It will delete the local portion
+/// of the Array's global memory.
+///
+/// \param meta - the global address of the Array's meta data.
+///
+/// \returns - HPX_SUCCESS
 int deallocate_array_local_handler(hpx_addr_t meta) {
   hpx_addr_t global = hpx_addr_add(meta,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
@@ -199,7 +236,7 @@ HPX_ACTION(HPX_DEFAULT, 0, deallocate_array_action, deallocate_array_handler,
 
 /// Put data into an array object
 ///
-/// This will fill records in a global array with the provided data. This
+/// This will fill records in a global array with @p in_data. This
 /// action is not well behaved as regards bad input arguments. This will likely
 /// be updated in the future.
 ///
@@ -256,7 +293,7 @@ HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
 
 /// Get data from an array object
 ///
-/// This will read records from a global array into the provided buffer. This
+/// This will read records from a global array into @p out_data. This
 /// action is not well behaved as regards bad input arguments. This will likely
 /// be updated in the future.
 ///
@@ -311,6 +348,11 @@ HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
+/// Action to return the local length of the Array
+///
+/// \param data - global address of the Array's meta data
+///
+/// \returns - HPX_SUCCESS
 int array_local_count_handler(hpx_addr_t data) {
   hpx_addr_t global = hpx_addr_add(data,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
@@ -328,6 +370,11 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
+/// Action to return the Array's total length
+///
+/// \param data - global address of the Array's meta data
+///
+/// \returns - HPX_SUCCESS
 int array_total_count_handler(hpx_addr_t data) {
   hpx_addr_t global = hpx_addr_add(data,
                                    sizeof(ArrayMetaData) * hpx_get_my_rank(),
@@ -345,6 +392,14 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
+/// Action to prepare for an Array collection
+///
+/// This action will create a couple LCO's used to aggregate the needed
+/// information to prepare a collection of the Array's records.
+///
+/// \param UNUSED - is unused
+///
+/// \returns - HPX_SUCCESS
 int array_collect_prep_handler(hpx_addr_t UNUSED) {
   // This is used to signal that prep is done
   hpx_addr_t retval[2];
@@ -362,6 +417,18 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
+/// Action to collect an Array
+///
+/// This action will both set the collection LCO's as well as perform the
+/// collection (when rank zero).
+///
+/// \param data - global address of the Array's meta data
+/// \param offsets - the address of the LCO to reduce the offsets in the final
+///                  local array.
+/// \param addxes - the address of the LCO used to reduce the local segment
+///                 addresses.
+///
+/// \returns - HPX_SUCCESS
 int array_collect_handler(hpx_addr_t data, hpx_addr_t offsets,
                           hpx_addr_t addxes) {
   // get local meta data

@@ -27,7 +27,7 @@
 #define __DASHMM_EVALUATOR_H__
 
 
-/// \file include/dashmm/evaluator.h
+/// \file
 /// \brief Definition of DASHMM Evaluator object
 
 
@@ -72,9 +72,8 @@ namespace dashmm {
 ///
 /// Finally, only one instance of an evaluator for a given set of types
 /// should be created. Multiple instances of a particular instance of an
-/// Evaluator will cause a fatal error.
-///
-/// In the future, this restriction may be enforced by the library.
+/// Evaluator will cause a fatal error. In the future, this restriction may
+/// be enforced by the library.
 ///
 /// This is a template class over the Source, Targer, Expansion and Method
 /// types. For a description of the requirements of these types, please see
@@ -100,6 +99,9 @@ class Evaluator {
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
+  /// Much of the registration occurs via Registrar objects, of which Evaluator
+  /// had a number. Finally, a few Evaluator specific actions are registered
+  /// in this constructor.
   Evaluator() : tlcoreg_{}, elcoreg_{}, snodereg_{}, tnodereg_{},
                 streereg_{}, ttreereg_{}, dtreereg_{} {
     // Actions for the evaluation
@@ -119,10 +121,11 @@ class Evaluator {
 
   /// Perform a multipole moment evaluation
   ///
-  /// Given source, targets, a refinement_limit, a method and an expansion,
+  /// Given source, targets, a refinement_limit, a method, the accuracy
+  /// parameter, the kernel parameters, and an optional distribution policy,
   /// this routine performs a multipole method evaluation. The source and
   /// target arrays will likely be sorted by DASHMM during evaluation, so it
-  /// is imperative that users include some sort of identifying data in the
+  /// is important that users include some sort of identifying data in the
   /// given arrays.
   ///
   /// In addition to sorting the data, the records in the targets Array will
@@ -137,11 +140,14 @@ class Evaluator {
   /// portion of the domain will be subdivided if there are more than the
   /// given number of sources or targets in that region.
   ///
-  /// The provided method and expansion are used as prototypes for any other
-  /// copies of those objects that are required. Some methods have data
-  /// associated with them. Some expansions require an accuracy parameter to
-  /// fully specify the expansion, and so this argument will supply that
-  /// accuracy.
+  /// The provided method is used as prototypes for any other copies of those
+  /// objects that are required. Some methods have data associated with them.
+  /// In general, expansions might need an accuracy parameter and some other
+  /// parameters that control the potential. These are passed in as @p n_digits
+  /// and @p kernelparams.
+  ///
+  /// Finally, @distro is an optional parameter if the user would like the
+  /// provide a policy that is not default constructed.
   ///
   /// \param sources - a DASHMM Array of the source points
   /// \param targets - a DASHMM Array of the target points
@@ -211,6 +217,19 @@ class Evaluator {
   };
 
   /// The evaluation action implementation
+  ///
+  /// This action is a diffusive action that starts the evaluation process.
+  /// Here, all of the collective work is begun. In particular, the tree is
+  /// constructed and a few synchronization LCOs are created. After this,
+  /// a few dependent actions are set up for when the various operations are
+  /// complete.
+  ///
+  /// NOTE: This action does not call hpx_exit().
+  ///
+  /// \param parms - the input arguments
+  /// \param total_size - the size of the arguments
+  ///
+  /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
@@ -250,15 +269,22 @@ class Evaluator {
     return HPX_SUCCESS;
   }
 
-  // This is a marshalled action that is the broadcast target
+  /// Action to perform rank-local work
+  ///
+  /// This action is the target of a broadcast. Each rank will compute the
+  /// DAG and start the evaluation proper. The passed in data contains a
+  /// few LCOs used for synchronization.
+  ///
+  /// \param data - the action arguments
+  /// \param msg_size - the size of the input data
+  ///
+  /// \returns - HPX_SUCCESS
   static int evaluate_rank_local_handler(char *data, size_t msg_size) {
     hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
     EvaluateParams *parms
         = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
 
-    // Generate the table - TODO: In principle, this can begin as soon as
-    // the domain geometry is ready. However, starting it then might be a
-    // difficult thing to arrange.
+    // Generate the table
     RankWise<dualtree_t> global_tree{preargs[1]};
     auto tree = global_tree.here();
     double domain_size = tree->domain()->size();
@@ -287,7 +313,7 @@ class Evaluator {
     // When the local work finishes, call a routine to delete the LCOs in the
     // DAG, and then continue on to destroying the tree.
     //
-    // NOTE: Consider that this will be a problem when we return the looked-up
+    // TODO: Consider that this will be a problem when we return the looked-up
     // remote addresses.
     hpx_call_when_with_continuation(heredone, HPX_HERE, evaluate_cleanup_DAG_,
                                     preargs[0], hpx_lco_set_action,
@@ -296,6 +322,17 @@ class Evaluator {
     return HPX_SUCCESS;
   }
 
+  /// Action that cleans up the DAG on each rank
+  ///
+  /// This is called after the evaluation. Upon completion of this action,
+  /// a dependent call will go out that completes the deletion of any allocated
+  /// resources.
+  ///
+  /// \param rwaddr - the global address of the DualTree
+  /// \param dag - the local address of this rank's DAG
+  /// \param heredone - an LCO indicating completion cleaned up by this action
+  ///
+  /// \returns - HPX_SUCCESS
   static int evaluate_cleanup_DAG_handler(hpx_addr_t rwaddr, DAG *dag,
                                           hpx_addr_t heredone) {
     RankWise<dualtree_t> global_tree{rwaddr};
@@ -306,6 +343,17 @@ class Evaluator {
     return HPX_SUCCESS;
   }
 
+  /// Action that cleans up the tree
+  ///
+  /// This is called on a single locality, and will clean up the rest of the
+  /// allocated resources for this evaluation. This action also exits the
+  /// current HPX-5 epoch.
+  ///
+  /// \param rwaddr - global address of the DualTree
+  /// \param alldone - global address of completion detection LCO
+  /// \param middone - global address of synchronization LCO
+  ///
+  /// \returns HPX_SUCCESS
   static int evaluate_cleanup_handler(hpx_addr_t rwaddr, hpx_addr_t alldone,
                                       hpx_addr_t middone) {
     hpx_lco_delete_sync(alldone);

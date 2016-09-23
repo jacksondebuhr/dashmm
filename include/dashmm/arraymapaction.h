@@ -53,7 +53,7 @@ class Array;
 /// action.
 ///
 /// To specify the action, the user will provide a function pointer with the
-/// following signature: void func(T *, const size_t, const size_t, const E *),
+/// following signature: void func(T *, const size_t, const E *),
 /// which has been aliased as map_function_t. When writing such a function,
 /// it is important to know that the meaning of the provided arguments:
 ///
@@ -68,11 +68,11 @@ class Array;
 /// a time-stepping code:
 ///
 /// ~~~{.cc}
-///     void update_position(T *data, const size_t count, const E *env) {
-///       for (size_t i = 0; i < count; ++i) {
-///         data[i].position += data[i].velocity * env->delta_t;
-///       }
-///     }
+/// void update_position(T *data, const size_t count, const E *env) {
+///   for (size_t i = 0; i < count; ++i) {
+///     data[i].position += data[i].velocity * env->delta_t;
+///   }
+/// }
 /// ~~~
 ///
 /// For each action to be applied to a given sort of array, the user will need
@@ -82,15 +82,15 @@ class Array;
 ///
 /// The final template parameter gives the degree of parallelism to employ in
 /// the resulting mapping of the action to the array. If the parameter is given
-/// the value zero, a single thread will process the entire array. If the
-/// parameter is positive, then the array segment will be split into a number
-/// of chunks equal to the number of HPX-5 scheduler threads times this factor.
-/// Certain situations will decrease the number of chunks: if the system is
-/// running with 1 thread, it will use only one chunk to avoid pointless
-/// overhead; if there are too few records, a number of chunks will be created
-/// equal to the number of records. This parameter has a default value of 1;
-/// unless the amount of work per record is very non-uniform, there should be
-/// little need to use another value.
+/// the value zero, a single thread per rank will process the entire array.
+/// If the parameter is positive, then the array segment will be split into a
+/// number of chunks equal to the number of HPX-5 scheduler threads times this
+/// factor. Certain situations will decrease the number of chunks: if the
+/// system is running with 1 thread, it will use only one chunk to avoid
+/// pointless overhead; if there are too few records, a number of chunks will
+/// be created equal to the number of records. This parameter has a default
+/// value of 1; unless the amount of work per record is very non-uniform,
+/// there should be little need to use another value.
 template <typename T, typename E, int factor = 1>
 class ArrayMapAction {
  public:
@@ -125,6 +125,16 @@ class ArrayMapAction {
  private:
   friend class Array<T>;
 
+  /// Action that is the root of the parallel work spawn
+  ///
+  /// This action will start the parallel work. This takes care of a few
+  /// tasks related to the management of the parallel spawn of the work.
+  ///
+  /// \param leaf - the action to take at the leaf computation
+  /// \param env - the user supplied environment
+  /// \param meta_data - global address of the Array's meta data
+  ///
+  /// \returns HPX_SUCCESS
   static int root_handler(hpx_action_t leaf, const E *env,
                           hpx_addr_t meta_data) {
     hpx_addr_t global = hpx_addr_add(meta_data,
@@ -177,6 +187,22 @@ class ArrayMapAction {
     hpx_exit(0, nullptr);
   }
 
+  /// Action serving the parallel spawn of the various chunks of work
+  ///
+  /// This will examine the inputs and spawn two more pieces of work if there
+  /// are enough chunks assigned to this action.  Eventually, only one
+  /// chunk will remain, and this will then initiate the leaf action on the
+  /// chunk of records.
+  ///
+  /// \param count - the number of records for this action to map over
+  /// \param total_count - the total number of records being mapped over
+  /// \param chunk_size - the size in records of each chunk
+  /// \param alldone - an LCO to manage completion detection
+  /// \param leaf - the leaf action to take
+  /// \param env - the environment to pass to the leaf action
+  /// \param data - the global data to be handled by tis action
+  ///
+  /// \returns - HPX_SUCCESS
   static int spawn_handler(size_t count, size_t total_count,
                            size_t chunk_size, hpx_addr_t alldone,
                            hpx_action_t leaf, const E *env, hpx_addr_t data) {

@@ -27,7 +27,7 @@
 #define __DASHMM_BUFFER_H__
 
 
-/// \file include/dashmm/buffer.h
+/// \file
 /// \brief Utility classes to make serialization of Expansions easier
 
 
@@ -144,6 +144,18 @@ class ReadBuffer : public Buffer {
     return retval;
   }
 
+  /// Interpret some data from the buffer as a given type array
+  ///
+  /// This will return a pointer with template type into the buffer.
+  /// This will advance the cursor of the buffer.
+  ///
+  /// NOTE: the compiler will not be able to perform type deduction for this
+  /// routine, so the explicit type will need to be specified for uses of
+  /// this method:
+  ///
+  /// int *code = buf.interpret_array<int>(n);
+  ///
+  /// \returns - pointer to the interpreted data; nullptr on error.
   template <typename T>
   T *interpret_array(size_t n) {
     T *retval = reinterpret_cast<T *>(cursor());

@@ -27,7 +27,7 @@
 #define __DASHMM_ARRAY_REF_H__
 
 
-/// \file include/dashmm/arrayref.h
+/// \file
 /// \brief ArrayRef object definition
 
 
@@ -38,21 +38,31 @@
 
 namespace dashmm {
 
-
-// TODO: does this make sense?
-// TODO: If we keep it, we should add something with the length perhaps
+.
+/// This class represents a pinned copy of a reference to an Array
+///
+/// An Array object represents data that lives in the global address space.
+/// An ArrayRef object represents a portion of that array. An ArrayData
+/// represents a locally accessible portion of the Array data.
+///
+/// This object is similar in some ways to a smart pointer, but instead of
+/// managing the lifetime of the allocation, this will manage the lifetime of
+/// an HPX-5 pin operation. To access the underlying data, one uses the
+/// value() member.
 template <typename Record>
 class ArrayData {
  public:
+  /// Default constructor
   ArrayData() : data_{HPX_NULL}, local_{nullptr} { }
 
+  /// Construct from a global address
   explicit ArrayData(hpx_addr_t data) : data_{data}, local_{nullptr} {
-    //assert(data_ != HPX_NULL);
     if (data_ != HPX_NULL) {
       assert(hpx_gas_try_pin(data_, (void **)&local_));
     }
   }
 
+  /// Copy construction
   ArrayData(const ArrayData<Record> &other) {
     data_ = other.data_;
     if (data_ != HPX_NULL) {
@@ -60,6 +70,7 @@ class ArrayData {
     }
   }
 
+  /// Move construction
   ArrayData(ArrayData<Record> &&other) {
     data_ = other.data_;
     local_ = other.local_;
@@ -67,12 +78,14 @@ class ArrayData {
     other.data_ = HPX_NULL;
   }
 
+  /// The destructor unpins the memory
   ~ArrayData() {
     if (data_ != HPX_NULL) {
       hpx_gas_unpin(data_);
     }
   }
 
+  /// Copy assignment
   ArrayData<Record> &operator=(const ArrayData<Record> &other) {
     if (data_ != HPX_NULL) {
       hpx_gas_unpin(data_);
@@ -85,6 +98,7 @@ class ArrayData {
     return *this;
   }
 
+  /// Move assignment
   ArrayData<Record> &operator=(ArrayData<Record> &&other) {
     if (data_ != HPX_NULL) {
       hpx_gas_unpin(data_);
@@ -100,6 +114,7 @@ class ArrayData {
     return *this;
   }
 
+  /// Return the local address
   Record *value() const {return local_;}
 
  private:

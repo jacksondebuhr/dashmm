@@ -26,9 +26,14 @@
 #include "dashmm/broadcast.h"
 
 
+/// \file
+/// \brief Implementation of broadcast utility routine
+
+
 namespace dashmm {
 
 
+/// Action implementing broadcast
 int broadcast_value_handler(char *value, size_t size) {
   hpx_exit(size, value);
 }

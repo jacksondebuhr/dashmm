@@ -27,6 +27,10 @@
 #define __DASHMM_REGISTRAR_H__
 
 
+/// \file
+/// \brief Registrar objects for HPX-5 active objects
+
+
 #include "dashmm/expansionlco.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
@@ -36,6 +40,7 @@
 namespace dashmm {
 
 
+/// Object that handles action registration for TargetLCOs
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -63,6 +68,7 @@ public:
 };
 
 
+/// Object that handles action registration for ExpansionLCOs
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -99,6 +105,7 @@ public:
 };
 
 
+/// Object that handles action registration for Node
 template <typename Record>
 class NodeRegistrar {
  public:
@@ -113,6 +120,7 @@ class NodeRegistrar {
 };
 
 
+/// Object that handles action registration for Tree
 template <typename Source, typename Target, typename Record,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -161,6 +169,7 @@ class TreeRegistrar {
 };
 
 
+/// Object that handles action registration for DualTree
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,

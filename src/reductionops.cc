@@ -23,7 +23,7 @@
 // =============================================================================
 
 
-/// \file src/reductionops.cc
+/// \file
 /// \brief Implemention of common reduction operations
 
 

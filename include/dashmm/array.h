@@ -27,7 +27,7 @@
 #define __DASHMM_ARRAY_H__
 
 
-/// \file include/dashmm/array.h
+/// \file
 /// \brief Definitions needed to interact with DASHMM array objects.
 
 
@@ -74,7 +74,7 @@ extern hpx_action_t array_collect_prep_action;
 /// Action for collection
 extern hpx_action_t array_collect_action;
 
-
+/// Return data from allocation action
 struct ArrayMetaAllocRunReturn {
   hpx_addr_t meta;
   hpx_addr_t reducer;
@@ -144,11 +144,11 @@ class Array {
     return retval;
   }
 
-  /// This creates an array object
+  /// This allocates an array object
   ///
   /// This is called from the SPMD user-application. This cannot be used
   /// inside an HPX-5 thread. Each rank of the user application will provide
-  /// its own record count. The resulting array will be created with the
+  /// its own @p record count. The resulting array will be created with the
   /// provided distribution of records. One or more of these counts can be
   /// zero provided there is at least one non-zero count from some rank.
   ///
@@ -179,13 +179,6 @@ class Array {
     hpx_run_spmd(&allocate_local_work_action, &runcode,
                  &metadata.meta, &metadata.reducer, &size, &record_count);
     if (runcode != kSuccess) {
-      // NOTE: If this branch is triggered, only some ranks will do this.
-      //  so there is an issue to sort out about cleaning up the resulting
-      //  mess.
-      // We can likely just get another reduction, and send it back, and
-      //  reduce on it before we leave the local work action. Then everyone
-      //  would agree on the result.
-      // TODO; probably do that...
       retval = kAllocationError;
     }
 
@@ -193,14 +186,6 @@ class Array {
 
     return retval;
   }
-
-
-  // TODO: Do we want an allocate method that also takes an action and an
-  // environment, which will allocate, and then call the action on each
-  // segment. This would avoid the generate and then copy into GAS thing.
-  //
-  // Or perhaps what this means is we need to make map more flexible. It could
-  // be one action per rank, or it could be otherwise.
 
 
   /// Destroy the Array
@@ -240,8 +225,6 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
     int runcode = kSuccess;
-    // TODO: the error handling with this is now strange. Each rank can
-    // have a different runcode here...
     hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data);
     return static_cast<ReturnCode>(runcode);
   }
@@ -267,8 +250,6 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
     int runcode = kSuccess;
-    // TODO: the error handling with this is now strange. Each rank can
-    // have a different runcode here...
     hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data);
     return static_cast<ReturnCode>(runcode);
   }
@@ -299,13 +280,16 @@ class Array {
     return retval;
   }
 
-  // Replace the local segment. If these change the overall total number of
-  // records, that will have to be fixed with a call to resum().
-  //
-  // This can be called from an HPX thread -- and can only be done that way
-  // at the moment
-  //
-  // NOTE: It is suggested that the casual user not use this routine.
+  /// Replace the local segment. If these change the overall total number of
+  /// records, that will have to be fixed with a call to resum().
+  ///
+  /// NOTE: This can only be called from inside an HPX-5 thread, and as such,
+  /// It is suggested that the casual user not use this routine.
+  ///
+  /// \param ref - an ArrayRef giving the new segment to install for this rank
+  ///
+  /// \returns - the address of the previous data segment; the user assumes
+  ///            ownership of this data.
   hpx_addr_t replace(ArrayRef<T> ref) {
     int rank = hpx_get_my_rank();
     hpx_addr_t global = hpx_addr_add(data_,
@@ -322,32 +306,12 @@ class Array {
     return retval;
   }
 
-  // TODO: The previous suggests that perhaps there should be some way to
-  // create an array from an unknown number of things. Basically create an
-  // empty array. Each rank then creates an ArrayRef object that gets filled
-  // somehow. (This would be new functionality for ArrayRef), and then each
-  // rank will call replace. And then there would need to be the collective
-  // operation of resum(), which is not implemented yet.
-  //
-  // This would want to be worked out to have a nice interface that someone
-  // might actually want to use.
-
-
-  // TODO: I think we want to add a couple extra arguments, or template
-  // parameters or something. The first is if the work should map on each
-  // rank into one segment per thread, or just as one large segment. Then
-  // if we are mapping onto threads, we pick an overdecomposition factor.
-  // both of these would have defaults.
-  //
-  // TODO: Can we make this a little better using something more like a normal
-  // functor?
-  //
   /// Map an action onto each record in the Array
   ///
-  /// This will cause the action represented by the given argument, to be
+  /// This will cause the action represented by @p act, to be
   /// invoked on all the entries of the array. The action will ultimatly work
-  /// on segments of the array. The environment is provided unmodified to each
-  /// segment. Please see the ArrayMapAction for more details.
+  /// on segments of the array. The environment. @p env, is provided unmodified
+  /// to each segment. Please see the ArrayMapAction for more details.
   ///
   /// This acts on a rank-by-rank basis. Each rank will participate, and will
   /// handle the records in the array owned by the rank. In principle, the
@@ -368,7 +332,10 @@ class Array {
   /// This will return a newly allocated array containing all of the records
   /// in the global address space that are represented by this object. The
   /// ordering of the records is not guaranteed, and so users should track
-  /// record identity in some way.
+  /// record identity in some way. This does not modify the data in the
+  /// global address space. Instead, this copies the entire array into one
+  /// local segment. This is predominantly intended as an ease-of-use method,
+  /// and should not be expected to perform well.
   ///
   /// The caller assumes ownership of the returned data. Further, only rank
   /// zero will return data. All other ranks will receive nullptr from this

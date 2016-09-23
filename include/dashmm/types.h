@@ -27,7 +27,7 @@
 #define __DASHMM_TYPES_H__
 
 
-/// \file include/dashmm/types.h
+/// \file
 /// \brief Basic type definitions used throughout DASHMM
 
 
@@ -96,6 +96,7 @@ enum class Operation {
   ItoI,
   ItoL
 };
+
 
 } // namespace dashmm
 

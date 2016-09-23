@@ -26,6 +26,10 @@
 #include "dashmm/viewset.h"
 
 
+/// \file
+/// \brief Implementation of ViewSet
+
+
 namespace dashmm {
 
 

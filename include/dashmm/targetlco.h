@@ -27,7 +27,7 @@
 #define __DASHMM_TARGET_LCO_H__
 
 
-/// \file include/dashmm/targetlco.h
+/// \file
 /// \brief TargetLCO object definition
 
 
@@ -86,7 +86,16 @@ class TargetLCO {
   /// Construct from an existing LCO
   TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
 
-  /// Construct an LCO from input TargetRef. This will create the LCO.
+  /// Construct an LCO from input TargetRef
+  ///
+  /// This will construct the LCO at the locality specified by @p where.
+  /// The LCO will expect @p n_inputs contributions.
+  ///
+  /// \param n_inputs - the number of inputs to the LCO
+  /// \param targets - ArrayRef indicating the global memory that the LCO is
+  ///                  representing
+  /// \param where - global address which should be local to the allocated
+  ///                LCO
   TargetLCO(size_t n_inputs, const targetref_t &targets, hpx_addr_t where) {
     Data init{static_cast<int>(n_inputs), targets};
     hpx_call_sync(where, create_, &lco_, sizeof(lco_), &init, sizeof(init));
@@ -94,7 +103,7 @@ class TargetLCO {
     n_targs_ = targets.n();
   }
 
-  /// Destroy the LCO. Use carefully!
+  /// Destroy the LCO
   void destroy() {
     if (lco_ != HPX_NULL) {
       hpx_lco_delete_sync(lco_);
@@ -235,7 +244,6 @@ class TargetLCO {
         hpx_gas_unpin(lhs->targets.data());
       }
     } else if (*code == kMtoT) {
-      // TODO: take a look at this MtoT type. We use nothing but the code here.
       readbuf.interpret<MtoT>();
 
       // The LCO data contains the reference to the targets, which must be
@@ -253,7 +261,6 @@ class TargetLCO {
 
       hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
-      // TODO: take a look at this LtoT type. We use nothing but the code here.
       readbuf.interpret<LtoT>();
 
       // The LCO data contains the reference to the targets, which must be

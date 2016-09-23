@@ -27,7 +27,7 @@
 #define __DASHMM_POINT_H__
 
 
-/// \file include/dashmm/point.h
+/// \file
 /// \brief Point object interface.
 
 

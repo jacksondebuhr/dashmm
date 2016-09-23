@@ -27,19 +27,35 @@
 #define __DASHMM_BROADCAST_H__
 
 
+/// \file
+/// \brief Ease of use class to provide value broadcast
+
 #include "hpx/hpx.h"
 
 
 namespace dashmm {
 
 
+/// The broadcast value action identifier
 extern hpx_action_t broadcast_value_action;
 
 
-/// This broadcasts the given value from rank 0 to the other ranks
+/// Broadcasts a given value from rank 0 to the other ranks
+///
+/// The provided value will be broadcast to each other rank. The provided
+/// address will both supply the argument and receive the argument for rank
+/// 0, and will receive the value for all other ranks.
+///
+/// The only requirement on the template parameter is that T needs to be
+/// trivially copyable.
+///
+/// \param value - for rank 0, this is the input value; for all ranks, this
+///                address will store the resulting value.
 template <typename T>
 void broadcast(T *value) {
-  hpx_run(&broadcast_value_action, value, value, sizeof(T));
+  if (hpx_get_my_ranks() > 1) {
+    hpx_run(&broadcast_value_action, value, value, sizeof(T));
+  }
 }
 
 

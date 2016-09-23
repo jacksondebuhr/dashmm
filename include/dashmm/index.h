@@ -27,7 +27,7 @@
 #define __DASHMM_INDEX_H__
 
 
-/// \file include/dashmm/index.h
+/// \file
 /// \brief An index type for specifying relative node geometry
 
 

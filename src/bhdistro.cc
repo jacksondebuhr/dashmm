@@ -40,9 +40,6 @@ void BHDistro::compute_distribution(DAG &dag) {
     mark_upstream_nodes(curr, nodes);
     nodes.pop();
   }
-
-  // TODO perhaps remove this once we are sure things are working
-  assert(distribution_complete(dag));
 }
 
 
@@ -94,8 +91,7 @@ void BHDistro::compute_locality(DAGNode *node) {
     bins[loc] += node->out_edges[i].weight;
   }
 
-  // Find max - currently, the lowest locality in a tie will win. TODO: Do
-  // something better about that.
+  // Find max - currently, the lowest locality in a tie will win.
   int maxval{bins[0]};
   size_t maxidx{0};
   for (int i = 1; i < n_ranks; ++i) {
