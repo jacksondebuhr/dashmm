@@ -27,8 +27,9 @@
 #define __DASHMM_MERGE_SHIFT_H__
 
 
-/// \file \include/builtins/merge_shift.h
+/// \file
 /// \brief Declaration of list enum used in FMM97 method
+
 
 enum MergedList {
   uall = 0, ///< +z direction list for all boxes

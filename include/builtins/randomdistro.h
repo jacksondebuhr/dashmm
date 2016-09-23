@@ -27,6 +27,10 @@
 #define __DASHMM_RANDOM_DISTRO_H__
 
 
+/// \file
+/// \brief Declaration of Random Distribution
+
+
 #include "dashmm/dag.h"
 
 

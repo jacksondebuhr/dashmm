@@ -42,6 +42,10 @@
 ///
 /// Failure to provide a type with the required members will result in
 /// compilation errors.
+struct Source {
+  Point position;
+  double charge;
+};
 
 
 
@@ -65,3 +69,7 @@
 /// and so a target must supply each member.
 ///
 /// Failure to provide the required members will result in compilation errors.
+struct Target {
+  Point position;
+  std::complex<double> phi;   // for most, but not all cases
+}

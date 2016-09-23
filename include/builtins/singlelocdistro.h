@@ -27,6 +27,10 @@
 #define __DASHMM_SINGLE_LOC_DISTRO_H__
 
 
+/// \file
+/// \brief Definition of Single Locality Distribution
+
+
 #include "dashmm/dag.h"
 
 

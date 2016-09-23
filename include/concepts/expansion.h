@@ -27,14 +27,11 @@
 /// following criteria. This file is not included anywhere in DASHMM, but it
 /// is in the source distribution as an example, and to explain the
 /// Expansion concept.
-
-
-/// First, some background information:
 ///
 /// The concept of Expansion in DASHMM is similar to but distint from the
 /// concept of a mathematical expansion of a given kernel function. The
 /// DASHMM Expansion object is better thought of as a collection of
-/// mathematical expansion. This allows for advances methods to be applied
+/// mathematical expansions. This allows for advanced methods to be applied
 /// using DASHMM, such as the merge-and-shift technique, which results in
 /// sets of expansions for a given node of the tree.
 ///
@@ -65,8 +62,7 @@
 /// details of which operations need which views are not the concern of
 /// DASHMM, but rather are the concern of the implementor of the specific
 /// Expansion class.
-
-
+///
 /// Expansions in DASHMM are template classes parameterized over the types of
 /// the sources and targets. A full description of the requirements of the
 /// Source and Target types can be found elsewhere.

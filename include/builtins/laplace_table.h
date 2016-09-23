@@ -27,7 +27,7 @@
 #define __DASHMM_LAPLACE_TABLE_H__
 
 
-/// \file include/builtins/laplace_table.h
+/// \file
 /// \brief Declaration of precomputed tables for Laplace
 
 
@@ -38,7 +38,7 @@
 #include <vector>
 #include "dashmm/types.h"
 #include "builtins/special_function.h"
-#include "builtins/builtin_table.h" 
+#include "builtins/builtin_table.h"
 
 namespace dashmm {
 
@@ -72,8 +72,8 @@ class LaplaceTable {
   double scale_; // scaling factor of level 0 to normalize box size to 1
   double *sqf_;
   double *sqbinom_;
-  builtin_map_t *dmat_plus_; 
-  builtin_map_t *dmat_minus_; 
+  builtin_map_t *dmat_plus_;
+  builtin_map_t *dmat_minus_;
 
   int s_;
   int nexp_;
@@ -91,7 +91,7 @@ class LaplaceTable {
 
   void generate_sqf();
   void generate_sqbinom();
-  void generate_wigner_dmatrix(); 
+  void generate_wigner_dmatrix();
   void generate_dmatrix_of_beta(double beta, double *dp, double *dm);
   void generate_xs();
   void generate_ys();

@@ -30,11 +30,10 @@
 /// parameters should be specified at construction time.
 ///
 /// DistroPolicy objects should be trivially copyable.
-
+///
 /// Some incoming nodes of the DAG will already have a locality set. Only
 /// those nodes that have locality of -1 initially should be given a
 /// locality during the distribution computation.
-
 class DistroPolicy {
 public:
   /// Construct a default version of the distribution policy. This can
@@ -53,5 +52,9 @@ public:
   /// After this call, all DAGNodes should have their locality set. It is
   /// permitted to parallelize this work, but this routine must not return
   /// before each locality has been set.
+  ///
+  /// This routine should be deterministic, and further, the results should
+  /// not depend on the precise ordering of DAG nodes in @p dag, or the edges
+  /// in the nodes of the DAG.
   void compute_distribution(DAG &dag);
 };

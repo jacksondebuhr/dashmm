@@ -26,20 +26,28 @@
 #ifndef __DASHMM_FMM97_DISTRO_H__
 #define __DASHMM_FMM97_DISTRO_H__
 
+
+/// \file
+/// \brief definition of FMM97 Distribution Policy
+
+
 #include "dashmm/dag.h"
+
 
 namespace dashmm {
 
+
 class FMM97Distro {
-public:
+ public:
   FMM97Distro() { }
   void compute_distribution(DAG &dag);
 
-private:
+ private:
   void color(DAGNode *n);
   void confine(DAGNode *n, char type);
   void assign(DAGNode *n);
 };
+
 
 } // dashmm
 

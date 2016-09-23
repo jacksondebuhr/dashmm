@@ -25,8 +25,8 @@
 #ifndef __DASHMM_BUILTIN_TABLE_H__
 #define __DASHMM_BUILTIN_TABLE_H__
 
-/// \file include/builtins/builtin_table.h
-/// \brief Declaration of comparator for builtin tables 
+/// \file
+/// \brief Declaration of comparator for builtin tables
 
 
 namespace dashmm {
@@ -35,7 +35,7 @@ struct builtin_cmp {
   bool operator()(const double &a, const double &b) const {
     // For builtin kernels, the smallest gap between key values of the
     // rotation matrix map is 0.01. This operator compares the first 6
-    // digits and should be sufficient. 
+    // digits and should be sufficient.
     double aa = floor(a * 1000000.0) / 100000.0;
     double bb = floor(b * 1000000.0) / 100000.0;
     if (aa == bb)
@@ -44,7 +44,7 @@ struct builtin_cmp {
   }
 };
 
-using builtin_map_t = std::map<double, double *, builtin_cmp>; 
+using builtin_map_t = std::map<double, double *, builtin_cmp>;
 
 } // namespace dashmm
 

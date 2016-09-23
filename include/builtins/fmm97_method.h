@@ -26,8 +26,10 @@
 #ifndef __DASHMM_FMM97_METHOD_H__
 #define __DASHMM_FMM97_METHOD_H__
 
-/// \file include/builtins/fmm97_method.h
+
+/// \file
 /// \brief Declaration of FMM method with merge and shift
+
 
 #include "dashmm/arrayref.h"
 #include "dashmm/defaultpolicy.h"

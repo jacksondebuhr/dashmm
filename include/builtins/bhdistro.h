@@ -27,6 +27,10 @@
 #define __DASHMM_BH_DISTRO_H__
 
 
+/// \file
+/// \brief Declaration of BH Distribution Policy
+
+
 #include <queue>
 
 #include "dashmm/dag.h"

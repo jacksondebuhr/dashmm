@@ -27,12 +27,10 @@
 /// following criteria. This file is not included anywhere in DASHMM, but it
 /// is in the source distribution as an example, and to explain the
 /// Method concept.
-
-
+///
 /// Methods in DASHMM are template classes parameterized over the types of
-/// sources and targets, the Expansion and a Distribution Policy. A full
-/// description of the requirements of the Source, Target and Expansion can
-/// be found elsewhere.
+/// sources and targets, and the Expansion. A full description of the
+/// requirements of the Source, Target and Expansion can be found elsewhere.
 ///
 /// When creating a user-defined Method, the name Method in the following
 /// should be replaced by the name of the new Method type.
@@ -55,7 +53,7 @@ class Method {
   /// Each method requires the specification of a distribution policy aliased
   /// to distropolicy_t. The best all around distribution policy included with
   /// DASHMM will be made available through dashmm/defaultpolicy.h as
-  /// DefaultDistributionPolicy. If the implemented of a method has a better
+  /// DefaultDistributionPolicy. If the implementer of a method has a better
   /// notion about how to distribute the nodes of the DAG for the particlar
   /// method, then a policy can be defined, and set as the new method's
   /// policy here.
@@ -117,10 +115,11 @@ class Method {
   ///
   /// NOTE: In the distributed case, the nodes may not have information about
   /// the number of sources or targets in the node. So any refinement test
-  /// cannot depend on those data.
-  ///
-  /// TODO: This is actually no longer an appropriate name for this. This is
-  /// not about refinement, but rather about where the DAG discovery will stop.
+  /// cannot depend on those data. Further, though this is initially
+  /// conceptually about the refinement of the tree, in distributed, to allow
+  /// for consistend views on each rank, the refinement proceeds anyway.
+  /// Instead, this is more to do with when the DAG stops being discovered in
+  /// the tree.
   ///
   /// \param same_sources_and_targets - are the source and target points the
   ///                                   same

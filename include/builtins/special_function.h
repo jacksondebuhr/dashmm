@@ -26,7 +26,7 @@
 #ifndef __DASHMM_SPECIAL_FUNCTION_H__
 #define __DASHMM_SPECIAL_FUNCTION_H__
 
-/// \file include/builtins/special_function.h
+/// \file
 /// \brief Declaration of special functions
 
 #include <cmath>

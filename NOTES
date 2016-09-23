@@ -6,10 +6,6 @@ TODO: Update User Expansion documentation; in particular ViewSet needs to be
       explained.
 
 
-TODO: The merger of the treebuild3 has created somewhat of a monster. That
-  really ought to be sorted out. It is pretty gnarly, and the code is at
-  a high risk of being hard to maintain.
-
 
 TODO: Think about the following issue
   The out edge spawn action will have to be ready to either do the current thing,
@@ -34,9 +30,6 @@ TODO: Another thing might be to send this to the tree and not the LCO. Then the
       Again, there is a termination problem with this, but it is a different
       perspective.
 
-
-TODO: Consider changing ExpansionLCO to only contain the needed info from the
-    DomainGeometry. The use is very simple, getting box sizes and so on.
 
 
 TODO: be more clear about when an expansion needs to own data and when not.
@@ -65,9 +58,6 @@ TODO: Decide if we should also test Hilbert ordering on the top level distrib
 TODO: Further, should we allow for a non-space-filling curve distribution.
       This might be a way to make a non-contiguous chunk on the SFC a better
       overall distribution.
-TODO: Recall that the usage pattern of the DAG routines will want to change
-      if we ever have multiple threads working on a single node for the DAG.
-      That might not be likely, but it bears some more careful thought.
 
 
 

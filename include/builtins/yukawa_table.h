@@ -27,7 +27,7 @@
 #define __DASHMM_YUKAWA_TABLE_H__
 
 
-/// \file include/builtins/yukawa_table.h
+/// \file
 /// \brief Declaration of precomputed tables for Yukawa
 
 
@@ -80,8 +80,8 @@ private:
   double size_;
   double scale_; // scaling factor of level 0 to avoid under-/over-flow
   double *sqf_;
-  builtin_map_t *dmat_plus_; 
-  builtin_map_t *dmat_minus_; 
+  builtin_map_t *dmat_plus_;
+  builtin_map_t *dmat_minus_;
   double *m2m_;
   double *l2l_;
   double *x_;

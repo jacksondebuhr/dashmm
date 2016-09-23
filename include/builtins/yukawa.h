@@ -27,7 +27,7 @@
 #define __DASHMM_YUKAWA_EXPANSION_H__
 
 
-/// \file include/builtins/yukawa.h
+/// \file
 /// \brief Declaration of Yukawa
 
 

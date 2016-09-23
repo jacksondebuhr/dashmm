@@ -27,7 +27,7 @@
 #define __DASHMM_LAPLACE_EXPANSION_H__
 
 
-/// \file include/builtins/laplace.h
+/// \file
 /// \brief Declaration of Laplace
 
 
