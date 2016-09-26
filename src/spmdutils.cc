@@ -23,7 +23,7 @@
 // =============================================================================
 
 
-#include "dashmm/broadcast.h"
+#include "dashmm/spmdutils.h"
 
 
 /// \file

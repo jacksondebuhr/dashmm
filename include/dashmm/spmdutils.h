@@ -59,6 +59,18 @@ void broadcast(T *value) {
 }
 
 
+/// Get the rank of the calling locality
+inline int get_my_rank() {
+  return hpx_get_my_rank();
+}
+
+
+/// Get the number of ranks
+inline int get_num_ranks() {
+  return hpx_get_num_ranks();
+}
+
+
 } // dashmm
 
 

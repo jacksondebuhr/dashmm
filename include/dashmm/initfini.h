@@ -61,7 +61,7 @@ ReturnCode init(int *argc, char ***argv);
 /// This will finalize the runtime system supporting DASHMM and will free any
 /// resources claimed by DASHMM.
 ///
-/// \return kSuccess on successful shutdown; kFiniError otherwise
+/// \return kSuccess
 ReturnCode finalize();
 
 

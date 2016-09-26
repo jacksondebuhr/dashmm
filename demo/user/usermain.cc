@@ -135,7 +135,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   //print out summary
-  if (hpx_get_my_rank() == 0) {
+  if (dashmm::get_my_rank() == 0) {
     fprintf(stdout, "Testing User expansion:\n");
     fprintf(stdout, "%d sources\n", retval.source_count);
     fprintf(stdout, "%d targets\n", retval.target_count);
