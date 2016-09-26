@@ -139,7 +139,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   // print out summary
-  if (hpx_get_my_rank() == 0) {
+  if (dashmm::get_my_rank() == 0) {
     fprintf(stdout, "Testing DASHMM:\n");
     fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
     fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
@@ -206,7 +206,7 @@ double set_sources(Particle *sources, int count) {
 // Output the data at the final timestep, if directed to do so by the user
 void output_results(const std::string &fname, const Particle *sources,
                     int count) {
-  if (hpx_get_my_rank()) return;
+  if (dashmm::get_my_rank()) return;
 
   FILE *ofd = fopen(fname.c_str(), "w");
   assert(ofd != nullptr);
@@ -287,7 +287,7 @@ void perform_time_stepping(InputArguments args) {
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
-    if (hpx_get_my_rank() == 0) {
+    if (dashmm::get_my_rank() == 0) {
       fprintf(stdout, "Starting step %d...\n", step);
     }
 

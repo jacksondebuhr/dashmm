@@ -228,7 +228,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   //print out summary
-  if (hpx_get_my_rank() == 0) {
+  if (dashmm::get_my_rank() == 0) {
     fprintf(stdout, "Testing DASHMM:\n");
     fprintf(stdout, "%d sources in a %s distribution\n",
             retval.source_count, retval.source_type.c_str());
@@ -411,7 +411,7 @@ dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
 // method, and the values computed with direct summation.
 void compare_results(TargetData *targets, int target_count,
                      TargetData *exacts, int exact_count) {
-  if (hpx_get_my_rank()) return;
+  if (dashmm::get_my_rank()) return;
 
   //create a map from index into offset for targets
   std::map<int, int> offsets{};
