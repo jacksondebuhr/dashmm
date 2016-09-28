@@ -45,14 +45,14 @@ void FMM97Distro::compute_distribution(DAG &dag) {
     assert(n->locality != -1);
     confine(n, 's');
   }
-  
+
   // Confine L of the target tree
   for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
     DAGNode *n = dag.target_leaves[i];
     assert(n->locality != -1);
     confine(n, 't');
   }
-
+  
   // Make decision on I of the target tree
   for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
     DAGNode *n = dag.target_nodes[i];
