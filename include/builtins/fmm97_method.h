@@ -94,14 +94,14 @@ class FMM97 {
     }
 
     if (curr->idx.level() >= 2) {
-      assert(curr->dag.add_normal() == true); 
-      if (curr->parent->dag.has_interm()) 
-        curr->dag.ItoL(&curr->parent->dag, 
+      assert(curr->dag.add_normal() == true);
+      if (curr->parent->dag.has_interm())
+        curr->dag.ItoL(&curr->parent->dag,
                        expansion_t::weight_estimate(Operation::ItoL));
 
-      if (curr->idx.level() >= 3) 
-        curr->dag.LtoL(&curr->parent->dag, 
-                       expansion_t::weight_estimate(Operation::LtoL)); 
+      if (curr->idx.level() >= 3)
+        curr->dag.LtoL(&curr->parent->dag,
+                       expansion_t::weight_estimate(Operation::LtoL));
     }
   }
 
@@ -135,54 +135,54 @@ class FMM97 {
         curr->dag.LtoT(&curr->dag, LtoT);
       }
     } else {
-      std::vector<sourcenode_t *> newcons{}; 
-      std::vector<sourcenode_t *> merge{}; 
+      std::vector<sourcenode_t *> newcons{};
+      std::vector<sourcenode_t *> merge{};
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
           if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
-            curr->dag.StoL(&(*S)->dag, StoL); 
+            curr->dag.StoL(&(*S)->dag, StoL);
           } else {
-            newcons.push_back(*S); 
+            newcons.push_back(*S);
           }
         } else {
           if (!well_sep_test((*S)->idx, t_index)) {
-            bool do_I2I = (curr->idx.level() >= 1 && 
-                           ((*S)->idx.x() != t_index.x() || 
+            bool do_I2I = (curr->idx.level() >= 1 &&
+                           ((*S)->idx.x() != t_index.x() ||
                             (*S)->idx.y() != t_index.y() ||
-                            (*S)->idx.z() != t_index.z())); 
-            bool S_is_leaf = true; 
-            
+                            (*S)->idx.z() != t_index.z()));
+            bool S_is_leaf = true;
+
             for (size_t i = 0; i < 8; ++i) {
-              sourcenode_t *child = (*S)->child[i]; 
+              sourcenode_t *child = (*S)->child[i];
               if (child != nullptr) {
-                newcons.push_back(child); 
+                newcons.push_back(child);
                 if (do_I2I)
-                  merge.push_back(child); 
-                S_is_leaf = false; 
-              } 
+                  merge.push_back(child);
+                S_is_leaf = false;
+              }
             }
 
-            if (S_is_leaf) 
-              newcons.push_back(*S); 
+            if (S_is_leaf)
+              newcons.push_back(*S);
           }
         }
       }
 
       if (merge.size()) {
-        assert(curr->dag.add_interm() == true);         
+        assert(curr->dag.add_interm() == true);
         for (auto S = merge.begin(); S != merge.end(); ++S) {
-          if ((*S)->dag.add_interm()) 
-            (*S)->dag.MtoI(&(*S)->dag, MtoI); 
-          
-          curr->dag.ItoI(&(*S)->dag,   
-                         expansion_t::weight_estimate(Operation::ItoI, 
-                                                      (*S)->idx, 
-                                                      t_index)); 
+          if ((*S)->dag.add_interm())
+            (*S)->dag.MtoI(&(*S)->dag, MtoI);
+
+          curr->dag.ItoI(&(*S)->dag,
+                         expansion_t::weight_estimate(Operation::ItoI,
+                                                      (*S)->idx,
+                                                      t_index));
         }
       }
-      
-      consider = std::move(newcons);      
+
+      consider = std::move(newcons);
     }
   }
 

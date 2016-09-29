@@ -26,7 +26,8 @@
 // The contents of this file are intended to be a skeleton of what is
 // required to define an Expansion type that can be used with DASHMM. The
 // comments in these files will explain what is needed and where the user will
-// have to implement their specific case.
+// have to implement their specific case. Further information can be found
+// in the DASHMM documentation.
 
 
 #ifndef __USER_EXPANSION_H__
