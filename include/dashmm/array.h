@@ -113,7 +113,7 @@ class Array {
   /// examine the data stored at the specified address for compatibility.
   ///
   /// \returns - true if this object refers to non-null global memory.
-  bool valid() const {return data != HPX_NULL;}
+  bool valid() const {return data_ != HPX_NULL;}
 
   /// Return the global address of the Array meta data.
   ///
