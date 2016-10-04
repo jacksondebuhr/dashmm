@@ -127,6 +127,7 @@ class Array {
   ///
   /// \returns - the number of records owned by this rank,
   size_t count() const {
+    assert(valid());
     size_t retval{0};
     hpx_run_spmd(&array_local_count_action, &retval, &data_);
     return retval;
@@ -139,6 +140,7 @@ class Array {
   ///
   /// \returns - the total number of records in all ranks.
   size_t length() const {
+    assert(valid());
     size_t retval{0};
     hpx_run_spmd(&array_total_count_action, &retval, &data_);
     return retval;
@@ -224,6 +226,7 @@ class Array {
   ///            the runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
+    assert(valid());
     int runcode = kSuccess;
     hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data);
     return static_cast<ReturnCode>(runcode);
@@ -249,6 +252,7 @@ class Array {
   ///            runtime; kDomainError if the provided index range is
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
+    assert(valid());
     int runcode = kSuccess;
     hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data);
     return static_cast<ReturnCode>(runcode);
@@ -323,6 +327,7 @@ class Array {
   /// \return - kSuccess
   template <typename E, int F>
   ReturnCode map(const ArrayMapAction<T, E, F> &act, const E *env) {
+    assert(valid());
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
   }
@@ -344,6 +349,8 @@ class Array {
   /// \returns - address of local memory holding a copy of the records if this
   ///            is rank zero; nullptr otherwise
   T *collect() {
+    assert(valid());
+
     hpx_addr_t lcos[2];
     hpx_run(&array_collect_prep_action, lcos, &data_);
 

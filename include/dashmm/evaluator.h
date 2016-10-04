@@ -241,6 +241,13 @@ class Evaluator {
     fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
     // END TREE CREATION
 
+    auto local_tree = global_tree.here();
+    fprintf(stdout, "UnifGridDistrib:");
+    for (int i = 0; i < hpx_get_num_ranks(); ++i) {
+      fprintf(stdout, " %d", local_tree->last(i) - local_tree->first(i) + 1);
+    }
+    fprintf(stdout, "\n");
+
     // Allocate space for message buffer
     size_t bcast_size = total_size + sizeof(hpx_addr_t) * 3;
     char *data = new char[bcast_size];
@@ -304,8 +311,8 @@ class Evaluator {
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
                                                 distribute_end);
-    fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-            distribute_deltat);
+    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
+    //        distribute_deltat);
     // END DISTRIBUTE
 
     // BEGIN ALLOCATE
@@ -319,7 +326,7 @@ class Evaluator {
     hpx_lco_wait(preargs[2]);
     hpx_time_t allocate_end = hpx_time_now();
     double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
+    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
     // END ALLOCATE
 
 
@@ -331,9 +338,12 @@ class Evaluator {
     hpx_lco_wait(heredone);
     hpx_time_t evaluate_end = hpx_time_now();
     double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
-    fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
+    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
     // END EVALUATE
 
+    fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
+            hpx_get_my_rank(),
+            distribute_deltat, allocate_deltat, evaluate_deltat);
 
     // Delete some local stuff
     hpx_lco_delete_sync(heredone);
