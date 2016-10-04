@@ -17,62 +17,10 @@
 // a new expansion or method. The Advanced Guide should cover the needed
 // information in those cases as well. e.g. ViewSet
 
-// array.h
-Array::Array()
-bool Array::valid()
-size_t Array::count()
-size_t Array::length()
-ReturnCode Array::allocate()
-ReturnCode Array::destroy()
-ReturnCode Array::get()
-ReturnCode Array::put()
-ReturnCode Array::map()
-T *Array::collect()
-
 
 // arraymapaction.h
 ArrayMapAction::ArrayMapAction()
-
-
-// evaluator.h
-Evaluator::Evaluator()
-ReturnCode Evaluator::evaluate()
-
-
-
-// types.h -- Are these needed?
-ExpansionRole
-Operation
-// What about DomainGeometry? Index?
-
-
-// bh_method.h
-BH::BH()
-double BH::theta()
-
-
-// direct_method.h
-Direct::Direct()
-
-
-// fmm97_method.h
-FMM97::FMM97()
-
-
-// fmm97distro.h
-FMM97Distro::FMM97Distro()
-
-
-// fmm_method.h
-FMM::FMM()
-
-
-// randomdistro.h
-RandomDistro::RandomDistro()
-
-
-// singlelocdistro.h
-SingleLocality::SingleLocality()
+//--- did not cover the final template argument
 
 
 /*
