@@ -1,0 +1,113 @@
+\chapter{Installing DASHMM}
+\label{ch:install}
+
+This chapter outlines what is needed to install and use of DASHMM, and
+gives a brief sketch of the demo programs included with DASHMM.
+
+\section{Prerequisites}
+
+DASHMM v. 1.0.0 depends on one external library: HPX-5. The current
+version of DASHMM depends on version 3.2.0 of HPX-5 or later, which
+may be found at \url{https://hpx.crest.iu.edu/}. Please see the
+official HPX-5 documentation for instructions on how to build, install
+and run HPX-5 on your system.
+
+The DASHMM build system relies on the {\tt pkg-config} utility to
+specify the needed HPX-5 compilation and linking options, so it is
+important to add the correct path for HPX-5 to your {\tt
+  PKG\_CONFIG\_PATH} environment variable. For example, assuming HPX-5
+is installed in {\tt /path/to/hpx}, this can be accomplished with {\tt
+  bash} with:
+
+\begin{verbatim}
+export PKG_CONFIG_PATH=/path/to/hpx/lib/pkgconfig:$PKG_CONFIG_PATH
+\end{verbatim}
+
+\section{Building DASHMM}
+
+The DASHMM library is straightforward to build. Once the previous
+prerequisite is met, one needs to perform the following steps:
+
+\begin{enumerate}
+\item Unpack the source code into some convenient directory. For the
+  sake of discussion, this guide assumes that the code has been
+  unpacked in {\tt /path/to/dashmm/}.
+\item In {\tt /path/to/dashmm/} can be found {\tt Makefile}. There are
+  few (if any) changes that need to be made to this file for
+  successful compilation. The most likely change would be to modify
+  the compiler used. Any compiler supported by HPX-5 will be able to
+  compile DASHMM, provided it also support the C++11 standard. For
+  example, to change the compiler from the default ({\tt g++}) to the
+  Intel compiler, one needs to replace {\tt CXX=g++} with {\tt
+    CXX=icpc}.
+\item Run {\tt make} from {\tt /path/to/dashmm}. This should build the
+  library statically and it will be ready to link with your specific
+  application.
+\end{enumerate}
+
+Because DASHMM is heavily templated, a good deal of the code is
+contained in the header files. This means that much of the compilation
+of the DASHMM code will occur when the user code is compiled. This can
+increase the compilation time of user code, but the added flexibility
+of DASHMM is worth the minor increase in compilation time.
+
+\section{Linking against DASHMM}
+
+To build a program using the DASHMM library, only a few things need to
+be done. DASHMM builds in place, so when compiling codoe that used the
+library, one must specify where to look for the header files, and
+where to look for the built library. Further, because DASHMM relies on
+HPX-5, one must also specify how to find HPX-5. For HPX-5 this is the
+easiest with the {\tt pkg-config} utility.
+
+Assuming that DASHMM was built in {\tt /path/to/dashmm}, to compile
+code (with, for example {\tt g++}) one must specify the following
+arguments for compilation:
+
+\begin{verbatim}
+-I/path/to/dashmm/include $(shell pkg-config --cflags hpx)
+\end{verbatim}
+
+\noindent Similarly, one must specify the following arguments for linking:
+
+\begin{verbatim}
+-L/path/to/dashmm/lib -ldashmm $(shell pkg-config --libs hpx)
+\end{verbatim}
+
+\noindent Examples of this can be found in the demo programs included with
+DASHMM.
+
+\section{DASHMM demo programs}
+
+Included with DASHMM are several test codes that demonstrate the use
+of the library. These are found in the {\tt /path/to/dashmm/demo}
+subfolder. Each test can be built simply by running {\tt make} in the
+code's directory. Detailed information about each code can be found in
+the provided {\tt README} file.
+
+\subsection{Basic demo}
+The {\tt basic} demo code creates a random distribution of source and
+target points and computes the potential at the targets due to the
+sources using any of the built-in kernels provided with DASHMM. A user
+can request a summary of the options to the test code by running the
+code with {\tt --help} as a command line argument, or by reading {\tt
+  /path/to/dashmm/demo/basic/README}.
+
+\subsection{Time-stepping demo}
+The {\tt stepping} demo code creates a distribution of particles and
+computes their acceleration and integrates their motion forward in
+time. Note that the point of the demo is not to provide a great time
+integrator, so many fine points of creating a good integrator are
+skipped. Instead, {\tt stepping} demonstrates those features of DASHMM
+that enable time-stepping codes as a use-case for DASHMM. A user can
+request a summary of the options to the code by running the code with
+{\tt --help} as a command line argument, or by reading {\tt
+  /path/to/dashmm/demo/stepping/README}.
+
+\subsection{User-defined expansion demo}
+
+The {\tt user} demo provides a skeleton code that implements a new
+expansion type. The code is documented, and the requirements of the
+Expansion concept are outlined in the in-source comments. This example
+should be considered to be more advanced, and would require
+investigation of the advanced interface to understand completely.
