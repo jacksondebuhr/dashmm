@@ -230,7 +230,8 @@ int deallocate_array_handler(hpx_addr_t obj) {
   hpx_gas_free_sync(obj);
   hpx_exit(0, nullptr);
 }
-HPX_ACTION(HPX_DEFAULT, 0, deallocate_array_action, deallocate_array_handler,
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           deallocate_array_action, deallocate_array_handler,
            HPX_ADDR);
 
 
@@ -287,7 +288,7 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
 
   hpx_exit(sizeof(retval), &retval);
 }
-HPX_ACTION(HPX_DEFAULT, 0, array_put_action, array_put_handler,
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_put_action, array_put_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 
@@ -344,7 +345,7 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
 
   hpx_exit(sizeof(retval), &retval);;
 }
-HPX_ACTION(HPX_DEFAULT, 0, array_get_action, array_get_handler,
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_get_action, array_get_handler,
            HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
 
 

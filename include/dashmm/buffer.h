@@ -65,7 +65,7 @@ public:
   /// Has the buffer been exhausted?
   bool complete() const {return remain_ == 0;}
 
-  /// Advances the cursor by bytes bytes.
+  /// Advances the cursor by @p bytes bytes.
   ///
   /// \param bytes - the number of bytes to advance the cursor
   ///
@@ -198,7 +198,7 @@ class WriteBuffer : public Buffer {
 
   /// Write the contents of a ReadBuffer into this object
   ///
-  /// This will read as many bytes from input as can be handles by the
+  /// This will read as many bytes from input as can be handled by the
   /// remaining capacity of this object. Only if the number of bytes written
   /// makes up the full remaining capacity of the ReadBuffer will this method
   /// return as successful.
