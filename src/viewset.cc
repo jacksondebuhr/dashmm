@@ -56,8 +56,9 @@ size_t ViewSet::bytes() const {
     retval += views_[i].bytes;
   }
 
-  retval += 2 * sizeof(int);  // for count and role
-  retval += 4 * sizeof(double); // for the center and the scale
+  retval += sizeof(ExpansionRole);          // the role
+  retval += sizeof(int);                    // for count
+  retval += 4 * sizeof(double);             // for the center and the scale
   retval += views_.size() * sizeof(int);
   retval += views_.size() * sizeof(size_t);
 
