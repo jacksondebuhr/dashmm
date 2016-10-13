@@ -2489,7 +2489,6 @@ class DualTree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     } else {
@@ -2574,7 +2573,6 @@ class DualTree {
       }
 
       // This will set the parent's LCO as well as delete cdone
-      assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     }
