@@ -857,6 +857,7 @@ class Tree {
 
     // Clear local memory once all parcels are sent
     hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
 
     delete [] message_buffer;
     return HPX_SUCCESS;
@@ -2233,122 +2234,133 @@ class DualTree {
     auto tree = global_tree.here();
 
     Array<source_t> sources{sources_gas};
-    sourceref_t src_ref = sources.ref(rank);
-    sourcearraydata_t src_data = src_ref.pin();
-    source_t *p_s = src_data.value();
-    int n_sources = src_ref.n();
-
     Array<target_t> targets{targets_gas};
-    targetref_t trg_ref = targets.ref(rank);
-    targetarraydata_t trg_data = trg_ref.pin();
-    target_t *p_t = trg_data.value();
-    int n_targets = trg_ref.n();
 
-    // Assign points to uniform grid
-    int *local_offset_s{nullptr};
-    int *local_offset_t{nullptr};
-    int *local_count = sort_local_points(&*tree, p_s, n_sources,
-                                         p_t, n_targets, &local_offset_s,
-                                         &local_offset_t);
-    int *local_scount = local_count;
-    int *local_tcount = &local_count[tree->dim3_];
+    // TODO: This is an inelegant solution to the problem of getting the
+    // local segments unpinned. src_data and trg_data will unpin the segment
+    // when the scope we introduce here is closed. Perhaps add unpin(), but
+    // that detracts from the RAII nature of the current ArrayData object.
+    {
+      sourceref_t src_ref = sources.ref(rank);
+      sourcearraydata_t src_data = src_ref.pin();
+      source_t *p_s = src_data.value();
+      int n_sources = src_ref.n();
 
-    // Compute point distribution
-    hpx_lco_get(tree->unif_count_, sizeof(int) * (tree->dim3_ * 2),
-                tree->unif_count_src());
-    tree->distribute_ = distribute_points(num_ranks,
-                                          tree->unif_count_src(),
-                                          tree->dim3_);
-    tree->generate_rank_map(num_ranks);
+      targetref_t trg_ref = targets.ref(rank);
+      targetarraydata_t trg_data = trg_ref.pin();
+      target_t *p_t = trg_data.value();
+      int n_targets = trg_ref.n();
 
-    // Exchange points
-    sourcenode_t *ns = tree->source_tree_->unif_grid_;
-    targetnode_t *nt = tree->target_tree_->unif_grid_;
-    int firstarg = tree->first(rank);
-    int lastarg = tree->last(rank);
-    sourcetree_t::init_point_exchange(tree->source_tree_, firstarg, lastarg,
-        tree->unif_count_src(), local_scount, local_offset_s, &tree->domain_,
-        tree->refinement_limit_, p_s, ns);
-    if (!tree->same_sandt_) {
-      targettree_t::init_point_exchange(tree->target_tree_, firstarg, lastarg,
-          tree->unif_count_tar(), local_tcount, local_offset_t, &tree->domain_,
-          tree->refinement_limit_, p_t, nt);
-    } else {
-      targettree_t::init_point_exchange_same_s_and_t(tree->target_tree_,
-          firstarg, lastarg, tree->unif_count_tar(), local_tcount,
-          local_offset_t, &tree->domain_, tree->refinement_limit_, p_t, nt,
-          ns, tree->source_tree_);
-    }
+      // Assign points to uniform grid
+      int *local_offset_s{nullptr};
+      int *local_offset_t{nullptr};
+      int *local_count = sort_local_points(&*tree, p_s, n_sources,
+                                           p_t, n_targets, &local_offset_s,
+                                           &local_offset_t);
+      int *local_scount = local_count;
+      int *local_tcount = &local_count[tree->dim3_];
 
-    // So this one is pretty simple. It sends those points from this rank
-    // going to the other rank in a parcel.
-    for (int r = 0; r < num_ranks; ++r) {
-      if (r != rank) {
-        hpx_call(HPX_HERE, send_points_, HPX_NULL, &r, &local_scount,
-                 &local_tcount, &local_offset_s, &local_offset_t,
-                 &p_s, &p_t, &rwtree);
-      }
-    }
-    hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
-    assert(dual_tree_complete != HPX_NULL);
+      // Compute point distribution
+      hpx_lco_get(tree->unif_count_, sizeof(int) * (tree->dim3_ * 2),
+                  tree->unif_count_src());
+      tree->distribute_ = distribute_points(num_ranks,
+                                            tree->unif_count_src(),
+                                            tree->dim3_);
+      tree->generate_rank_map(num_ranks);
 
-    for (int r = 0; r < num_ranks; ++r) {
-      int first = tree->first(r);
-      int last = tree->last(r);
-
-      if (r == rank) {
-        for (int i = first; i <= last; ++i) {
-          if (*(tree->unif_count_src(i)) == 0) {
-            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-          } else {
-            source_t *arg = tree->sorted_src().value();
-            int typearg = 0;
-            assert(ns[i].complete() != HPX_NULL);
-            hpx_call_when_with_continuation(ns[i].complete(),
-                HPX_HERE, sourcetree_t::send_node_,
-                dual_tree_complete, hpx_lco_set_action,
-                &ns, &arg, &i, &rwtree, &typearg);
-          }
-
-          if (*(tree->unif_count_tar(i)) == 0) {
-            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-          } else {
-            target_t *arg = tree->sorted_tar().value();
-            int typearg = 1;
-            assert(nt[i].complete() != HPX_NULL);
-            hpx_call_when_with_continuation(nt[i].complete(),
-                HPX_HERE, targettree_t::send_node_,
-                dual_tree_complete, hpx_lco_set_action,
-                &nt, &arg, &i, &rwtree, &typearg);
-          }
-        }
+      // Exchange points
+      sourcenode_t *ns = tree->source_tree_->unif_grid_;
+      targetnode_t *nt = tree->target_tree_->unif_grid_;
+      int firstarg = tree->first(rank);
+      int lastarg = tree->last(rank);
+      sourcetree_t::init_point_exchange(tree->source_tree_, firstarg, lastarg,
+          tree->unif_count_src(), local_scount, local_offset_s, &tree->domain_,
+          tree->refinement_limit_, p_s, ns);
+      if (!tree->same_sandt_) {
+        targettree_t::init_point_exchange(tree->target_tree_, firstarg, lastarg,
+            tree->unif_count_tar(), local_tcount, local_offset_t,
+            &tree->domain_, tree->refinement_limit_, p_t, nt);
       } else {
-        for (int i = first; i <= last; ++i) {
-          if (*(tree->unif_count_src(i)) == 0) {
-            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-          } else {
-            assert(ns[i].complete() != HPX_NULL);
-            hpx_call_when_with_continuation(ns[i].complete(),
-                dual_tree_complete, hpx_lco_set_action,
-                ns[i].complete(), hpx_lco_delete_action,
-                nullptr, 0);
-          }
+        targettree_t::init_point_exchange_same_s_and_t(tree->target_tree_,
+            firstarg, lastarg, tree->unif_count_tar(), local_tcount,
+            local_offset_t, &tree->domain_, tree->refinement_limit_, p_t, nt,
+            ns, tree->source_tree_);
+      }
 
-          if (*(tree->unif_count_tar(i)) == 0) {
-            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-          } else {
-            assert(nt[i].complete() != HPX_NULL);
-            hpx_call_when_with_continuation(nt[i].complete(),
-                dual_tree_complete, hpx_lco_set_action,
-                nt[i].complete(), hpx_lco_delete_action,
-                nullptr, 0);
+      // So this one is pretty simple. It sends those points from this rank
+      // going to the other rank in a parcel.
+      for (int r = 0; r < num_ranks; ++r) {
+        if (r != rank) {
+          hpx_call(HPX_HERE, send_points_, HPX_NULL, &r, &local_scount,
+                   &local_tcount, &local_offset_s, &local_offset_t,
+                   &p_s, &p_t, &rwtree);
+        }
+      }
+      hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
+      assert(dual_tree_complete != HPX_NULL);
+
+      for (int r = 0; r < num_ranks; ++r) {
+        int first = tree->first(r);
+        int last = tree->last(r);
+
+        if (r == rank) {
+          for (int i = first; i <= last; ++i) {
+            if (*(tree->unif_count_src(i)) == 0) {
+              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+            } else {
+              source_t *arg = tree->sorted_src().value();
+              int typearg = 0;
+              assert(ns[i].complete() != HPX_NULL);
+              hpx_call_when_with_continuation(ns[i].complete(),
+                  HPX_HERE, sourcetree_t::send_node_,
+                  dual_tree_complete, hpx_lco_set_action,
+                  &ns, &arg, &i, &rwtree, &typearg);
+            }
+
+            if (*(tree->unif_count_tar(i)) == 0) {
+              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+            } else {
+              target_t *arg = tree->sorted_tar().value();
+              int typearg = 1;
+              assert(nt[i].complete() != HPX_NULL);
+              hpx_call_when_with_continuation(nt[i].complete(),
+                  HPX_HERE, targettree_t::send_node_,
+                  dual_tree_complete, hpx_lco_set_action,
+                  &nt, &arg, &i, &rwtree, &typearg);
+            }
+          }
+        } else {
+          for (int i = first; i <= last; ++i) {
+            if (*(tree->unif_count_src(i)) == 0) {
+              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+            } else {
+              assert(ns[i].complete() != HPX_NULL);
+              hpx_call_when_with_continuation(ns[i].complete(),
+                  dual_tree_complete, hpx_lco_set_action,
+                  ns[i].complete(), hpx_lco_delete_action,
+                  nullptr, 0);
+            }
+
+            if (*(tree->unif_count_tar(i)) == 0) {
+              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+            } else {
+              assert(nt[i].complete() != HPX_NULL);
+              hpx_call_when_with_continuation(nt[i].complete(),
+                  dual_tree_complete, hpx_lco_set_action,
+                  nt[i].complete(), hpx_lco_delete_action,
+                  nullptr, 0);
+            }
           }
         }
       }
-    }
 
-    hpx_lco_wait(dual_tree_complete);
-    hpx_lco_delete_sync(dual_tree_complete);
+      hpx_lco_wait(dual_tree_complete);
+      hpx_lco_delete_sync(dual_tree_complete);
+
+      delete [] local_count;
+      delete [] local_offset_s;
+      delete [] local_offset_t;
+    }
 
     // Replace segment in the array
     hpx_addr_t old_src_data = sources.replace(tree->source_tree_->sorted_);
@@ -2361,10 +2373,6 @@ class DualTree {
         hpx_gas_free_sync(old_tar_data);
       }
     }
-
-    delete [] local_count;
-    delete [] local_offset_s;
-    delete [] local_offset_t;
 
     return HPX_SUCCESS;
   }

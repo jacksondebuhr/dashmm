@@ -485,6 +485,9 @@ int array_collect_handler(hpx_addr_t data, hpx_addr_t offsets,
 
     delete [] counts;
     delete [] where;
+
+    hpx_lco_delete_sync(offsets);
+    hpx_lco_delete_sync(addxes);
   }
 
   delete [] contrib;
