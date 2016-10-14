@@ -2554,10 +2554,12 @@ class DualTree {
     // If so, this branch is done, and we need not spawn more.
 
     // Here is where we make the target lco if needed
-    if (node->dag.has_parts() && node->dag.parts()->locality == myrank) {
-      targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
-                       HPX_THERE(node->dag.parts()->locality)};
-      node->dag.set_targetlco(tlco.lco(), tlco.n());
+    if (node->dag.has_parts()) {
+      if (node->dag.parts()->locality == myrank) {
+        targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
+                         HPX_THERE(node->dag.parts()->locality)};
+        node->dag.set_targetlco(tlco.lco(), tlco.n());
+      }
 
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
     } else {
