@@ -2453,7 +2453,6 @@ class DualTree {
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
-                            HPX_THERE(node->dag.normal()->locality),
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
@@ -2468,7 +2467,6 @@ class DualTree {
                                 node->dag.interm()->out_edges.size(),
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
-                                HPX_THERE(node->dag.interm()->locality),
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
@@ -2529,7 +2527,6 @@ class DualTree {
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
                             tree->domain_, node->idx, std::move(input_expand),
-                            HPX_THERE(node->dag.normal()->locality),
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
@@ -2544,7 +2541,6 @@ class DualTree {
                                 node->dag.interm()->out_edges.size(),
                                 tree->domain_, node->idx,
                                 std::move(interm_expand),
-                                HPX_THERE(node->dag.interm()->locality),
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
@@ -2556,8 +2552,7 @@ class DualTree {
     // Here is where we make the target lco if needed
     if (node->dag.has_parts()) {
       if (node->dag.parts()->locality == myrank) {
-        targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts,
-                         HPX_THERE(node->dag.parts()->locality)};
+        targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts};
         node->dag.set_targetlco(tlco.lco(), tlco.n());
       }
 

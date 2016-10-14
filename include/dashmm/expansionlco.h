@@ -121,7 +121,7 @@ class ExpansionLCO {
   /// \param rwtree - the global address of the dual tree
   ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
                Index index, std::unique_ptr<expansion_t> expand,
-               hpx_addr_t where, hpx_addr_t rwtree) {
+               hpx_addr_t rwtree) {
     assert(expand != nullptr);
 
     ViewSet views = expand->get_all_views();
@@ -760,25 +760,6 @@ class ExpansionLCO {
     lco.contribute(std::move(translated));
   }
 
-  /// Create an expansion LCO from an expansion
-  ///
-  /// This is used to create ExpansionLCOs at particular localities.
-  /// The @p payload contains the expansion data. This action is called
-  /// at a particular locality which guarantees that the LCO is where the
-  /// DAG distribution has computed it ought to be.
-  ///
-  /// This action continues the address of the resulting LCO.
-  ///
-  /// \param payload - the expansion data
-  /// \param bytes - the size of the incoming data
-  static int create_from_expansion_handler(Header *payload, size_t bytes) {
-    size_t total = bytes + sizeof(OutEdgeRecord) * payload->out_edge_count;
-    hpx_addr_t gdata = hpx_lco_user_new(total, init_, operation_,
-                                        predicate_, payload, bytes);
-    assert(gdata != HPX_NULL);
-    return HPX_THREAD_CONTINUE(gdata);
-  }
-
 
   // The functions implementing the user LCO
   static hpx_action_t init_;
@@ -822,13 +803,6 @@ template <typename S, typename T,
           template <typename, typename,
                     template <typename, typename> class> class M>
 hpx_action_t ExpansionLCO<S, T, E, M>::spawn_out_edges_from_remote_ =
-    HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::create_from_expansion_ =
     HPX_ACTION_NULL;
 
 

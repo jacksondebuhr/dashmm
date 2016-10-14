@@ -61,9 +61,6 @@ public:
                         targetlco_t::predicate_,
                         targetlco_t::predicate_handler,
                         HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        targetlco_t::create_, targetlco_t::create_at_locality,
-                        HPX_POINTER, HPX_SIZE_T);
   }
 };
 
@@ -96,10 +93,6 @@ public:
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::spawn_out_edges_from_remote_,
                         expansionlco_t::spawn_out_edges_from_remote_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        expansionlco_t::create_from_expansion_,
-                        expansionlco_t::create_from_expansion_handler,
                         HPX_POINTER, HPX_SIZE_T);
   }
 };
