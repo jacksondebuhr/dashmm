@@ -99,8 +99,9 @@ class Node {
   /// Constuct with a known index. This will set the index of the node,
   /// and will allocate the completion detection LCO.
   ///
-  /// \param idx - the index of the node
-  Node(Index idx) : idx{idx}, parts{}, parent{nullptr}, dag{idx}, first_{0} {
+  /// \param index - the index of the node
+  Node(Index index)
+      : idx{index}, parts{}, parent{nullptr}, dag{index}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -112,11 +113,11 @@ class Node {
   ///
   /// This will also create the completion detection LCO.
   ///
-  /// \param idx - the node index
+  /// \param index - the node index
   /// \param parts - the particles inside the volume represented by this node
   /// \param parent - the parent of this node
-  Node(Index idx, arrayref_t parts, node_t *parent)
-      : idx{idx}, parts{parts}, parent{parent}, dag{idx}, first_{0} {
+  Node(Index index, arrayref_t parts, node_t *parent)
+      : idx{index}, parts{parts}, parent{parent}, dag{index}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
