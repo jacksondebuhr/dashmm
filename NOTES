@@ -69,6 +69,8 @@ Overall Plan to 1.0
     - actually build the documentation with DoxyGen to see if it is done
 
 
+ * We will need a better explicit dag representation - it uses a huge amount of
+      memory.
  * Split Evaluate into pieces and expose more interface to users
     - NOTE: This is not a vital thing to accomplish for 1.0.0
     - Enable repeat use of a DAG

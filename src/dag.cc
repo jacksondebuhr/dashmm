@@ -447,4 +447,30 @@ void DAG::toEdgeCSV(std::string fname) {
 }
 
 
+size_t DAG::node_count() const {
+  return (source_leaves.capacity() + source_nodes.capacity()
+          + target_nodes.capacity() + target_leaves.capacity());
+}
+
+
+size_t DAG::edge_count() const {
+  size_t retval{0};
+
+  for (auto i = source_leaves.begin(), e = source_leaves.end(); i != e; ++i) {
+    retval += (*i)->out_edges.capacity() + (*i)->in_edges.capacity();
+  }
+  for (auto i = source_nodes.begin(), e = source_nodes.end(); i != e; ++i) {
+    retval += (*i)->out_edges.capacity() + (*i)->in_edges.capacity();
+  }
+  for (auto i = target_nodes.begin(), e = target_nodes.end(); i != e; ++i) {
+    retval += (*i)->out_edges.capacity() + (*i)->in_edges.capacity();
+  }
+  for (auto i = target_leaves.begin(), e = target_leaves.end(); i != e; ++i) {
+    retval += (*i)->out_edges.capacity() + (*i)->in_edges.capacity();
+  }
+
+  return retval;
+}
+
+
 } // dashmm

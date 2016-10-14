@@ -266,6 +266,7 @@ class ExpansionLCO {
   ///
   /// \param edges - the out edge data
   void set_out_edge_data(std::vector<DAGEdge> &edges) {
+    // TODO reduce a copy here using the parcel interface
     int n_out = edges.size();
     size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
     char *input_data = new char[bytes];

@@ -70,6 +70,7 @@ struct DAGNode {
   size_t n_parts;                /// number of points stored in a target lco
                                  /// or a source ref
   int color;
+
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
       n_parts{0}, color{0} {}
@@ -126,11 +127,17 @@ class DAG {
     return (a.target->locality < b.target->locality);
   }
 
-  /// Determine if an edghe is to a target Node
+  /// Determine if an edge is to a target Node
   static bool operation_to_target(Operation op) {
     return op == Operation::MtoT || op == Operation::LtoT
                                  || op == Operation::StoT;
   }
+
+  /// Count nodes in the full DAG
+  size_t node_count() const;
+
+  /// Count edges in the full DAG
+  size_t edge_count() const;
 
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
