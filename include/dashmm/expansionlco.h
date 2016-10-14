@@ -29,6 +29,7 @@
 /// \file
 /// \brief Interface to Expansion LCO
 
+#include <cstring>
 
 #include <algorithm>
 #include <memory>
@@ -127,10 +128,18 @@ class ExpansionLCO {
     ViewSet views = expand->get_all_views();
     size_t bytes = views.bytes();
     size_t less_edges = sizeof(Header) + bytes;
+    size_t total = less_edges + sizeof(OutEdgeRecord) * n_out;
 
-    Header *input_data = reinterpret_cast<Header *>(new char[less_edges]);
+    data_ = hpx_lco_user_new(total, init_, operation_, predicate_,
+                             &bytes, sizeof(bytes));
+    assert(data_ != HPX_NULL);
+
+    void *lco_lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lco_lva));
+    Header *input_data =
+        static_cast<Header *>(hpx_lco_user_get_user_data(lco_lva));
+
     input_data->yet_to_arrive = n_in + 1; // to account for setting out edges
-    input_data->expansion_size = bytes;
     input_data->domain = domain;
     input_data->index = index;
     input_data->rwaddr = rwtree;
@@ -139,13 +148,7 @@ class ExpansionLCO {
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 
-    size_t total = less_edges
-                    + sizeof(OutEdgeRecord) * input_data->out_edge_count;
-    data_ = hpx_lco_user_new(total, init_, operation_, predicate_,
-                             input_data, less_edges);
-    assert(data_ != HPX_NULL);
-
-    delete [] input_data;
+    hpx_gas_unpin(data_);
 
     // setup the out edge action
     if (n_out != 0) {
@@ -360,9 +363,9 @@ class ExpansionLCO {
   /// \param inti - the initialization data for the LCO
   /// \param init_bytes - the size of the initialization data for the LCO
   static void init_handler(Header *head, size_t bytes,
-                           Header *init, size_t init_bytes) {
-    assert(bytes == init_bytes + sizeof(OutEdgeRecord) * init->out_edge_count);
-    memcpy(head, init, init_bytes);
+                           size_t *init, size_t init_bytes) {
+    head->expansion_size = *init;
+    memset(head->payload, 0, *init);
   }
 
   /// The set operation handler for the Expansion LCO
