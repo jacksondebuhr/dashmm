@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 
 #include <hpx/hpx.h>
 
@@ -11,10 +12,43 @@ constexpr size_t kArraySize = kRecordSize * kNumRecords;
 
 // The size of the LCO data
 constexpr size_t kKB = 1024;
+constexpr size_t kLCOInitSize = kKB;
 constexpr size_t kLCOSize = 4 * kKB;
 // The number of LCOs - this will scale with the number of particles
 constexpr size_t kPrefactor = 10;
 constexpr size_t kLCOCount = kPrefactor * kNumRecords / 40;
+
+
+struct Data {
+  int count;
+  char payload[];
+};
+
+
+void init_handler(Data *i, size_t bytes, Data *init, size_t init_bytes) {
+  i->count = 1;
+  memcpy(i->payload, init, init_bytes);
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+           init_action, init_handler,
+           HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
+
+
+void operation_handler(Data *lhs, const void *rhs, size_t bytes) {
+  lhs->count -= 1;
+  memcpy(lhs->payload, rhs, bytes);
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+           operation_action, operation_handler,
+           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
+
+
+bool predicate_handler(const Data *i, size_t bytes) {
+  return (i->count == 0);
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE,
+           predicate_action, predicate_handler,
+           HPX_POINTER, HPX_SIZE_T);
 
 
 // We have to forward declare the handler because this is a recursive action
@@ -55,8 +89,14 @@ int lco_tree_alloc_handler(size_t idx, hpx_addr_t *lcos, hpx_addr_t done) {
   }
 
   // allocate my lco
-  lcos[idx] = hpx_lco_future_new(kLCOSize);
+  //lcos[idx] = hpx_lco_future_new(kLCOSize);
+
+  char *initdata = new char[kLCOInitSize];
+  lcos[idx] = hpx_lco_user_new(kLCOSize + sizeof(int), init_action,
+                               operation_action, predicate_action,
+                               initdata, kLCOInitSize);
   assert(lcos[idx] != HPX_NULL);
+  delete [] initdata;
 
   // setup dependent call of done when cdone triggers
   hpx_call_when(cdone, cdone, hpx_lco_delete_action, done, nullptr, 0);
