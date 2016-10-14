@@ -139,15 +139,15 @@ class ExpansionLCO {
     WriteBuffer inbuf{input_data->payload, bytes};
     views.serialize(inbuf);
 
-    hpx_addr_t retval{HPX_NULL};
-    hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
-                  input_data, less_edges);
+    size_t total = less_edges
+                    + sizeof(OutEdgeRecord) * input_data->out_edge_count;
+    data_ = hpx_lco_user_new(total, init_, operation_, predicate_,
+                             input_data, less_edges);
+    assert(data_ != HPX_NULL);
+
     delete [] input_data;
 
-    data_ = retval;
-
     // setup the out edge action
-    assert(data_ != HPX_NULL);
     if (n_out != 0) {
       int unused = 0;
       hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &unused);
@@ -322,11 +322,11 @@ class ExpansionLCO {
   /// on the exact format can be found with the ViewSet documentation.
   struct Header {
     int yet_to_arrive;
+    int out_edge_count;
     size_t expansion_size;
     DomainGeometry domain;
     Index index;
     hpx_addr_t rwaddr;
-    int out_edge_count;
     char payload[];
   };
 
