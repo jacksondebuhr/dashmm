@@ -2,12 +2,14 @@
 #include <cstdio>
 #include <cstring>
 
+#include <vector>
+
 #include <hpx/hpx.h>
 
 
 // The size of the array - this is to mimic the DASHMM use case
 constexpr size_t kRecordSize = 48;
-constexpr size_t kNumRecords = 1000000;
+constexpr size_t kNumRecords = 2000000;
 constexpr size_t kArraySize = kRecordSize * kNumRecords;
 
 // The size of the LCO data
@@ -18,6 +20,12 @@ constexpr size_t kLCOSize = 4 * kKB;
 constexpr size_t kPrefactor = 10;
 constexpr size_t kLCOCount = kPrefactor * kNumRecords / 40;
 
+// The size of the 'local' memory allocation
+constexpr size_t kLocalAllocCount = 300000000;
+
+struct Junk {
+  char data[24];
+};
 
 struct Data {
   int count;
@@ -151,6 +159,14 @@ int rankwise_handler(hpx_addr_t array_alloc_done, hpx_addr_t lco_alloc_done,
   hpx_lco_and_set(array_alloc_done, HPX_NULL);
   fprintf(stdout, "  %d: array allocated\n", rank);
   hpx_lco_wait(array_alloc_done);
+
+  // allocate some local memory
+  std::vector<Junk> local_junk{};
+  for (size_t i = 0; i < kLocalAllocCount; ++i) {
+    //Junk toadd{};
+    //toadd.data[14] = 'c';
+    local_junk.push_back(Junk{});
+  }
 
   // in parallel allocate a bunch of LCOs
   hpx_addr_t *lcos = new hpx_addr_t[kLCOCount];

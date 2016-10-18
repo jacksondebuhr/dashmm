@@ -2938,7 +2938,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
-  /// Actinon to set up termination detection for the DAG evaluation
+  /// Action to set up termination detection for the DAG evaluation
   ///
   /// \param done - LCO for termination detection
   /// \param targs - target DAG nodes
