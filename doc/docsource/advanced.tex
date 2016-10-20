@@ -1,4 +1,71 @@
 \chapter{Advanced Guide to DASHMM}
 \label{ch:advanced}
 
-Coming Soon!
+In this chapter, the complete interface to DASHMM will be presented. This will
+cover some repeat information as the previous chapter, but will provide more
+details that are not relevant for the basic usage of DASHMM. In a few cases,
+the coverage of a library construct is complete in the previous chapter, and
+so those topics will not be repeated here.
+
+The fundamental difference between the basic and advanced interface to
+DASHMM is that the advanced interface is needed when a user is implementing
+a new Expansion or Method. This will require a user to be familiar with more
+of the details of how the execution is performed, and will thus require some
+more details about how HPX-5 provides parallelism to DASHMM. However, the
+extent to which a user will have to learn HPX-5 directly is still extremely
+limited.
+
+The arrangement of material in this chapter will parallel the arrangement in
+the previous.
+
+\section{DASHMM Concepts}
+
+This sections covers the conceptual framwork of both DASHMM's implementation
+of general multipole methods and the parallelization of those methods with
+HPX-5.
+
+\subsection{Multipole method abstractions}
+
+Both mathematically, and in the code. So the operations and the template
+arguments.
+
+\subsection{Parallelization abstractions}
+
+More detail about this that is relevant for advanced use of the library.
+
+
+\section{Basic types}
+
+Domain Geometry. Index. ExpansionRole. Operation.
+
+\section{Initializing DASHMM}
+
+Go over some of the relevant hpx related arguments here for init.
+
+\section{Evaluation}
+
+Basically just add the distribution policy stuff.
+
+\section{DASHMM arrays}
+
+Do we need the alternate constructor? From the hpx address?
+
+\section{Array map actions}
+
+Go over decomposition template parameter.
+
+\section{DAG objects}
+
+\section{Built-in methods}
+
+\section{Built-in expansions}
+
+\section{Built-in distribution policies}
+
+Also go over the default policy
+
+\section{User-defined Expansions}
+
+\section{User-defined Methods}
+
+\section{User-defined distribution policies}
