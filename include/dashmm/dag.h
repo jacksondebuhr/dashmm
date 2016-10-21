@@ -343,8 +343,16 @@ class DAGInfo {
 
   /// Sets locality on the normal node
   void set_normal_locality(int loc) {
-    if (parts_ != nullptr && normal_ != nullptr) {
+    // TODO: Verify this is still working in all cases....
+    if (normal_ != nullptr) {
       normal_->locality = loc;
+    }
+  }
+
+  /// Sets locality on the intermediate node
+  void set_interm_locality(int loc) {
+    if (interm_ != nullptr) {
+      interm_->locality = loc;
     }
   }
 

@@ -52,7 +52,7 @@ void FMM97Distro::compute_distribution(DAG &dag) {
     assert(n->locality != -1);
     confine(n, 't');
   }
-  
+
   // Make decision on I of the target tree
   for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
     DAGNode *n = dag.target_nodes[i];
@@ -75,47 +75,47 @@ void FMM97Distro::confine(DAGNode *n, char type) {
 
   if (type == 's') {
     for (size_t i = 0; i < n->out_edges.size(); ++i) {
-      DAGNode *target = n->out_edges[i].target; 
-      Operation op = n->out_edges[i].op; 
-      bool terminate = true; 
+      DAGNode *target = n->out_edges[i].target;
+      Operation op = n->out_edges[i].op;
+      bool terminate = true;
 
       if (op == Operation::MtoI) {
-        target->locality = n->locality; 
-      } 
+        target->locality = n->locality;
+      }
 
       if (op == Operation::MtoM) {
         if (n->locality > target->locality) {
-          target->locality = n->locality; 
+          target->locality = n->locality;
           terminate = false;
         }
       }
 
-      if (op == Operation::StoM) 
-        terminate = false; 
+      if (op == Operation::StoM)
+        terminate = false;
 
-      if (terminate == false) 
-        confine(target, type); 
+      if (terminate == false)
+        confine(target, type);
     }
-  } 
+  }
 
   if (type == 't') {
     for (size_t i = 0; i < n->in_edges.size(); ++i) {
       DAGNode *source = n->in_edges[i].source;
       Operation op = n->in_edges[i].op;
-      bool terminate = true; 
+      bool terminate = true;
 
-      if (op == Operation::LtoT) 
-        terminate = false; 
+      if (op == Operation::LtoT)
+        terminate = false;
 
       if (op == Operation::LtoL) {
         if (n->locality > source->locality) {
-          source->locality = n->locality; 
-          terminate = false; 
+          source->locality = n->locality;
+          terminate = false;
         }
       }
 
-      if (terminate == false) 
-        confine(source, type); 
+      if (terminate == false)
+        confine(source, type);
     }
   }
 }
@@ -123,56 +123,56 @@ void FMM97Distro::confine(DAGNode *n, char type) {
 
 void FMM97Distro::assign(DAGNode *n) {
   /// \param n is the expansion LCO for an intermediate expansion of the target
-  /// tree. 
+  /// tree.
 
-  // Categorize incoming edges 
-  std::map<int, int> color; 
-  std::map<int, int> weight; 
-  int in_weight = 0; 
+  // Categorize incoming edges
+  std::map<int, int> color;
+  std::map<int, int> weight;
+  int in_weight = 0;
 
   for (size_t i = 0; i < n->in_edges.size(); ++i) {
-    int w = n->in_edges[i].weight; 
-    int c = n->in_edges[i].source->color; 
-    int source_locality = n->in_edges[i].source->locality; 
+    int w = n->in_edges[i].weight;
+    int c = n->in_edges[i].source->color;
+    int source_locality = n->in_edges[i].source->locality;
 
-    color[source_locality] = std::max(color[source_locality], c); 
-    weight[source_locality] += w; 
+    color[source_locality] = std::max(color[source_locality], c);
+    weight[source_locality] += w;
     in_weight += w;
   }
 
-  int min_weight = std::numeric_limits<int>::max(); 
-  int max_color = std::numeric_limits<int>::min(); 
-  int locality = -1; 
+  int min_weight = std::numeric_limits<int>::max();
+  int max_color = std::numeric_limits<int>::min();
+  int locality = -1;
 
   for (auto i = weight.begin(); i != weight.end(); ++i) {
-    int source_locality = i->first; 
+    int source_locality = i->first;
 
     // Adjust incoming communication cost if \param n is placed on
-    // source_locality 
-    int w = in_weight - i->second; 
+    // source_locality
+    int w = in_weight - i->second;
 
-    // Adjust ItoL cost if \param n is placed on source_locality 
+    // Adjust ItoL cost if \param n is placed on source_locality
     for (size_t j = 0; j < n->out_edges.size(); ++j) {
-      int target_locality = n->out_edges[j].target->locality; 
-      if (target_locality != source_locality) 
-        w += n->out_edges[0].weight; 
+      int target_locality = n->out_edges[j].target->locality;
+      if (target_locality != source_locality)
+        w += n->out_edges[0].weight;
     }
 
-    int c = color[source_locality]; 
+    int c = color[source_locality];
 
     if (w < min_weight) {
-      min_weight = w; 
-      max_color = c; 
+      min_weight = w;
+      max_color = c;
       locality = source_locality;
     } else if (w == min_weight && c > max_color) {
-      // Increase slack time 
-      max_color = c; 
-      locality = source_locality; 
+      // Increase slack time
+      max_color = c;
+      locality = source_locality;
     }
   }
 
-  n->locality = locality; 
-  assert(locality != -1); 
+  n->locality = locality;
+  assert(locality != -1);
 }
 
 } // dashmm

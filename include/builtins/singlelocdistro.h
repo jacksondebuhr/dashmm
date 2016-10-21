@@ -47,6 +47,8 @@ class SingleLocality {
   SingleLocality(int loc = 0) : locality_{loc} { }
 
   void compute_distribution(DAG &dag);
+  static void assign_for_source(DAGInfo &dag, int locality) { }
+  static void assign_for_target(DAGInfo &dag, int locality) { }
 
  private:
   int locality_;

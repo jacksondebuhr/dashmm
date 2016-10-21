@@ -2831,6 +2831,13 @@ class DualTree {
                                                     sourcenode_t *node,
                                                     hpx_addr_t done) {
     tree->method_.aggregate(node, &tree->domain_);
+    int loc{0};
+    if (node->idx.level() >= tree->unif_level_) {
+      int dag_idx = sourcetree_t::get_unif_grid_index(node->idx,
+                                                      tree->unif_level_);
+      loc = tree->rank_of_unif_grid(dag_idx);
+    }
+    method_t::distropolicy_t::assign_for_source(node->dag, loc);
     hpx_lco_delete_sync(done);
     return HPX_SUCCESS;
   }
@@ -2927,6 +2934,14 @@ class DualTree {
         hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
                  &tree, &node->child[i], &ccons, &same_sandt, &cdone);
       }
+
+      int loc{0};
+      if (node->idx.level() >= tree->unif_level_) {
+        int dag_idx = targettree_t::get_unif_grid_index(node->idx,
+                                                        tree->unif_level_);
+        loc = tree->rank_of_unif_grid(dag_idx);
+      }
+      method_t::distropolicy_t::assign_for_source(node->dag, loc);
 
       assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,

@@ -57,4 +57,8 @@ public:
   /// not depend on the precise ordering of DAG nodes in @p dag, or the edges
   /// in the nodes of the DAG.
   void compute_distribution(DAG &dag);
+
+  static void assign_for_source(DAGInfo &dag, int locality);
+
+  static void assign_for_target(DAGInfo &dag, int locality);
 };

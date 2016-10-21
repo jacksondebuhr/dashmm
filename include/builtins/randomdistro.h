@@ -41,6 +41,8 @@ class RandomDistro {
  public:
   RandomDistro(int seed = 137) : seed_{seed} { }
   void compute_distribution(DAG &dag);
+  static void assign_for_source(DAGInfo &dag, int locality) { }
+  static void assign_for_target(DAGInfo &dag, int locality) { }
 
  private:
   int seed_;
