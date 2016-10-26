@@ -2824,21 +2824,28 @@ class DualTree {
   ///
   /// \param tree - the DualTree
   /// \param node - the node of the source tree
-  /// \param done - the completion detection LCO that is deleted by this action
+  /// \param cdone - the completion detection LCO that is deleted by this action
+  /// \param done - the completion LCO that is set by this action
   ///
   /// \returns - HPX_SUCCESS
   static int source_apply_method_child_done_handler(dualtree_t *tree,
                                                     sourcenode_t *node,
+                                                    hpx_addr_t cdone, 
                                                     hpx_addr_t done) {
-    tree->method_.aggregate(node, &tree->domain_);
-    int loc{0};
+    tree->method_.aggregate(node, &tree->domain_); 
+    int loc{0}; 
     if (node->idx.level() >= tree->unif_level_) {
-      int dag_idx = sourcetree_t::get_unif_grid_index(node->idx,
-                                                      tree->unif_level_);
-      loc = tree->rank_of_unif_grid(dag_idx);
-    }
-    method_t::distropolicy_t::assign_for_source(node->dag, loc);
-    hpx_lco_delete_sync(done);
+      int dag_idx = sourcetree_t::get_unif_grid_index(node->idx, 
+                                                      tree->unif_level_); 
+      loc = tree->rank_of_unif_grid(dag_idx); 
+    } 
+
+    int height; 
+    hpx_lco_get(cdone, sizeof(int), &height); 
+    hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
+    hpx_lco_delete_sync(cdone); 
+
+    method_t::distropolicy_t::assign_for_source(node->dag, loc, height);    
     return HPX_SUCCESS;
   }
 
@@ -2863,25 +2870,29 @@ class DualTree {
       int dag_rank = tree->rank_of_unif_grid(dag_idx);
       node->dag.set_parts_locality(dag_rank);
       node->dag.set_normal_locality(dag_rank);
-      hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
+
+      int height = 0; 
+      hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL); 
+
       return HPX_SUCCESS;
     }
 
-    hpx_addr_t cdone = hpx_lco_and_new(n_children);
+   hpx_addr_t cdone = hpx_lco_reduce_new(n_children, sizeof(int), 
+                                          int_max_ident_op, int_max_op); 
     assert(cdone != HPX_NULL);
 
     for (int i = 0; i < 8; ++i) {
-      if (node->child[i] == nullptr) continue;
-      hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
-               &tree, &node->child[i], &cdone);
+      if (node->child[i] == nullptr) continue; 
+      hpx_call(HPX_HERE, source_apply_method_, HPX_NULL, 
+               &tree, &node->child[i], &cdone); 
     }
 
     // Once the children are done, call aggregate here, continuing a set to
     // done once that has happened.
-    assert(cdone != HPX_NULL);
-    hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, done,
-                  &tree, &node, &cdone);
-
+    assert(cdone != HPX_NULL);    
+    hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, HPX_NULL, 
+                  &tree, &node, &cdone, &done);
+    
     return HPX_SUCCESS;
   }
 
@@ -2941,7 +2952,7 @@ class DualTree {
                                                         tree->unif_level_);
         loc = tree->rank_of_unif_grid(dag_idx);
       }
-      method_t::distropolicy_t::assign_for_source(node->dag, loc);
+      method_t::distropolicy_t::assign_for_target(node->dag, loc);
 
       assert(cdone != HPX_NULL);
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
