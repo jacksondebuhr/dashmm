@@ -34,38 +34,307 @@ arguments.
 More detail about this that is relevant for advanced use of the library.
 
 
+
 \section{Basic types}
 
-Domain Geometry. Index. ExpansionRole. Operation.
+The following basic types are needed when implementing user-defined methods and
+expansions.
+
+\subsection{\texttt{Operation}}
+
+DASHMM organizes the transformations between various forms of the potential
+expansion into a set of operations. The \texttt{Operation} scoped enumeration
+identifies the operations that DASHMM recognizes. They are: \texttt{Nop},
+\texttt{StoM}, \texttt{StoL}, \texttt{MtoM}, \texttt{MtoL}, \texttt{LtoL},
+\texttt{MtoT}, \texttt{LtoT}, \texttt{StoT}, \texttt{MtoI}, \texttt{ItoI}
+and \texttt{ItoL}.
+
+\subsection{\texttt{ExpansionRole}}
+
+DASHMM creates Expansion objects in a number of roles. The role is essentially
+a description of which tree in the dual tree an expansion is most closely
+associated with, and whether the expansion is a primary or intermediate
+expansion.  The \texttt{ExpansionRole} is an enumeration with the following
+members: \texttt{kSourcePrimary}, \texttt{kSourceIntermediate},
+\texttt{kTargetPrimary}, \texttt{kTargetIntermediate} and
+\texttt{kNoRoleNeeded}. The latter is for situations that that require an
+operation from the Expansion type, but which do not require expansion data.
+The prototypical example of this is the \texttt{S->T} operation.
+
+\subsection{\texttt{Index}}
+
+Each node of both the source and target trees can be identified with four
+integers: the level of the tree (starting with 0 for the root), and the
+position of the low corner of the node in units of the node size at the given
+level. The index allows DASHMM to not only perform accurate positional
+comparisions, but also to provide an ordering of the nodes of the tree at a
+given level.
+
+The \texttt{Index} type has the following members:
+
+\begin{itemize}
+  \item \texttt{Index::Index(int ix = 0, int iy = 0, int iz = 0, int lvl = 0)}:
+    Construct an Index with the given on-level position and level.
+  \item \texttt{int Index::x() const}: Return the on-level position in the
+    x direction.
+  \item \texttt{int Index::y() const}: Return the on-level position in the
+    y direction.
+  \item \texttt{int Index::z() const}: Return the on-level position in the
+    z direction.
+  \item \texttt{int Index::level() const}: Return the level of the index.
+  \item \texttt{Index Index::parent(int num = 1) const}: Return the
+    \texttt{num}-th parent of this \texttt{Index}.
+  \item \texttt{Index Index::child(int which) const}: Return the given child
+    of this Index. \texttt{which} is a composite value that indicates with
+    each bit if the child is on the left or right in that direction. For
+    example for \texttt{which == 6}, the child is the left child in the
+    z-direction, and the right child in both the y and x directions.
+  \item \texttt{int Index::which\_child() const}: Return which child of its
+    parent, this node is.
+  \item \texttt{bool Index::operator==(const Index \&other)}: Equality operator.
+\end{itemize}
+
+\subsection{\texttt{DomainGeometry}}
+
+To represent the computational domain of the sources and targets, DASHMM
+uses the \texttt{DomainGeometry} object. This object can be used to convert
+an \texttt{Index} into \texttt{Point}s for various locations in the volume
+represented by that index. The domains represented by DASHMM are cubical
+regions.
+
+The \texttt{DomainGeometry} object provides the following methods:
+
+\begin{itemize}
+  \item \texttt{DomainGeometry::DomainGeometry()}: Default construct a domain
+    to begin at the origin, with a zero side length.
+  \item \texttt{DomainGeometry::DomainGeometry(Point low, double size)}:
+    construct a domain with the given low corner, and the given side length.
+  \item \texttt{DomainGeometry::DomainGeometry(Point low, Point high,
+    double f = 1.0)}: Construct a domain from the given low and high corners.
+    The given region need not be cubical. The resulting object will represent
+    the smallest cube that contains the specified volume. Additionally, the
+    final parameter can be used to enlarge the resulting cube by a fixed
+    fraction.
+  \item \texttt{double DomainGeometry::size() const}: return the side length
+    of the represented cubical volume.
+  \item \texttt{Point DomainGeometry::low() const}: return the low corner of
+    the represented volume.
+  \item \texttt{Point DomainGeometry::high() const}: return the high corner of
+    the represented volume.
+  \item \texttt{Point DomainGeometry::center() const}: return the center of the
+    represented volume.
+  \item \texttt{Point DomainGeometry::low\_from\_index(Index idx) const}: return
+    the low corner of the region represented by the given index.
+  \item \texttt{Point DomainGeometry::high\_from\_index(Index idx) const}: return
+    the high corner of the region represented by the given index.
+  \item \texttt{Point DomainGeometry::center\_from\_index(Index idx) const}: return
+    the center of the region represented by the given index.
+  \item \texttt{double DomainGeometry::size\_from\_index(Index idx) const}: return
+    the size of the region represented by the given index.
+\end{itemize}
+
+
 
 \section{Initializing DASHMM}
 
-Go over some of the relevant hpx related arguments here for init.
+Initialization of DASHMM via \texttt{init()} requires providing the command
+line arguments to the program. This is to provide the opportunity to HPX-5 to
+detect any command line arguments that modify its behavior. A full description
+of the available options can be found in the HPX-5 documentation. Here, we
+shall cover those that are most relevant for programs using DASHMM.
+
+NOTE: The material in this section should not be considered to be part of the
+library's interface, and are subject to modification out of the control of
+the DASHMM development team.
+
+The following HPX-5 command line arguments are the most relevant to DASHMM:
+
+\begin{itemize}
+  \item \texttt{--hpx-help}: Display a help message giving a brief description
+    of all available options.
+  \item \texttt{--hpx-threads}: Specify the number of scheduler threads that
+    HPX-5 will use per rank. Typically, one thread per core gives best results,
+    but fewer is sometimes useful in scalability studies.
+  \item \texttt{--hpx-heapsize}: Specify the size in bytes of the amount of
+    global address space available to each rank. The default is frequently too
+    low for large problem sizes. This, however, should not be set to take all
+    of the system memory.
+\end{itemize}
+
+
 
 \section{Evaluation}
 
-Basically just add the distribution policy stuff.
+The \texttt{Evaluator} object has one additional feature that was not
+covered in the previous chapter. In addition to the parameters outlined
+in Chapter~\ref{ch:basic}, one final optional parameter is available.
 
-\section{DASHMM arrays}
+Each Method has a distribution policy that specifies how the DAG nodes are
+to be distributed around the available resources. To allow for these policies
+to have some parameters selectable at runtime, the
+\texttt{Evaluator::evaluate} method accepts a distribution policy object.
+This allows for users to fine-tune the behavior of the distribution if needed.
+When the final argument is not supplied, DASHMM employs a default constructed
+object of the type \texttt{Method<Source, Target, Expansion>::distropolicy\_t},
+where \texttt{Method, Source, Target} and \texttt{Expansion} are the template
+arguments supplied to the particular instance of \texttt{Evaluator}.
 
-Do we need the alternate constructor? From the hpx address?
+
 
 \section{Array map actions}
 
-Go over decomposition template parameter.
+The \texttt{ArrayMapAction} utility class supports a third template parameter
+that controls the level of parallelism employed in the mapping of the work
+to the records in the array. This parameter is an integer that has the
+following meaning: if the argument is zero, the array will be handled in a
+single chunk; if the argument is positive, the array will be handled in a number
+of chunks equal to the number of HPX-5 scheduler threads times the provided
+argument.
+
+The default value of this argument is 1, so the default operation of
+the map will be to split each rank's portion of the array into a number of
+equally sized pieces equal to the number of scheduler threads. Unless there is
+the possibility for variation in the amount of computation that the mapped
+action performs per record, it is likely that the default value will be
+the sufficient. If, however, the work for each record is variable, better
+performance may be achieved with smaller chunks, and thus larger third arguments
+to the template.
+
+The full declaration of \texttt{ArrayMapAction} is as follows:
+
+\begin{verbatim}
+template <typename T, typename E, int factor = 1>
+class ArrayMapAction;
+\end{verbatim}
+
+
 
 \section{DAG objects}
 
+After the dual tree is constructed, DASHMM creates an explicit representation
+of the DAG for the given method applied to the just constructed tree. This DAG
+is used to perform a work distribution, and to act as a scaffold from which
+the actual expansion data is instantiated. For users wishing to implement
+their own methods, the DAG objects are the objects that will be needed. In
+DASHMM, the Method builds a DAG from the dual tree. There are 4 classes that
+make up the DAG system for DASHMM: \texttt{DAG}, \texttt{DAGInfo},
+\texttt{DAGNode} and \texttt{DAGEdge}, which will be covered in turn.
+
+\subsection{\texttt{DAGEdge}}
+
+The edges connecting nodes in the DAG is described with the \texttt{DAGEdge}
+type. This simple type holds a pointer to the source and target
+\texttt{DAGNode} connected by the edges, the \texttt{Operation} that the edge
+represents, and an integer weight that gives an estimate of the communication
+cost of the edge. The weight is optionally used by the distribution policy to
+aid in the decision about data placement around the system. The full definition
+of \texttt{DAGEdge} is as follows:
+
+\begin{verbatim}
+struct DAGEdge {
+  DAGNode *source;          /// Source node of the edge
+  DAGNode *target;          /// Target node of the edge
+  Operation op;             /// Operation to perform along edge
+  int weight;               /// estimate of communication cost if it occurs
+
+  DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop}, weight{0} {}
+  DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
+    : source{start}, target{end}, op{inop}, weight{w} {}
+};
+\end{verbatim}
+
+\subsection{\texttt{DAGNode}}
+
+The nodes of the DAG are represented by the simple type \texttt{DAGNode}. It
+contains the following public members:
+
+\begin{itemize}
+  \item \texttt{std::vector<DAGEdge> out_edges}: the edges of the DAG that
+    start at this node.
+  \item \texttt{std::vector<DAGEdge> in_edges}: the edges of the DAG that end
+    at this node.
+  \item \texttt{Index idx}: the index of the tree node to which this DAG node
+    is associated.
+  \item \texttt{int locality}: the locality to which this node will be assigned
+    by the distribution. Note that this will most often be set by the
+    distribution policy. To indicate that the locality is not set, a value of
+    \texttt{-1} should be used.
+  \item \texttt{int color}: A color that might be used by the distribution
+    policy. This has meaning only in the context of the distribution policy.
+\end{itemize}
+
+\noindent Additionally, there are three member functions:\
+
+\begin{itemize}
+  \item \texttt{DAGNode::DAGNode(Index i)}: Construct a DAG node. This will set
+    the index to the given value, give the locality a value of \texttt{-1}, and
+    default construct the remaining members of the node.
+  \item \texttt{void DAGNode::add_out_edge(DAGNode *end, Operation op,
+    int weight)}: Add an out edge from this node to the given node with the
+    given operation and the given weight. Note, this will not add the equivalent
+    edge to the target node of the edge.
+  \item \texttt{void DAGNode::add_in_edge(DAGNode *start, Operation op,
+    int weight)}: Add an in edge from the given node to this node with the
+    given operation and the given weight. Note, this will not add the equivalent
+    edge to the source node of the edge.
+\end{itemize}
+
+\noindent In practice, the latter two are typically not needed, see
+\texttt{DAGInfo} below.
+
+
+\subsection{\texttt{DAG}}
+
+The \texttt{DAG} object is given to a distribution policy when computing the
+localities of the nodes in the DAG. This is another simple object that contains
+four containers of the nodes of the DAG. These containers separate the nodes
+by their position in the DAG.
+
+The \texttt{DAG} object has the following members:
+
+\begin{itemize}
+  \item \texttt{std::vector<DAGNode *> source_leaves}: Nodes of the DAG that
+    are associated with leaves of the source tree. These nodes will have no
+    incoming edges.
+  \item \texttt{std::vector<DAGNode *> source_nodes}: All other DAG nodes that
+    are associated with nodes of the source tree.
+  \item \texttt{std::vector<DAGNode *> target_leaves}: Nodes of the DAG that are
+    associated with leaves of the target tree. These nodes will have no outgoing
+    edges. In some methods, these are not associated with the leaves of the
+    target tree, but rather those nodes of the target tree after which more
+    refinement for the method would only induce unnecessary overhead.
+  \item \texttt{std::vector<DAGNode *> target_nodes}: All other DAG nodes that
+    are associated with node of the target tree.
+\end{itemize}
+
+
+\subsection{\texttt{DAGInfo}}
+
+The \texttt{DAGInfo} object contains all the information related to the DAG
+for each node of the source and target trees. These objects will be the
+primary means by which a Method interacts with the DAG.
+
+
 \section{Built-in methods}
 
+
+
 \section{Built-in expansions}
+
+
 
 \section{Built-in distribution policies}
 
 Also go over the default policy
 
+
+
 \section{User-defined Expansions}
 
+
+
 \section{User-defined Methods}
+
+
 
 \section{User-defined distribution policies}
