@@ -169,12 +169,22 @@ std::map<const DAGNode *, int> create_dagnode_to_index(DAG &dag) {
   std::map<const DAGNode *, int> retval{};
   retval[nullptr] = 0;    // we use nullptr for the count
 
-  add_dagnode_to_index_entries(dag.source_leaves, retval);
+  //add_dagnode_to_index_entries(dag.source_leaves, retval);
   add_dagnode_to_index_entries(dag.source_nodes, retval);
   add_dagnode_to_index_entries(dag.target_nodes, retval);
-  add_dagnode_to_index_entries(dag.target_leaves, retval);
+  //add_dagnode_to_index_entries(dag.target_leaves, retval);
 
   return retval;
+}
+
+
+bool skip_SandT_operations(Operation op) {
+  bool skip{false};
+  if (op == Operation::StoT || op == Operation::StoM || op == Operation::StoL
+      || op == Operation::LtoT || op == Operation::MtoT) {
+    skip = true;
+  }
+  return skip;
 }
 
 
@@ -186,6 +196,7 @@ void append_out_edges(std::map<const DAGNode *, int> &dtoi,
     // loop over the out edges
     std::vector<DAGEdge> &out = nodes[i]->out_edges;
     for (size_t j = 0; j < out.size(); ++j) {
+      if (skip_SandT_operations(out[j].op)) continue;
       edges.emplace_back(
         Edge{dtoi[out[j].source], dtoi[out[j].target], out[j].weight, out[j].op}
       );
@@ -198,7 +209,7 @@ std::vector<Edge> create_edges(std::map<const DAGNode *, int> &dtoi,
                                DAG &dag) {
   std::vector<Edge> retval{};
 
-  append_out_edges(dtoi, dag.source_leaves, retval);
+  //append_out_edges(dtoi, dag.source_leaves, retval);
   append_out_edges(dtoi, dag.source_nodes, retval);
   append_out_edges(dtoi, dag.target_nodes, retval);
   // No target_leaves, as they have no out edges
@@ -211,11 +222,11 @@ std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
                                DAG &dag) {
   std::vector<Node> retval(dtoi.size() - 1);
 
-  for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
-    retval[dtoi[dag.source_leaves[i]]].type = NodeType::Source;
-    retval[dtoi[dag.source_leaves[i]]].locality
-        = dag.source_leaves[i]->locality;
-  }
+  //for (size_t i = 0; i < dag.source_leaves.size(); ++i) {
+  //  retval[dtoi[dag.source_leaves[i]]].type = NodeType::Source;
+  //  retval[dtoi[dag.source_leaves[i]]].locality
+  //      = dag.source_leaves[i]->locality;
+  //}
   for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
     if (dag.source_nodes[i]->out_edges.size() == 0) {
       retval[dtoi[dag.source_nodes[i]]].type = NodeType::Multipole;
@@ -234,11 +245,11 @@ std::vector<Node> create_nodes(std::map<const DAGNode *, int> &dtoi,
     }
     retval[dtoi[dag.target_nodes[i]]].locality = dag.target_nodes[i]->locality;
   }
-  for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
-    retval[dtoi[dag.target_leaves[i]]].type = NodeType::Target;
-    retval[dtoi[dag.target_leaves[i]]].locality
-        = dag.target_leaves[i]->locality;
-  }
+  //for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
+  //  retval[dtoi[dag.target_leaves[i]]].type = NodeType::Target;
+  //  retval[dtoi[dag.target_leaves[i]]].locality
+  //      = dag.target_leaves[i]->locality;
+  //}
   return retval;
 }
 

@@ -43,6 +43,10 @@
 namespace dashmm {
 
 
+// TODO: Should this stuff all be in a namespace DAG? So dashmm::DAG::Edge
+// and so on? It is a bit cleaner perhaps.
+
+
 struct DAGNode;
 
 
