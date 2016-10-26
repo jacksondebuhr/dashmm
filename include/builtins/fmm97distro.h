@@ -41,13 +41,8 @@ class FMM97Distro {
  public:
   FMM97Distro() { }
   void compute_distribution(DAG &dag);
-  static void assign_for_source(DAGInfo &dag, int locality) { }
-  static void assign_for_target(DAGInfo &dag, int locality) { }
-
- private:
-  void color(DAGNode *n);
-  void confine(DAGNode *n, char type);
-  void assign(DAGNode *n);
+  static void assign_for_source(DAGInfo &dag, int locality, int height); 
+  static void assign_for_target(DAGInfo &dag, int locality); 
 };
 
 
