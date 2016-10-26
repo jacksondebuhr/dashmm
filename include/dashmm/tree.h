@@ -1438,8 +1438,8 @@ class DualTree {
   /// \returns - the resulting DAG.
   DAG *create_DAG() {
     // Do work on the source tree
-    hpx_addr_t sdone = hpx_lco_future_new(0);
-    assert(sdone != HPX_NULL);
+    hpx_addr_t sdone = hpx_lco_future_new(sizeof(int)); 
+    assert(sdone != HPX_NULL); 
 
     dualtree_t *thetree = this;
     hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
@@ -2877,7 +2877,7 @@ class DualTree {
       return HPX_SUCCESS;
     }
 
-   hpx_addr_t cdone = hpx_lco_reduce_new(n_children, sizeof(int), 
+    hpx_addr_t cdone = hpx_lco_reduce_new(n_children, sizeof(int), 
                                           int_max_ident_op, int_max_op); 
     assert(cdone != HPX_NULL);
 
@@ -2886,7 +2886,7 @@ class DualTree {
       hpx_call(HPX_HERE, source_apply_method_, HPX_NULL, 
                &tree, &node->child[i], &cdone); 
     }
-
+    
     // Once the children are done, call aggregate here, continuing a set to
     // done once that has happened.
     assert(cdone != HPX_NULL);    
