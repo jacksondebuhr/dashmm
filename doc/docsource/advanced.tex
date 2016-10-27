@@ -249,9 +249,9 @@ The nodes of the DAG are represented by the simple type \texttt{DAGNode}. It
 contains the following public members:
 
 \begin{itemize}
-  \item \texttt{std::vector<DAGEdge> out_edges}: the edges of the DAG that
+  \item \texttt{std::vector<DAGEdge> out\_edges}: the edges of the DAG that
     start at this node.
-  \item \texttt{std::vector<DAGEdge> in_edges}: the edges of the DAG that end
+  \item \texttt{std::vector<DAGEdge> in\_edges}: the edges of the DAG that end
     at this node.
   \item \texttt{Index idx}: the index of the tree node to which this DAG node
     is associated.
@@ -263,17 +263,17 @@ contains the following public members:
     policy. This has meaning only in the context of the distribution policy.
 \end{itemize}
 
-\noindent Additionally, there are three member functions:\
+\noindent Additionally, there are three member functions:
 
 \begin{itemize}
   \item \texttt{DAGNode::DAGNode(Index i)}: Construct a DAG node. This will set
     the index to the given value, give the locality a value of \texttt{-1}, and
     default construct the remaining members of the node.
-  \item \texttt{void DAGNode::add_out_edge(DAGNode *end, Operation op,
+  \item \texttt{void DAGNode::add\_out\_edge(DAGNode *end, Operation op,
     int weight)}: Add an out edge from this node to the given node with the
     given operation and the given weight. Note, this will not add the equivalent
     edge to the target node of the edge.
-  \item \texttt{void DAGNode::add_in_edge(DAGNode *start, Operation op,
+  \item \texttt{void DAGNode::add\_in\_edge(DAGNode *start, Operation op,
     int weight)}: Add an in edge from the given node to this node with the
     given operation and the given weight. Note, this will not add the equivalent
     edge to the source node of the edge.
@@ -293,17 +293,17 @@ by their position in the DAG.
 The \texttt{DAG} object has the following members:
 
 \begin{itemize}
-  \item \texttt{std::vector<DAGNode *> source_leaves}: Nodes of the DAG that
+  \item \texttt{std::vector<DAGNode *> source\_leaves}: Nodes of the DAG that
     are associated with leaves of the source tree. These nodes will have no
     incoming edges.
-  \item \texttt{std::vector<DAGNode *> source_nodes}: All other DAG nodes that
+  \item \texttt{std::vector<DAGNode *> source\_nodes}: All other DAG nodes that
     are associated with nodes of the source tree.
-  \item \texttt{std::vector<DAGNode *> target_leaves}: Nodes of the DAG that are
+  \item \texttt{std::vector<DAGNode *> target\_leaves}: Nodes of the DAG that are
     associated with leaves of the target tree. These nodes will have no outgoing
     edges. In some methods, these are not associated with the leaves of the
     target tree, but rather those nodes of the target tree after which more
     refinement for the method would only induce unnecessary overhead.
-  \item \texttt{std::vector<DAGNode *> target_nodes}: All other DAG nodes that
+  \item \texttt{std::vector<DAGNode *> target\_nodes}: All other DAG nodes that
     are associated with node of the target tree.
 \end{itemize}
 
@@ -314,13 +314,157 @@ The \texttt{DAGInfo} object contains all the information related to the DAG
 for each node of the source and target trees. These objects will be the
 primary means by which a Method interacts with the DAG.
 
+Each \texttt{DAGInfo} object represents up to three DAG nodes: a particles
+node, the normal DAG node, and an intemediate DAG node. The particles node
+represents the terminal nodes of the DAG: either the information about
+the sources, or the information about the targets. These DAG nodes do not
+represent expansions. The normal
+DAG node represents expansions with a role of \texttt{kSourcePrimary} or
+\texttt{KTargetPrimary}. The intermediate node represents expansions with a
+role of \texttt{kSouceIntermediate} or \texttt{kTargetIntermediate}. A
+particular method might not use certain expansion roles, so a
+\texttt{DAGInfo} object might not contain the normal or intermediate DAG node.
+Further, not all tree nodes are leaves, and so only some \texttt{DAGInfo}
+objects will have a particles node.
 
-\section{Built-in methods}
+This object manages the concurrent modification of the DAG. However, that
+management is hidden from users of this object.
 
+The \texttt{DAGInfo} methods that a user might need to use in a Method are
+covered below.
 
+\subsubsection{\texttt{Index DAGInfo::index() const}}
 
-\section{Built-in expansions}
+Return the index of the volume represented by the DAG nodes owned by this
+object.
 
+\subsubsection{\texttt{bool DAGInfo::add\_normal()}}
+
+Add a normal DAG node to this object. This will return \texttt{true} if this
+call added the node. Otherwise, if the \texttt{DAGNode} already owns a normal
+node, this call will do nothing, and return false.
+
+\subsubsection{\texttt{bool DAGInfo::add\_interm()}}
+
+Add an intermediate DAG node to this object. This will return \texttt{true} if
+this call added the node. Otherwise, if the \texttt{DAGNode} already owns an
+intermediate node, this call will do nothing, and return \texttt{false}.
+
+\subsubsection{\texttt{bool DAGInfo::add\_parts()}}
+
+Add a particles DAG node to this object. This will return \texttt{true} if this
+call added the node. Otherwise, if the \texttt{DAGNode} already owns a particles
+node, this call will do nothing, and return false.
+
+\subsubsection{\texttt{bool DAGInfo::has\_normal() const}}
+
+Predicate returning if this object owns a normal DAG node.
+
+\subsubsection{\texttt{bool DAGInfo::has\_interm() const}}
+
+Predicate returning if this object owns an intermediate DAG node.
+
+\subsubsection{\texttt{bool DAGInfo::has\_parts() const}}
+
+Predicate returning of this object owns a particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::set\_normal\_locality(int loc)}}
+
+Set the locality for the normal DAG node, if it exists, to the given
+locality, \texttt{loc}.
+
+\subsubsection{\texttt{void DAGInfo::set\_interm\_locality(int loc)}}
+
+Set the locality for the intermediate DAG node, if it exists, to the given
+locality, \texttt{loc}.
+
+\subsubsection{\texttt{void DAGInfo::StoM(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{S->M} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a particles
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::StoL(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{S->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a particles
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoM(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{M->M} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoL(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{M->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::LtoL(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{L->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoT(DAGInfo *target, int weight)}}
+
+Connect the normal DAG node of this object to the particles DAG node of
+\texttt{source} with an \texttt{M->T} operation, and assign the resulting edge
+the given \texttt{weight}. It is an error to call this method if this object
+does not own a normal DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::LtoT(DAGInfo *target, int weight)}}
+
+Connect the normal DAG node of this object to the particles DAG node of
+\texttt{source} with an \texttt{L->T} operation, and assign the resulting edge
+the given \texttt{weight}. It is an error to call this method if this object
+does not own a normal DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::StoT(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the particles DAG node of
+this object with an \texttt{S->T} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a particles DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoI(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the intermediate DAG node of
+this object with an \texttt{M->I} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own an
+intermediate DAG node.
+
+\subsubsection{\texttt{void DAGInfo::ItoI(DAGInfo *source, int weight)}}
+
+Connect the intermediate DAG node of \texttt{source} to the intermediate DAG
+node of this object with an \texttt{I->I} operation, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own an intermediate DAG node, and if the \texttt{source} does
+not own an intermediate DAG node.
+
+\subsubsection{\texttt{void DAGInfo::ItoL(DAGInfo *source, int weight)}}
+
+Connect the intermediate DAG node of \texttt{source} to the normal DAG
+node of this object with an \texttt{I->L} operation, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does
+not own an intermediate DAG node.
 
 
 \section{Built-in distribution policies}
