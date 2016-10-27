@@ -1036,7 +1036,6 @@ class Laplace {
     if (op == Operation::MtoI) {
       weight = 6;
     } else if (op == Operation::ItoI) {
-      int weight = 0;
       int dx = s.x() - 2 * t.x();
       int dy = s.y() - 2 * t.y();
       int dz = s.z() - 2 * t.z();
