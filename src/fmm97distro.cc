@@ -33,10 +33,15 @@ namespace dashmm {
 
 void FMM97Distro::assign_for_source(DAGInfo &dag, int locality, int height) {
   DAGNode *normal = dag.normal(); 
-
   if (normal != nullptr) {
     normal->locality = locality; 
     normal->color = height + 1; 
+  }
+
+  DAGNode *interm = dag.interm(); 
+  if (interm != nullptr) {
+    interm->locality = locality; 
+    interm->color = height + 2;
   }
 }
 
@@ -55,18 +60,12 @@ void FMM97Distro::assign_for_target(DAGInfo &dag, int locality) {
 
     for (size_t i = 0; i < interm->in_edges.size(); ++i) {
       int w = interm->in_edges[i].weight; 
-      DAGNode *Is = interm->in_edges[i].source; 
-      DAGNode *M = Is->in_edges[0].source; 
+      int c = interm->in_edges[i].source->color; 
+      int source_locality = interm->in_edges[i].source->locality; 
       
-      Is->locality = M->locality; 
-      Is->color = M->color + 1; 
-
-      int c = Is->color; 
-      int source_locality = Is->locality; 
-
       color[source_locality] = std::max(color[source_locality], c); 
       weight[source_locality] += w; 
-      in_weight += w; 
+      in_weight += w;
     }
 
     int min_weight = std::numeric_limits<int>::max(); 
@@ -95,6 +94,10 @@ void FMM97Distro::assign_for_target(DAGInfo &dag, int locality) {
 
 
 void FMM97Distro::compute_distribution(DAG &dag) {
+  // TODO: 
+  // There may exist some nodes in the source_nodes container that do not have
+  // outgoing edges. In the future, these nodes can be eliminated (no allocation
+  // or work scheduled). 
 }
 
 } // dashmm

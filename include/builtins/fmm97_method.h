@@ -71,6 +71,10 @@ class FMM97 {
       assert(curr->dag.add_normal() == true);
       curr->dag.StoM(&curr->dag,
                      expansion_t::weight_estimate(Operation::StoM));
+
+      assert(curr->dag.add_interm() == true); 
+      curr->dag.MtoI(&curr->dag, 
+                     expansion_t::weight_estimate(Operation::MtoI)); 
     }
   }
 
@@ -84,6 +88,10 @@ class FMM97 {
                          expansion_t::weight_estimate(Operation::MtoM));
         }
       }
+
+      assert(curr->dag.add_interm() == true); 
+      curr->dag.MtoI(&curr->dag, 
+                     expansion_t::weight_estimate(Operation::MtoI)); 
     }
   }
 
@@ -111,7 +119,6 @@ class FMM97 {
     int StoL = expansion_t::weight_estimate(Operation::StoL);
     int StoT = expansion_t::weight_estimate(Operation::StoT);
     int LtoT = expansion_t::weight_estimate(Operation::LtoT);
-    int MtoI = expansion_t::weight_estimate(Operation::MtoI);
 
     // If a source node S is at the same level as \p curr and is well separated
     // from \p curr, skip S as its contribution to \p curr has been processed by
@@ -136,7 +143,7 @@ class FMM97 {
       }
     } else {
       std::vector<sourcenode_t *> newcons{};
-      std::vector<sourcenode_t *> merge{};
+      std::vector<sourcenode_t *> merge{}; 
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -172,16 +179,12 @@ class FMM97 {
       if (merge.size()) {
         assert(curr->dag.add_interm() == true);
         for (auto S = merge.begin(); S != merge.end(); ++S) {
-          if ((*S)->dag.add_interm())
-            (*S)->dag.MtoI(&(*S)->dag, MtoI);
-
           curr->dag.ItoI(&(*S)->dag,
                          expansion_t::weight_estimate(Operation::ItoI,
                                                       (*S)->idx,
                                                       t_index));
         }
       }
-
       consider = std::move(newcons);
     }
   }
