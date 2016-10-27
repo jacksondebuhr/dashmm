@@ -109,7 +109,7 @@ class Index {
   }
 
   /// Equality operator
-  bool operator==(const Index &other) {
+  bool operator==(const Index &other) const {
     return (level_ == other.level_
               && idx_[0] == other.idx_[0]
               && idx_[1] == other.idx_[1]
