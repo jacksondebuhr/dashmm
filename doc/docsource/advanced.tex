@@ -70,29 +70,45 @@ level. The index allows DASHMM to not only perform accurate positional
 comparisions, but also to provide an ordering of the nodes of the tree at a
 given level.
 
-The \texttt{Index} type has the following members:
+\subsubsection{\texttt{Index::Index(int ix = 0, int iy = 0, int iz = 0, int lvl = 0)}}
 
-\begin{itemize}
-  \item \texttt{Index::Index(int ix = 0, int iy = 0, int iz = 0, int lvl = 0)}:
-    Construct an Index with the given on-level position and level.
-  \item \texttt{int Index::x() const}: Return the on-level position in the
-    x direction.
-  \item \texttt{int Index::y() const}: Return the on-level position in the
-    y direction.
-  \item \texttt{int Index::z() const}: Return the on-level position in the
-    z direction.
-  \item \texttt{int Index::level() const}: Return the level of the index.
-  \item \texttt{Index Index::parent(int num = 1) const}: Return the
-    \texttt{num}-th parent of this \texttt{Index}.
-  \item \texttt{Index Index::child(int which) const}: Return the given child
-    of this Index. \texttt{which} is a composite value that indicates with
-    each bit if the child is on the left or right in that direction. For
-    example for \texttt{which == 6}, the child is the left child in the
-    z-direction, and the right child in both the y and x directions.
-  \item \texttt{int Index::which\_child() const}: Return which child of its
-    parent, this node is.
-  \item \texttt{bool Index::operator==(const Index \&other)}: Equality operator.
-\end{itemize}
+Construct an Index with the given on-level position and level.
+
+\subsubsection{\texttt{int Index::x() const}}
+
+Return the on-level position in the x direction.
+
+\subsubsection{\texttt{int Index::y() const}}
+
+Return the on-level position in the y direction.
+
+\subsubsection{\texttt{int Index::z() const}}
+
+Return the on-level position in the z direction.
+
+\subsubsection{\texttt{int Index::level() const}}
+
+Return the level of the index.
+
+\subsubsection{\texttt{Index Index::parent(int num = 1) const}}
+
+Return the \texttt{num}-th parent of this \texttt{Index}.
+
+\subsubsection{\texttt{Index Index::child(int which) const}}
+
+Return the given child of this Index. \texttt{which} is a composite value
+that indicates with each bit if the child is on the left or right in that
+direction. For example for \texttt{which == 6}, the child is the left child
+in the z-direction, and the right child in both the y and x directions.
+
+\subsubsection{\texttt{int Index::which\_child() const}}
+
+Return which child of its parent, this node is.
+
+\subsubsection{\texttt{bool Index::operator==(const Index \&other) const}}
+
+Equality operator.
+
 
 \subsection{\texttt{DomainGeometry}}
 
@@ -102,36 +118,52 @@ an \texttt{Index} into \texttt{Point}s for various locations in the volume
 represented by that index. The domains represented by DASHMM are cubical
 regions.
 
-The \texttt{DomainGeometry} object provides the following methods:
+\subsubsection{\texttt{DomainGeometry::DomainGeometry()}}
 
-\begin{itemize}
-  \item \texttt{DomainGeometry::DomainGeometry()}: Default construct a domain
-    to begin at the origin, with a zero side length.
-  \item \texttt{DomainGeometry::DomainGeometry(Point low, double size)}:
-    construct a domain with the given low corner, and the given side length.
-  \item \texttt{DomainGeometry::DomainGeometry(Point low, Point high,
-    double f = 1.0)}: Construct a domain from the given low and high corners.
-    The given region need not be cubical. The resulting object will represent
-    the smallest cube that contains the specified volume. Additionally, the
-    final parameter can be used to enlarge the resulting cube by a fixed
-    fraction.
-  \item \texttt{double DomainGeometry::size() const}: return the side length
-    of the represented cubical volume.
-  \item \texttt{Point DomainGeometry::low() const}: return the low corner of
-    the represented volume.
-  \item \texttt{Point DomainGeometry::high() const}: return the high corner of
-    the represented volume.
-  \item \texttt{Point DomainGeometry::center() const}: return the center of the
-    represented volume.
-  \item \texttt{Point DomainGeometry::low\_from\_index(Index idx) const}: return
-    the low corner of the region represented by the given index.
-  \item \texttt{Point DomainGeometry::high\_from\_index(Index idx) const}: return
-    the high corner of the region represented by the given index.
-  \item \texttt{Point DomainGeometry::center\_from\_index(Index idx) const}: return
-    the center of the region represented by the given index.
-  \item \texttt{double DomainGeometry::size\_from\_index(Index idx) const}: return
-    the size of the region represented by the given index.
-\end{itemize}
+Default construct a domain to begin at the origin, with a zero side length.
+
+\subsubsection{\texttt{DomainGeometry::DomainGeometry(Point low, double size)}}
+
+Construct a domain with the given low corner, and the given side length.
+
+\subsubsection{\texttt{DomainGeometry::DomainGeometry(Point low, Point high, double f = 1.0)}}
+
+Construct a domain from the given low and high corners. The given region need
+not be cubical. The resulting object will represent the smallest cube that
+contains the specified volume. Additionally, the final parameter can be used
+to enlarge the resulting cube by a fixed fraction.
+
+\subsubsection{\texttt{double DomainGeometry::size() const}}
+
+Return the side length of the represented cubical volume.
+
+\subsubsection{\texttt{Point DomainGeometry::low() const}}
+
+Return the low corner of the represented volume.
+
+\subsubsection{\texttt{Point DomainGeometry::high() const}}
+
+Return the high corner of the represented volume.
+
+\subsubsection{\texttt{Point DomainGeometry::center() const}}
+
+Return the center of the represented volume.
+
+\subsubsection{\texttt{Point DomainGeometry::low\_from\_index(Index idx) const}}
+
+Return the low corner of the region represented by the given index.
+
+\subsubsection{\texttt{Point DomainGeometry::high\_from\_index(Index idx) const}}
+
+Return the high corner of the region represented by the given index.
+
+\subsubsection{\texttt{Point DomainGeometry::center\_from\_index(Index idx) const}}
+
+Return the center of the region represented by the given index.
+
+\subsubsection{\texttt{double DomainGeometry::size\_from\_index(Index idx) const}}
+
+Return the size of the region represented by the given index.
 
 
 
@@ -149,17 +181,21 @@ the DASHMM development team.
 
 The following HPX-5 command line arguments are the most relevant to DASHMM:
 
-\begin{itemize}
-  \item \texttt{--hpx-help}: Display a help message giving a brief description
-    of all available options.
-  \item \texttt{--hpx-threads}: Specify the number of scheduler threads that
-    HPX-5 will use per rank. Typically, one thread per core gives best results,
-    but fewer is sometimes useful in scalability studies.
-  \item \texttt{--hpx-heapsize}: Specify the size in bytes of the amount of
-    global address space available to each rank. The default is frequently too
-    low for large problem sizes. This, however, should not be set to take all
-    of the system memory.
-\end{itemize}
+\subsubsection{\texttt{--hpx-help}}
+
+Display a help message giving a brief description of all available options.
+
+\subsubsection{\texttt{--hpx-threads}}
+
+Specify the number of scheduler threads that HPX-5 will use per rank.
+Typically, one thread per core gives best results, but fewer is sometimes
+useful in scalability studies.
+
+\subsubsection{\texttt{--hpx-heapsize}}
+
+Specify the size in bytes of the amount of global address space available to
+each rank. The default is frequently too low for large problem sizes. This,
+however, should not be set to take all of the system memory.
 
 
 
@@ -230,57 +266,56 @@ cost of the edge. The weight is optionally used by the distribution policy to
 aid in the decision about data placement around the system. The full definition
 of \texttt{DAGEdge} is as follows:
 
-\begin{verbatim}
-struct DAGEdge {
-  DAGNode *source;          /// Source node of the edge
-  DAGNode *target;          /// Target node of the edge
-  Operation op;             /// Operation to perform along edge
-  int weight;               /// estimate of communication cost if it occurs
+\subsubsection{\texttt{DAGNode *DAGEdge::source}}
 
-  DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop}, weight{0} {}
-  DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
-    : source{start}, target{end}, op{inop}, weight{w} {}
-};
-\end{verbatim}
+Source node of the edge.
+
+\subsubsection{\texttt{DAGNode *DAGEdge::target}}
+
+Target node of the edge.
+
+\subsubsection{\texttt{Operation DAGEdge::op}}
+
+Operation to perform along edge.
+
+\subsubsection{\texttt{int DAGEdge::weight}}
+
+Estimate of communication cost required if the edge were to span localities.
+
 
 \subsection{\texttt{DAGNode}}
 
 The nodes of the DAG are represented by the simple type \texttt{DAGNode}. It
 contains the following public members:
 
-\begin{itemize}
-  \item \texttt{std::vector<DAGEdge> out_edges}: the edges of the DAG that
-    start at this node.
-  \item \texttt{std::vector<DAGEdge> in_edges}: the edges of the DAG that end
-    at this node.
-  \item \texttt{Index idx}: the index of the tree node to which this DAG node
-    is associated.
-  \item \texttt{int locality}: the locality to which this node will be assigned
-    by the distribution. Note that this will most often be set by the
-    distribution policy. To indicate that the locality is not set, a value of
-    \texttt{-1} should be used.
-  \item \texttt{int color}: A color that might be used by the distribution
-    policy. This has meaning only in the context of the distribution policy.
-\end{itemize}
+\subsubsection{\texttt{std::vector<DAGEdge> DAGNode::out\_edges}}
 
-\noindent Additionally, there are three member functions:\
+The edges of the DAG that start at this node.
 
-\begin{itemize}
-  \item \texttt{DAGNode::DAGNode(Index i)}: Construct a DAG node. This will set
-    the index to the given value, give the locality a value of \texttt{-1}, and
-    default construct the remaining members of the node.
-  \item \texttt{void DAGNode::add_out_edge(DAGNode *end, Operation op,
-    int weight)}: Add an out edge from this node to the given node with the
-    given operation and the given weight. Note, this will not add the equivalent
-    edge to the target node of the edge.
-  \item \texttt{void DAGNode::add_in_edge(DAGNode *start, Operation op,
-    int weight)}: Add an in edge from the given node to this node with the
-    given operation and the given weight. Note, this will not add the equivalent
-    edge to the source node of the edge.
-\end{itemize}
+\subsubsection{\texttt{std::vector<DAGEdge> DAGNode::in\_edges}}
 
-\noindent In practice, the latter two are typically not needed, see
-\texttt{DAGInfo} below.
+The edges of the DAG that end at this node.
+
+\subsubsection{\texttt{Index DAGNode::idx}}
+
+The index of the tree node to which this DAG node is associated.
+
+\subsubsection{\texttt{int DAGNode::locality}}
+
+The locality to which this node will be assigned by the distribution. Note
+that this will most often be set by the distribution policy. To indicate that
+the locality is not set, a value of \texttt{-1} should be used.
+
+\subsubsection{\texttt{int DAGNode::color}}
+
+A color that might be used by the distribution policy. This has meaning only
+in the context of the distribution policy.
+
+\subsubsection{\texttt{DAGNode::DAGNode(Index i)}}
+
+Construct a DAG node. This will set the index to the given value, give the
+locality a value of \texttt{-1}, and default construct the remaining members
+of the node.
 
 
 \subsection{\texttt{DAG}}
@@ -292,20 +327,27 @@ by their position in the DAG.
 
 The \texttt{DAG} object has the following members:
 
-\begin{itemize}
-  \item \texttt{std::vector<DAGNode *> source_leaves}: Nodes of the DAG that
-    are associated with leaves of the source tree. These nodes will have no
-    incoming edges.
-  \item \texttt{std::vector<DAGNode *> source_nodes}: All other DAG nodes that
-    are associated with nodes of the source tree.
-  \item \texttt{std::vector<DAGNode *> target_leaves}: Nodes of the DAG that are
-    associated with leaves of the target tree. These nodes will have no outgoing
-    edges. In some methods, these are not associated with the leaves of the
-    target tree, but rather those nodes of the target tree after which more
-    refinement for the method would only induce unnecessary overhead.
-  \item \texttt{std::vector<DAGNode *> target_nodes}: All other DAG nodes that
-    are associated with node of the target tree.
-\end{itemize}
+\subsubsection{\texttt{std::vector<DAGNode *> source\_leaves}}
+
+Nodes of the DAG that are associated with leaves of the source tree. These
+nodes will have no incoming edges.
+
+\subsubsection{\texttt{std::vector<DAGNode *> source\_nodes}}
+
+All other DAG nodes that are associated with nodes of the source tree.
+
+\subsubsection{\texttt{std::vector<DAGNode *> target\_leaves}}
+
+Nodes of the DAG that are associated with leaves of the target tree. These
+nodes will have no outgoing edges. In some methods, these are not associated
+with the leaves of the target tree, but rather those nodes of the target
+tree after which more refinement for the method would only induce
+unnecessary overhead.
+
+\subsubsection{\texttt{std::vector<DAGNode *> target\_nodes}}
+
+All other DAG nodes that are associated with node of the target tree.
+
 
 
 \subsection{\texttt{DAGInfo}}
@@ -314,13 +356,157 @@ The \texttt{DAGInfo} object contains all the information related to the DAG
 for each node of the source and target trees. These objects will be the
 primary means by which a Method interacts with the DAG.
 
+Each \texttt{DAGInfo} object represents up to three DAG nodes: a particles
+node, the normal DAG node, and an intemediate DAG node. The particles node
+represents the terminal nodes of the DAG: either the information about
+the sources, or the information about the targets. These DAG nodes do not
+represent expansions. The normal
+DAG node represents expansions with a role of \texttt{kSourcePrimary} or
+\texttt{KTargetPrimary}. The intermediate node represents expansions with a
+role of \texttt{kSouceIntermediate} or \texttt{kTargetIntermediate}. A
+particular method might not use certain expansion roles, so a
+\texttt{DAGInfo} object might not contain the normal or intermediate DAG node.
+Further, not all tree nodes are leaves, and so only some \texttt{DAGInfo}
+objects will have a particles node.
 
-\section{Built-in methods}
+This object manages the concurrent modification of the DAG. However, that
+management is hidden from users of this object.
 
+The \texttt{DAGInfo} methods that a user might need to use in a Method are
+covered below.
 
+\subsubsection{\texttt{Index DAGInfo::index() const}}
 
-\section{Built-in expansions}
+Return the index of the volume represented by the DAG nodes owned by this
+object.
 
+\subsubsection{\texttt{bool DAGInfo::add\_normal()}}
+
+Add a normal DAG node to this object. This will return \texttt{true} if this
+call added the node. Otherwise, if the \texttt{DAGNode} already owns a normal
+node, this call will do nothing, and return false.
+
+\subsubsection{\texttt{bool DAGInfo::add\_interm()}}
+
+Add an intermediate DAG node to this object. This will return \texttt{true} if
+this call added the node. Otherwise, if the \texttt{DAGNode} already owns an
+intermediate node, this call will do nothing, and return \texttt{false}.
+
+\subsubsection{\texttt{bool DAGInfo::add\_parts()}}
+
+Add a particles DAG node to this object. This will return \texttt{true} if this
+call added the node. Otherwise, if the \texttt{DAGNode} already owns a particles
+node, this call will do nothing, and return false.
+
+\subsubsection{\texttt{bool DAGInfo::has\_normal() const}}
+
+Predicate returning if this object owns a normal DAG node.
+
+\subsubsection{\texttt{bool DAGInfo::has\_interm() const}}
+
+Predicate returning if this object owns an intermediate DAG node.
+
+\subsubsection{\texttt{bool DAGInfo::has\_parts() const}}
+
+Predicate returning of this object owns a particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::set\_normal\_locality(int loc)}}
+
+Set the locality for the normal DAG node, if it exists, to the given
+locality, \texttt{loc}.
+
+\subsubsection{\texttt{void DAGInfo::set\_interm\_locality(int loc)}}
+
+Set the locality for the intermediate DAG node, if it exists, to the given
+locality, \texttt{loc}.
+
+\subsubsection{\texttt{void DAGInfo::StoM(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{S->M} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a particles
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::StoL(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{S->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a particles
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoM(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{M->M} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoL(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{M->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::LtoL(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the normal DAG node of
+this object with an \texttt{L->L} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own a normal
+DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoT(DAGInfo *target, int weight)}}
+
+Connect the normal DAG node of this object to the particles DAG node of
+\texttt{source} with an \texttt{M->T} operation, and assign the resulting edge
+the given \texttt{weight}. It is an error to call this method if this object
+does not own a normal DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::LtoT(DAGInfo *target, int weight)}}
+
+Connect the normal DAG node of this object to the particles DAG node of
+\texttt{source} with an \texttt{L->T} operation, and assign the resulting edge
+the given \texttt{weight}. It is an error to call this method if this object
+does not own a normal DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::StoT(DAGInfo *source, int weight)}}
+
+Connect the particles DAG node of \texttt{source} to the particles DAG node of
+this object with an \texttt{S->T} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a particles DAG node, and if the \texttt{source} does not own a
+particles DAG node.
+
+\subsubsection{\texttt{void DAGInfo::MtoI(DAGInfo *source, int weight)}}
+
+Connect the normal DAG node of \texttt{source} to the intermediate DAG node of
+this object with an \texttt{M->I} operation, and assign the resulting edge the
+given \texttt{weight}. It is an error to call this method if this object does
+not own a normal DAG node, and if the \texttt{source} does not own an
+intermediate DAG node.
+
+\subsubsection{\texttt{void DAGInfo::ItoI(DAGInfo *source, int weight)}}
+
+Connect the intermediate DAG node of \texttt{source} to the intermediate DAG
+node of this object with an \texttt{I->I} operation, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own an intermediate DAG node, and if the \texttt{source} does
+not own an intermediate DAG node.
+
+\subsubsection{\texttt{void DAGInfo::ItoL(DAGInfo *source, int weight)}}
+
+Connect the intermediate DAG node of \texttt{source} to the normal DAG
+node of this object with an \texttt{I->L} operation, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does
+not own an intermediate DAG node.
 
 
 \section{Built-in distribution policies}
