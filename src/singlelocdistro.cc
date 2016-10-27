@@ -28,14 +28,6 @@
 
 namespace dashmm {
 
-void SingleLocality::assign_for_source(DAGInfo &dag, int locality, int height) {
-  DAGNode *normal = dag.normal(); 
-  if (normal != nullptr) {
-    normal->locality = locality; 
-  }
-}
-
-
 void SingleLocality::compute_distribution(DAG &dag) {
   for (auto i: dag.source_nodes) {
     if (i->locality < 0) {
