@@ -213,7 +213,7 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::source_apply_method_child_done_,
                         dualtree_t::source_apply_method_child_done_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_ADDR);
+                        HPX_POINTER, HPX_POINTER, HPX_ADDR, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::target_apply_method_,
                         dualtree_t::target_apply_method_handler,

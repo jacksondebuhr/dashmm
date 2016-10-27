@@ -27,6 +27,8 @@
 /// \brief Implemention of common reduction operations
 
 
+#include <limits>
+#include <algorithm> 
 #include "dashmm/reductionops.h"
 
 
@@ -72,5 +74,22 @@ void size_sum_op_handler(size_t *lhs, const size_t *rhs, size_t bytes) {
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, size_sum_op, size_sum_op_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
+void int_max_ident_handler(int *input, const size_t bytes) {
+  size_t count = bytes / sizeof(int); 
+  for (size_t i = 0; i < count; ++i) {
+    input[i] = std::numeric_limits<int>::min(); 
+  }
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_ident_op, int_max_ident_handler, 
+           HPX_POINTER, HPX_SIZE_T); 
+
+void int_max_op_handler(int *lhs, const int *rhs, size_t bytes) {
+  size_t count = bytes / sizeof(int); 
+  for (size_t i = 0; i < count; ++i) {
+    lhs[i] = std::max(lhs[i], rhs[i] + 1); 
+  }
+}
+HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_op, int_max_op_handler, 
+           HPX_POINTER, HPX_SIZE_T); 
 
 } // namespace dashmm

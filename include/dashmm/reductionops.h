@@ -49,6 +49,12 @@ extern hpx_action_t size_sum_ident;
 /// Operation for size_t summation
 extern hpx_action_t size_sum_op;
 
+/// Identity operation for integer maximum
+extern hpx_action_t int_max_ident_op; 
+
+/// Operation for integer maximum
+extern hpx_action_t int_max_op; 
+
 
 } // namespace dashmm
 
