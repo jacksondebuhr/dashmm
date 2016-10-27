@@ -2869,7 +2869,8 @@ class DualTree {
       assert(dag_idx >= 0);
       int dag_rank = tree->rank_of_unif_grid(dag_idx);
       node->dag.set_parts_locality(dag_rank);
-      node->dag.set_normal_locality(dag_rank);
+
+      method_t::distropolicy_t::assign_for_source(node->dag, dag_rank, 0); 
 
       int height = 0; 
       hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL); 

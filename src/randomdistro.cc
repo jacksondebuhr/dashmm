@@ -33,6 +33,12 @@
 
 namespace dashmm {
 
+void RandomDistro::assign_for_source(DAGInfo &dag, int locality, int height) {
+  DAGNode *normal = dag.normal(); 
+  if (normal != nullptr) {
+    normal->locality = locality; 
+  }
+}
 
 void RandomDistro::compute_distribution(DAG &dag) {
   // check that all sources and targets have locality set

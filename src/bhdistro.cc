@@ -30,6 +30,11 @@
 
 namespace dashmm {
 
+void BHDistro::assign_for_source(DAGInfo &dag, int locality, int height) {
+  DAGNode *normal = dag.normal(); 
+  if (normal != nullptr) 
+    normal->locality = locality; 
+}
 
 void BHDistro::compute_distribution(DAG &dag) {
   std::queue<DAGNode *> nodes = collect_readies(dag);
