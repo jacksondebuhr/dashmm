@@ -695,27 +695,106 @@ size in bytes of the data in a given view, which can be obtained with
 Get term \texttt{i} of the given \texttt{view}. The term is returned as a
 complex number, so real-valued expansions must return a complex number.
 
-\subsubsection{\texttt{ Expansion:: }}
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::S\_to\_M(Point center, source\_t *first, source\_t *last) const}}
 
-\subsubsection{\texttt{ Expansion:: }}
+Create a multipole expansion for a given set of sources. The expansion will
+have the given \texttt{center}, and the sources are gives as pointers to the
+\texttt{first} and one past the \texttt{last} record.
 
-\subsubsection{\texttt{ Expansion:: }}
+The returned expansion will have a role of \texttt{kSourcePrimary}.
 
-\subsubsection{\texttt{ Expansion:: }}
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::S\_to\_L(Point center, source\_t *first, source\_t *last) const}}
 
-\subsubsection{\texttt{ Expansion:: }}
+Create a local expansion for a given set of sources. The expansion will
+have the given \texttt{center}, and the sources are gives as pointers to the
+\texttt{first} and one past the \texttt{last} record.
 
-\subsubsection{\texttt{ Expansion:: }}
+The returned expansion will have a role of \texttt{kTargetPrimary}.
 
-\subsubsection{\texttt{ Expansion:: }}
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::M\_to\_M(int from\_child, double s\_size) const}}
 
-\subsubsection{\texttt{ Expansion:: }}
+Change the center of a multipole expansion. The shift in the center is
+specified through \texttt{from\_child}, which indicates the child from which
+the expansion is being converted. \texttt{s\_size} is the size of that child
+node.
 
-\subsubsection{\texttt{ Expansion:: }}
+This expansion will have a role of \texttt{kSourcePrimary}.
 
-\subsubsection{\texttt{ Expansion:: }}
+The returned expansion will have a role of \texttt{kSourcePrimary}.
 
-\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::M\_to\_L(Index s\_index, double s\_size, Index t\_index) const}}
+
+Convert a multipole expansion to a local expansion. To specify the change the
+source and target indices (\texttt{s\_index} and \texttt{t\_index}), as well
+as the size of the source (\texttt{s\_size}) are provided.
+
+This expansion will have a role of \texttt{kSourcePrimary}.
+
+The returned expansion will have a role of \texttt{kTargetPrimary}.
+
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::L\_to\_L(int to\_child, double t\_size) const}}
+
+Convert a local expansion to a local expansion for a child. The child is
+specified by \texttt{to\_child}, which gives the child of the tree node
+associated with this expansion that the resulting expansion should be
+associated with.
+
+This expansion will have a role of \texttt{kTargetPrimary}.
+
+The returned expansion will have a role of \texttt{kTargetPrimary}.
+
+\subsubsection{\texttt{void Expansion::M\_to\_T(target\_t *first, target\_t *last) const}}
+
+Apply the effect of a multipole expansion to a set of targets, specified by
+a pointer to the \texttt{first} and one past the \texttt{last} target.
+
+This expansion will have a role of \texttt{kSourcePrimary}.
+
+\subsubsection{\texttt{void Expansion::L\_to\_T(target\_t *first, target\_t *last) const}}
+
+Apply the effect of a local expansion to a set of targets, specified by
+a pointer to the \texttt{first} and one past the \texttt{last} target.
+
+This expansion will have a role of \texttt{kTargetPrimary}.
+
+\subsubsection{\texttt{void Expansion::S\_to\_T(source\_t *s\_first, source\_t *s\_last, target\_t *t\_first, target\_t *t\_last) const}}
+
+Apply the direct interaction of a set of sources to a set of targets. The
+sources and targets are specified by pointers to the first and one past the
+last record.
+
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::M\_to\_I(Index s\_index) const}}
+
+Create an intermediate expansion from a multipole expansion. \texttt{s\_index}
+is the index of the tree node being represented by both the multipole and
+intermediate expansions.
+
+This expansion will have a role of \texttt{kSourcePrimary}.
+
+The returned expansion will have a role of \texttt{kSourceIntermediate}.
+
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::I\_to\_I(Index s\_index, double s\_size, Index t\_index) const}}
+
+Translate a source-side intermediate expansion into a target-side intermediate
+expansion. The \texttt{s\_index} and \texttt{t\_index} are the index of the
+tree nodes that are represented by this object, and the resulting expansion,
+respectively. Additionally, the \texttt{s\_size} gives the size of the source
+tree node.
+
+This expansion will have a role of \texttt{kSourceIntermediate}.
+
+The returned expansion will have a role of \texttt{kSourceIntermediate}.
+
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::I\_to\_L(Index t\_index, double t\_size) const}}
+
+Translate a target-side intermediate expansion into a local expansion. The
+target tree node's index, \texttt{t\_index}, and size, \texttt{t\_size},
+are provided.
+
+This expansion will have a role of \texttt{kTargetIntermediate}.
+
+The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \subsubsection{\texttt{void Expansion::add\_expansion(const expansion\_t *temp}}
 
