@@ -4,8 +4,13 @@ THIS BRANCH TODO
 TODO: Update tutorial
 TODO: Update User Expansion documentation; in particular ViewSet needs to be
       explained.
-TODO: Add method members to set locality during DAG discovery if the method
-      can know that.
+TODO: Make the way that Expansions manage their data not suck as much as it
+      does now. Really. There is a strange complicated dance happening with
+      all of this, and it will be easy for a user to muck it up.
+      -----> NOTE: this will mean breaking changes, and a definite bump to
+                   2.0.0.
+      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
+                   first grant likely.
 
 
 TODO: Think about the following issue
@@ -95,6 +100,13 @@ Future feature TODO pulled from the source
    together. No use yet, but could be nice.
  * Array::allocate() ::get() and ::put() all can now return different codes on
    different ranks.
+ * The expansion concept does not allow for access of the kernel parameters.
+   They end up in the table, and cannot be accessed later. Not sure if this is
+   a problem, but it could be.
+TODO: Another idea from Bo: Store the edges in one place and then just index
+      into that. Cuts down on the representation by quite a bit.
+TODO: Probably don't save the actual expansion data in the LCO. AGAS is not
+      being used, so why protect against it being used in the future.
 
 
 OPEN QUESTIONS and TODO
@@ -121,6 +133,14 @@ Some notes about issues or future features
 * We will need to improve the error handling in this thing quite a bit.
 Basically any way that the user-facing methods can go wrong should return
 sensible error where possible instead of just being assertions that fail.
+
+* It would be nice if we were to decouple some of the use of the tree and the
+construction of the tree. The ultimate goal would be to perhaps allow the user
+to supply their tree to us, like if they had a better method to make it, or
+if their code already needs to make a tree for some reason. Then DASHMM could
+just do the DAG and so on. This would also allow us to try other constructions
+more easily. We basically would be able to hot swap implementations. Also,
+this might make it simpler to make a tree that can update adiabadically.
 
 
 

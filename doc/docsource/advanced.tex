@@ -19,6 +19,7 @@ The arrangement of material in this chapter will parallel the arrangement in
 the previous.
 
 \section{DASHMM Concepts}
+\label{sec:advconcepts}
 
 This sections covers the conceptual framwork of both DASHMM's implementation
 of general multipole methods and the parallelization of those methods with
@@ -509,13 +510,251 @@ object does not own a normal DAG node, and if the \texttt{source} does
 not own an intermediate DAG node.
 
 
+
+\section{\texttt{ViewSet}}
+
+TODO:
+
+
+
+\section{Tree nodes}
+
+TODO: for use in Methods...
+
+
+
 \section{Built-in distribution policies}
 
-Also go over the default policy
+The distribution policy controls on which localities the nodes of the DAG
+are ultimately placed. Each Method is required to define a distribution policy
+to be used with that method (see below). DASHMM has a few built-in distribution
+policies that can be used in user-defined methods. Additionally, there is a
+default policy defined that represents the current best all-around policy
+available in DASHMM. To make use of this default in a user-defined Method,
+one merely has to include the following in the class definition:
+
+\begin{verbatim}
+using distropolicy_t = dashmm::DefaultDistributionPolicy;
+\end{verbatim}
+
+\noindent \texttt{DefaultDistributionPolicy} is defined in
+\texttt{dashmm/defaultpolicy.h}.
+
+Each distribution policy only sets the locality of nodes that are not
+automatically set by DASHMM. DAG nodes that have an automatically determined
+locality include: the source DAG nodes, the target DAG nodes, and those
+normal expansions on the source or target side representing the same node of
+the source or target tree as a source or target DAG node.
+
+The following distribution policies are included with DASHMM:
+
+\subsubsection{\texttt{SingleLocality}}
+
+This distribution policy places all of the DAG nodes on a single locality in
+the system. The locality can be selected in the constructor, and has a default
+value of 0: \texttt{SingleLocality::SingleLocality(int loc = 0)}.
+
+\subsubsection{\texttt{RandomDistro}}
+
+This distribution places DAG nodes around the available localities at random.
+Note that this is generally speaking a bad idea, but the scaling of this
+distribution is not bad, even if the raw performance is bad. The seed for the
+RNG can be set using the constructor, which has a default value:
+\texttt{RandomDistro::RandomDistro(int seed = 137)}.
+
+\subsubsection{\texttt{BHDistro}}
+
+This distribution policy, which is the policy used for the \texttt{BH} method,
+is compatible with any method; there is no dependence on its operation on the
+sorts of DAG nodes or the operations perfomed on the DAG edges. This policy
+works by starting at the target DAG nodes and working backwards through the
+rest of the DAG. The locality of a node being examined is set to the locality
+which minimizes the communication with other localities. In deciding what is
+the minimal communication, the weight of the DAG edges is used to approximate
+the cost of the message.
+
+\subsubsection{\texttt{FMM97Distro}}
+
+TODO: Have Bo write this section...
 
 
 
 \section{User-defined Expansions}
+
+To define an expansion, a user need only create a class that conforms to the
+following interface. For more details on the relation of Expansions to the
+mathematics, please see section~\ref{sec:advconcepts} above. To implement a
+user-defined Expansion, one must be familiar with the following DASHMM
+constructs: \texttt{Point}, \texttt{ExpansionRole}, \texttt{ViewSet},
+\texttt{Index}, \texttt{Operation} and \texttt{dcomplex\_t}.
+
+In the following, we shall take the name of the user-defined Expansion to
+be \texttt{Expansion}, but one can use any other name that one wishes.
+
+Expansions are template types with two parameters, the Source and Target
+types. The following would be the declaration of the user-defined Expansion:
+
+\begin{verbatim}
+template <typename Source, typename Target>
+class Expansion;
+\end{verbatim}
+
+\noindent It is not required, but the following aliases will be assumed to be
+have been defined in the following description of the Expansion interface:
+
+\begin{verbatim}
+using source_t = Source;
+using target_t = Target;
+using expansion_t = Expansion<Source, Target>;
+\end{verbatim}
+
+\noindent The latter introduces some brevity, while the former are mostly
+for completeness, though in some situations involving the \texttt{auto} keyword
+they allow for retrieving the Source and Target type.
+
+\subsubsection{\texttt{Expansion::Expansion(Point center, double scale, ExpansionRole role)}}
+
+This constructor creates the expansion object with the given \texttt{center},
+\texttt{scale} and \texttt{role}. There is no obligation on the part of the
+expansion to use these inputs, but they will be provided for those expansions
+that will need these data.
+
+The scale provided to this constructor will be produced by
+\texttt{Expansion::compute\_scale}.
+
+\subsubsection{\texttt{Expansion::Expansion(const ViewSet \&views)}}
+
+This constructor interprets the provided \texttt{views} as the data serving
+this expansion. Unlike the previous constructor, this constructor produces an
+object that does not own any data. Instead, it interprets existing data.
+
+Further, this constructor must be able to operate in a mode where \texttt{views}
+is empty. This `shallow` mode of construction is for cases where the
+expansion data is not needed, such as the \texttt{S->T} operation, but where
+some of the kernel parameters might be needed.
+
+\subsubsection{\texttt{Expansion::~Expansion()}}
+
+The destructor should free the data of the expansion. In some instances, the
+expansion will not own any data, and so this should do nothing. Only if the
+expansion is \texttt{valid()} should this ever delete allocated memory.
+
+\subsubsection{\texttt{void Expansion::release()}}
+
+This will release the internal data for an expansion. These objects need to
+support the ability to export the data making the expansion, losing ownership
+of the data in the process. Further, expansion objects need to be able to be
+constructed in a shallow way from existing data. \texttt{release()} breaks the
+association. After \texttt{release()}, calls to \texttt{valid()} must return
+false.
+
+The simplest implementation of this is to have the object store a pointer to
+memory allocated on the heap (as in \texttt{new char [size]}), and
+\texttt{release()} can just set that pointer to \texttt{nullptr}.
+
+\subsubsection{\texttt{bool Expansion::valid(const ViewSet \&views) const}}
+
+Returns if the indicated views are valid. An expansion is valid if it has
+data associated with it. If \texttt{views} is empty, this will check all
+views.
+
+\subsubsection{\texttt{int Expansion::view\_count() const}}
+
+Return the current number of views for this object. This will either be the
+full number for an object created with the first constructor, or a smaller
+number for an expansion created by interpretation in the second constructor.
+
+\subsubsection{\texttt{void Expansion::get\_views(ViewSet \&views) const}}
+
+Fill in data in the \texttt{views} object. Given a \texttt{ViewSet} that
+contains the view indicies, this will populate the size and data members of
+\texttt{views}. Note that this does not perform a copy of the data in the
+views.
+
+\subsubsection{\texttt{ViewSet Expansion::get\_all\_views() const}}
+
+Get all current views of this object.
+
+\subsubsection{\texttt{ExpansionRole Expansion::role() const}}
+
+Return the expansion role of this object.
+
+\subsubsection{\texttt{Point Expansion::center() const}}
+
+Return the point around which the expansion is defined.
+
+\subsubsection{\texttt{size\_t Expansion::view\_size(int view) const}}
+
+Return the view size for the specified \texttt{view}. This returns the number
+of terms in the expansion for the given view. Do not confuse this with the
+size in bytes of the data in a given view, which can be obtained with
+\texttt{get\_views()}.
+
+\subsubsection{\texttt{dcomplex\_t Expansion::view\_term(int view, size\_t i) const}}
+
+Get term \texttt{i} of the given \texttt{view}. The term is returned as a
+complex number, so real-valued expansions must return a complex number.
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{ Expansion:: }}
+
+\subsubsection{\texttt{void Expansion::add\_expansion(const expansion\_t *temp}}
+
+Add the given expansion to this expansion. Typically this involves summing the
+coefficients, but can be more involved in some cases.
+
+\subsubsection{\texttt{static void Expansion::update\_table(int n\_digits, double domain\_size, const std::vector<double> \&kernel\_params)}}
+
+Update a kernel table. This should generate or update a kernel table associated
+with this expansion type. The kernel table is a mechanism for precomputing
+values that are required by expansion operations. As the same table should
+serve every instance of this class, the table should be a static member of the
+class. This routine will either allocate and fill these tables (if this is the
+first call to this function during the program lifetime, or if the table has
+been explicitly deleted) or it will replace the values in the table without
+necessarily reallocating the memory for the table (if this is a subsequent call
+to this function).
+
+The value of \texttt{n\_digits} and \texttt{kernel\_params} are ultimately
+provided by the user's call to \texttt{Evaluator::evaluate()}. The
+\texttt{domain\_size} is computed by DASHMM after the tree is constructed.
+
+\subsubsection{\texttt{static void Expansion::delete\_table()}}
+
+Destroy the kernel table. This should destroy any tables that exist that are
+associated with this type of expansion.
+
+\subsubsection{\texttt{static double Expansion::compute\_scale(Index index)}}
+
+Compute the scale to pass into expansion constructors. The will only be called
+after the table exists, so the implementation can rely on the existence of the
+table. In particular, kernel parameters needed by this routine should be
+stored in the table.
+
+\subsubsection{\texttt{static int Expansion::weight\_estimate(Operation op, Index s = Index{}, Index t = Index{})}}
+
+Compute an estimate of the cost to send the result of the given operation
+across the network. In some expansions, the operation is enough to determing
+the cost. In others, the source and target indices, \texttt{s} and \texttt{t}.
 
 
 
@@ -524,3 +763,57 @@ Also go over the default policy
 
 
 \section{User-defined distribution policies}
+
+For users defining their own Methods, it can potentially be helpful to also
+define a distribution policy for that method if the built-in methods cannot
+take advantage of details of the generated DAG. This section outlines the
+concept of \texttt{DistributionPolicy}, giving details on the required
+interface. Distribution policies have a relatively small interface. For the
+sake of discussion, we shall call the user-defined policy \texttt{Policy},
+but one can give any name to the policy.
+
+\subsubsection{\texttt{Policy::Policy()}}
+
+Distribution policies require either a default constructor, or a constructor
+with all arguments given default values.
+
+\subsubsection{\texttt{void Policy::compute\_distribution(DAG \&dag)}}
+
+This is the main distribution method. After the DAG is fully discovered, it will
+be passed into this function where the localities of every DAG node need to be
+given a value. Because DASHMM sets a few localities in a fixed way, only those
+DAG nodes with a locality set to \texttt{-1} (the default value) should have
+a locality assigned. Changing the locality of a DAG node that has already had
+a locality assigned will lead to program failure and termination.
+
+Other than the previous two conditions, there are no other restriction on the
+implementation. However, it is generally best to avoid very deep recursion.
+HPX-5 threads each have a stack associated with them, and these stacks are
+generally small, given that there will be a large number of threads. Thus, it
+is much easier to overrun a thread's stack.
+
+\subsubsection{\texttt{void Policy::assign\_for\_source(DAGInfo \&dag, int locality)}}
+
+The routine is called for every source tree node during DAG discovery. It is an
+opportunity to set localities when the DAG nodes are created, and not all at
+once in \texttt{compute\_distribution}.
+
+WARNING: There is inadequate contention management available to safely use this
+routine without a thorough understanding of the internal workings of DASHMM.
+It is strongly advised to not give this method a non-trivial implementation.
+
+NOTE: This is an experimental feature, and should not be considered to be part
+of the DASHMM API; it may be removed in the future.
+
+\subsubsection{\texttt{void Policy::assign\_for\_target(DAGInfo \&dag, int locality)}}
+
+The routine is called for every target tree node during DAG discovery. It is an
+opportunity to set localities when the DAG nodes are created, and not all at
+once in \texttt{compute\_distribution}.
+
+WARNING: There is inadequate contention management available to safely use this
+routine without a thorough understanding of the internal workings of DASHMM.
+It is strongly advised to not give this method a non-trivial implementation.
+
+NOTE: This is an experimental feature, and should not be considered to be part
+of the DASHMM API; it may be remove in the future.

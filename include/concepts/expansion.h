@@ -28,7 +28,7 @@
 /// is in the source distribution as an example, and to explain the
 /// Expansion concept.
 ///
-/// The concept of Expansion in DASHMM is similar to but distint from the
+/// The concept of Expansion in DASHMM is similar to but distinct from the
 /// concept of a mathematical expansion of a given kernel function. The
 /// DASHMM Expansion object is better thought of as a collection of
 /// mathematical expansions. This allows for advanced methods to be applied
@@ -78,12 +78,11 @@ class Expansion {
 
   /// Expansions must provide two constructors
   ///
-  /// The first creates the object with the given center and the given
-  /// accuracy parameter. For FMM, this might be the number of digits
-  /// requested. The listed scale is when the expansion type is not
-  /// scale-invariant (e.g. Yukawa) Further, the provided role will indicate
-  /// how the Expansion will be used. There is no requirement to use any of
-  /// these arguments, but the constructor must accept them.
+  /// The first creates the object with the given center. The listed scale
+  /// is when the expansion type is not scale-invariant (e.g. Yukawa).
+  /// Further, the provided role will indicate how the Expansion will be used.
+  /// There is no requirement to use any of these arguments, but the
+  /// constructor must accept them.
   ///
   /// The scale value that will be provided to the expansion will be provided
   /// by the compute_scale static member of this class.
@@ -295,11 +294,7 @@ class Expansion {
   std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const;
 
   /// Add an expansion to this expansion
-  ///
-  /// Given another expansion (assumed to be of the same type), add the
-  /// expansions together.
-  ///
-  void add_expansion(const expansion_t *temp1);
+  void add_expansion(const expansion_t *temp);
 
 
   /// Update a kernel table
