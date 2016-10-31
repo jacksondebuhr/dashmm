@@ -11,6 +11,7 @@ TODO: Make the way that Expansions manage their data not suck as much as it
                    2.0.0.
       -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
                    first grant likely.
+TODO: Make S->* static members of Expansion.
 
 
 TODO: Think about the following issue
@@ -68,7 +69,6 @@ TODO: Further, should we allow for a non-space-filling curve distribution.
 
 
 Overall Plan to 1.0
- * Work on good distribution policies for all methods (Direct, who cares)
  * Documentation clean up throughout
     - advanced user guide; including how to define methods
     - be sure to be clear about routines callable from HPX or not.
@@ -141,6 +141,9 @@ if their code already needs to make a tree for some reason. Then DASHMM could
 just do the DAG and so on. This would also allow us to try other constructions
 more easily. We basically would be able to hot swap implementations. Also,
 this might make it simpler to make a tree that can update adiabadically.
+
+* FORTRAN skeleten Expansion. Somehow link to a user's existing FORTRAN
+operations.
 
 
 

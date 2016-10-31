@@ -28,6 +28,7 @@
 
 namespace dashmm {
 
+
 void SingleLocality::compute_distribution(DAG &dag) {
   for (auto i: dag.source_nodes) {
     if (i->locality < 0) {

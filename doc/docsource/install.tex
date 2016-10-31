@@ -7,7 +7,7 @@ gives a brief sketch of the demo programs included with DASHMM.
 \section{Prerequisites}
 
 DASHMM v. 1.0.0 depends on one external library: HPX-5. The current
-version of DASHMM depends on version 3.2.0 of HPX-5 or later, which
+version of DASHMM depends on version 4.0.0 of HPX-5 or later, which
 may be found at \url{https://hpx.crest.iu.edu/}. Please see the
 official HPX-5 documentation for instructions on how to build, install
 and run HPX-5 on your system.
@@ -16,8 +16,8 @@ The DASHMM build system relies on the {\tt pkg-config} utility to
 specify the needed HPX-5 compilation and linking options, so it is
 important to add the correct path for HPX-5 to your {\tt
   PKG\_CONFIG\_PATH} environment variable. For example, assuming HPX-5
-is installed in {\tt /path/to/hpx}, this can be accomplished with {\tt
-  bash} with:
+is installed in {\tt /path/to/hpx}, this can be accomplished using
+{\tt bash} with:
 
 \begin{verbatim}
 export PKG_CONFIG_PATH=/path/to/hpx/lib/pkgconfig:$PKG_CONFIG_PATH

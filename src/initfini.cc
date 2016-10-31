@@ -45,7 +45,6 @@ ReturnCode init(int *argc, char ***argv) {
 
 
 ReturnCode finalize() {
-  //shutdown the runtime
   hpx_finalize();
 
   return kSuccess;

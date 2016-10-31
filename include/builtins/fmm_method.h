@@ -38,7 +38,7 @@
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
-#include "builtins/fmm97distro.h"
+#include "builtins/bhdistro.h"
 
 
 namespace dashmm {
@@ -60,7 +60,7 @@ class FMM {
   using targetnode_t = Node<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM>;
 
-  using distropolicy_t = FMM97Distro;
+  using distropolicy_t = BHDistro;
 
   FMM() { }
 

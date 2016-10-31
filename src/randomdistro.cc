@@ -23,6 +23,10 @@
 // =============================================================================
 
 
+/// \file src/randomdistro.cc
+/// \brief Implementation of RandomDistro
+
+
 #include "builtins/randomdistro.h"
 
 #include <cassert>

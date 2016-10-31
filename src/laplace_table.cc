@@ -32,7 +32,9 @@
 
 namespace dashmm {
 
+
 std::unique_ptr<LaplaceTable> builtin_laplace_table_;
+
 
 LaplaceTable::LaplaceTable(int n_digits, double size) {
   scale_ = 1.0 / size;
@@ -41,7 +43,7 @@ LaplaceTable::LaplaceTable(int n_digits, double size) {
   p_ = expan_length[n_digits];
   generate_sqf();
   generate_sqbinom();
-  generate_wigner_dmatrix(); 
+  generate_wigner_dmatrix();
 
   switch (n_digits) {
   case 3:
@@ -133,10 +135,12 @@ LaplaceTable::LaplaceTable(int n_digits, double size) {
 LaplaceTable::~LaplaceTable() {
   delete [] sqf_;
   delete [] sqbinom_;
-  for (auto it = dmat_plus_->begin(); it != dmat_plus_->end(); ++it)
+  for (auto it = dmat_plus_->begin(); it != dmat_plus_->end(); ++it) {
     delete [] it->second;
-  for (auto it = dmat_minus_->begin(); it != dmat_minus_->end(); ++it)
+  }
+  for (auto it = dmat_minus_->begin(); it != dmat_minus_->end(); ++it) {
     delete [] it->second;
+  }
   delete dmat_plus_;
   delete dmat_minus_;
 
@@ -156,8 +160,9 @@ LaplaceTable::~LaplaceTable() {
 void LaplaceTable::generate_sqf() {
   sqf_ = new double[2 * p_ + 1];
   sqf_[0] = 1.0;
-  for (int i = 1; i <= p_ * 2; ++i)
+  for (int i = 1; i <= p_ * 2; ++i) {
     sqf_[i] = sqf_[i - 1] * sqrt(i);
+  }
 }
 
 void LaplaceTable::generate_sqbinom() {
@@ -191,8 +196,8 @@ void LaplaceTable::generate_sqbinom() {
 }
 
 void LaplaceTable::generate_wigner_dmatrix() {
-  dmat_plus_ = new builtin_map_t; 
-  dmat_minus_ = new builtin_map_t; 
+  dmat_plus_ = new builtin_map_t;
+  dmat_minus_ = new builtin_map_t;
 
   double cbeta[24] = {1.0 / sqrt(5.0), 1.0 / sqrt(6.0), 1.0 / sqrt(9.0),
                       1.0 / sqrt(10.0), 1.0 / sqrt(11.0), 1.0 / sqrt(14.0),
@@ -380,8 +385,9 @@ void LaplaceTable::generate_lambdaknm() {
   lambdaknm_ = new double[s_ * (p_ + 1) * (p_ + 2) / 2];
   double *temp = new double[2 * p_ + 1];
   temp[0] = 1.0;
-  for (int i = 1; i <= p_ * 2; ++i)
+  for (int i = 1; i <= p_ * 2; ++i) {
     temp[i] = temp[i - 1] * sqrt(i);
+  }
 
   int offset = 0;
   for (int k = 0; k < s_; ++k) {
@@ -419,9 +425,10 @@ void update_laplace_table(int n_digits, double size) {
   // stored. If not, delete the current table and generate one with the updated
   // accuracy requirement.
 
-  if (builtin_laplace_table_ == nullptr)
+  if (builtin_laplace_table_ == nullptr) {
     builtin_laplace_table_ =
       std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits, size}};
+  }
 }
 
 

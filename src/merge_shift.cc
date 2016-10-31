@@ -28,6 +28,10 @@
 
 #include "builtins/merge_shift.h"
 
+
+namespace dashmm {
+
+
 const int merge_and_shift_table[6][6][6][3] = {
   { //[0][][][]
     { // [0][0][][]
@@ -192,3 +196,5 @@ const int merge_and_shift_table[6][6][6][3] = {
   }
 };
 
+
+} // dashmm

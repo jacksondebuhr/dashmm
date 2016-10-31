@@ -23,12 +23,17 @@
 // =============================================================================
 
 
+/// \file src/bhdistro.cc
+/// \brief Implement BHDistro
+
+
 #include "builtins/bhdistro.h"
 
 #include <vector>
 
 
 namespace dashmm {
+
 
 void BHDistro::compute_distribution(DAG &dag) {
   std::queue<DAGNode *> nodes = collect_readies(dag);

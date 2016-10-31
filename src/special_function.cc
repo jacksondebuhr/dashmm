@@ -26,20 +26,26 @@
 /// \file src/special_function.cc
 /// \brief Implementation of special functions
 
+
 #include "builtins/special_function.h"
+
 
 namespace dashmm {
 
+
 const double M_SQRTPI = 0.9189385332046727417803297L;
+
 
 void legendre_Plm(int n, double x, double *P) {
   double u = -sqrt(1.0 - x * x);
   P[midx(0, 0)] = 1.0;
-  for (int i = 1; i <= n; i++)
+  for (int i = 1; i <= n; i++) {
     P[midx(i, i)] = P[midx(i - 1, i - 1)] * u * (2 * i - 1);
+  }
 
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     P[midx(i + 1, i)] = P[midx(i, i)] * x * (2 * i + 1);
+  }
 
   for (int m = 0; m <= n; m++) {
     for (int ell = m + 2; ell <= n; ell++) {
@@ -55,11 +61,13 @@ void legendre_Plm_gt1_scaled(int nb, double x, double scale, double *P) {
   double u = sqrt(x * x - 1.0) * scale;
 
   P[midx(0, 0)] = 1.0;
-  for (int n = 1; n <= nb; ++n)
+  for (int n = 1; n <= nb; ++n) {
     P[midx(n, n)] = P[midx(n - 1, n - 1)] * u * (2 * n - 1);
+  }
 
-  for (int n = 0; n < nb; ++n)
+  for (int n = 0; n < nb; ++n) {
     P[midx(n + 1, n)] = P[midx(n, n)] * (2 * n + 1) * v;
+  }
 
   for (int m = 0; m <= nb; ++m) {
     for (int n = m + 2; n <= nb; ++n) {
@@ -124,8 +132,9 @@ double Gamma(double x) {
     double y1 = floor(y);
     res = y - y1;
     if (res != 0.0) {
-      if (y1 != floor(y1 * 0.5) * 2)
+      if (y1 != floor(y1 * 0.5) * 2) {
         parity = true;
+      }
       fact = -M_PI / sin(M_PI * res);
       y += 1.0;
     } else {
@@ -185,10 +194,12 @@ double Gamma(double x) {
     }
   }
 
-  if (parity)
+  if (parity){
     res = -res;
-  if (fact != 1.0)
+  }
+  if (fact != 1.0) {
     res = fact / res;
+  }
   return res;
 }
 
@@ -288,8 +299,9 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
             if (psave * psavel > test)
               break;
           }
-          if (ncalc != nend)
+          if (ncalc != nend) {
             ncalc--;
+          }
 
           stepin = false;
           break;
@@ -330,8 +342,9 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
       // Store B[n - 1] and set higher orders to 0.0
       B[n - 1] = tempa;
       nend = -nend;
-      for (int ell = 0; ell < nend; ++ell)
+      for (int ell = 0; ell < nend; ++ell) {
         B[n + ell] = 0.0;
+      }
     } else {
       // Recur backward via difference equation, calculating (but not storing
       // b[n - 1]), until n = nb
@@ -343,10 +356,12 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
         tempa = en * tempb / x + tempc;
         em -= 1.0;
         emp2al -= 1.0;
-        if (n == 1)
+        if (n == 1) {
           break;
-        if (n == 2)
+        }
+        if (n == 2) {
           emp2al = 1.0;
+        }
         empal -= 1.0;
         sum = (sum + tempa * empal) * emp2al / em;
       }
@@ -355,17 +370,21 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
       B[n - 1] = tempa;
       if (nb <= 1) {
         sum = (sum + sum) + tempa;
-        if (alpha != 0.0)  // statement 230
+        if (alpha != 0.0) {  // statement 230
           sum = sum * Gamma(alpha + 1.0) * pow(x * 0.5, -alpha);
-        if (ize == 1)
+        }
+        if (ize == 1) {
           sum *= exp(-x);
+        }
         tempa = enmten;
-        if (sum > 1.0)
+        if (sum > 1.0) {
           tempa *= sum;
+        }
 
         for (int n = 0; n < nb; ++n) {
-          if (B[n] < tempa)
+          if (B[n] < tempa) {
             B[n] = 0.0;
+          }
           B[n] /= sum;
         }
 
@@ -378,17 +397,21 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
       B[n - 1] = (en * tempa) / x + tempb;
       if (n == 1) {
         sum = (sum + sum) + B[0];
-        if (alpha != 0.0)  // statement 230
+        if (alpha != 0.0) { // statement 230
           sum = sum * Gamma(alpha + 1.0) * pow(x * 0.5, -alpha);
-        if (ize == 1)
+        }
+        if (ize == 1) {
           sum *= exp(-x);
+        }
         tempa = enmten;
-        if (sum > 1.0)
+        if (sum > 1.0) {
           tempa *= sum;
+        }
 
         for (int n = 0; n < nb; ++n) {
-          if (B[n] < tempa)
+          if (B[n] < tempa) {
             B[n] = 0.0;
+          }
           B[n] /= sum;
         }
 
@@ -396,8 +419,9 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
       }
       em -= 1.0;
       emp2al -= 1.0;
-      if (n == 2)
+      if (n == 2) {
         emp2al = 1.0;
+      }
       empal -= 1.0;
       sum = (sum + B[n - 1] * empal) * emp2al / em;
     }
@@ -412,8 +436,9 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
         B[n - 1] = (en * B[n]) / x + B[n + 1];
         em -= 1.0;
         emp2al -= 1.0;
-        if (n == 2)
+        if (n == 2) {
           emp2al = 1.0;
+        }
         empal -= 1.0;
         sum = (sum + B[n - 1] * empal) * emp2al / em;
       }
@@ -424,34 +449,41 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
     sum = (sum + sum) + B[0];
 
     // Normalize, divide all B[n] by sum
-    if (alpha != 0.0)  // statement 230
+    if (alpha != 0.0) {  // statement 230
       sum = sum * Gamma(alpha + 1.0) * pow(x * 0.5, -alpha);
-    if (ize == 1)
+    }
+    if (ize == 1) {
       sum *= exp(-x);
+    }
     tempa = enmten;
-    if (sum > 1.0)
+    if (sum > 1.0) {
       tempa *= sum;
+    }
 
     for (int n = 0; n < nb; ++n) {
-      if (B[n] < tempa)
+      if (B[n] < tempa) {
         B[n] = 0.0;
+      }
       B[n] /= sum;
     }
   } else {
     empal = 1.0 + alpha;
     halfx = (x > enmten ? x * 0.5 : 0.0);
     tempa = (alpha != 0 ? pow(halfx, alpha) / Gamma(empal) : 1.0);
-    if (ize == 2)
+    if (ize == 2) {
       tempa *= exp(-x);
+    }
     tempb = ((x + 1.0) > 1.0 ? halfx * halfx : 0.0);
     B[0] = tempa + tempa * tempb / empal;
-    if (x != 0 && B[0] == 0.0)
+    if (x != 0 && B[0] == 0.0) {
       ncalc = 0;
+    }
 
     if (nb > 1) {
       if (x == 0.0) {
-        for (int i = 1; i < nb; ++i)
+        for (int i = 1; i < nb; ++i) {
           B[i] = 0.0;
+        }
       } else {
         // Calculate higher order functions
         tempc = halfx;
@@ -462,11 +494,13 @@ int bessel_In(int nb, double alpha, double x, int ize, double *B) {
           tempa /= empal;
           empal += 1.0;
           tempa *= tempc;
-          if (tempa <= tover * empal)
+          if (tempa <= tover * empal) {
             tempa = 0.0;
+          }
           B[n] = tempa + tempa * tempb / empal;
-          if (B[n] == 0 && ncalc > n)
+          if (B[n] == 0 && ncalc > n) {
             ncalc = n - 1;
+          }
         }
       }
     }
@@ -487,13 +521,15 @@ void bessel_in_scaled(int nb, double x, double scale, double *B) {
     B[0] = t1 * (1.0 + t2 / 3.0);
     for (int i = 1; i <= nb; ++i) {
       t1 = t1 * scale_x / (2 * i + 1);
-      if (t1 <= enmten)
+      if (t1 <= enmten) {
         t1 = 0.0;
+      }
       B[i] = t1 * (1.0 + t2 / (2 * i + 3));
     }
   } else if (x > 1.0e2) {
-    for (int  i = 0; i <= nb; ++i)
+    for (int  i = 0; i <= nb; ++i) {
       B[i] = 0.0;
+    }
   } else {
     double factor = sqrt(M_PI_2 / x);
 
@@ -502,8 +538,9 @@ void bessel_in_scaled(int nb, double x, double scale, double *B) {
     for (int i = 0; i <= nb; ++i) {
       B[i] *= factor;
       factor /= scale;
-      if (fabs(B[i]) <= enmten)
+      if (fabs(B[i]) <= enmten) {
         factor = 0.0;
+      }
     }
   }
 }
@@ -523,14 +560,16 @@ void bessel_kn_scaled(int nb, double x, double scale, double *B) {
     double u1 = scale / ex;
     double u2 = scale * scale;
     for (int n = 2; n <= nb; ++n) {
-      if (fabs(B[n - 1]) * u1 >= xinf / (2 * n - 1))
+      if (fabs(B[n - 1]) * u1 >= xinf / (2 * n - 1)) {
         break;
+      }
       B[n] = (2 * n - 1) * u1 * B[n - 1] + u2 * B[n - 2];
       ncalc++;
     }
 
-    for (int n = ncalc + 1; n <= nb; ++n)
+    for (int n = ncalc + 1; n <= nb; ++n) {
       B[n] = 0.0;
+    }
   } else {
     B[0] = 0.0;
     ncalc = (nb + 1 <= 0 ? nb + 1 : 0) - 1;

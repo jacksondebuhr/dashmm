@@ -26,9 +26,12 @@
 /// \file src/yukawa_table.cc
 /// \brief Implementation of precomputed tables for Yukawa
 
+
 #include "builtins/yukawa_table.h"
 
+
 namespace dashmm {
+
 
 const int YukawaTable::maxlev = 21;
 std::unique_ptr<YukawaTable> builtin_yukawa_table_;
@@ -249,8 +252,9 @@ YukawaTable::YukawaTable(int n_digits, double size, double lambda) {
       for (int j = 1; j <= m[k] / 2; ++j) {
         double alphaj = j * alpha;
         double arg = sqrt(x_[k] * x_[k] + 2 * x_[k] * ld) * cos(alphaj);
-        for (int d = -3; d <= 3; ++d)
+        for (int d = -3; d <= 3; ++d) {
           xs_[lev][offset++] = dcomplex_t{cos(arg * d), sin(arg * d)};
+        }
       }
     }
 
@@ -260,8 +264,9 @@ YukawaTable::YukawaTable(int n_digits, double size, double lambda) {
       for (int j = 1; j <= m[k] / 2; ++j) {
         double alphaj = j * alpha;
         double arg = sqrt(x_[k] * x_[k] + 2 * x_[k] * ld) * sin(alphaj);
-        for (int d = -3; d <= 3; ++d)
+        for (int d = -3; d <= 3; ++d) {
           ys_[lev][offset++] = dcomplex_t{cos(arg * d), sin(arg * d)};
+        }
       }
     }
 
@@ -279,10 +284,12 @@ YukawaTable::YukawaTable(int n_digits, double size, double lambda) {
 
 YukawaTable::~YukawaTable() {
   delete [] sqf_;
-  for (auto it = dmat_plus_->begin(); it != dmat_plus_->end(); ++it)
+  for (auto it = dmat_plus_->begin(); it != dmat_plus_->end(); ++it) {
     delete [] it->second;
-  for (auto it = dmat_minus_->begin(); it != dmat_minus_->end(); ++it)
+  }
+  for (auto it = dmat_minus_->begin(); it != dmat_minus_->end(); ++it) {
     delete [] it->second;
+  }
   delete dmat_plus_;
   delete dmat_minus_;
   delete [] m2m_;
@@ -311,8 +318,9 @@ void YukawaTable::generate_sqf() {
   double *temp = new double[2 * p_ + 1];
 
   temp[0] = 1.0;
-  for (int i = 1; i <= p_ * 2; ++i)
+  for (int i = 1; i <= p_ * 2; ++i) {
     temp[i] = temp[i - 1] * i;
+  }
 
   int idx = 0;
   for (int n = 0; n <= p_; ++n) {
@@ -326,8 +334,8 @@ void YukawaTable::generate_sqf() {
 }
 
 void YukawaTable::generate_scaled_wigner_dmat() {
-  dmat_plus_ = new builtin_map_t; 
-  dmat_minus_ = new builtin_map_t; 
+  dmat_plus_ = new builtin_map_t;
+  dmat_minus_ = new builtin_map_t;
 
   double cbeta[3] = {sqrt(3) / 3, -sqrt(3) / 3, 0};
   int nd = (p_ + 1) * (4 * p_ * p_ + 11 * p_ + 6) / 6;
@@ -455,8 +463,9 @@ void YukawaTable::generate_scaled_dmat_of_beta(double beta, double *dp,
   // Scale
   double factorial[2 * p_ + 1];
   factorial[0] = 1.0;
-  for (int i = 1; i <= 2 * p_; ++i)
+  for (int i = 1; i <= 2 * p_; ++i) {
     factorial[i] = factorial[i - 1] * i;
+  }
 
   int offset = 0;
   for (int n = 0; n <= p_; ++n) {
@@ -478,8 +487,9 @@ void YukawaTable::generate_m2m() {
   double *bessel = new double[2 * p_ + 1];
 
   factorial[0] = 1.0;
-  for (int i = 1; i <= 2 * p_; ++i)
+  for (int i = 1; i <= 2 * p_; ++i) {
     factorial[i] = factorial[i - 1] * i;
+  }
 
   for (int lev = 0; lev <= maxlev; ++lev) {
     // lev refers to parent box
@@ -523,8 +533,9 @@ void YukawaTable::generate_l2l() {
   double *bessel = new double[2 * p_ + 1];
 
   factorial[0] = 1.0;
-  for (int i = 1; i <= 2 * p_; ++i)
+  for (int i = 1; i <= 2 * p_; ++i) {
     factorial[i] = factorial[i - 1] * i;
+  }
 
   for (int lev = 0; lev <= maxlev; ++lev) {
     // lev refers to the parent box
@@ -569,5 +580,6 @@ void update_yukawa_table(int n_digits, double size, double lambda) {
     builtin_yukawa_table_ =
       std::unique_ptr<YukawaTable>{new YukawaTable{n_digits, size, lambda}};
 }
+
 
 } // namespace dashmm
