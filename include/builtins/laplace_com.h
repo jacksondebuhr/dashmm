@@ -43,8 +43,6 @@
 #include "dashmm/viewset.h"
 
 
-// NOTE: Built-in Methods and Expansions will be part of the dashmm namespace.
-// User-defined Methods and Expansion will not be.
 namespace dashmm {
 
 
@@ -232,7 +230,7 @@ class LaplaceCOM {
     }
   }
 
-  void L_to_T(Target *first, Target *last) const {}
+  void L_to_T(Target *first, Target *last) const { }
 
   void S_to_T(Source *s_first, Source *s_last,
               Target *t_first, Target *t_last) const {

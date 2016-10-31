@@ -40,7 +40,9 @@
 #include "builtins/special_function.h"
 #include "builtins/builtin_table.h"
 
+
 namespace dashmm {
+
 
 class LaplaceTable {
  public:
@@ -103,6 +105,7 @@ class LaplaceTable {
 extern std::unique_ptr<LaplaceTable> builtin_laplace_table_;
 
 void update_laplace_table(int n_digits, double size);
+
 
 } // namespace dashmm
 

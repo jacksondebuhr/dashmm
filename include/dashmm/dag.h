@@ -43,10 +43,6 @@
 namespace dashmm {
 
 
-// TODO: Should this stuff all be in a namespace DAG? So dashmm::DAG::Edge
-// and so on? It is a bit cleaner perhaps.
-
-
 struct DAGNode;
 
 
@@ -347,7 +343,6 @@ class DAGInfo {
 
   /// Sets locality on the normal node
   void set_normal_locality(int loc) {
-    // TODO: Verify this is still working in all cases....
     if (normal_ != nullptr) {
       normal_->locality = loc;
     }

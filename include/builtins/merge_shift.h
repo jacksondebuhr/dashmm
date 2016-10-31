@@ -31,6 +31,9 @@
 /// \brief Declaration of list enum used in FMM97 method
 
 
+namespace dashmm {
+
+
 enum MergedList {
   uall = 0, ///< +z direction list for all boxes
   u1234 = 1, ///< +z direction list for boxes 1, 2, 3, 4
@@ -63,5 +66,8 @@ enum MergedList {
 };
 
 extern const int merge_and_shift_table[6][6][6][3];
+
+}
+
 
 #endif // __DASHMM_MERGE_SHIFT_H__

@@ -29,6 +29,7 @@
 /// \file
 /// \brief Interface to Expansion LCO
 
+
 #include <cstring>
 
 #include <algorithm>
@@ -52,9 +53,6 @@
 namespace dashmm {
 
 
-// TODO: the following is not an elegant solution. This likely relies on the
-// inclusion order to make this work out. I will want to look at this some.
-/// Forward declaration of tree.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -478,10 +476,6 @@ class ExpansionLCO {
     // Make a scratch space for the sends
     size_t total_size = sizeof(Header) + head->expansion_size +
                         sizeof(OutEdgeRecord) * head->out_edge_count;
-    // TODO increase by sizeof(hpx_addr_t) when return messages happen
-    // Actually, this will need to be two of these. One for the tree
-    // local pointer array, and one for the return address - actually, if
-    // we do the return as a continuation action, we do not need two
     Header *scratch = reinterpret_cast<Header *>(new char [total_size]);
     memcpy(scratch, head, total_size);
 
@@ -526,7 +520,6 @@ class ExpansionLCO {
         hpx_parcel_t *parc = hpx_parcel_acquire(scratch, message_size);
         hpx_parcel_set_action(parc, spawn_out_edges_from_remote_);
         hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
-        // TODO eventually we may need a continuation action and target
 
         // NOTE: we need to wait for local completion because we are going to
         // modify the buffer in place for the next locality
@@ -572,13 +565,6 @@ class ExpansionLCO {
                                                     out_edges[i].op);
       }
     }
-
-    // Send the response message if any lookups were performed
-    // TODO: this is not needed just yet. NOTE: the return message will need
-    // to be sure that the other sends have finished... Is this an argument
-    // for copies on the origin side?
-    // TODO: decide if this is a continuation action, or a return action
-    // sent from here
 
     spawn_out_edges_work(head);
 

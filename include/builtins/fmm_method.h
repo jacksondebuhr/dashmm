@@ -98,9 +98,10 @@ class FMM {
     if (curr->idx.level() >= 2) {
       assert(curr->dag.add_normal() == true);
 
-      if (curr->idx.level() >= 3)
+      if (curr->idx.level() >= 3) {
         curr->dag.LtoL(&curr->parent->dag,
                        expansion_t::weight_estimate(Operation::LtoL));
+      }
     }
   }
 
@@ -217,8 +218,9 @@ class FMM {
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];
-          if (child != nullptr)
+          if (child != nullptr) {
             proc_coll_recur(T, child);
+          }
         }
       }
     }

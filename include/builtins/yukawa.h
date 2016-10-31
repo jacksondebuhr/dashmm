@@ -47,6 +47,7 @@
 
 namespace dashmm {
 
+
 /// Yukawa kernel Spherical Harmonic expansion
 ///
 /// This expansion is of the Yukawa Kernel about the center of the node
@@ -177,8 +178,9 @@ public:
 
       // Compute powers of exp(-i * phi)
       powers_ephi[0] = 1.0;
-      for (int j = 1; j <= p; ++j)
+      for (int j = 1; j <= p; ++j) {
         powers_ephi[j] = powers_ephi[j - 1] * ephi;
+      }
 
       // Compute scaled modified spherical bessel function
       bessel_in_scaled(p, lambda * r, scale, bessel);
@@ -230,8 +232,9 @@ public:
 
       // Compute powers of exp(-i * phi)
       powers_ephi[0] = 1.0;
-      for (int j = 1; j <= p; j++)
+      for (int j = 1; j <= p; j++) {
         powers_ephi[j] = powers_ephi[j - 1] * ephi;
+      }
 
       // Compute scaled modified spherical bessel function
       bessel_kn_scaled(p, lambda * r, scale, bessel);
@@ -301,8 +304,9 @@ public:
     for (int n = 0; n <= p; ++n) {
       for (int m = 0; m <= n; ++m) {
         dcomplex_t temp{0.0, 0.0};
-        for (int np = m; np <= p; ++np)
+        for (int np = m; np <= p; ++np) {
           temp += W2[midx(np, m)] * coeff[sidx(n, m, np, p)];
+        }
         W1[midx(n, m)] = temp;
       }
     }
@@ -365,8 +369,9 @@ public:
     for (int n = 0; n <= p; ++n) {
       for (int m = 0; m <= n; ++m) {
         dcomplex_t temp{0.0, 0.0};
-        for (int np = m; np <= p; ++np)
+        for (int np = m; np <= p; ++np) {
           temp += W2[midx(np, m)] * coeff[sidx(n, m, np, p)];
+        }
         W1[midx(n, m)] = temp;
       }
     }
@@ -402,8 +407,9 @@ public:
 
       // Compute powers of exp(i * phi)
       powers_ephi[0] = 1.0;
-      for (int j = 1; j <= p; j++)
+      for (int j = 1; j <= p; j++) {
         powers_ephi[j] = powers_ephi[j - 1] * ephi;
+      }
 
       // Compute scaled modified spherical bessel function
       bessel_kn_scaled(p, lambda * r, scale, bessel);
@@ -412,8 +418,9 @@ public:
       legendre_Plm(p, ctheta, legendre);
 
       // Evaluate M_n^0
-      for (int n = 0; n <= p; ++n)
+      for (int n = 0; n <= p; ++n) {
         potential += M[midx(n, 0)] * legendre[midx(n, 0)] * bessel[n];
+      }
 
       // Evaluate M_n^m
       for (int n = 1; n <= p; ++n) {
@@ -456,8 +463,9 @@ public:
 
       // Compute powers of exp(i * phi)
       powers_ephi[0] = 1.0;
-      for (int j = 1; j <= p; ++j)
+      for (int j = 1; j <= p; ++j) {
         powers_ephi[j] = powers_ephi[j - 1] * ephi;
+      }
 
       // Compute scaled modified spherical bessel function
       bessel_in_scaled(p, lambda * r, scale, bessel);
@@ -466,8 +474,9 @@ public:
       legendre_Plm(p, ctheta, legendre);
 
       // Evaluate local expansion L_n^0
-      for (int n = 0; n <= p; ++n)
+      for (int n = 0; n <= p; ++n) {
         potential += L[midx(n, 0)] * legendre[midx(n, 0)] * bessel[n];
+      }
 
       // Evaluate L_n^m
       for (int n = 1; n <= p; ++n) {
@@ -494,8 +503,9 @@ public:
       for (auto j = s_first; j != s_last; ++j) {
         Point s2t = point_sub(i->position, j->position);
         double dist = lambda * s2t.norm();
-        if (dist > 0)
+        if (dist > 0) {
           potential += j->charge * exp(-dist) / dist;
+        }
       }
       i->phi += potential * M_PI_2;
     }
@@ -579,29 +589,35 @@ public:
         // Process M_n^0 terms
         z1[0] = 0;
         z2[0] = 0;
-        for (int n = 0; n <= p; n += 2)
+        for (int n = 0; n <= p; n += 2) {
           z1[0] += SH[dir][midx(n, 0)] * legendre[midx(n, 0)];
-        for (int n = 1; n <= p; n += 2)
+        }
+        for (int n = 1; n <= p; n += 2) {
           z2[0] += SH[dir][midx(n, 0)] * legendre[midx(n, 0)];
+        }
 
         // Process M_n^m, where m is odd
         for (int m = 1; m <= f[k]; m += 2) {
           z1[m] = 0;
           z2[m] = 0;
-          for (int n = m; n <= p; n += 2)
+          for (int n = m; n <= p; n += 2) {
             z2[m] += SH[dir][midx(n, m)] * legendre[midx(n, m)];
-          for (int n = m + 1; n <= p; n += 2)
+          }
+          for (int n = m + 1; n <= p; n += 2) {
             z1[m] += SH[dir][midx(n, m)] * legendre[midx(n, m)];
+          }
         }
 
         // Process M_n^m, where m is even
         for (int m = 2; m <= f[k]; m += 2) {
           z1[m] = 0;
           z2[m] = 0;
-          for (int n = m; n <= p; n += 2)
+          for (int n = m; n <= p; n += 2) {
             z1[m] += SH[dir][midx(n, m)] * legendre[midx(n, m)];
-          for (int n = m + 1; n <= p; n += 2)
+          }
+          for (int n = m + 1; n <= p; n += 2) {
             z2[m] += SH[dir][midx(n, m)] * legendre[midx(n, m)];
+          }
         }
 
         // Compute W(k, j)
@@ -681,8 +697,9 @@ public:
     for (int i = 0; i < 3; ++i) {
       int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
 
-      if (tag == -1)
+      if (tag == -1) {
         break;
+      }
 
       if (tag <= 1) {
         e2e(T[i], S_mz, dx, dy, 0, scale);
@@ -702,11 +719,13 @@ public:
       used[i] = true;
     }
 
-    if (used[1] == false)
+    if (used[1] == false) {
       delete [] T2;
+    }
 
-    if (used[2] == false)
+    if (used[2] == false) {
       delete [] T3;
+    }
 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
@@ -730,8 +749,9 @@ public:
     int nexp = builtin_yukawa_table_->nexp(scale);
 
     dcomplex_t *E[28]{nullptr};
-    for (int i = 0; i < 28; ++i)
+    for (int i = 0; i < 28; ++i) {
       E[i] = reinterpret_cast<dcomplex_t *>(views_.view_data(i));
+    }
     dcomplex_t *L =
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     dcomplex_t *S = new dcomplex_t[nexp * 6]();
@@ -895,8 +915,9 @@ public:
       dcomplex_t *rhs =
         reinterpret_cast<dcomplex_t *>(temp1->views_.view_data(i));
 
-      for (int j = 0; j < size; ++j)
+      for (int j = 0; j < size; ++j) {
         lhs[j] += rhs[j];
+      }
     }
   }
 
@@ -923,8 +944,9 @@ public:
       int dz = s.z() - 2 * t.z();
       for (int i = 0; i < 3; ++i) {
         int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
-        if (tag == -1)
+        if (tag == -1) {
           break;
+        }
         weight++;
       }
     } else {
@@ -944,8 +966,9 @@ private:
     // Compute powers of exp(i * alpha)
     dcomplex_t *powers_ealpha = new dcomplex_t[p + 1];
     powers_ealpha[0] = dcomplex_t{1.0, 0.0};
-    for (int j = 1; j <= p; ++j)
+    for (int j = 1; j <= p; ++j) {
       powers_ealpha[j] = powers_ealpha[j - 1] * ealpha;
+    }
 
     int offset = 0;
     for (int n = 0; n <= p; ++n) {
@@ -1063,8 +1086,9 @@ private:
       double factor = w[k] / m[k];
       for (int n = 0; n <= p; ++n) {
         int mmax = (n <= f[k] ? n : f[k]);
-        for (int m = 0; m <= mmax; ++m)
+        for (int m = 0; m <= mmax; ++m) {
           W1[midx(n, m)] += z[m] * legendre[midx(n, m)] * factor;
+        }
       }
     }
 

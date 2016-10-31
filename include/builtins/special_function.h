@@ -26,13 +26,17 @@
 #ifndef __DASHMM_SPECIAL_FUNCTION_H__
 #define __DASHMM_SPECIAL_FUNCTION_H__
 
+
 /// \file
 /// \brief Declaration of special functions
+
 
 #include <cmath>
 #include <cassert>
 
+
 namespace dashmm {
+
 
 inline int midx(const int n, const int m) {
   return n * (n + 1) / 2 + m;
@@ -62,6 +66,8 @@ void bessel_in_scaled(int nb, double x, double scale, double *B);
 
 void bessel_kn_scaled(int nb, double x, double scale, double *B);
 
+
 } // namespace dashmm
+
 
 #endif // __DASHMM_SPECIAL_FUNCTION_H__

@@ -12,6 +12,20 @@ TODO: Make the way that Expansions manage their data not suck as much as it
       -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
                    first grant likely.
 TODO: Make S->* static members of Expansion.
+TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
+      like an inelegant solution, and perhaps one that relies on the
+      inclusion order. Check into this.
+TODO: targetlco.h: contribute_*_to_T; IN each case there is likely some extra
+      copying going on. See if there is a way to reduce that. Perhaps via the
+      parcel interface.
+TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
+      and so on. Extending this, should we do the same thing for other
+      subsystems?
+TODO: From tree.h line 2240
+    // TODO: This is an inelegant solution to the problem of getting the
+    // local segments unpinned. src_data and trg_data will unpin the segment
+    // when the scope we introduce here is closed. Perhaps add unpin(), but
+    // that detracts from the RAII nature of the current ArrayData object.
 
 
 TODO: Think about the following issue

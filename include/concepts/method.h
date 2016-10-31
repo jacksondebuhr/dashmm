@@ -116,10 +116,10 @@ class Method {
   /// NOTE: In the distributed case, the nodes may not have information about
   /// the number of sources or targets in the node. So any refinement test
   /// cannot depend on those data. Further, though this is initially
-  /// conceptually about the refinement of the tree, in distributed, to allow
-  /// for consistend views on each rank, the refinement proceeds anyway.
-  /// Instead, this is more to do with when the DAG stops being discovered in
-  /// the tree.
+  /// conceptually about the refinement of the tree, in distributed cases,
+  /// to allow for consistent views on each rank, the refinement proceeds
+  /// anyway. Instead, this is more to do with when the DAG stops being
+  /// discovered in the tree.
   ///
   /// \param same_sources_and_targets - are the source and target points the
   ///                                   same

@@ -41,11 +41,12 @@ class FMM97Distro {
  public:
   FMM97Distro() { }
   void compute_distribution(DAG &dag);
-  static void assign_for_source(DAGInfo &dag, int locality, int height); 
-  static void assign_for_target(DAGInfo &dag, int locality); 
+  static void assign_for_source(DAGInfo &dag, int locality, int height);
+  static void assign_for_target(DAGInfo &dag, int locality);
 };
 
 
 } // dashmm
+
 
 #endif // __DASHMM_FMM97_DISTRO_H__

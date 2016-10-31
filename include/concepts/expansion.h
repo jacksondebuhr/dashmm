@@ -43,9 +43,9 @@
 /// nodes in the Source tree and nodes in the Target tree. Further, there
 /// are intermediate expansions that might be employed in advanced versions
 /// of multipole methods. These intermediate expansions may also take different
-/// forms if they are associated with a Source node or a Target node.
+/// forms if they are associated with a Source tree node or a Target tree node.
 ///
-/// Second, to allow for the possibility that one node of the DAG, that is,
+/// Second, it allow for the possibility that one node of the DAG, that is,
 /// the part of the compuation represented by an Expansion, might need multiple
 /// mathematical expanions. One use for this is to enable certain advanced
 /// multipole methods, but one might also use the same evaluation to perform
@@ -79,7 +79,7 @@ class Expansion {
   /// Expansions must provide two constructors
   ///
   /// The first creates the object with the given center. The listed scale
-  /// is when the expansion type is not scale-invariant (e.g. Yukawa).
+  /// is for not scale-invariant kernels (e.g. Yukawa).
   /// Further, the provided role will indicate how the Expansion will be used.
   /// There is no requirement to use any of these arguments, but the
   /// constructor must accept them.
@@ -126,7 +126,7 @@ class Expansion {
   /// An expansion is valid if it has data associated with it. After calling
   /// release(), an expansion will be invalidated.
   ///
-  /// If view is empty, this will check all views.
+  /// If @p view is empty, this will check all views.
   bool valid(const ViewSet &view) const;
 
   /// Return the current number of views for the object.

@@ -58,7 +58,17 @@ public:
   /// in the nodes of the DAG.
   void compute_distribution(DAG &dag);
 
+  /// Assign DAG node localities just after method application.
+  ///
+  /// NOTE: The use of this routine is discouraged. While it is a required
+  /// member of any distribution policy, unless one is very sure of what they
+  /// doing, leave the implementation of this trivial.
   static void assign_for_source(DAGInfo &dag, int locality);
 
+  /// Assign DAG node localities just after method application.
+  ///
+  /// NOTE: The use of this routine is discouraged. While it is a required
+  /// member of any distribution policy, unless one is very sure of what they
+  /// doing, leave the implementation of this trivial.
   static void assign_for_target(DAGInfo &dag, int locality);
 };

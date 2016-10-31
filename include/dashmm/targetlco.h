@@ -124,7 +124,6 @@ class TargetLCO {
   /// \param n - the number of sources
   /// \param sources - the sources themselves
   void contribute_S_to_T(size_t n, source_t *sources) const {
-    // TODO: Is there a way to reduce copies here? Use parcels?
     size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);
@@ -144,7 +143,6 @@ class TargetLCO {
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
   void contribute_M_to_T(size_t bytes, void *data) const {
-    // TODO: Is there a way to reduce copies here? Use parcels?
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
     assert(input);
@@ -160,7 +158,6 @@ class TargetLCO {
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
   void contribute_L_to_T(size_t bytes, void *data) const {
-    // TODO: Is there a way to reduce copies here? Use parcels?
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
     assert(input);

@@ -40,7 +40,9 @@
 
 #include "builtins/fmm97distro.h"
 
+
 namespace dashmm {
+
 
 /// A Method to implement FMM with merge and shift
 ///
@@ -60,7 +62,7 @@ class FMM97 {
 
   using distropolicy_t = FMM97Distro;
 
-  FMM97() {}
+  FMM97() { }
 
   void generate(sourcenode_t *curr, DomainGeometry *domain) const {
     curr->dag.add_parts();
@@ -72,9 +74,9 @@ class FMM97 {
       curr->dag.StoM(&curr->dag,
                      expansion_t::weight_estimate(Operation::StoM));
 
-      assert(curr->dag.add_interm() == true); 
-      curr->dag.MtoI(&curr->dag, 
-                     expansion_t::weight_estimate(Operation::MtoI)); 
+      assert(curr->dag.add_interm() == true);
+      curr->dag.MtoI(&curr->dag,
+                     expansion_t::weight_estimate(Operation::MtoI));
     }
   }
 
@@ -89,9 +91,9 @@ class FMM97 {
         }
       }
 
-      assert(curr->dag.add_interm() == true); 
-      curr->dag.MtoI(&curr->dag, 
-                     expansion_t::weight_estimate(Operation::MtoI)); 
+      assert(curr->dag.add_interm() == true);
+      curr->dag.MtoI(&curr->dag,
+                     expansion_t::weight_estimate(Operation::MtoI));
     }
   }
 
@@ -103,13 +105,15 @@ class FMM97 {
 
     if (curr->idx.level() >= 2) {
       assert(curr->dag.add_normal() == true);
-      if (curr->parent->dag.has_interm())
+      if (curr->parent->dag.has_interm()) {
         curr->dag.ItoL(&curr->parent->dag,
                        expansion_t::weight_estimate(Operation::ItoL));
+      }
 
-      if (curr->idx.level() >= 3)
+      if (curr->idx.level() >= 3) {
         curr->dag.LtoL(&curr->parent->dag,
                        expansion_t::weight_estimate(Operation::LtoL));
+      }
     }
   }
 
@@ -143,7 +147,7 @@ class FMM97 {
       }
     } else {
       std::vector<sourcenode_t *> newcons{};
-      std::vector<sourcenode_t *> merge{}; 
+      std::vector<sourcenode_t *> merge{};
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
         if ((*S)->idx.level() < t_index.level()) {
@@ -164,14 +168,16 @@ class FMM97 {
               sourcenode_t *child = (*S)->child[i];
               if (child != nullptr) {
                 newcons.push_back(child);
-                if (do_I2I)
+                if (do_I2I) {
                   merge.push_back(child);
+                }
                 S_is_leaf = false;
               }
             }
 
-            if (S_is_leaf)
+            if (S_is_leaf) {
               newcons.push_back(*S);
+            }
           }
         }
       }
@@ -240,8 +246,9 @@ class FMM97 {
       } else {
         for (size_t i = 0; i < 8; ++i) {
           sourcenode_t *child = S->child[i];
-          if (child != nullptr)
+          if (child != nullptr) {
             proc_coll_recur(T, child);
+          }
         }
       }
     }

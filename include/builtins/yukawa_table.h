@@ -40,7 +40,9 @@
 #include "builtins/special_function.h"
 #include "builtins/builtin_table.h"
 
+
 namespace dashmm {
+
 
 class YukawaTable {
  public:
@@ -107,6 +109,7 @@ private:
 extern std::unique_ptr<YukawaTable> builtin_yukawa_table_;
 
 void update_yukawa_table(int n_digits, double size, double lambda);
+
 
 } // namespace dashmm
 

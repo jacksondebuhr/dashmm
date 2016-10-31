@@ -42,8 +42,6 @@
 #include "dashmm/viewset.h"
 
 
-// NOTE: Built-in Methods and Expansions will be part of the dashmm namespace.
-// User-defined Methods and Expansion will not be.
 namespace dashmm {
 
 

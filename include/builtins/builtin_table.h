@@ -22,14 +22,17 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
 #ifndef __DASHMM_BUILTIN_TABLE_H__
 #define __DASHMM_BUILTIN_TABLE_H__
+
 
 /// \file
 /// \brief Declaration of comparator for builtin tables
 
 
 namespace dashmm {
+
 
 struct builtin_cmp {
   bool operator()(const double &a, const double &b) const {
@@ -46,6 +49,8 @@ struct builtin_cmp {
 
 using builtin_map_t = std::map<double, double *, builtin_cmp>;
 
+
 } // namespace dashmm
+
 
 #endif // __DASHMM_BUILTIN_TABLE_H__

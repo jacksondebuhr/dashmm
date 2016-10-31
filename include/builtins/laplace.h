@@ -48,6 +48,7 @@
 
 namespace dashmm {
 
+
 /// Laplace kernel Spherical Harmonic expansion
 ///
 /// This expansion is of the Laplace Kernel about the center of the node
@@ -132,7 +133,6 @@ class Laplace {
 
   int view_count() const { return views_.count(); }
 
-  // This is likely to be removed from the interface
   void get_views(ViewSet &view) const {}
 
   ViewSet get_all_views() const {return views_;}
@@ -618,8 +618,9 @@ class Laplace {
       for (auto j = s_first; j != s_last; ++j) {
         Point s2t = point_sub(i->position, j->position);
         double dist = s2t.norm();
-        if (dist > 0)
+        if (dist > 0) {
           potential += j->charge / dist;
+        }
       }
       i->phi += potential;
     }
@@ -695,28 +696,34 @@ class Laplace {
         // Process M_n^0 terms
         z1[0] = 0;
         z2[0] = 0;
-        for (int n = 0; n <= p; n += 2)
+        for (int n = 0; n <= p; n += 2) {
           z1[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)];
-        for (int n = 1; n <= p; n += 2)
+        }
+        for (int n = 1; n <= p; n += 2) {
           z2[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)];
+        }
 
         // Process M_n^m terms for nonzero m
         for (int m = 1; m <= f_[k]; m += 2) {
           z1[m] = 0;
           z2[m] = 0;
-          for (int n = m; n <= p; n += 2)
+          for (int n = m; n <= p; n += 2) {
             z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          for (int n = m + 1; n <= p; n += 2)
+          }
+          for (int n = m + 1; n <= p; n += 2) {
             z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
+          }
         }
 
         for (int m = 2; m <= f_[k]; m += 2) {
           z1[m] = 0;
           z2[m] = 0;
-          for (int n = m; n <= p; n += 2)
+          for (int n = m; n <= p; n += 2) {
             z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          for (int n = m + 1; n <= p; n += 2)
+          }
+          for (int n = m + 1; n <= p; n += 2) {
             z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
+          }
         }
 
         // Compute W(k, j)
@@ -846,8 +853,9 @@ class Laplace {
     int nexp = builtin_laplace_table_->nexp();
 
     dcomplex_t *E[28]{nullptr};
-    for (int i = 0; i < 28; ++i)
+    for (int i = 0; i < 28; ++i) {
       E[i] = reinterpret_cast<dcomplex_t *>(views_.view_data(i));
+    }
     dcomplex_t *L =
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     dcomplex_t *S = new dcomplex_t[nexp * 6]();
@@ -989,8 +997,9 @@ class Laplace {
       break;
     }
 
-    for (int i = 0; i < 6 * nexp; ++i)
+    for (int i = 0; i < 6 * nexp; ++i) {
       S[i] *= scale;
+    }
 
     e2l(S_mz, 'z', false, L);
     e2l(S_pz, 'z', true, L);
@@ -1014,8 +1023,9 @@ class Laplace {
       dcomplex_t *rhs =
         reinterpret_cast<dcomplex_t *>(temp1->views_.view_data(i));
 
-      for (int j = 0; j < size; ++j)
+      for (int j = 0; j < size; ++j) {
         lhs[j] += rhs[j];
+      }
     }
   }
 
@@ -1041,8 +1051,9 @@ class Laplace {
       int dz = s.z() - 2 * t.z();
       for (int i = 0; i < 3; ++i) {
         int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
-        if (tag == -1)
+        if (tag == -1) {
           break;
+        }
         weight++;
       }
     } else {
@@ -1218,8 +1229,9 @@ class Laplace {
       double power_lambdak = 1.0; // (-lambda_k)^n
       for (int n = 0; n <= p; ++n) {
         int mmax = fmin(n, f_[k]);
-        for (int m = 0; m <= mmax; ++m)
+        for (int m = 0; m <= mmax; ++m) {
           W1[midx(n, m)] += power_lambdak * z[m];
+        }
         power_lambdak *= -lambda[k];
       }
       delete [] z;
