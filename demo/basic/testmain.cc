@@ -49,13 +49,16 @@ struct SourceData {
 // to make it easy to compare with the exact result.
 struct TargetData {
   dashmm::Point position;
-  std::complex<double> phi;    //real, imag
+  std::complex<double> phi;
   int index;
 };
 
 // Here we create the evaluator objects that we shall need in this demo.
 // These must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
+//
+// It is more typical to have only one or possibly two evaluators. The
+// proliferation here is because this demo program allows for many use-cases.
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::BH> laplace_bh{};
 dashmm::Evaluator<SourceData, TargetData,

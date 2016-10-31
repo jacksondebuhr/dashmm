@@ -44,11 +44,7 @@
 
 
 // This is the specific detail of the implementation of the data for the
-// User expansion. There are some requirements on the serialization of an
-// expansion, and they are represented below. The start of the serialization
-// must be two integers. The first is reserved for use by DASHMM. The second
-// is the accuracy parameter for this instance of the Expansion. After these,
-// the data can take any form so long as it is trivially copyable.
+// User expansion.
 struct UserData {
   int acc;
   //Whatever else that is needed. One example might be
@@ -117,11 +113,10 @@ class User {
   // data as the Expansion. This constructor is where this occurs.
   //
   // There are some operations that do not need the actual expansion terms
-  // (such as S->T), and so this constructor should also work for
-  // ptr == nullptr. The object so constructed will not own any data, but will
+  // (such as S->T), and so this constructor should also work for an empty
+  // @p views. The object so constructed will not own any data, but will
   // nevertheless be able to perform those operations not requiring the
-  // expansion data. In these 'empty' constructions, n_digits will still be
-  // supplied.
+  // expansion data.
   User(const dashmm::ViewSet &views) {
     assert(views.count() < 2);
     bytes_ = sizeof(UserData);
@@ -142,9 +137,8 @@ class User {
     }
   }
 
-  // This routine will supply the serialized version of the data in this
-  // expansion object. After a call to release(), this object no longer owns
-  // the associated data, and will not free it when this object is destroyed.
+  // After a call to release(), this object will not free any data when this
+  // object is destroyed.
   //
   // That this interface is required is the reason that these objects should
   // be implemented as a handle. Otherwise, this method would need to first
@@ -154,10 +148,11 @@ class User {
   // performance. That being said, one can implement an Expansion in other
   // styles, but one should be aware that there could be performance impacts.
   //
-  // Note that not only does release provide the data to the caller, but it will
-  // render this object invalid. Otherwise, when this object was destroyed, an
-  // attempt would be made to free the data, which is precisely what is not
-  // intended.
+  // After the call to release, this object will be invalid.
+  //
+  // Note also that this should never be called on an expansion that is the
+  // creator of the original data. This is intended for use with expansions
+  // that have been constructed from interpreted data.
   void release() {
     data_ = nullptr;
   }
@@ -293,15 +288,21 @@ class User {
             s_last - s_first, t_last - t_first);
   }
 
+  // This will compute the translation from a source-side multipole moment
+  // to a source-side intermediate expansion.
   std::unique_ptr<expansion_t> M_to_I(dashmm::Index s_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
+  // This will compute the translation from a source-side intermediate
+  // expansion to a target-side intermediate expansion.
   std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index, double s_size,
                                       dashmm::Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
+  // This will compute the translation from a target-side intermediate
+  // expansion to a target-side local expansion.
   std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index,
                                       double t_size) const {
     return std::unique_ptr<expansion_t>{nullptr};
@@ -312,13 +313,32 @@ class User {
     fprintf(stdout, "Adding an expansion\n");
   }
 
+  // If an expansion has one-time computation that all instances of the
+  // expansion will use (in a read-only fashion), that can be implemented with
+  // a kernel table.
+  //
+  // This routine is called by DASHMM whenever it is possible that the kernel
+  // parameters, accuracy requirement or overall domain size changes. In
+  // practice, this occurs once per evaluation. This will either allocate the
+  // table, or modify its contents.
   static void update_table(int n_digits, double domain_size,
                            const std::vector<double> &kernel_params) { }
 
+  // To properly clean up DASHMM, the table for a given expansion should be
+  // deleted. This routine deletes that data.
   static void delete_table() { }
 
+  // For kernels that are scaling-variant, this routine provides a scaling
+  // factor to a number of other routines. The only input is the index in the
+  // tree, which is sufficient to work out the scaling factor. If the
+  // computation of the scaling factor requires other information, it should be
+  // saved in the kernel's table using the kernel_params passed to update_table
+  // above.
   static double compute_scale(dashmm::Index index) {return 1.0;}
 
+  // This returns an estimate of the communication cost of a particular edge
+  // if the edge spans localities in the distributed DAG. The units are
+  // arbitrary.
   static int weight_estimate(dashmm::Operation op,
                              dashmm::Index s = dashmm::Index{},
                              dashmm::Index t = dashmm::Index{}) {
@@ -326,8 +346,7 @@ class User {
   }
 
  private:
-  // This object acts as a handle to some other piece of memory. The details
-  // of the UserData type can be found in user_expansion.cc.
+  // This object acts as a handle to some other piece of memory.
   UserData *data_;
 
   // This stores the size (in bytes) of data_.

@@ -154,7 +154,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
 }
 
 
-// Use to collect timing information
+// Used to collect timing information
 inline double getticks(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
