@@ -513,14 +513,134 @@ not own an intermediate DAG node.
 
 \section{\texttt{ViewSet}}
 
-TODO:
+The \texttt{ViewSet} object is a means by which a subset of the possible views
+of an Expansion can be selected. The DASHMM concept of Expansion allows for
+multiple mathematical expansions to be contained in the Expansion object. This
+is a feature used by some advanced methods. A \texttt{ViewSet} essentially
+indexes over the possible views of an Expansion. For example, if an
+Expansion has six versions (or six views) of the data, then a \texttt{ViewSet}
+might select a subset of these: views 2, 4 and 5. Like anything in C++, the
+indices are zero based. The particular meaning of each index is defined only
+with respect to the Expansion's implementation.
 
+\subsubsection{\texttt{ViewSet::ViewSet()}}
+
+Default construct the object.
+
+\subsubsection{\texttt{ViewSet::ViewSet(ExpansionRole role, const Point \&center, double scale)}}
+
+Create an empty \texttt{ViewSet}, while setting a few vital features: the
+\texttt{role} of the represented expansion, the \texttt{center} around which it
+is defined, and the \texttt{scale} used for scaling-variant kernels.
+
+\subsubsection{\texttt{void ViewSet::clear()}}
+
+Clear out the object. After clear, it will be as if the object were default
+constructed.
+
+\subsubsection{\texttt{void ViewSet::add\_view(int index)}}
+
+Add a view with the given \texttt{index}. This is an incomplete view.
+
+\subsubsection{\texttt{void ViewSet::add\_view(int index, size\_t bytes, char *data)}}
+
+Add a view with the given \texttt{index}, size in \texttt{bytes} and
+\texttt{data}. This is a complete view, indicating not only which index, but
+also the data backing the view.
+
+NOTE: The \texttt{ViewSet} does not assume ownership of \texttt{data}.
+
+\subsubsection{\texttt{void ViewSet::set\_bytes(int view, size\_t bytes)}}
+
+Set the size of a given view. \texttt{view} gives which view of this object to
+set the size of. That is, \texttt{view} is not an index into the original
+Expansion, but an index into the set of views represented in this object.
+
+\subsubsection{\texttt{void ViewSet::set\_data(int view, char *data)}}
+
+Set the data for a given view. \texttt{view} gives which view of this object to
+set the size of. That is, \texttt{view} is not an index into the original
+Expansion, but an index into the set of views represented in this object.
+
+\subsubsection{\texttt{void ViewSet::set\_role(ExpansionRole role)}}
+
+Set the \texttt{role} of this object.
+
+\subsubsection{\texttt{void ViewSet::set\_center(const Point \&center)}}
+
+Set the \texttt{center} of this object. This represents the point around
+which the expansion is defined.
+
+\subsubsection{\texttt{void ViewSet::set\_scale(double s)}}
+
+Set the \texttt{scale} of this object. This is needed for scaling-variant
+kernels.
+
+\subsubsection{\texttt{int ViewSet::view\_index(int view) const}}
+
+Return the index in the original Expansion that is represented by the
+given \texttt{view}.
+
+\subsubsection{\texttt{size\_t ViewSet::view\_bytes(int view) const}}
+
+Return the size in bytes of the given \texttt{view}.
+
+\subsubsection{\texttt{char *ViewSet::view\_data(int view) const}}
+
+Return the data of the given \texttt{view}.
+
+\subsubsection{\texttt{ExpansionRole ViewSet::role() const}}
+
+Return the role of the represented expansion.
+
+\subsubsection{\texttt{Point ViewSet::center() const}}
+
+Return the center of the represented expansion.
+
+\subsubsection{\texttt{double ViewSet::scale() const}}
+
+Return the scale of the represented expansion.
+
+\subsubsection{\texttt{int ViewSet::count() const}}
+
+Return the number of views in this object.
+
+\subsubsection{\texttt{size\_t ViewSet::bytes() const}}
+
+Return the total size of the data represented by this object. This includes
+not only the data of the views themselves, but some metadata used during
+serialization of this object.
 
 
 \section{Tree nodes}
 
-TODO: for use in Methods...
+The nodes of the dual tree are implemented as the class \texttt{Node<T>}, which
+is a template over the record type, either Source or Target. Typically these
+types are aliased to \texttt{sourcenode\_t = Node<Source>}, and
+\texttt{targetnode\_t = node<Target>}. The members of this class that might be
+needed by implementers of new Methods are detailed below.
 
+\subsubsection{\texttt{Index Node<T>::idx}}
+
+The index of the tree node.
+
+\subsubsection{\texttt{Node<T> *Node<T>::parent}}
+
+The parent of this node in the tree. This is only \texttt{nullptr} if this is
+the root.
+
+\subsubsection{\texttt{Node<T> *Node<T>::child[8]}}
+
+The children of this node in the tree. These might be \texttt{nullptr}.
+
+\subsubsection{\texttt{DAGInfo Node<T>::dag}}
+
+A \texttt{DAGInfo} object providing a handle to the relevant portions of the
+DAG for this node.
+
+\subsubsection{\texttt{bool Node<T>::is\_leaf() const}}
+
+A utility predicate answering the question: Is this node a leaf?
 
 
 \section{Built-in distribution policies}
@@ -829,7 +949,7 @@ after the table exists, so the implementation can rely on the existence of the
 table. In particular, kernel parameters needed by this routine should be
 stored in the table.
 
-\subsubsection{\texttt{static int Expansion::weight\_estimate(Operation op, Index s = Index{}, Index t = Index{})}}
+\subsubsection{\texttt{static int Expansion::weight\_estimate(Operation op, Index s = Index\{\}, Index t = Index\{\})}}
 
 Compute an estimate of the cost to send the result of the given operation
 across the network. In some expansions, the operation is enough to determing
@@ -838,6 +958,124 @@ the cost. In others, the source and target indices, \texttt{s} and \texttt{t}.
 
 
 \section{User-defined Methods}
+
+To create a user-defined Method, one must create a class with that conforms
+to the following interface. For a description of the four primary routines
+of a Method, please see~\ref{sec:advconcepts}. To implement a user-defined
+Method, one must be familiar with the following DASHMM constructs: the
+\texttt{Expansion} concept, nodes of the tree (both souce and target),
+\texttt{DomainGeometry} and \texttt{DAGInfo}.
+
+In the following we shall take the name of the user-defined Method to be
+\texttt{Method}, but one can use any name that one wishes.
+
+Methods are templates over three parameters, the Source, Target and Expansion
+types. The following is the full declaration of a user-defined Method:
+
+\begin{verbatim}
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion>
+class Method;
+\end{verbatim}
+
+\noindent It is helpful to also define the following aliases as members of
+any Method:
+
+\begin{verbatim}
+using source_t = Source;
+using target_t = Target;
+using expansion_t = Expansion<Source, Target>;
+using method_t = Method<Source, Target, Expansion>;
+using sourcenode_t = Node<Source>;
+using targetnode_t = Node<Target>;
+\end{verbatim}
+
+\noindent The above aliases will be used in the following description.
+
+\subsubsection{\texttt{Method::distropolicy\_t}}
+
+Any method must define this type to specify the distribution policy that is to
+be used with the method. This allows for the possibility that special details
+of the implemented \texttt{Method} might allow for better distribution of the
+DAG. If there is no such better distribution, or the implementer is not
+concerned, or if the default provided by DASHMM is found to be sufficient, then
+one can use \texttt{dashmm::DefaultDistributionPolicy} defined in
+\texttt{dashmm/defaultpolicy.h}.
+
+\subsubsection{\texttt{Method::Method()}}
+
+Methods must have a default constructor. Note that other constructors are
+allowed. Methods instances used for particular evaluations are copied so
+methods can support runtime parameters.
+
+\subsubsection{\texttt{void Method::generate(sourcenode\_t *curr, DomainGeometry *domain) const}}
+
+This routine is called at the leaves of the source tree to generate the initial
+expansions from the source data. The leaf node in question is provided via
+\texttt{curr}. For use in cases where the size of the node is relevant,
+the problem \texttt{domain} is also provided. The typical interaction with
+\texttt{curr} is to use its \texttt{dag} member.
+
+\texttt{generate} is responsible for creating the DAG nodes that the method
+requires for the given source tree leaf node. Further, any operations between
+these nodes should be scheduled during \texttt{generate} (via the many
+\texttt{DAGInfo} methods). The typical operation scheduled during
+\texttt{generate} is \texttt{S->M}.
+
+
+\subsubsection{\texttt{void Method::aggregate(sourcenode\_t *curr, DomainGeometry *domain) const}}
+
+This routine is called for the internal nodes of the source tree to generate
+any expansions needed by the method that are associated with non-leaf source
+tree nodes. The current node, \texttt{curr}, and the overall \texttt{domain}
+are provided.
+
+\texttt{aggregate} is responsible for creating the DAG nodes that the method
+requires. Further, operations between nodes should be scheduled. The typical
+operation for \texttt{aggregate} is \texttt{M->M}.
+
+\subsubsection{\texttt{void Method::inherit(targetnode\_t *curr, DomainGeometry *domain, bool curr\_is\_leaf) const}}
+
+In \texttt{inherit} information from parents in the target tree are propagated
+to children. In addition to the node, \texttt{curr} and the \texttt{domain},
+whether is the current node is a leaf if indicated with
+\texttt{curr\_is\_leaf}. This is necessary as some methods might allow for
+internal target tree nodes to nonetheless act as if they were leaves.
+
+\texttt{inherit} is responsible for creating the DAG nodes that the method
+requires, and for scheduling the operations between DAG nodes. The typical
+operation for \texttt{inherit} is \texttt{L->L}.
+
+\subsubsection{\texttt{void Method::process(targetnode\_t *curr, std::vector<sourcenode\_t *> \&consider, bool curr\_is\_leaf, DomainGeometry *domain) const}}
+
+The most complex work of the method often takes place in \texttt{process}. In
+addition to the current node, the domain geometry, and if this leaf is a node,
+a vector of source tree nodes are provided. This vector, \texttt{consider},
+gives the list of source nodes that might have an impact on the calculation of
+the potential for the target locations represented by this node.
+
+\texttt{consider} should be examined, and where possible elements should be
+removed from the vector when their effect on the targets in \texttt{curr} can
+be computed. That is, if some opaeration is scheduled between a node in
+\texttt{consider} and \texttt{curr}, then that source node has been handled,
+and can be removed. In some instances, a node might be removed from
+\texttt{consider} and the children of that node will be added to consider.
+
+At the end of \texttt{process}, the set of nodes in \texttt{consider} will be
+different than were passed into this function. The resulting \texttt{consider}
+will be passed to the children of \texttt{curr}, unless \texttt{curr\_is\_leaf}
+was true. In that case, it should be that \texttt{consider} will have been
+completely used by the call to \texttt{process}.
+
+\subsubsection{\texttt{void Method::refine\_test(bool same\_sources\_and\_targets, const targetnode\_t *curr, const std::vector<sourcenode\_t *> \&consider) const}}
+
+This method determines if the given target tree node should be refined, or if
+it represents a leaf of the DAG. This decision is based on \texttt{curr},
+\texttt{consider} and if the sources and targets are identical in this
+evaluation. The latter is provided as \texttt{same\_sources\_and\_targets}.
+
+This method should return \texttt{true} if the target tree should be refined
+further, and \texttt{false} otherwise.
 
 
 

@@ -31,7 +31,7 @@
 /// \brief Specify default policies for use in the Library
 
 
-#include "builtins/fmm97distro.h"
+#include "builtins/bhdistro.h"
 
 
 namespace dashmm {
@@ -39,7 +39,7 @@ namespace dashmm {
 
 /// The default distribution policy to be used by Methods. This represents the
 /// best all around policy that is available in DASHMM.
-using DefaultDistributionPolicy = FMM97Distro;
+using DefaultDistributionPolicy = BHDistro;
 
 
 } // namespace dashmm
