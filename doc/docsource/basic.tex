@@ -49,12 +49,12 @@ is of type \texttt{Point} and the \texttt{charge} is of type
 \texttt{double}. For example, the following is a minimal Source type that
 works with every expansion provided with DASHMM.
 
-\begin{verbatim}
+\begin{lstlisting}
 struct SourceData {
   Point position;
   double charge;
 };
-\end{verbatim}
+\end{lstlisting}
 
 \noindent Beyond these required members, anything might be added to a Source
 type. This allows the user to associate application specific data to
@@ -71,12 +71,12 @@ member \texttt{phi} of type \texttt{std::complex<double>}, which been
 aliased as \texttt{dcomplex\_t} in DASHMM. So the following would work
 for many of the included DASHMM expansions:
 
-\begin{verbatim}
+\begin{lstlisting}
 struct TargetData {
   Point position;
   std::complex<double> phi;
 };
-\end{verbatim}
+\end{lstlisting}
 
 \noindent Beyond the required members, anything might be added to the Target
 type. A typical choice is an identifier of some kind because DASHMM
@@ -205,65 +205,98 @@ The \texttt{Point} class is used to represent locations in three dimensional
 space. \texttt{Point} is expected for giving the locations of sources and
 targets. It has the following members and relevant non-member operations:
 
-\subsubsection{\texttt{Point::Point(double x = 0, double y = 0, double z = 0)}}
+\begin{lstlisting}
+Point::Point(double x = 0, double y = 0, double z = 0)
+\end{lstlisting}
 
 Construct a point from a given set of coordinates. This can also be used to
 default construct a point.
 
-\subsubsection{\texttt{Point::Point(double *arr)}}
+\begin{lstlisting}
+Point::Point(double *arr)
+\end{lstlisting}
 
 Construct a point from a C-style array. It is  important that \texttt{arr}
 should contain at least three members.
 
-\subsubsection{\texttt{Point::Point(const Point \&pt)}}
+\begin{lstlisting}
+Point::Point(const Point &pt)
+\end{lstlisting}
 
 Copy construct a point.
 
-\subsubsection{\texttt{Point Point::scale(double c) const}}
+\begin{lstlisting}
+Point Point::scale(double c) const
+\end{lstlisting}
 
 Return a point whose coordinates have  all been scaled by the factor \texttt{c}.
 
-\subsubsection{\texttt{double Point::operator[](size\_t i) const}}
+\begin{lstlisting}
+double Point::operator[](size_t i) const
+\end{lstlisting}
 
 Indexing access to the coordinates of the point. \texttt{i} must be in the
 range $[0,2]$.
 
-\subsubsection{\texttt{double Point::x() const}}
+\begin{lstlisting}
+double Point::x() const
+\end{lstlisting}
+
 
 Return the x coordinate of the point.
 
-\subsubsection{\texttt{double Point::y() const}}
+\begin{lstlisting}
+double Point::y() const
+\end{lstlisting}
+
 
 Return the y coordinate of the point.
 
-\subsubsection{\texttt{double Point::z() const}}
+\begin{lstlisting}
+double Point::z() const
+\end{lstlisting}
 
 Return the z coordinate of the point.
 
-\subsubsection{\texttt{double Point::norm() const}}
+\begin{lstlisting}
+double Point::norm() const
+\end{lstlisting}
 
 Return the 2-norm of the point.
 
-\subsubsection{\texttt{void Point::lower\_bound(const Point \&other)}}
+\begin{lstlisting}
+void Point::lower_bound(const Point &other)
+\end{lstlisting}
+
 
 This computes the lowest coordinate in each direction of this point and
 \texttt{other} and sets this point's coordinate to that value.
 
-\subsubsection{\texttt{void Point::upper\_bound(const Point \&other)}}
+\begin{lstlisting}
+void Point::upper_bound(const Point &other)
+\end{lstlisting}
+
 
 This computes the highest coordinate in each direction of this point and
 \texttt{other} and sets this point's coordinates to that value.
 
-\subsubsection{\texttt{double point\_dot(const Point \&left, const Point \&right)}}
+\begin{lstlisting}
+double point_dot(const Point &left, const Point &right)
+\end{lstlisting}
+
 
 Treat the points as if they are vectors and take their dot product.
 
-\subsubsection{\texttt{Point point\_add(const Point \&left, const Point \&right)}}
+\begin{lstlisting}
+Point point_add(const Point &left, const Point &right)
+\end{lstlisting}
 
 Perform a  component-wise addition of \texttt{left} and \texttt{right} and
 return a point with the result.
 
-\subsubsection{\texttt{Point point\_sub(const Point \&left, const Point \&right)}}
+\begin{lstlisting}
+Point point_sub(const Point &left, const Point &right)
+\end{lstlisting}
 
 Perform a component-wise subtraction of \texttt{right} from \texttt{left} and return
 a point with the result.
@@ -276,7 +309,10 @@ operations that must only occur before initialization, and some that can only
 occur after initialization. All DASHMM operations must occur before the
 library is finalized.
 
-\subsubsection{\texttt{ReturnCode init(int *argc, char ***argv)}}
+\begin{lstlisting}
+ReturnCode init(int *argc, char ***argv)
+\end{lstlisting}
+
 
 Initialize the runtime system supporting DASHMM and allocate any resources
 needed by DASHMM. The addresses of the command line arguments must be
@@ -295,7 +331,10 @@ See below for details.
 
 This is a collective call; all localities must participate.
 
-\subsubsection{\texttt{ReturnCode finalize()}}
+\begin{lstlisting}
+ReturnCode finalize()
+\end{lstlisting}
+
 
 This will free any DASHMM specific resources and shut down the runtime system.
 No other calls to DASHMM must occur after the call to \texttt{finalize()}.
@@ -307,15 +346,24 @@ This is a collective call; all localities must participate.
 DASHMM provides a small number of traditional SPMD utilities to make certain
 things simpler.
 
-\subsubsection{\texttt{int get\_my\_rank()}}
+\begin{lstlisting}
+int get_my_rank()
+\end{lstlisting}
+
 
 This returns the rank of the calling locality.
 
-\subsubsection{\texttt{int get\_num\_ranks()}}
+\begin{lstlisting}
+int get_num_ranks()
+\end{lstlisting}
+
 
 This returns the number of ranks available.
 
-\subsubsection{\texttt{void broadcast(T *value)}}
+\begin{lstlisting}
+void broadcast(T *value)
+\end{lstlisting}
+
 
 This performs a broadcast of the given value at rank 0 to all other ranks.
 This is a template over the type \texttt{T}. This is a collective operation.
@@ -336,9 +384,9 @@ the target type, the expansion type and the method type. The \texttt{Evaluator}
 for a given set of types must be declared before the call to \texttt{init()}.
 For example:
 
-\begin{verbatim}
+\begin{lstlisting}
 dashmm::Evaluator<Source, Target, dashmm::Laplace, dashmm::FMM97> eval{};
-\end{verbatim}
+\end{lstlisting}
 
 \noindent would be an \texttt{Evaluator} for the Laplace kernel using the
 advanced FMM method for two user-defined types
@@ -350,7 +398,10 @@ out all of the needed actions to actually implement the evaluation using
 HPX-5, and will also register those actions with HPX-5.
 
 
-\subsubsection{\texttt{ReturnCode Evaluator::evaluate(...)}}
+\begin{lstlisting}
+ReturnCode Evaluator::evaluate(...)
+\end{lstlisting}
+
 
 Perform a multipole method evaluation. The arguments to this method, in order,
 are as follows:
@@ -397,9 +448,9 @@ the global address space provided by HPX-5. The \texttt{Array} object is a templ
 type over the record. The only requirement on the record type is that it is
 trivially copyable. When an \texttt{Array} is created, as in
 
-\begin{verbatim}
+\begin{lstlisting}
 Array<T> source_data{};
-\end{verbatim}
+\end{lstlisting}
 
 \noindent no global memory is yet allocated for the array. To allocate the
 global memory that will serve the array, one must use \texttt{allocate()}.
@@ -412,7 +463,10 @@ the data.
 \texttt{Array} objects are intended to be employed in user code, and so most
 members of the interface are SPMD in nature, and are collective operations.
 
-\subsubsection{\texttt{Array<T>::Array()}}
+\begin{lstlisting}
+Array<T>::Array()
+\end{lstlisting}
+
 
 \texttt{Array} objects have a single constructor, which does not allocate any
 global memory. It takes a single optional argument that is not needed for basic
@@ -424,7 +478,10 @@ an \texttt{Array} object. The individual \texttt{Array} objects will be bound
 into a unified object referring to the global address space using
 \texttt{allocate()}.
 
-\subsubsection{\texttt{bool Array<T>::valid() const}}
+\begin{lstlisting}
+bool Array<T>::valid() const
+\end{lstlisting}
+
 
 This returns if the array is valid, that is, it refers to some global memory.
 When initially constructed, an \texttt{Array} will be invalid, and can only be
@@ -433,21 +490,28 @@ made valid by allocating global memory for the records (see
 
 This method is not collective.
 
-\subsubsection{\texttt{size\_t Array<T>::count() const}}
+\begin{lstlisting}
+size_t Array<T>::count() const
+\end{lstlisting}
+
 
 This returns the number of records in the segment of the array on the calling
 locality. This is a collective call, and it is an error to call this method
 on an invalid array. Each calling rank will receive a different result from
 this method.
 
-\subsubsection{\texttt{size\_t Array<T>::length() const}}
+\begin{lstlisting}
+size_t Array<T>::length() const
+\end{lstlisting}
 
 This returns the total length of the entire array. The result of
 \texttt{length()} is equal to the sum of the results of \texttt{count()} from
 each rank. This is a collective call, and it is an error to call this method
 on an invalid array.
 
-\subsubsection{\texttt{ReturnCode Array<T>::allocate(size\_t record\_count)}}
+\begin{lstlisting}
+ReturnCode Array<T>::allocate(size_t record_count)
+\end{lstlisting}
 
 This allocates the global memory to serve an array with the given counts on
 each locality. After this call the array will be valid unless there is an
@@ -465,14 +529,19 @@ non-zero number of records. For instance, one locality might allocate all of
 the records for an array, or each locality might own a portion of the overall
 records.
 
-\subsubsection{\texttt{ReturnCode Array<T>::destroy()}}
+\begin{lstlisting}
+ReturnCode Array<T>::destroy()
+\end{lstlisting}
 
 This will destroy the global memory allocated for this array object. It is
 an error to call this on an invalid array. This is a collective call. The
 result of the method will be either \texttt{kRuntimeError} if there is an error
 in the runtime, or \texttt{kSuccess} otherwise.
 
-\subsubsection{\texttt{ReturnCode Array<T>::get(size\_t first, size\_t last, T *out)}}
+\begin{lstlisting}
+ReturnCode Array<T>::get(size_t first, size_t last, T *out)}}
+\end{lstlisting}
+
 This method gets data from an array object, and places the requested
 records into the buffer provided by \texttt{out}. The range of records that is
 retrieved is specified by \texttt{first} (inclusive) and \texttt{last}
@@ -491,7 +560,9 @@ This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index range
 is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 
-\subsubsection{\texttt{ReturnCode Array<T>::put(size\_t first, size\_t last, T *in)}}
+\begin{lstlisting}
+ReturnCode Array<T>::put(size_t first, size_t last, T *in)
+\end{lstlisting}
 
 This method puts data into an array object, copying the specified
 records from the buffer provided by \texttt{in}. The range of records that is
@@ -510,7 +581,9 @@ This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index
 range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 
-\subsubsection{\texttt{T *Array<T>::collect()}}
+\begin{lstlisting}
+T *Array<T>::collect()
+\end{lstlisting}
 
 This method collects all of the records in the array and returns a new local
 allocation containing the records at locality 0. This is, largely speaking, a
@@ -549,13 +622,13 @@ a \texttt{T *} giving the data on which to act, the second is a
 third is \texttt{const E *}, where \texttt{E} is the environment type of the
 \texttt{ArrayMapAction}. For example:
 
-\begin{verbatim}
+\begin{lstlisting}
 void update_position(T *data, const size_t count, const E *env) {
   for (size_t i = 0; i < count; ++i) {
     data[i].position += data[i].velocity * env->delta_t;
   }
 }
-\end{verbatim}
+\end{lstlisting}
 
 \noindent is an action that might perform a position update for a
 time-stepping code. It is important to note that the action implementation can
@@ -565,15 +638,19 @@ The first argument to the action will be a correctly offset pointer into a
 contiguous chunk of records. The action should only assume that
 \texttt{data[0]} through \texttt{data[count - 1]} are available for use.
 
-\subsubsection{\texttt{ArrayMapAction<T, E>::map\_function\_t}}
+\begin{lstlisting}
+ArrayMapAction<T, E>::map_function_t
+\end{lstlisting}
 
 This class aliases the type of function that can implement the action. It is:
 
-\begin{verbatim}
+\begin{lstlisting}
 void (*)(T *, const size_t, const E *)
-\end{verbatim}
+\end{lstlisting}
 
-\subsubsection{\texttt{ArrayMapAction<T, E>::ArrayMapAction(map\_function\_t f)}}
+\begin{lstlisting}
+ArrayMapAction<T, E>::ArrayMapAction(map_function_t f)
+\end{lstlisting}
 
 This constructs an array map action object. The provided function pointer
 will give the action that is performed on the array. To use an action,
@@ -583,7 +660,9 @@ called. This object will register the needed actions with the runtime system.
 For any given action \texttt{f} only a single \texttt{ArrayMapAction}
 should be defined.
 
-\subsubsection{\texttt{ReturnCode Array<T>::map(ArrayMapAction<T, E> \&act, const E *env)}}
+\begin{lstlisting}
+ReturnCode Array<T>::map(ArrayMapAction<T, E> &act, const E *env)
+\end{lstlisting}
 
 Once an \texttt{ArrayMapAction} is defined, it can be used on a specific array
 by calling that array's \texttt{map()} method. This will cause the action
@@ -643,9 +722,9 @@ execution time.
 
 When creating a \texttt{BH} object, the opening angle $\theta_C$ is specified:
 
-\begin{verbatim}
+\begin{lstlisting}
 BH bh_method(0.6);
-\end{verbatim}
+\end{lstlisting}
 
 \noindent Generally the opening angle should be less than one. As the
 angle approaches

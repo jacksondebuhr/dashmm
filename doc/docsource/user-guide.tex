@@ -3,12 +3,18 @@
 \usepackage[english]{babel}
 \usepackage{hyperref}
 \usepackage{verbatim}
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+language=C++, 
+basicstyle=\footnotesize\ttfamily, 
+keywordstyle=\bfseries\color{green!40!black}, 
+commentstyle=\itshape\color{purple!40!black}, 
+aboveskip=2\medskipamount,
+belowskip=2\medskipamount, 
+frame=single,  
+}
 
-% I have removed these as my workstation does not seem to have that font, and
-% I am not interested in chasing that down.
-%\usepackage{fontspec}
-%\defaultfontfeatures{Mapping=tex-text}
-%\setromanfont[Mapping=tex-text]{Palatino Linotype}
 
 % Book's title and subtitle
 \title{
