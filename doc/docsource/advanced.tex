@@ -21,7 +21,7 @@ the previous.
 \section{DASHMM Concepts}
 \label{sec:advconcepts}
 
-This sections covers the conceptual framwork of both DASHMM's implementation
+This sections covers the conceptual framework of both DASHMM's implementation
 of general multipole methods and the parallelization of those methods with
 HPX-5.
 
@@ -60,7 +60,7 @@ members: \texttt{kSourcePrimary}, \texttt{kSourceIntermediate},
 \texttt{kTargetPrimary}, \texttt{kTargetIntermediate} and
 \texttt{kNoRoleNeeded}. The latter is for situations that that require an
 operation from the Expansion type, but which do not require expansion data.
-The prototypical example of this is the \texttt{S->T} operation.
+The prototypical example of this is \texttt{Operation::StoT}. 
 
 \subsection{\texttt{Index}}
 
@@ -114,7 +114,7 @@ Equality operator.
 \subsection{\texttt{DomainGeometry}}
 
 To represent the computational domain of the sources and targets, DASHMM
-uses the \texttt{DomainGeometry} object. This object can be used to convert
+uses \texttt{DomainGeometry} object. This object can be used to convert
 an \texttt{Index} into \texttt{Point}s for various locations in the volume
 represented by that index. The domains represented by DASHMM are cubical
 regions.
@@ -233,7 +233,7 @@ the map will be to split each rank's portion of the array into a number of
 equally sized pieces equal to the number of scheduler threads. Unless there is
 the possibility for variation in the amount of computation that the mapped
 action performs per record, it is likely that the default value will be
-the sufficient. If, however, the work for each record is variable, better
+sufficient. If, however, the work for each record is variable, better
 performance may be achieved with smaller chunks, and thus larger third arguments
 to the template.
 
@@ -260,12 +260,12 @@ make up the DAG system for DASHMM: \texttt{DAG}, \texttt{DAGInfo},
 \subsection{\texttt{DAGEdge}}
 
 The edges connecting nodes in the DAG is described with the \texttt{DAGEdge}
-type. This simple type holds a pointer to the source and target
-\texttt{DAGNode} connected by the edges, the \texttt{Operation} that the edge
-represents, and an integer weight that gives an estimate of the communication
-cost of the edge. The weight is optionally used by the distribution policy to
-aid in the decision about data placement around the system. The full definition
-of \texttt{DAGEdge} is as follows:
+type. This simple type holds pointers to the source and target
+\texttt{DAGNode}s connected by the edge, the \texttt{Operation} that the edge
+represents, and an integer \texttt{weight} that gives an estimate of the
+communication cost of the edge. The \texttt{weight} is optionally used by the
+distribution policy to aid in the decision about data placement around the
+system. The full definition of \texttt{DAGEdge} is as follows:
 
 \subsubsection{\texttt{DAGNode *DAGEdge::source}}
 
@@ -363,7 +363,7 @@ represents the terminal nodes of the DAG: either the information about
 the sources, or the information about the targets. These DAG nodes do not
 represent expansions. The normal
 DAG node represents expansions with a role of \texttt{kSourcePrimary} or
-\texttt{KTargetPrimary}. The intermediate node represents expansions with a
+\texttt{kTargetPrimary}. The intermediate node represents expansions with a
 role of \texttt{kSouceIntermediate} or \texttt{kTargetIntermediate}. A
 particular method might not use certain expansion roles, so a
 \texttt{DAGInfo} object might not contain the normal or intermediate DAG node.
@@ -424,7 +424,7 @@ locality, \texttt{loc}.
 \subsubsection{\texttt{void DAGInfo::StoM(DAGInfo *source, int weight)}}
 
 Connect the particles DAG node of \texttt{source} to the normal DAG node of
-this object with an \texttt{S->M} operation, and assign the resulting edge the
+this object with \texttt{Operation::StoM}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a normal DAG node, and if the \texttt{source} does not own a particles
 DAG node.
@@ -432,7 +432,7 @@ DAG node.
 \subsubsection{\texttt{void DAGInfo::StoL(DAGInfo *source, int weight)}}
 
 Connect the particles DAG node of \texttt{source} to the normal DAG node of
-this object with an \texttt{S->L} operation, and assign the resulting edge the
+this object with \texttt{Operation::StoL}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a normal DAG node, and if the \texttt{source} does not own a particles
 DAG node.
@@ -440,7 +440,7 @@ DAG node.
 \subsubsection{\texttt{void DAGInfo::MtoM(DAGInfo *source, int weight)}}
 
 Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with an \texttt{M->M} operation, and assign the resulting edge the
+this object with \texttt{Operation::MtoM}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a normal DAG node, and if the \texttt{source} does not own a normal
 DAG node.
@@ -448,7 +448,7 @@ DAG node.
 \subsubsection{\texttt{void DAGInfo::MtoL(DAGInfo *source, int weight)}}
 
 Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with an \texttt{M->L} operation, and assign the resulting edge the
+this object with \texttt{Operation::MtoL}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a normal DAG node, and if the \texttt{source} does not own a normal
 DAG node.
@@ -456,7 +456,7 @@ DAG node.
 \subsubsection{\texttt{void DAGInfo::LtoL(DAGInfo *source, int weight)}}
 
 Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with an \texttt{L->L} operation, and assign the resulting edge the
+this object with \texttt{Operation::LtoL}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a normal DAG node, and if the \texttt{source} does not own a normal
 DAG node.
@@ -464,23 +464,23 @@ DAG node.
 \subsubsection{\texttt{void DAGInfo::MtoT(DAGInfo *target, int weight)}}
 
 Connect the normal DAG node of this object to the particles DAG node of
-\texttt{source} with an \texttt{M->T} operation, and assign the resulting edge
+\texttt{target} with \texttt{Operation::MtoT}, and assign the resulting edge
 the given \texttt{weight}. It is an error to call this method if this object
-does not own a normal DAG node, and if the \texttt{source} does not own a
+does not own a normal DAG node, and if the \texttt{target} does not own a
 particles DAG node.
 
 \subsubsection{\texttt{void DAGInfo::LtoT(DAGInfo *target, int weight)}}
 
 Connect the normal DAG node of this object to the particles DAG node of
-\texttt{source} with an \texttt{L->T} operation, and assign the resulting edge
+\texttt{target} with \texttt{Operation::LtoT}, and assign the resulting edge
 the given \texttt{weight}. It is an error to call this method if this object
-does not own a normal DAG node, and if the \texttt{source} does not own a
+does not own a normal DAG node, and if the \texttt{target} does not own a
 particles DAG node.
 
 \subsubsection{\texttt{void DAGInfo::StoT(DAGInfo *source, int weight)}}
 
 Connect the particles DAG node of \texttt{source} to the particles DAG node of
-this object with an \texttt{S->T} operation, and assign the resulting edge the
+this object with \texttt{Operation::StoT}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
 not own a particles DAG node, and if the \texttt{source} does not own a
 particles DAG node.
@@ -488,23 +488,23 @@ particles DAG node.
 \subsubsection{\texttt{void DAGInfo::MtoI(DAGInfo *source, int weight)}}
 
 Connect the normal DAG node of \texttt{source} to the intermediate DAG node of
-this object with an \texttt{M->I} operation, and assign the resulting edge the
+this object with \texttt{Operation::MtoI}, and assign the resulting edge the
 given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own an
-intermediate DAG node.
+not own an intermediate DAG node, and if the \texttt{source} does not own a
+normal DAG node.
 
 \subsubsection{\texttt{void DAGInfo::ItoI(DAGInfo *source, int weight)}}
 
 Connect the intermediate DAG node of \texttt{source} to the intermediate DAG
-node of this object with an \texttt{I->I} operation, and assign the resulting
+node of this object with \texttt{Operation::ItoI}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own an intermediate DAG node, and if the \texttt{source} does
 not own an intermediate DAG node.
 
 \subsubsection{\texttt{void DAGInfo::ItoL(DAGInfo *source, int weight)}}
 
-Connect the intermediate DAG node of \texttt{source} to the normal DAG
-node of this object with an \texttt{I->L} operation, and assign the resulting
+Connect the intermediate DAG node of \texttt{source} to the normal DAG node of 
+this object with \texttt{Operation::ItoL} operation, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does
 not own an intermediate DAG node.
@@ -531,7 +531,8 @@ Default construct the object.
 
 Create an empty \texttt{ViewSet}, while setting a few vital features: the
 \texttt{role} of the represented expansion, the \texttt{center} around which it
-is defined, and the \texttt{scale} used for scaling-variant kernels.
+is defined, and the scaling factor \texttt{scale} associated with the
+represented expansion. 
 
 \subsubsection{\texttt{void ViewSet::clear()}}
 
@@ -573,8 +574,7 @@ which the expansion is defined.
 
 \subsubsection{\texttt{void ViewSet::set\_scale(double s)}}
 
-Set the \texttt{scale} of this object. This is needed for scaling-variant
-kernels.
+Set the \texttt{scale} of this object. 
 
 \subsubsection{\texttt{int ViewSet::view\_index(int view) const}}
 
@@ -695,9 +695,15 @@ the cost of the message.
 
 \subsubsection{\texttt{FMM97Distro}}
 
-TODO: Have Bo write this section...
-
-
+This distribution policy only applies to the \texttt{FMM97} method. It explores
+the source and target tree structure within the DAG. The normal and intermediate
+DAG nodes associated with a node in the source tree, and the normal DAG node
+associated with a node in the target tree, are placed on the locality that
+contains the descendant source or target DAG nodes. To determine the placement
+of the intermediate DAG node associated with a node in the target tree, the
+policy considers the weight of the DAG edges to minimize communication cost, and
+the color of the DAG edges to increase slack time to hide communication
+latency. 
 
 \section{User-defined Expansions}
 
@@ -749,11 +755,11 @@ this expansion. Unlike the previous constructor, this constructor produces an
 object that does not own any data. Instead, it interprets existing data.
 
 Further, this constructor must be able to operate in a mode where \texttt{views}
-is empty. This `shallow` mode of construction is for cases where the
-expansion data is not needed, such as the \texttt{S->T} operation, but where
+is empty. This `shallow' mode of construction is for cases where the
+expansion data is not needed, such as \texttt{Operation::StoT}, but where
 some of the kernel parameters might be needed.
 
-\subsubsection{\texttt{Expansion::~Expansion()}}
+\subsubsection{\texttt{Expansion::$\sim$Expansion()}}
 
 The destructor should free the data of the expansion. In some instances, the
 expansion will not own any data, and so this should do nothing. Only if the
@@ -815,7 +821,7 @@ size in bytes of the data in a given view, which can be obtained with
 Get term \texttt{i} of the given \texttt{view}. The term is returned as a
 complex number, so real-valued expansions must return a complex number.
 
-\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::S\_to\_M(Point center, source\_t *first, source\_t *last) const}}
+\subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::S\_to\_M(Point center,source\_t *first, source\_t *last) const}}
 
 Create a multipole expansion for a given set of sources. The expansion will
 have the given \texttt{center}, and the sources are gives as pointers to the
@@ -904,7 +910,7 @@ tree node.
 
 This expansion will have a role of \texttt{kSourceIntermediate}.
 
-The returned expansion will have a role of \texttt{kSourceIntermediate}.
+The returned expansion will have a role of \texttt{kTargetIntermediate}.
 
 \subsubsection{\texttt{std::unique\_ptr<expansion\_t> Expansion::I\_to\_L(Index t\_index, double t\_size) const}}
 
@@ -916,7 +922,7 @@ This expansion will have a role of \texttt{kTargetIntermediate}.
 
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
-\subsubsection{\texttt{void Expansion::add\_expansion(const expansion\_t *temp}}
+\subsubsection{\texttt{void Expansion::add\_expansion(const expansion\_t *temp)}}
 
 Add the given expansion to this expansion. Typically this involves summing the
 coefficients, but can be more involved in some cases.
@@ -1020,7 +1026,7 @@ the problem \texttt{domain} is also provided. The typical interaction with
 requires for the given source tree leaf node. Further, any operations between
 these nodes should be scheduled during \texttt{generate} (via the many
 \texttt{DAGInfo} methods). The typical operation scheduled during
-\texttt{generate} is \texttt{S->M}.
+\texttt{generate} is \texttt{Operation::StoM}.
 
 
 \subsubsection{\texttt{void Method::aggregate(sourcenode\_t *curr, DomainGeometry *domain) const}}
@@ -1032,7 +1038,7 @@ are provided.
 
 \texttt{aggregate} is responsible for creating the DAG nodes that the method
 requires. Further, operations between nodes should be scheduled. The typical
-operation for \texttt{aggregate} is \texttt{M->M}.
+operation for \texttt{aggregate} is \texttt{Operation::MtoM}.
 
 \subsubsection{\texttt{void Method::inherit(targetnode\_t *curr, DomainGeometry *domain, bool curr\_is\_leaf) const}}
 
@@ -1044,7 +1050,7 @@ internal target tree nodes to nonetheless act as if they were leaves.
 
 \texttt{inherit} is responsible for creating the DAG nodes that the method
 requires, and for scheduling the operations between DAG nodes. The typical
-operation for \texttt{inherit} is \texttt{L->L}.
+operation for \texttt{inherit} is \texttt{Operation::LtoL}.
 
 \subsubsection{\texttt{void Method::process(targetnode\_t *curr, std::vector<sourcenode\_t *> \&consider, bool curr\_is\_leaf, DomainGeometry *domain) const}}
 
