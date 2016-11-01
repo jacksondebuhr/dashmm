@@ -9,16 +9,16 @@ kernels, please see chapter~\ref{ch:advanced}.
 
 One of the goals of DASHMM is to make it easy to use multipole
 methods, and so the basic interface targets ease-of-use. Additionally,
-the library aims to make it easy to perform parallel computations
-using the multipole method. However, the advanced dynamic techniques
+the library aims to make it easy to perform \emph{parallel} multiple
+method computations. However, the advanced dynamic techniques
 that DASHMM employs are not simple to use directly, so the library is
 constructed in a way that allows the user to get the benefits of
 parallel execution without having to write the parallel code
 themselves. That being said, it can be useful to have a sense of what
 underlies the conceptual framework of DAHSMM. And so, the following
 section will cover these concepts at a level that might be relevant
-for basic use of the library. More details can be found in the next
-chapter.
+for basic use of the library. More details can be found in
+Chapter~\ref{ch:advanced}.
 
 \section{DASHMM concepts}
 This section covers both the conceptual framework of the multipole
@@ -401,11 +401,11 @@ trivially copyable. When an \texttt{Array} is created, as in
 Array<T> source_data{};
 \end{verbatim}
 
-\noindent o global memory is yet allocated for the array. To allocate the
+\noindent no global memory is yet allocated for the array. To allocate the
 global memory that will serve the array, one must use \texttt{allocate()}.
 Array objects can be thought of as a traditional array,
 but which is broken into one part for each locality in the system. The parts,
-or segments of the array, could have different lengths. Some segments can
+or \emph{segments} of the array, could have different lengths. Some segments can
 even have no records, meaning that a given locality does not have a share of
 the data.
 
@@ -515,7 +515,8 @@ range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 This method collects all of the records in the array and returns a new local
 allocation containing the records at locality 0. This is, largely speaking, a
 convenience feature. Note that this will allocate a copy of the entirety of the
-array on one locality.
+array on one locality. Note also that the caller assumes ownership of the
+returned data.
 
 This is a collective call. The returned pointer will only be valid on locality
 zero. All other ranks will receive \texttt{nullptr}.
@@ -544,7 +545,7 @@ objects must be defined before \texttt{init()} is called.
 
 The function implementing the action must take three arguments, the first is
 a \texttt{T *} giving the data on which to act, the second is a
-\texttt{const size\_t} gives the number of records on which to act, and the
+\texttt{const size\_t} giving the number of records on which to act, and the
 third is \texttt{const E *}, where \texttt{E} is the environment type of the
 \texttt{ArrayMapAction}. For example:
 
@@ -693,9 +694,8 @@ below.
 \subsection{\texttt{Laplace}}
 
 The \texttt{Laplace} expansion is a spherical harmonic expansion of the Laplace
-potential. Unlike \texttt{LaplaceCOM} and \texttt{LaplaceCOMAcc} below,
-this expansion is
-designed to handle sources with both signs of charge without losing accuracy.
+potential that is designed to handle sources with both signs of charge without
+losing accuracy, unlike \texttt{LaplaceCOM} and \texttt{LaplaceCOMAcc} below.
 This potential is scale-invariant, so there are no kernel parameters that are
 needed in the call to \texttt{evaluate()}. However, calls to evaluate must
 supply an accuracy parameter giving the number of digits of accuracy that are
@@ -782,5 +782,5 @@ provided.
 
 This expansion imposes the following restrictions on the target type: a
 member of type \texttt{Point} with the name \texttt{position} must be provided;
-a member of type \texttt{double [3]} with the name \texttt{acceleration} must
+a member of type \texttt{double acceleration[3]} must
 be provided.

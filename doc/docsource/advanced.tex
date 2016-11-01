@@ -1,11 +1,12 @@
 \chapter{Advanced Guide to DASHMM}
 \label{ch:advanced}
 
-In this chapter, the complete interface to DASHMM will be presented. This will
-cover some repeat information as the previous chapter, but will provide more
-details that are not relevant for the basic usage of DASHMM. In a few cases,
-the coverage of a library construct is complete in the previous chapter, and
-so those topics will not be repeated here.
+In this chapter, the rest of the interface to DASHMM will be presented. Some
+of the material presented here provides further information on constructs
+presented in the previous chapter. In other cases, the coverage of a library
+construct is complete in the previous chapter, and so those topics will not be
+repeated here. Finally, some constructs not needed for basic DASHMM usage
+are presented in their entirety
 
 The fundamental difference between the basic and advanced interface to
 DASHMM is that the advanced interface is needed when a user is implementing
@@ -27,12 +28,99 @@ HPX-5.
 
 \subsection{Multipole method abstractions}
 
-Both mathematically, and in the code. So the operations and the template
-arguments.
+The following abstractions form the basis for the implementation of multipole
+methods in DASHMM.
+
+\subsubsection{The Dual Tree}
+
+The multipole method framework implemented in DASHMM is general enough to allow
+for situations where the sources of an interaction, and the locations where the
+interaction is to be computed are different. As a result, DASHMM uses the Dual
+Tree construction. This involves a hierarchical partitioning of the problem
+domain for both the source and target points. This leads naturally to two
+trees, one each for sources and targets. These tree are constructed to be
+compatible with one another: the root of the source and target trees represent
+the same volume. Each node of both trees can have up to eight children.
+
+When referring to particular volumes in the tree, DASHMM often uses an integer
+index giving which level of the tree and where on that level the node is. This
+makes it possible to refer to the volumes of the tree nodes without needing to
+wrangle with floating point arithmetic.
+
+When these trees are constructed, the source and target points are ultimately
+assigned to a node of the associated tree. The refinement of the tree is
+adaptive in DASHMM; a node is refined, adding up to eight children, until the
+number of points in a node is below some given threshold. In this way, the
+tree adapts to the distribution of source and target points.
+
+\subsubsection{The DAG}
+
+Ultimately, a multipole method computation is the creation and evaluation of
+a directed acyclic graph (DAG). This DAG encodes in its nodes the various
+approximations, or expansions, that are used to the effects of the sources
+represented by a given node. Encoded in the edges of the DAG are the operations
+that transform the various approximations into other approximations.
+
+DASHMM constructs two versions of the DAG representing a given multipole
+computation: the first is an explicit representation that is used during the
+discovery of the overall structure of the DAG and which is used to distribute
+the work among the available localities; the second is an implicit
+representation that lives in the data, synchronization objects, and the
+interconnections amoung the tasks that are performed in the actual computation.
+
+The explicit DAG is represented in DASHMM with objects that an advanced user of
+DASHMM might need to interact with. The implicit DAG comprises a number of
+HPX-5-aware objects that manage the parallel execution. The exact use and form
+of these objects is not necessary for even an advanced user; DASHMM hides the
+specific details of HPX-5 from its users.
+
+\subsubsection{Expansion Roles}
+
+Each node of the DAG is associated with a node of either the source or target
+tree. This leads to the four expansion roles defined in DASHMM. Nodes
+associated with the typical expansions (multipole and local) are termed
+`normal'. Nodes associated with expansions that are used in advanced techniques
+such as merge-and-shift are called `intermediate' expansions. This leads to
+the four roles for expansions: two kinds for each of two trees.
+
+\subsubsection{Operations}
+
+The abstraction of the multipole method in DASHMM allows for the following
+operations. Of course, for a particular use-case, these operations make take
+on meanings different from the typical meaning for FMM or BH. The notation for
+the following operations all take the form \texttt{A->B}, where \texttt{A} is
+one of \texttt{\{S, M, L, I\}} and \texttt{B} is one of the
+following \texttt{\{M, L, I, T\}}. \texttt{S} is a node of the DAG that
+represents the leaves of a source tree; it represents a set of sources.
+\texttt{M} is a node of the DAG representing a normal expansion in the source
+tree. \texttt{L} is a node of the DAG representing a normal expansion in the
+target tree. \texttt{T} is a node of the DAG representing a leaf of the
+target tree; it represents a set of target locations. \texttt{I} represents
+the intermediate expansions on either the source or target trees (no
+distinction is made in this notation as the source or target side of the
+\texttt{I} can be inferred from the operation).
+
+The \texttt{S->M} operation is any operation that produces an approximation
+or summary version of the source data in a given node. These operations
+generate multipole moments from sources in typical use cases.
+
+The \texttt{M->M} operation is used to combine summaries of a set of sources
+into summaries that apply to larger volumes, or to larger number of sources.
+Typical uses of this operation produce a hierarchy of multipole expansions
+for every node of the source tree.
+
+The \texttt{M->L} operation
+
+\subsubsection{Expansions and Views}
+
+\subsubsection{Kernel details}
+
+scale, tables
 
 \subsection{Parallelization abstractions}
 
-More detail about this that is relevant for advanced use of the library.
+locality
+outline of execution
 
 
 
@@ -60,7 +148,7 @@ members: \texttt{kSourcePrimary}, \texttt{kSourceIntermediate},
 \texttt{kTargetPrimary}, \texttt{kTargetIntermediate} and
 \texttt{kNoRoleNeeded}. The latter is for situations that that require an
 operation from the Expansion type, but which do not require expansion data.
-The prototypical example of this is \texttt{Operation::StoT}. 
+The prototypical example of this is \texttt{Operation::StoT}.
 
 \subsection{\texttt{Index}}
 
@@ -93,7 +181,8 @@ Return the level of the index.
 
 \subsubsection{\texttt{Index Index::parent(int num = 1) const}}
 
-Return the \texttt{num}-th parent of this \texttt{Index}.
+Return the \texttt{num}-th parent of this \texttt{Index}. By default, this
+gives the index of the immediate parent.
 
 \subsubsection{\texttt{Index Index::child(int which) const}}
 
@@ -104,7 +193,7 @@ in the z-direction, and the right child in both the y and x directions.
 
 \subsubsection{\texttt{int Index::which\_child() const}}
 
-Return which child of its parent, this node is.
+Return which child of its parent this node is.
 
 \subsubsection{\texttt{bool Index::operator==(const Index \&other) const}}
 
@@ -503,7 +592,7 @@ not own an intermediate DAG node.
 
 \subsubsection{\texttt{void DAGInfo::ItoL(DAGInfo *source, int weight)}}
 
-Connect the intermediate DAG node of \texttt{source} to the normal DAG node of 
+Connect the intermediate DAG node of \texttt{source} to the normal DAG node of
 this object with \texttt{Operation::ItoL} operation, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does
@@ -519,9 +608,9 @@ multiple mathematical expansions to be contained in the Expansion object. This
 is a feature used by some advanced methods. A \texttt{ViewSet} essentially
 indexes over the possible views of an Expansion. For example, if an
 Expansion has six versions (or six views) of the data, then a \texttt{ViewSet}
-might select a subset of these: views 2, 4 and 5. Like anything in C++, the
-indices are zero based. The particular meaning of each index is defined only
-with respect to the Expansion's implementation.
+might select a subset of these (e.g., views 2, 4 and 5). Like anything in C++,
+the indices are zero based. The particular meaning of each index is defined
+only with respect to the Expansion's implementation.
 
 \subsubsection{\texttt{ViewSet::ViewSet()}}
 
@@ -532,12 +621,12 @@ Default construct the object.
 Create an empty \texttt{ViewSet}, while setting a few vital features: the
 \texttt{role} of the represented expansion, the \texttt{center} around which it
 is defined, and the scaling factor \texttt{scale} associated with the
-represented expansion. 
+represented expansion.
 
 \subsubsection{\texttt{void ViewSet::clear()}}
 
-Clear out the object. After clear, it will be as if the object were default
-constructed.
+Clear out the object. After \texttt{clear()}, it will be as if the object
+were default constructed.
 
 \subsubsection{\texttt{void ViewSet::add\_view(int index)}}
 
@@ -574,7 +663,7 @@ which the expansion is defined.
 
 \subsubsection{\texttt{void ViewSet::set\_scale(double s)}}
 
-Set the \texttt{scale} of this object. 
+Set the \texttt{scale} of this object.
 
 \subsubsection{\texttt{int ViewSet::view\_index(int view) const}}
 
@@ -617,7 +706,7 @@ serialization of this object.
 The nodes of the dual tree are implemented as the class \texttt{Node<T>}, which
 is a template over the record type, either Source or Target. Typically these
 types are aliased to \texttt{sourcenode\_t = Node<Source>}, and
-\texttt{targetnode\_t = node<Target>}. The members of this class that might be
+\texttt{targetnode\_t = Node<Target>}. The members of this class that might be
 needed by implementers of new Methods are detailed below.
 
 \subsubsection{\texttt{Index Node<T>::idx}}
@@ -626,7 +715,7 @@ The index of the tree node.
 
 \subsubsection{\texttt{Node<T> *Node<T>::parent}}
 
-The parent of this node in the tree. This is only \texttt{nullptr} if this is
+The parent of this node in the tree. This is only \texttt{nullptr} for
 the root.
 
 \subsubsection{\texttt{Node<T> *Node<T>::child[8]}}
@@ -703,7 +792,7 @@ contains the descendant source or target DAG nodes. To determine the placement
 of the intermediate DAG node associated with a node in the target tree, the
 policy considers the weight of the DAG edges to minimize communication cost, and
 the color of the DAG edges to increase slack time to hide communication
-latency. 
+latency.
 
 \section{User-defined Expansions}
 

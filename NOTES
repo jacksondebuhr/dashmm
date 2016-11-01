@@ -26,6 +26,7 @@ TODO: From tree.h line 2240
     // local segments unpinned. src_data and trg_data will unpin the segment
     // when the scope we introduce here is closed. Perhaps add unpin(), but
     // that detracts from the RAII nature of the current ArrayData object.
+TODO: Array collect really ought to return a smart pointer, right?
 
 
 TODO: Think about the following issue
