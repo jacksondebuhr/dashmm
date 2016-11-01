@@ -540,7 +540,6 @@ void perform_evaluation_test(InputArguments args) {
     delete [] test_targets;
 
     //do direct evaluation
-    //*
     if (args.kernel == "laplace") {
       dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
       err = laplace_direct.evaluate(source_handle, test_handle,
@@ -555,7 +554,6 @@ void perform_evaluation_test(InputArguments args) {
                                    args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
     }
-    //*/
 
     // Retrieve the test results
     test_targets = test_handle.collect();
