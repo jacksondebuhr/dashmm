@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -16,16 +27,18 @@
 #define __DASHMM_FMM_METHOD_H__
 
 
-/// \file include/fmm_method.h
+/// \file
 /// \brief Declaration of FMM Method
 
 
+#include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
+#include "dashmm/tree.h"
+
+#include "builtins/bhdistro.h"
 
 
 namespace dashmm {
@@ -42,108 +55,109 @@ class FMM {
   using expansion_t = Expansion<Source, Target>;
   using method_t = FMM<Source, Target, Expansion>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM>;
-  using sourceref_t = SourceRef<Source>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, FMM>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, FMM>;
+  using sourceref_t = ArrayRef<Source>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, FMM>;
 
-  void generate(sourcenode_t &curr, int n_digits) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{curr.center(), n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
-    sourceref_t sources = curr.parts();
-    double scale = 1.0 / curr.size();
-    currexp.S_to_M(curr.center(), sources, scale);
+  using distropolicy_t = BHDistro;
+
+  FMM() { }
+
+  void generate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.add_parts();
+    if (curr->idx.level() >= 2) {
+      // If \p curr is of level 0 or 1, \p curr is not well separated
+      // from any node. As a result, there is no need to create the
+      // normal expansion.
+      assert(curr->dag.add_normal() == true);
+      curr->dag.StoM(&curr->dag,
+                     expansion_t::weight_estimate(Operation::StoM));
+    }
   }
 
-  void aggregate(sourcenode_t &curr, int n_digits) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{curr.center(), n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
-    for (size_t i = 0; i < 8; ++i) {
-      sourcenode_t kid = curr.child(i);
-      if (kid.is_valid()) {
-        expansionlco_t kexp = kid.expansion();
-        currexp.M_to_M(kexp, i, kid.size());
+  void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
+    if (curr->idx.level() >= 2) {
+      assert(curr->dag.add_normal() == true);
+      for (size_t i = 0; i < 8; ++i) {
+        sourcenode_t *kid = curr->child[i];
+        if (kid != nullptr) {
+          curr->dag.MtoM(&kid->dag,
+                         expansion_t::weight_estimate(Operation::MtoM));
+        }
       }
     }
   }
 
-  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{curr.center(), n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const {
+    if (curr_is_leaf) {
+      curr->dag.add_parts();
+    }
 
-    if (curr.parent().is_valid()) {
-      expansionlco_t pexp = curr.parent().expansion();
-      currexp.L_to_L(pexp, which_child, curr.size());
+    if (curr->idx.level() >= 2) {
+      assert(curr->dag.add_normal() == true);
+
+      if (curr->idx.level() >= 3) {
+        curr->dag.LtoL(&curr->parent->dag,
+                       expansion_t::weight_estimate(Operation::LtoL));
+      }
     }
   }
 
-  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
-               bool curr_is_leaf) const {
-    expansionlco_t currexp = curr.expansion();
-    double scale = 1.0 / curr.size();
-    targetlco_t targets = curr.parts();
-    Index t_index = curr.index();
+  void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
+               bool curr_is_leaf, DomainGeometry *domain) const {
+    Index t_index = curr->idx;
+    int StoL = expansion_t::weight_estimate(Operation::StoL);
+    int StoT = expansion_t::weight_estimate(Operation::StoT);
+    int LtoT = expansion_t::weight_estimate(Operation::LtoT);
+    int MtoL = expansion_t::weight_estimate(Operation::MtoL);
 
     if (curr_is_leaf) {
       for (auto S = consider.begin(); S != consider.end(); ++S) {
-        if (S->level() < curr.level()) {
-          if (well_sep_test_asymmetric(t_index, S->index())) {
-            sourceref_t sources = S->parts();
-            currexp.S_to_L(curr.center(), sources, scale);
+        if ((*S)->idx.level() < t_index.level()) {
+          if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
+            curr->dag.StoL(&(*S)->dag, StoL);
           } else {
-            sourceref_t sources = S->parts();
-            expansionlco_t expand = S->expansion();
-            expand.S_to_T(sources, targets);
+            curr->dag.StoT(&(*S)->dag, StoT);
           }
         } else {
-          if (well_sep_test(S->index(), curr.index())) {
-            expansionlco_t expand = S->expansion();
-            double s_size = S->size();
-            Index s_index = S->index();
-            currexp.M_to_L(expand, s_index, s_size, t_index);
+          if (well_sep_test((*S)->idx, t_index)) {
+            curr->dag.MtoL(&(*S)->dag, MtoL);
           } else {
             proc_coll_recur(curr, *S);
           }
         }
       }
 
-      currexp.L_to_T(targets, scale);
+      if (curr->idx.level() >= 2)
+        curr->dag.LtoT(&curr->dag, LtoT);
     } else {
-      std::vector<sourcenode_t> newcons{ };
+      std::vector<sourcenode_t *> newcons{ };
 
       for (auto S = consider.begin(); S != consider.end(); ++S) {
-        if (S->level() < curr.level()) {
-          if (well_sep_test_asymmetric(t_index, S->index())) {
-            sourceref_t sources = S->parts();
-            currexp.S_to_L(curr.center(), sources, scale);
+        if ((*S)->idx.level() < t_index.level()) {
+          if (well_sep_test_asymmetric(t_index, (*S)->idx)) {
+            curr->dag.StoL(&(*S)->dag, StoL);
           } else {
-            // a 1; add it to newcons
             newcons.push_back(*S);
           }
         } else {
-          if (well_sep_test(S->index(), curr.index())) {
-            expansionlco_t expand = S->expansion();
-            double s_size = S->size();
-            Index s_index = S->index();
-            currexp.M_to_L(expand, s_index, s_size, t_index);
+          if (well_sep_test((*S)->idx, t_index)) {
+            curr->dag.MtoL(&(*S)->dag, MtoL);
           } else {
             bool S_is_leaf = true;
             for (size_t i = 0; i < 8; ++i) {
-              sourcenode_t child = S->child(i);
-              if (child.is_valid()) {
+              sourcenode_t *child = (*S)->child[i];
+              if (child != nullptr) {
                 newcons.push_back(child);
                 S_is_leaf = false;
               }
             }
 
-            if (S_is_leaf)
+            if (S_is_leaf) {
               newcons.push_back(*S);
+            }
           }
         }
       }
@@ -152,15 +166,15 @@ class FMM {
     }
   }
 
-  bool refine_test(bool same_sources_and_targets, const targetnode_t &curr,
-                   const std::vector<sourcenode_t> &consider) const {
+  bool refine_test(bool same_sources_and_targets, const targetnode_t *curr,
+                   const std::vector<sourcenode_t *> &consider) const {
     if (same_sources_and_targets) {
       return true;
     }
 
     for (auto i = consider.begin(); i != consider.end(); ++i) {
-      if (i->level() == curr.level()) {
-        if (!well_sep_test(i->index(), curr.index()) && !i->is_leaf()) {
+      if ((*i)->idx.level() == curr->idx.level()) {
+        if (!well_sep_test((*i)->idx, curr->idx) && !(*i)->is_leaf()) {
           return true;
         }
       }
@@ -177,15 +191,10 @@ class FMM {
     Index l_mod_top{l_mod.x() + shift, l_mod.y() + shift, l_mod.z() + shift,
           l_mod.level()};
 
-    // in the asymmetric case, we need to check both sides of the larger box
-    // to make sure there is a gap of one of the smaller boxes
-    if (abs(smaller.x() - l_mod.x()) > 1
-        && abs(smaller.x() - l_mod_top.x()) > 1) return true;
-    if (abs(smaller.y() - l_mod.y()) > 1
-        && abs(smaller.y() - l_mod_top.y()) > 1) return true;
-    if (abs(smaller.z() - l_mod.z()) > 1
-        && abs(smaller.z() - l_mod_top.z()) > 1) return true;
-    return false;
+    // NOTE: shortcut evaluation
+    return (l_mod.x() - smaller.x() > 1) || (smaller.x() - l_mod_top.x() > 1)
+        || (l_mod.y() - smaller.y() > 1) || (smaller.y() - l_mod_top.y() > 1)
+        || (l_mod.z() - smaller.z() > 1) || (smaller.z() - l_mod_top.z() > 1);
   }
 
   bool well_sep_test(Index source, Index target) const {
@@ -197,23 +206,21 @@ class FMM {
     return false;
   }
 
-  void proc_coll_recur(targetnode_t &T, sourcenode_t &S) const {
-    if (well_sep_test_asymmetric(S.index(), T.index())) {
-      expansionlco_t expand = S.expansion();
-      targetlco_t targets = T.parts();
-      double scale = 1.0 / S.size();
-      expand.M_to_T(targets, scale);
+  void proc_coll_recur(targetnode_t *T, sourcenode_t *S) const {
+    int MtoT = expansion_t::weight_estimate(Operation::MtoT);
+    int StoT = expansion_t::weight_estimate(Operation::StoT);
+
+    if (well_sep_test_asymmetric(S->idx, T->idx)) {
+      S->dag.MtoT(&T->dag, MtoT);
     } else {
-      if (S.is_leaf()) {
-        expansionlco_t expand = S.expansion();
-        targetlco_t targets = T.parts();
-        sourceref_t sources = S.parts();
-        expand.S_to_T(sources, targets);
+      if (S->is_leaf()) {
+        T->dag.StoT(&S->dag, StoT);
       } else {
         for (size_t i = 0; i < 8; ++i) {
-          sourcenode_t child = S.child(i);
-          if (child.is_valid())
+          sourcenode_t *child = S->child[i];
+          if (child != nullptr) {
             proc_coll_recur(T, child);
+          }
         }
       }
     }

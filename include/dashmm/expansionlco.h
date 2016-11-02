@@ -1,47 +1,71 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+#ifndef __DASHMM_EXPANSION_LCO_H__
+#define __DASHMM_EXPANSION_LCO_H__
 
-#ifndef __DASHMM_EXPANSION_REF_H__
-#define __DASHMM_EXPANSION_REF_H__
 
-
-/// \file include/expansionlco.h
+/// \file
 /// \brief Interface to Expansion LCO
 
 
+#include <cstring>
+
+#include <algorithm>
 #include <memory>
 #include <vector>
 
 #include <hpx/hpx.h>
 
+#include "dashmm/arrayref.h"
+#include "dashmm/buffer.h"
+#include "dashmm/dag.h"
+#include "dashmm/domaingeometry.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
-#include "dashmm/sourceref.h"
+#include "dashmm/rankwise.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetref.h"
 #include "dashmm/types.h"
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {
 
 
-/// Forward declaration of Evaluator so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
                     template <typename, typename> class> class Method>
-class Evaluator;
+class DualTree;
+
+
+/// Forward declaration of registrar so that we can become friends
+template <typename Source, typename Target,
+          template <typename, typename> class Expansion,
+          template <typename, typename,
+                    template <typename, typename> class> class Method>
+class ExpansionLCORegistrar;
 
 
 /// Expansion LCO
@@ -55,8 +79,8 @@ class Evaluator;
 /// underlying Expansion object. However, some of the function signatures are
 /// different, and some are missing.
 ///
-/// The referred to object is actually a user-defined LCO that manages the
-/// potentially concurrent contribution to the expansion.
+/// The referred to object is, in the HPX-5 parlance, a user-defined LCO that
+/// manages the potentially concurrent contribution to the expansion.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
@@ -68,34 +92,67 @@ class ExpansionLCO {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
 
-  using sourceref_t = SourceRef<Source>;
-  using targetref_t = TargetRef<Target>;
+  using sourceref_t = ArrayRef<Source>;
+  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
 
+
   /// Construct the expansion from a given global address.
-  ExpansionLCO(hpx_addr_t addr, int n_digits)
-      : data_{addr}, n_digits_{n_digits} { }
+  ExpansionLCO(hpx_addr_t addr) : data_{addr} {}
 
-  /// Construct from an existing expansion - this will create a new LCO
-  ExpansionLCO(std::unique_ptr<expansion_t> exp, hpx_addr_t where) {
-    if (exp == nullptr) {
-      data_ = HPX_NULL;
-      n_digits_ = -1;
+  /// Construct the expansion LCO from expansion data
+  ///
+  /// This will create the expansion LCO at the locality specified by where,
+  /// with the provided data. The number of inputs will be increased by one
+  /// to account for the fact that the out edges will need to be set after the
+  /// expansion LCOs are created.
+  ///
+  /// \param n_in - the number of input edges to the expansion
+  /// \param n_out - the number of output edges from the expansion
+  /// \param domain - the domain geometry
+  /// \param index - the index of the node containing this expansion
+  /// \param expand - initial data for the expansion object
+  /// \param where - an addess at the locality where the expansion LCO should be
+  ///                created
+  /// \param rwtree - the global address of the dual tree
+  ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
+               Index index, std::unique_ptr<expansion_t> expand,
+               hpx_addr_t rwtree) {
+    assert(expand != nullptr);
+
+    ViewSet views = expand->get_all_views();
+    size_t bytes = views.bytes();
+    size_t less_edges = sizeof(Header) + bytes;
+    size_t total = less_edges + sizeof(OutEdgeRecord) * n_out;
+
+    data_ = hpx_lco_user_new(total, init_, operation_, predicate_,
+                             &bytes, sizeof(bytes));
+    assert(data_ != HPX_NULL);
+
+    void *lco_lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lco_lva));
+    Header *input_data =
+        static_cast<Header *>(hpx_lco_user_get_user_data(lco_lva));
+
+    input_data->yet_to_arrive = n_in + 1; // to account for setting out edges
+    input_data->domain = domain;
+    input_data->index = index;
+    input_data->rwaddr = rwtree;
+    input_data->out_edge_count = n_out;
+
+    WriteBuffer inbuf{input_data->payload, bytes};
+    views.serialize(inbuf);
+
+    hpx_gas_unpin(data_);
+
+    // setup the out edge action
+    if (n_out != 0) {
+      int unused = 0;
+      hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &unused);
     }
-
-    size_t bytes = exp->bytes();
-    int n_digits = exp->accuracy();
-    char *ldata = reinterpret_cast<char *>(exp->release());
-
-    hpx_addr_t retval{HPX_NULL};
-    hpx_call_sync(where, create_from_expansion_, &retval, sizeof(retval),
-                  ldata, bytes);
-    delete [] ldata;
-
-    data_ = retval;
-    n_digits_ = n_digits;
   }
 
   /// Destroy the GAS data referred by the object.
@@ -103,18 +160,14 @@ class ExpansionLCO {
     if (data_ != HPX_NULL) {
       hpx_lco_delete_sync(data_);
       data_ = HPX_NULL;
-      n_digits_ = -1;
     }
   }
 
   /// Return the global address of the referred data.
-  hpx_addr_t data() const {return data_;}
+  hpx_addr_t lco() const {return data_;}
 
   /// Is the object currently referring to global data?
   bool valid() const {return data_ != HPX_NULL;}
-
-  /// Accuracy of expansion
-  int accuracy() const {return n_digits_;}
 
   /// Set this expansion with the multipole expansion of the given sources
   ///
@@ -123,22 +176,19 @@ class ExpansionLCO {
   /// an asynchronous operation. The contribution will be scheduled, but will
   /// not necessarily be complete when this function returns.
   ///
-  /// Note that this sets the expansion to be equal to the computed
-  /// multipole expansion. Further, this must not be called
-  /// after finalize().
+  /// The expansion resulting from the provided sources is added to the
+  /// expansion represented by this object.
   ///
   /// \param center - the center of the computed expansion
-  /// \param sources - a reference to the sources from which to compute the
-  ///                  multipole expansion
-  /// \param scale - scaling factor
-  void S_to_M(Point center, sourceref_t sources, double scale) const {
-    schedule();
-    int nsrc = sources.n();
-    double cx = center.x();
-    double cy = center.y();
-    double cz = center.z();
-    hpx_call(sources.data(), s_to_m_, HPX_NULL, &nsrc, &cx, &cy, &cz,
-             &scale, &data_, &n_digits_);
+  /// \param sources - the source data
+  /// \param n_src - the number of sources
+  /// \param idx - the index of the node for which this is an expansion
+  void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+    double scale = expansion_t::compute_scale(idx);
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
+    expansion_t local{views};
+    auto multi = local.S_to_M(center, sources, &sources[n_src]);
+    contribute(std::move(multi));
   }
 
   /// Set this expansion with the local expansion of the given sources
@@ -150,104 +200,18 @@ class ExpansionLCO {
   ///
   /// Note that this does not set the expansion to be equal to the computed
   /// local expansion. Instead, it adds the computed local to the
-  /// current contents of the expansion. Further, this must not be called
-  /// after finalize().
+  /// current contents of the expansion.
   ///
   /// \param center - the center of the computed expansion
-  /// \param sources - a reference to the sources from which to compute the
-  ///                  local expansion
-  /// \param scale - scaling factor
-  void S_to_L(Point center, sourceref_t sources, double scale) const {
-    schedule();
-    int nsrc = sources.n();
-    double cx = center.x();
-    double cy = center.y();
-    double cz = center.z();
-    hpx_call(sources.data(), s_to_l_, HPX_NULL, &nsrc, &cx, &cy, &cz, &scale,
-             &data_, &n_digits_);
-  }
-
-  /// Contribute a translated multipole moment to this expansion
-  ///
-  /// This will translate the given multipole expansion and then add it to
-  /// this expansion. This is an asynchronous operation; this can return
-  /// before the contribution to this expansion has been made. This must not
-  /// be called after finalize().
-  ///
-  /// \param source - the multipole expansion to translate
-  /// \param from_child - the child from which the expansion will occur
-  /// \param s_size - the size of the child node for @p source
-  void M_to_M(expansionlco_t source, int from_child, double s_size) const {
-    schedule();
-    hpx_call_when(source.data(), source.data(), m_to_m_, HPX_NULL,
-                  &data_, &n_digits_, &from_child, &s_size);
-  }
-
-  /// Contribute a translated multipole moment to this local expansion
-  ///
-  /// This will translate a multipole expansion into a local expansion and
-  /// add it to this expansion. This operation is asynchronous; this can
-  /// return before the contribution has been made. This must not be called
-  /// after finalize().
-  ///
-  /// \param source - the multipole expansion to translate
-  /// \param s_index - the index of the node containing @p source
-  /// \param s_size - the size of the node containing @p source
-  /// \param t_index - the index of the node containing this expansion
-  void M_to_L(expansionlco_t source, Index s_index, double s_size,
-              Index t_index) const {
-    schedule();
-    MtoLParams args{*this, s_index, s_size, t_index, n_digits_};
-    hpx_call_when(source.data(), source.data(), m_to_l_, HPX_NULL,
-                  &args, sizeof(args));
-  }
-
-  /// Contribute a translated local expansion to this local expansion
-  ///
-  /// This will translate the given local expansion into a local expansion
-  /// that can be added to this expansion. This operation is asynchronous;
-  /// this can return before the contribution to this expansion has been made.
-  /// This must not be called after finalize().
-  ///
-  /// \param source - the local expansion to translate
-  /// \param to_child - the child to which the expansion is being translated
-  /// \param t_size - the size of the child node
-  void L_to_L(expansionlco_t source, int to_child, double t_size) const {
-    schedule();
-    hpx_call_when(source.data(), source.data(), l_to_l_, HPX_NULL,
-                  &data_, &n_digits_, &to_child, &t_size);
-  }
-
-  /// Apply the effect of a multipole expansion to targets
-  ///
-  /// This will compute the effect of this multipole expansion on the given
-  /// @p targets. Note that this is an asynchronous operation. This will only
-  /// perform work once this expansion is ready.
-  ///
-  /// \param targets - the target for which the multipole expansion is applied
-  /// \param scale - scaling factor
-  void M_to_T(targetlco_t targets, double scale) const {
-    targets.schedule(1);
-    hpx_addr_t tsend = targets.lco();
-    int nsend = targets.n();
-    hpx_call_when(data_, data_, m_to_t_, HPX_NULL, &n_digits_, &scale,
-                  &tsend, &nsend);
-  }
-
-  /// Apply the effect of a local expansion to targets
-  ///
-  /// This will compute the effect of this local expansion on the given
-  /// @p targets. Note that this is an asynchronous operation. This will
-  /// only perform work once this expansion is ready.
-  ///
-  /// \param targets - the target for which the local expansion is applied
-  /// \param scale - scaling factor
-  void L_to_T(targetlco_t targets, double scale) const {
-    targets.schedule(1);
-    hpx_addr_t tsend = targets.lco();
-    int nsend = targets.n();
-    hpx_call_when(data_, data_, l_to_t_, HPX_NULL, &n_digits_, &scale,
-                  &tsend, &nsend);
+  /// \param sources - the source data
+  /// \param n_src - the number of sources
+  /// \param idx - the index of the node for which this is an expansion
+  void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+    double scale = expansion_t::compute_scale(idx);
+    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
+    expansion_t local{views};
+    auto multi = local.S_to_L(center, sources, &sources[n_src]);
+    contribute(std::move(multi));
   }
 
   /// Apply effect of sources to targets
@@ -256,87 +220,97 @@ class ExpansionLCO {
   /// @p targets. Note that this is an asynchronous operation. This may
   /// return before the contribution to the targets has been computed.
   ///
-  /// \param sources - a reference to the source points
+  /// \param sources - the source data
+  /// \param n_sources - the number of sources
   /// \param targets - a reference to the target points
-  void S_to_T(sourceref_t sources, targetlco_t targets) const {
-    targets.schedule(1);
-    int n_src = sources.n();
-    hpx_addr_t tsend = targets.lco();
-    int n_trg = targets.n();
-    hpx_call(sources.data(), s_to_t_, HPX_NULL, &n_src, &tsend, &n_trg);
+  void S_to_T(Source *sources, size_t n_sources, targetlco_t targets) const {
+    targets.contribute_S_to_T(n_sources, sources);
   }
-
-  /// Add the given expansion to this expansion
-  ///
-  /// This will add the @p summand to this expansion. This is an asynchronous
-  /// operation, and will only complete once @p summand is set. This does
-  /// schedule a contribution, so this should only be called before the call
-  /// to finalize(). This routine takes ownership of the supplied expansion,
-  /// and will free any resources associated with the expansion.
-  ///
-  /// \param summand - a reference to the expansion to add to this one
-  void add_expansion(expansionlco_t summand) {
-    schedule();  // we are going to have another contribution
-    hpx_call_when(summand.data(), summand.data(), add_,
-                  HPX_NULL, &data_, &n_digits_);
-  }
-
-  /// Create a new expansion of the same type referred to by this object.
-  ///
-  /// \param center - the center point for the next expansion.
-  /// \param n_digits - the accuracy parameter for the expansion
-  ///
-  /// \returns - the resulting expansion.
-  std::unique_ptr<expansion_t> get_new_expansion(Point center,
-                                                 int n_digits) const {
-    return std::unique_ptr<expansion_t>{new expansion_t{center, n_digits}};
-  }
-
-  /// Signal to the expansion that all operations have been scheduled.
-  ///
-  /// This should be called only after all possible contributions to the
-  /// expansion have been scheduled. The underlying LCO cannot trigger until
-  /// finalize() has been called, and so any work dependent on this expansion
-  /// would be on-hold until the call to finalize().
-  void finalize() const {
-    if (data_ != HPX_NULL) {
-      int code = kFinish;
-      hpx_lco_set_lsync(data_, sizeof(code), &code, HPX_NULL);
-    }
-  }
-
-  /// Signal to the expansion that it should expect an operation
-  ///
-  /// This will inform the underlying LCO of another eventual contribution to
-  /// its value. The asynchronous nature of the computation in DASHMM means that
-  /// contributions will happen when they are ready. schedule() will inform
-  /// that a contribution is on the way.
-  void schedule() const {
-    if (data_ != HPX_NULL) {
-      int code = kSchedule;
-      hpx_lco_set_rsync(data_, sizeof(code), &code);
-    }
-  }
-
 
   /// Contribute to the referred expansion
   ///
-  /// This will setup the given @p payload with the correct internal code
-  /// and will call the appropriate set operation on the referred LCO. This
+  /// This will call the appropriate set operation on the referred LCO. This
   /// will result in the add_expansion method of the expansion being called.
   ///
-  /// \param bytes - the size of the input serialized expansion
-  /// \param payload - the serialized expansion data
-  void contribute(size_t bytes, char *payload) {
-    int *code = reinterpret_cast<int *>(payload);
-    *code = kContribute;
-    hpx_lco_set_lsync(data_, bytes, payload, HPX_NULL);
+  /// \param expand - the expansion to contribute
+  void contribute(std::unique_ptr<expansion_t> &&expand) {
+    ViewSet views = expand->get_all_views();
+    size_t bytes = views.bytes();
+
+    hpx_parcel_t *parc = hpx_parcel_acquire(nullptr, bytes + sizeof(int));
+    assert(parc != nullptr);
+
+    hpx_parcel_set_action(parc, hpx_lco_set_action);
+    hpx_parcel_set_target(parc, data_);
+
+    WriteBuffer parcbuf{(char *)hpx_parcel_get_data(parc), bytes + sizeof(int)};
+
+    int opcode = SetOpCodes::kContribute;
+    parcbuf.write((char *)&opcode, sizeof(opcode));
+    views.serialize(parcbuf);
+
+    // We do not need local completion because we do not own this parcel, so
+    // we will not delete it. And so since we are already copied into the
+    // parcel, we can go ahead and move on with life.
+    hpx_parcel_send(parc, HPX_NULL);
+
+    // NOTE: No release is needed. The argument will go out of scope at this
+    // point, and the data will be freed.
   }
 
+  /// Set the out edge data for this expansion LCO
+  ///
+  /// This will set the underlying LCO with the correct out edge data.
+  ///
+  /// \param edges - the out edge data
+  void set_out_edge_data(std::vector<DAGEdge> &edges) {
+    // TODO reduce a copy here using the parcel interface
+    int n_out = edges.size();
+    size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
+    char *input_data = new char[bytes];
+    assert(input_data);
+
+    int *codes = reinterpret_cast<int *>(input_data);
+    codes[0] = SetOpCodes::kOutEdges;
+    codes[1] = n_out;
+
+    if (n_out) {
+      std::sort(edges.begin(), edges.end(), DAG::compare_edge_locality);
+
+      OutEdgeRecord *records =
+          reinterpret_cast<OutEdgeRecord *>(input_data + sizeof(int) * 2);
+
+      for (int i = 0; i < n_out; ++i) {
+        records[i].op = edges[i].op;
+        records[i].target = edges[i].target->global_addx;
+        records[i].tidx = edges[i].target->idx;
+        records[i].locality = edges[i].target->locality;
+      }
+    }
+
+    hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);
+
+    delete [] input_data;
+  }
+
+  /// Reset the underlying LCO
+  ///
+  /// This will not only reset the underlying LCO, but will also perform an
+  /// 'empty' set of the out edge data. The intent of this method is for use
+  /// in cases where a DAG is reused multiple times. At the moment, this
+  /// functionality is not available in DASHMM, but will be soon.
+  void reset() {
+    if (data_ == HPX_NULL) return;
+
+    hpx_lco_reset_sync(data_);
+
+    std::vector<DAGEdge> empty{};
+    set_out_edge_data(empty);
+  }
 
  private:
-  // Give the evaluator access so that it might register our actions
-  friend class Evaluator<Source, Target, Expansion, Method>;
+  // Give the registrar access so that it might register our actions
+  friend class ExpansionLCORegistrar<Source, Target, Expansion, Method>;
 
   ///////////////////////////////////////////////////////////////////
   // Types used internally
@@ -345,36 +319,31 @@ class ExpansionLCO {
   /// Part of the internal representation of the Expansion LCO
   ///
   /// Expansion are user-defined LCOs. The data they contain are this object
-  /// and the serialized expansion. This object gives the number of expected
-  /// inputs, the number that have actually occurred, and a flag to indicate
-  /// if all of the expected inputs have been scheduled.
+  /// and the serialized expansion. The payload contains the serialized form
+  /// of the expansion. This is done through the ViewSet object, and details
+  /// on the exact format can be found with the ViewSet documentation.
   struct Header {
-    int arrived;
-    int scheduled;
-    int finished;
-    size_t payload_size;
+    int yet_to_arrive;
+    int out_edge_count;
+    size_t expansion_size;
+    DomainGeometry domain;
+    Index index;
+    hpx_addr_t rwaddr;
     char payload[];
   };
 
-  /// Behavior codes for the Expansion LCO
-  ///
-  /// The set operation for the Expansion LCO takes three forms. Two are simple:
-  /// incrementing the number count of scheduled inputs, and finalizing the
-  /// inputs. The third is for actually making contributions to the Expansion
-  /// data.
-  enum SetCodes {
-    kFinish = 1,
-    kSchedule = 2,
-    kContribute = 3
+  /// This stores the data needed to serve the out edge once the LCO is set
+  struct OutEdgeRecord {
+    Operation op;
+    hpx_addr_t target;
+    Index tidx;
+    int locality;
   };
 
-  // Marshalled parameter type for m_to_l_
-  struct MtoLParams {
-    expansionlco_t total;
-    Index s_index;
-    double s_size;
-    Index t_index;
-    int n_digits;
+  /// Operation codes for the LCOs set operation
+  enum SetOpCodes {
+    kContribute,
+    kOutEdges
   };
 
 
@@ -384,72 +353,92 @@ class ExpansionLCO {
 
   /// Initialization handler for Expansion LCOs
   ///
-  /// This initialized an Expansion LCO given an input serialized
-  /// expansion. Often, this will just be the default constructed expansion,
-  /// but might be otherwise in specific cases.
+  /// The input header is copied directly into the LCO's header. This copies
+  /// the metadata as well as the payload (the initial value of the expansion
+  /// and the out edges).
+  ///
+  /// \param head - the address of the LCO data
+  /// \param bytes - the size of the LCO data
+  /// \param inti - the initialization data for the LCO
+  /// \param init_bytes - the size of the initialization data for the LCO
   static void init_handler(Header *head, size_t bytes,
-                           void *init, size_t init_bytes) {
-    assert(bytes == init_bytes + sizeof(Header));
-    head->arrived = 0;
-    head->scheduled = 0;
-    head->finished = 0;
-    head->payload_size = init_bytes;
-    memcpy(head->payload, init, init_bytes);
+                           size_t *init, size_t init_bytes) {
+    head->expansion_size = *init;
+    memset(head->payload, 0, *init);
   }
 
   /// The set operation handler for the Expansion LCO
   ///
-  /// This takes one of three forms. The input to this is either a single integer
-  /// or a serialized Expansion. In the latter case, the reserved data at the
-  /// beginning of the expansion serialization is used to give the operation
-  /// code for the set.
+  /// Set will either save the out edges, or add the input expansion to
+  /// the expansion stored in this LCO.
+  ///
+  /// The input to this function is either an expansion or a set of out edge
+  /// records. In either case, @p rhs begins with an integer indicating which
+  /// sort of set was called. Then, for a contribution, the rest of the
+  /// input buffer is a serialized ViewSet, which can be deserialized into
+  /// an expansion, which is then added to the expansion represented by this
+  /// LCO. For the case of setting the out edges, the rest of the inpute buffer
+  /// is an array of OutEdgeRecord.
+  ///
+  /// \param lhs - the address of this LCO's data
+  /// \param rhs - the input buffer
+  /// \param bytes - the size of the input buffer
   static void operation_handler(Header *lhs, void *rhs, size_t bytes) {
-    int *code = static_cast<int *>(rhs);
+    ReadBuffer input{static_cast<char *>(rhs), bytes};
 
-    if (*code == kFinish) {
-      assert(lhs->finished == 0);
-      lhs->finished = 1;
-    } else if (*code == kSchedule) {
-      assert(lhs->finished == 0);
-      lhs->scheduled += 1;
-    } else if (*code == kContribute) {
-      // increment the counter
-      lhs->arrived += 1;
-      if (lhs->finished) {
-        assert(lhs->arrived <= lhs->scheduled);
-      }
+    int *code = input.interpret<int>();
 
-      // This is for the S->M contribution. That one occurs in place, and so
-      // we need to contribute without actually doing anything.
-      if (bytes <= sizeof(int)) {
-        return;
-      }
+    // decrement the counter
+    lhs->yet_to_arrive -= 1;
+    assert(lhs->yet_to_arrive >= 0);
 
-      // The start of rhs must be two integers, the second being n_digits.
-      expansion_t incoming{rhs, bytes, code[1]};
+    switch (*code) {
+      case SetOpCodes::kContribute:
+        {
+          ViewSet views{};
+          views.interpret(input);
+          expansion_t incoming{views};
 
-      // create the expansion from the payload
-      int *n_digits = reinterpret_cast<int *>(lhs->payload + sizeof(int));
-      expansion_t expand{lhs->payload, lhs->payload_size, *n_digits};
+          // create the expansion from the payload
+          ReadBuffer here{lhs->payload, lhs->expansion_size};
+          ViewSet here_views{};
+          here_views.interpret(here);
+          expansion_t expand{here_views};
 
-      // add the one to the other
-      expand.add_expansion(&incoming);
+          // add the one to the other
+          expand.add_expansion(&incoming);
 
-      // release the data, because these objects do not actually own those buffers
-      expand.release();
-      incoming.release();
+          // release the data, because these objects do not actually own it
+          expand.release();
+          incoming.release();
+        }
+        break;
+      case SetOpCodes::kOutEdges:
+        {
+          int n_edges{};
+          input.read(&n_edges);
 
-    } else {
-      assert(0 && "Incorrect code to expansion LCO");
+          if (n_edges) {
+            // Usage Check
+            assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
+            // We use out edge count here for the size so that an incorrect use
+            // does not write outside of bounds.
+            WriteBuffer dest{&lhs->payload[lhs->expansion_size],
+                             sizeof(OutEdgeRecord) * lhs->out_edge_count};
+            dest.write(input);
+          }
+        }
+
+        break;
     }
   }
 
   /// The predicate to detect triggering of the Expansion LCO
   ///
-  /// The expansion LCO is triggered if it has been finalized and the number
-  /// of contributions match the number of scheduled operations.
+  /// If all contributions have arrived, and the out edge data has been set,
+  /// we can trigger.
   static bool predicate_handler(Header *i, size_t bytes) {
-    return (i->finished && (i->arrived == i->scheduled));
+    return (i->yet_to_arrive == 0);
   }
 
 
@@ -457,165 +446,308 @@ class ExpansionLCO {
   // Other related actions
   ///////////////////////////////////////////////////////////////////
 
-  static int s_to_m_handler(Source *sources, int n_src, double cx, double cy,
-                            double cz, double scale, hpx_addr_t expand,
-                            int n_digits) {
-    void *temp{nullptr};
-
-    // SMP assumption here: source and expansion LCO are on the same locality
-    hpx_gas_try_pin(expand, &temp);
-    Header *data = static_cast<Header *>(hpx_lco_user_get_user_data(temp));
-    expansion_t local{data->payload, data->payload_size, n_digits};
-    local.S_to_M(Point{cx, cy, cz}, sources, &sources[n_src], scale);
-    local.release();
-    hpx_gas_unpin(expand);
-
-    int code = kContribute;
-    hpx_lco_set_lsync(expand, sizeof(code), &code, HPX_NULL);
-
-    return HPX_SUCCESS;
-  }
-
-  static int s_to_l_handler(Source *sources, int n_src, double cx, double cy,
-                            double cz, double scale, hpx_addr_t expand,
-                            int n_digits) {
-    expansion_t local{nullptr, 0, n_digits};
-    auto multi = local.S_to_L(Point{cx, cy, cz}, sources, &sources[n_src],
-                              scale);
-    size_t bytes = multi->bytes();
-    char *serial = static_cast<char *>(multi->release());
-
-    expansionlco_t total{expand, n_digits};
-    total.contribute(bytes, serial);
-    delete [] serial;
-
-    return HPX_SUCCESS;
-  }
-
-  static int m_to_m_handler(hpx_addr_t expand, int n_digits, int from_child,
-                            double s_size) {
-    hpx_addr_t target = hpx_thread_current_target();
+  /// Spawn the work at the out edges of this LCO
+  ///
+  /// Once the LCO is triggered, it will perform the actions required by the
+  /// out edges of that LCO. This happens typically in two steps. The first is
+  /// bundling of the out edges that go to LCOs at the same locality together
+  /// and sending the data across the network a single time. Then at the
+  /// remote side, the addresses are looked up and the work is performed.
+  /// See spawn_out_edges_from_remote_handler and spawn_out_edges_work for
+  /// more details.
+  ///
+  /// \param unused - is not used
+  ///
+  /// \returns - HPX_SUCCESS
+  static int spawn_out_edges_handler(int unused) {
+    hpx_addr_t lco_ = hpx_thread_current_target();
     // HACK: This action is local to the expansion, so we getref here with
     // whatever as the size and things are okay...
-    Header *ldata{nullptr};
-    hpx_lco_getref(target, 1, (void **)&ldata);
-    expansion_t lexp{ldata->payload, ldata->payload_size, n_digits};
+    Header *head{nullptr};
+    hpx_lco_getref(lco_, 1, (void **)&head);
+
+    // Shortcut to the work in the case of a single locality
+    if (hpx_get_num_ranks() == 1) {
+      spawn_out_edges_work(head);
+      hpx_lco_release(lco_, head);
+      return HPX_SUCCESS;
+    }
+
+    // Make a scratch space for the sends
+    size_t total_size = sizeof(Header) + head->expansion_size +
+                        sizeof(OutEdgeRecord) * head->out_edge_count;
+    Header *scratch = reinterpret_cast<Header *>(new char [total_size]);
+    memcpy(scratch, head, total_size);
+
+    // Once we have the copy, we are done with the LCO data
+    hpx_lco_release(lco_, head);
+
+    // Get reference to out edges
+    OutEdgeRecord *out_edges = reinterpret_cast<OutEdgeRecord *>(
+        &scratch->payload[scratch->expansion_size]);
+
+    // make a local copy of the edge count
+    int save_count = scratch->out_edge_count;
+
+    // loop over the sorted edges
+    int my_rank = hpx_get_my_rank();
+    OutEdgeRecord *begin = out_edges;
+    OutEdgeRecord *end = &out_edges[save_count];
+    while (begin != end) {
+      int curr_rank = begin->locality;
+
+      // Find end of current locality's edges
+      OutEdgeRecord *curr = begin;
+      while (curr != end && curr->locality == curr_rank) {
+        curr += 1;    // look at next record
+      }
+
+      //move into start of range
+      scratch->out_edge_count = curr - begin;
+      size_t send_edges_size = sizeof(OutEdgeRecord) * scratch->out_edge_count;
+      if (begin != out_edges) {
+        std::move(begin, curr, out_edges);
+      }
+
+      // Now send the parcel or do the work
+      if (curr_rank == my_rank) {
+        spawn_out_edges_work(scratch);
+      } else {
+        size_t message_size = sizeof(Header) + scratch->expansion_size
+                                           + send_edges_size;
+                                    // TODO + (1/2) x hpx_addr_t eventually
+
+        hpx_parcel_t *parc = hpx_parcel_acquire(scratch, message_size);
+        hpx_parcel_set_action(parc, spawn_out_edges_from_remote_);
+        hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
+
+        // NOTE: we need to wait for local completion because we are going to
+        // modify the buffer in place for the next locality
+        hpx_parcel_send_sync(parc);
+      }
+
+      //advance
+      begin = curr;
+    }
+
+    delete [] scratch;
+
+    // done
+    return HPX_SUCCESS;
+  }
+
+  /// Action to handle incoming edges from a remote
+  ///
+  /// This action is spawned when out edges from a remote arrive. It will first
+  /// look up any LCO address based on the index in the local tree and then it
+  /// will perform the work. The possibility that some might not need to be
+  /// looked up relies on the future possible reuse of the DAG. This is a
+  /// feature that does not currently exist, but which might in the future.
+  ///
+  /// The message contains an expansion's data, but with only a subset of the
+  /// out edge records.
+  ///
+  /// \param head - the message data from the remote
+  /// \param msg_size - the size of the incoming data
+  ///
+  /// \returns - HPX_SUCCESS
+  static int spawn_out_edges_from_remote_handler(Header *head,
+                                                 size_t msg_size) {
+    // Detect if the edges have unknown target addresses and lookup the
+    // correct edges
+    RankWise<dualtree_t> global_tree{head->rwaddr};
+    auto tree = global_tree.here();
+    OutEdgeRecord *out_edges =
+      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+    for (int i = 0; i < head->out_edge_count; ++i) {
+      if (out_edges[i].target == HPX_NULL) {
+        out_edges[i].target = tree->lookup_lco_addx(out_edges[i].tidx,
+                                                    out_edges[i].op);
+      }
+    }
+
+    spawn_out_edges_work(head);
+
+    return HPX_SUCCESS;
+  }
+
+  /// Routine driving the actual work of the incoming edges
+  ///
+  /// This is called either after the address lookup, or directly for those
+  /// edges local to the initiating LCO.
+  ///
+  /// \param head - the message data
+  static void spawn_out_edges_work(Header *head) {
+    ViewSet views{};
+    if (head->out_edge_count > 0) {
+      ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+      views.interpret(inbuf);
+    }
+
+    // Loop over the out edges, and spawn the work
+    OutEdgeRecord *out_edges =
+      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+
+    for (int i = 0; i < head->out_edge_count; ++i) {
+      switch(out_edges[i].op) {
+        case Operation::MtoM:
+          m_to_m_out_edge(head, views, out_edges[i].target);
+          break;
+        case Operation::MtoL:
+          m_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
+          break;
+        case Operation::LtoL:
+          l_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
+          break;
+        case Operation::MtoT:
+          m_to_t_out_edge(head, out_edges[i].target);
+          break;
+        case Operation::LtoT:
+          l_to_t_out_edge(head, out_edges[i].target);
+          break;
+        case Operation::MtoI:
+          m_to_i_out_edge(head, views, out_edges[i].target);
+          break;
+        case Operation::ItoI:
+          i_to_i_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
+          break;
+        case Operation::ItoL:
+          i_to_l_out_edge(head, views, out_edges[i].target, out_edges[i].tidx);
+          break;
+        default:
+          assert(0 && "Impossible operation during out edge spawn");
+          break;
+      }
+    }
+  }
+
+  /// Serve an M->M edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  static void m_to_m_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target) {
+    double s_size = head->domain.size_from_level(head->index.level());
+    int from_child = head->index.which_child();
+
+    expansion_t lexp{views};
     auto translated = lexp.M_to_M(from_child, s_size);
     lexp.release();
-    hpx_lco_release(target, ldata);
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
-    expansionlco_t total{expand, n_digits};
-    total.contribute(bytes, transexpand);
-
-    delete [] transexpand;
-
-    return HPX_SUCCESS;
+    expansionlco_t destination{target};
+    destination.contribute(std::move(translated));
   }
 
-  static int m_to_l_handler(MtoLParams *parms, size_t UNUSED) {
-    hpx_addr_t target = hpx_thread_current_target();
-    // HACK: This action is local to the expansion, so we getref here with
-    // whatever as the size and things are okay...
-    Header *ldata{nullptr};
-    hpx_lco_getref(target, 1, (void **)&ldata);
+  /// Serve an M->L edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  /// \param tidx - index of target LCO
+  static void m_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx) {
+    double s_size = head->domain.size_from_level(head->index.level());
 
-    expansion_t lexp{ldata->payload, ldata->payload_size, parms->n_digits};
-    auto translated = lexp.M_to_L(parms->s_index, parms->s_size,
-                                 parms->t_index);
+    // translate the source expansion
+    expansion_t lexp{views};
+    auto translated = lexp.M_to_L(head->index, s_size, tidx);
     lexp.release();
-    hpx_lco_release(target, ldata);
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
-    parms->total.contribute(bytes, transexpand);
-
-    delete [] transexpand;
-
-    return HPX_SUCCESS;
+    expansionlco_t lco{target};
+    lco.contribute(std::move(translated));
   }
 
-  static int l_to_l_handler(hpx_addr_t expand, int n_digits, int to_child,
-                            double t_size) {
-    hpx_addr_t target = hpx_thread_current_target();
-    // HACK: This action is local to the expansion, so we getref here with
-    // whatever as the size and things are okay...
-    Header *ldata{nullptr};
-    hpx_lco_getref(target, 1, (void **)&ldata);
-    expansion_t lexp{ldata->payload, ldata->payload_size, n_digits};
+  /// Serve an L->L edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  /// \param tidx - index of target LCO
+  static void l_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx) {
+    int to_child = tidx.which_child();
+    double t_size = head->domain.size_from_level(tidx.level());
+
+    expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
     lexp.release();
-    hpx_lco_release(target, ldata);
 
-    size_t bytes = translated->bytes();
-    char *transexpand = reinterpret_cast<char *>(translated->release());
-
-    expansionlco_t total{expand, n_digits};
-    total.contribute(bytes, transexpand);
-
-    delete [] transexpand;
-
-    return HPX_SUCCESS;
+    expansionlco_t total{target};
+    total.contribute(std::move(translated));
   }
 
-  static int m_to_t_handler(int n_digits, double scale,
-                            hpx_addr_t targ, int n_trg) {
-    targetlco_t targets{targ, n_trg};
-    // HACK: This action is local to the expansion, so we getref here with
-    // whatever as the size and things are okay...
-    Header *ldata{nullptr};
-    hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-    targets.contribute_M_to_T(ldata->payload_size, ldata->payload,
-                              n_digits, scale);
-    hpx_lco_release(hpx_thread_current_target(), ldata);
-
-    return HPX_SUCCESS;
+  /// Serve an M->T edge
+  ///
+  /// \param head - the incoming data
+  /// \param target - global address of target LCO
+  static void m_to_t_out_edge(Header *head, hpx_addr_t target) {
+    // NOTE: we do not put in the correct number of targets. This is fine
+    // because contribute_M_to_T does not rely on this information.
+    targetlco_t destination{target, 0};
+    destination.contribute_M_to_T(head->expansion_size, head->payload);
   }
 
-  static int l_to_t_handler(int n_digits, double scale,
-                            hpx_addr_t targ, int n_trg) {
-    targetlco_t targets{targ, n_trg};
-    // HACK: This action is local to the expansion, so we getref here with
-    // whatever as the size and things are okay...
-    Header *ldata{nullptr};
-    hpx_lco_getref(hpx_thread_current_target(), 1, (void **)&ldata);
-    targets.contribute_L_to_T(ldata->payload_size, ldata->payload,
-                              n_digits, scale);
-    hpx_lco_release(hpx_thread_current_target(), ldata);
-
-    return HPX_SUCCESS;
+  /// Serve an L->T edge
+  ///
+  /// \param head - the incoming data
+  /// \param target - global address of target LCO
+  static void l_to_t_out_edge(Header *head, hpx_addr_t target) {
+    // NOTE: we do not put in the correct number of targets. This is fine
+    // because contribute_L_to_T does not rely on this information.
+    targetlco_t destination{target, 0};
+    destination.contribute_L_to_T(head->expansion_size, head->payload);
   }
 
-  static int s_to_t_handler(Source *sources, int n_sources,
-                            hpx_addr_t target, int n_trg) {
-    targetlco_t targets{target, n_trg};
-    targets.contribute_S_to_T(n_sources, sources);
-    return HPX_SUCCESS;
+  /// Serve an M->I edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  static void m_to_i_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target) {
+    expansion_t lexp{views};
+    auto translated = lexp.M_to_I(head->index);
+    lexp.release();
+
+    expansionlco_t lco{target};
+    lco.contribute(std::move(translated));
   }
 
-  static int add_handler(hpx_addr_t expand, int n_digits) {
-    expansionlco_t total{expand, n_digits};
+  /// Serve an I->I edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  /// \param tidx - index of target LCO
+  static void i_to_i_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx) {
+    double s_size = head->domain.size_from_level(head->index.level());
 
-    Header *ldata{nullptr};
-    // HACK: This action is local to the expansion, so we getref here with
-    // whatever as the size and things are okay...
-    hpx_addr_t target = hpx_thread_current_target();
-    hpx_lco_getref(target, 1, (void **)&ldata);
-    total.contribute(ldata->payload_size, ldata->payload);
-    hpx_lco_release(target, ldata);
+    expansion_t lexp{views};
+    auto translated = lexp.I_to_I(head->index, s_size, tidx);
+    lexp.release();
 
-    return HPX_SUCCESS;
+    expansionlco_t lco{target};
+    lco.contribute(std::move(translated));
   }
 
-  static int create_from_expansion_handler(void *payload, size_t bytes) {
-    size_t total_size = sizeof(Header) + bytes;
-    hpx_addr_t gdata = hpx_lco_user_new(total_size, init_, operation_,
-                                        predicate_, payload, bytes);
-    assert(gdata != HPX_NULL);
-    return HPX_THREAD_CONTINUE(gdata);
+  /// Serve an I->L edge
+  ///
+  /// \param head - the incoming data
+  /// \param views - ViewSet serving the expansion
+  /// \param target - global address of target LCO
+  /// \param tidx - index of target LCO
+  static void i_to_l_out_edge(Header *head, const ViewSet &views,
+                              hpx_addr_t target, Index tidx) {
+    double t_size = head->domain.size_from_level(tidx.level());
+
+    expansion_t lexp{views};
+    auto translated = lexp.I_to_L(tidx, t_size);
+    lexp.release();
+
+    expansionlco_t lco{target};
+    lco.contribute(std::move(translated));
   }
 
 
@@ -625,19 +757,11 @@ class ExpansionLCO {
   static hpx_action_t predicate_;
 
   // The actions for the various operations
-  static hpx_action_t s_to_m_;
-  static hpx_action_t s_to_l_;
-  static hpx_action_t m_to_m_;
-  static hpx_action_t m_to_l_;
-  static hpx_action_t l_to_l_;
-  static hpx_action_t m_to_t_;
-  static hpx_action_t l_to_t_;
-  static hpx_action_t s_to_t_;
-  static hpx_action_t add_;
+  static hpx_action_t spawn_out_edges_;
+  static hpx_action_t spawn_out_edges_from_remote_;
   static hpx_action_t create_from_expansion_;
 
   hpx_addr_t data_;     // this is the LCO
-  int n_digits_;
 };
 
 template <typename S, typename T,
@@ -662,61 +786,14 @@ template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::s_to_m_ = HPX_ACTION_NULL;
+hpx_action_t ExpansionLCO<S, T, E, M>::spawn_out_edges_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::s_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::m_to_m_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::m_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::l_to_l_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::m_to_t_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::l_to_t_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::s_to_t_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::add_ = HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t ExpansionLCO<S, T, E, M>::create_from_expansion_ = HPX_ACTION_NULL;
+hpx_action_t ExpansionLCO<S, T, E, M>::spawn_out_edges_from_remote_ =
+    HPX_ACTION_NULL;
 
 
 } // namespace dashmm

@@ -1,6 +1,11 @@
-VERSION=0.6
+VERSION=1.0.0
 BASENAME=dashmm-$VERSION
 FILENAME=$BASENAME.tar
+
+
+echo "Did you remove the comments in evaluator.h?"
+echo "If not, please go remove them now."
+
 
 mkdir $BASENAME
 cp AUTHORS $BASENAME/

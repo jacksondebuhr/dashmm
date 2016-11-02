@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -16,7 +27,7 @@
 #define __DASHMM_TARGET_LCO_H__
 
 
-/// \file include/targetlco.h
+/// \file
 /// \brief TargetLCO object definition
 
 
@@ -24,18 +35,19 @@
 
 #include <hpx/hpx.h>
 
-#include "dashmm/targetref.h"
+#include "dashmm/arrayref.h"
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {
 
 
-/// Forward declaration of Evaluator so that we can become friends
+/// Forward declaration of TargetLCORegistrar so that we can become friends
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
           template <typename, typename,
                     template <typename, typename> class> class Method>
-class Evaluator;
+class TargetLCORegistrar;
 
 
 /// Target LCO
@@ -53,7 +65,7 @@ class Evaluator;
 /// interact with the object very often. Mostly they will pass objects of this
 /// type to ExpansionLCO objects.
 ///
-/// This is a template class parameterized by the Source, Target, Expansion
+/// This is a template class parameterized by the Source, Target, Expansion,
 /// and Method types for a particular evaluation of DASHMM.
 template <typename Source, typename Target,
           template <typename, typename> class Expansion,
@@ -66,24 +78,33 @@ class TargetLCO {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
 
-  using targetref_t = TargetRef<Target>;
+  using targetref_t = ArrayRef<Target>;
 
   /// Construct a default object
   TargetLCO() : lco_{HPX_NULL}, n_targs_{0} { }
 
   /// Construct from an existing LCO
-  TargetLCO(hpx_addr_t data, int n_targs) : lco_{data}, n_targs_{n_targs} { }
+  TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
 
-  /// Construct an LCO from input TargetRef. This will create the LCO.
-  explicit TargetLCO(const targetref_t &targets) {
-    Init init{targets};
-    lco_ = hpx_lco_user_new(sizeof(Data), init_, operation_, predicate_,
-                            &init, sizeof(init));
+  /// Construct an LCO from input TargetRef
+  ///
+  /// This will construct the LCO at the locality specified by @p where.
+  /// The LCO will expect @p n_inputs contributions.
+  ///
+  /// \param n_inputs - the number of inputs to the LCO
+  /// \param targets - ArrayRef indicating the global memory that the LCO is
+  ///                  representing
+  /// \param where - global address which should be local to the allocated
+  ///                LCO
+  TargetLCO(size_t n_inputs, const targetref_t &targets) {
+    Data init{static_cast<int>(n_inputs), targets};
+    lco_ = hpx_lco_user_new(sizeof(init), init_, operation_,
+                            predicate_, &init, sizeof(init));
     assert(lco_ != HPX_NULL);
     n_targs_ = targets.n();
   }
 
-  /// Destroy the LCO. Use carefully!
+  /// Destroy the LCO
   void destroy() {
     if (lco_ != HPX_NULL) {
       hpx_lco_delete_sync(lco_);
@@ -95,39 +116,22 @@ class TargetLCO {
   /// The global address of the referred to object
   hpx_addr_t lco() const {return lco_;}
 
-  int n() const {return n_targs_;}
-
-  /// Indicate to the underlying LCO that all operations have been scheduled
-  void finalize() const {
-    if (lco_ != HPX_NULL) {
-      int code = kFinish;
-      hpx_lco_set_lsync(lco_, sizeof(code), &code, HPX_NULL);
-    }
-  }
-
-  /// Indicate to the underlying LCO that it should expect \param num more
-  /// operations
-  void schedule(int num) const {
-    if (lco_ != HPX_NULL) {
-      int input[2] = {kSetOnly, num};
-      // NOTE: This one must be remote complete so that there is no timing issue
-      // between scheduling an input and finalizing the schedule.
-      hpx_lco_set_rsync(lco_, sizeof(int) * 2, input);
-    }
-  }
+  /// The number of targets in the referred object
+  size_t n() const {return n_targs_;}
 
   /// Contribute a S->T operation to the referred targets
   ///
   /// \param n - the number of sources
   /// \param sources - the sources themselves
-  void contribute_S_to_T(int n, source_t *sources) const {
-    // NOTE: we assume this is called local to the sources
+  void contribute_S_to_T(size_t n, source_t *sources) const {
     size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
     StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
     assert(input);
     input->code = kStoT;
     input->count = n;
-    memcpy(input->sources, sources, sizeof(source_t) * n);
+    if (n != 0) {
+      memcpy(input->sources, sources, sizeof(source_t) * n);
+    }
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
 
@@ -138,16 +142,11 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  /// \param n_digits - accuracy of the expansion
-  /// \param scale - scaling factor
-  void contribute_M_to_T(size_t bytes, void *data,
-                         int n_digits, double scale) const {
+  void contribute_M_to_T(size_t bytes, void *data) const {
     size_t inputsize = sizeof(MtoT) + bytes;
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
     assert(input);
     input->code = kMtoT;
-    input->n_digits = n_digits;
-    input->scale = scale;
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -158,16 +157,11 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  /// \param n_digits - accuracy of the expansion
-  /// \param scale - scaling factor
-  void contribute_L_to_T(size_t bytes, void *data,
-                         int n_digits, double scale) const {
+  void contribute_L_to_T(size_t bytes, void *data) const {
     size_t inputsize = sizeof(LtoT) + bytes;
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
     assert(input);
     input->code = kLtoT;
-    input->n_digits = n_digits;
-    input->scale = scale;
     input->bytes = bytes;
     memcpy(input->data, data, bytes);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -175,34 +169,25 @@ class TargetLCO {
   }
 
  private:
-  /// Make Evaluator a friend -- it handles action registration
-  friend class Evaluator<Source, Target, Expansion, Method>;
+  /// Become friends with TargetLCORegistrar
+  friend class TargetLCORegistrar<Source, Target, Expansion, Method>;
 
   /// LCO data type
   struct Data {
-    int arrived;
-    int scheduled;
-    int finished;
-    targetref_t targets;
-  };
-
-  /// LCO initialization type
-  struct Init {
+    int yet_to_arrive;
     targetref_t targets;
   };
 
   /// S->T parameters type
   struct StoT {
     int code;
-    int count;
+    size_t count;
     source_t sources[];
   };
 
   /// M->T parameters type
   struct MtoT {
     int code;
-    int n_digits;
-    double scale;
     size_t bytes;
     char data[];
   };
@@ -210,58 +195,57 @@ class TargetLCO {
   /// L->T parameters type
   struct LtoT {
     int code;
-    int n_digits;
-    double scale;
     size_t bytes;
     char data[];
   };
 
   /// Codes to define what the LCO set is doing.
   enum SetCodes {
-    kSetOnly = 1,
-    kStoT = 2,
-    kMtoT = 3,
-    kLtoT = 4,
-    kFinish = 5
+    kStoT = 0,
+    kMtoT = 1,
+    kLtoT = 2,
   };
 
   /// Initialize the LCO
   static void init_handler(Data *i, size_t bytes,
-                           Init *init, size_t init_bytes) {
-    i->arrived = 0;
-    i->scheduled = 0;
-    i->finished = 0;
-    i->targets = init->targets;
+                           Data *init, size_t init_bytes) {
+    *i = *init;
   }
 
   /// The 'set' operation on the LCO
   ///
   /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
-    int *code = static_cast<int *>(rhs);
-    if (*code == kSetOnly) {    // this is a pair of ints, a code and a count
-      lhs->scheduled += code[1];
-    } else if (*code == kStoT) {
+    int *code = reinterpret_cast<int *>(rhs);
+    ReadBuffer readbuf{(char *)rhs, bytes};
+
+    lhs->yet_to_arrive -= 1;
+    assert(lhs->yet_to_arrive >= 0);
+
+    if (lhs->targets.data() == HPX_NULL) {
+      return;
+    }
+
+    if (*code == kStoT) {
       // The input contains the sources
       StoT *input = static_cast<StoT *>(rhs);
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      if (input->count) {
+        // The LCO data contains the reference to the targets, which must be
+        // pinned.
+        target_t *targets{nullptr};
+        // NOTE: This should succeed because we place the LCO at the same
+        // locality as the actual target data.
+        assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{nullptr, 0, -1};
-      expand.S_to_T(input->sources, &input->sources[input->count],
-                     targets, &targets[lhs->targets.n()]);
-      expand.release(); // NOTE: This is not strictly needed
+        expansion_t expand(ViewSet{});
+        expand.S_to_T(input->sources, &input->sources[input->count],
+                       targets, &targets[lhs->targets.n()]);
 
-      hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
+        hpx_gas_unpin(lhs->targets.data());
+      }
     } else if (*code == kMtoT) {
-      MtoT *input = static_cast<MtoT *>(rhs);
+      readbuf.interpret<MtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -270,15 +254,15 @@ class TargetLCO {
       // as the actual target data.
       assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{input->data, input->bytes, input->n_digits};
-      expand.M_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      ViewSet views{};
+      views.interpret(readbuf);
+      expansion_t expand(views);
+      expand.M_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
     } else if (*code == kLtoT) {
-      LtoT *input = static_cast<LtoT *>(rhs);
+      readbuf.interpret<LtoT>();
 
       // The LCO data contains the reference to the targets, which must be
       // pinned.
@@ -287,15 +271,13 @@ class TargetLCO {
       // as the actual target data.
       assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
 
-      expansion_t expand{input->data, input->bytes, input->n_digits};
-      expand.L_to_T(targets, &targets[lhs->targets.n()], input->scale);
+      ViewSet views{};
+      views.interpret(readbuf);
+      expansion_t expand(views);
+      expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
 
       hpx_gas_unpin(lhs->targets.data());
-
-      lhs->arrived += 1;
-    } else if (*code == kFinish) {
-      lhs->finished = 1;
     } else {
       assert(0 && "Incorrect code to TargetLCO");
     }
@@ -304,13 +286,13 @@ class TargetLCO {
   /// The LCO is set if it has been finalized, and all scheduled operations
   /// have taken place.
   static bool predicate_handler(Data *i, size_t bytes) {
-    return i->finished && (i->arrived == i->scheduled);
+    return (i->yet_to_arrive == 0);
   }
 
   /// The global address of the LCO
   hpx_addr_t lco_;
   /// The number of targets represented by the LCO.
-  int n_targs_;
+  size_t n_targs_;
 
   /// HPX function for LCO initialization
   static hpx_action_t init_;

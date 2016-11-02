@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -16,7 +27,7 @@
 #define __DASHMM_DOMAIN_GEOMETRY_H__
 
 
-/// \file include/domaingeometry.h
+/// \file
 /// \brief Object to represent the top-level domain
 
 
@@ -33,6 +44,9 @@ namespace dashmm {
 /// and target trees.
 class DomainGeometry {
  public:
+  /// Default constructor
+  DomainGeometry() : low_{Point{0.0, 0.0, 0.0}}, size_{0.0} { }
+
   /// Constructor from low corner and side length
   DomainGeometry(Point low, double size)
       : low_{low}, size_{size} { }

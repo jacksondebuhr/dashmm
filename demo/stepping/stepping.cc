@@ -1,15 +1,27 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
+
 
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +38,10 @@
 
 
 // NOTE: We are working in units where G = 1.
+
+
+// The Particle type will serve as both the Source and Target types for the
+// evaluation. This is a common use-case for time-stepping codes.
 struct Particle {
   dashmm::Point position;
   double charge;
@@ -35,6 +51,7 @@ struct Particle {
 };
 
 
+// The arguments to the command line
 struct InputArguments {
   int count;
   int refinement_limit;
@@ -43,11 +60,12 @@ struct InputArguments {
 };
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt);
+// We make the prototype of this function available so that we might use this
+// function in an ArrayMapAction. See below.
+void update_particles(Particle *P, const size_t count, const double *dt);
 
 
-// Here we create the evaluator objects that we shall need in this demo.
+// Here we create the evaluator object that we need in this demo.
 // This must be instantiated before the call to dashmm::init so that they
 // might register the relevant actions with the runtime system.
 dashmm::Evaluator<Particle, Particle,
@@ -58,23 +76,25 @@ dashmm::Evaluator<Particle, Particle,
 dashmm::ArrayMapAction<Particle, double> update_action{update_particles};
 
 
+// Print out help for the program.
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
 "Options available: [possible/values] (default value)\n"
 "  --nsources=num               number of source points to generate (10000)\n"
 "  --threshold=num              source and target tree partition refinement\n"
 "                                 limit (40)\n"
-"  --nsteps=num                 number of steps to take (100)\n"
+"  --nsteps=num                 number of steps to take (20)\n"
 "  --output=file                specify file for output (disabled)\n",
           progname);
 }
 
 
+// Parse the command line
 int read_arguments(int argc, char **argv, InputArguments &retval) {
   // Set defaults
   retval.count = 10000;
   retval.refinement_limit = 40;
-  retval.steps = 100;
+  retval.steps = 20;
   retval.output.clear();
 
   int opt = 0;
@@ -119,17 +139,22 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   }
 
   // print out summary
-  fprintf(stdout, "Testing DASHMM:\n");
-  fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
-  fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
-  if (!retval.output.empty()) {
-    fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+  if (dashmm::get_my_rank() == 0) {
+    fprintf(stdout, "Testing DASHMM:\n");
+    fprintf(stdout, "%d sources taking %d steps\n", retval.count, retval.steps);
+    fprintf(stdout, "threshold: %d\n", retval.refinement_limit);
+    if (!retval.output.empty()) {
+      fprintf(stdout, "output in file: %s\n\n", retval.output.c_str());
+    }
+  } else {
+    retval.count = 0;
   }
 
   return 0;
 }
 
 
+// Used to collect timing information
 inline double getticks(void) {
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -141,6 +166,7 @@ inline double elapsed(double t1, double t0) {
 }
 
 
+// Pick a position uniformly distributed in the 3-ball.
 dashmm::Point pick_sphere_position() {
   double r = (double)rand() / RAND_MAX;
   double ctheta = 2.0 * (double)rand() / RAND_MAX - 1.0;
@@ -153,13 +179,13 @@ dashmm::Point pick_sphere_position() {
   return dashmm::Point{pos[0], pos[1], pos[2]};
 }
 
-
+// Select a mass at random
 double pick_mass() {
   double retval = (double)rand() / RAND_MAX + 1.0;
   return retval;
 }
 
-
+// Set the source data
 double set_sources(Particle *sources, int count) {
   double m_tot{0.0};
   for (int i = 0; i < count; ++i) {
@@ -177,9 +203,11 @@ double set_sources(Particle *sources, int count) {
   return m_tot;
 }
 
-
+// Output the data at the final timestep, if directed to do so by the user
 void output_results(const std::string &fname, const Particle *sources,
                     int count) {
+  if (dashmm::get_my_rank()) return;
+
   FILE *ofd = fopen(fname.c_str(), "w");
   assert(ofd != nullptr);
 
@@ -196,16 +224,23 @@ void output_results(const std::string &fname, const Particle *sources,
 }
 
 
-void update_particles(Particle *P, const size_t count, const size_t offset,
-                      const double *dt) {
+// This function serves the action for the ArrayMapAction that will update the
+// positions of the particles given the computed acceleration. This function
+// is called on the particle data between each step, and allows the user to
+// perform updates in parallel without having to explicitly use parallel
+// constructs.
+void update_particles(Particle *P, const size_t count, const double *dt) {
   for (size_t i = 0; i < count; ++i) {
     double x[3] = {P[i].position[0], P[i].position[1], P[i].position[2]};
     for (int j = 0; j < 3; ++j) {
       // NOTE: the minus sign is because the output of LaplaceCOMAcc is for
-      // a positive potential. So we add the minus sign here.
+      // a repulsive force. So we add the minus sign here.
       // NOTE: we work in units where G = 1.
       // NOTE: the point of this demo is not the time integrator, hence the
       // simplistic update.
+      // NOTE: Also, the forces are not softened, and so close encounters
+      // can lead to very bad results. So please be aware that running this
+      // code for too many steps will cause trouble.
       x[j] += P[i].velocity[j] * (*dt)
               - 0.5 * P[i].acceleration[j] * (*dt) * (*dt);
       P[i].velocity[j] -= P[i].acceleration[j] * (*dt);
@@ -215,13 +250,19 @@ void update_particles(Particle *P, const size_t count, const size_t offset,
 }
 
 
+// The main driver routine for the demo. This will set up the particles,
+// take the requested number of timesteps, and then (optionally) output the
+// results to a file.
 void perform_time_stepping(InputArguments args) {
   srand(123456);
 
   // create some arrays
-  Particle *sources = reinterpret_cast<Particle *>(
-    new char [sizeof(Particle) * args.count]);
-  double m_tot = set_sources(sources, args.count);
+  Particle *sources{nullptr};
+  double m_tot{1.0};
+  if (args.count) {
+    sources = new Particle[args.count];
+    m_tot = set_sources(sources, args.count);
+  }
 
   // prep source Array
   dashmm::Array<Particle> source_handle{ };
@@ -229,26 +270,30 @@ void perform_time_stepping(InputArguments args) {
   assert(err == dashmm::kSuccess);
   err = source_handle.put(0, args.count, sources);
   assert(err == dashmm::kSuccess);
+  delete [] sources;
 
   // Compute a reasonable dt:
   // This is chosen so that one dynamical time is roughly 200 steps.
+  // NOTE: this will only be correct on rank 0, so we broadcast the value.
   double dt{sqrt(1.0 / m_tot) / 200.0};
+  dashmm::broadcast(&dt);
 
   // Clear timing information
   double t_eval{0.0};
   double t_update{0.0};
 
-  // Prototypes for the expansion and method
-  dashmm::LaplaceCOMAcc<Particle, Particle> expansion{
-    dashmm::Point{0.0, 0.0, 0.0}, 0
-  };
+  // Prototypes for the method
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
   // Time-stepping
   for (int step = 0; step < args.steps; ++step) {
+    if (dashmm::get_my_rank() == 0) {
+      fprintf(stdout, "Starting step %d...\n", step);
+    }
+
     double t0 = getticks();
     err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
-                          method, expansion);
+                          method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
@@ -262,24 +307,24 @@ void perform_time_stepping(InputArguments args) {
   }
 
   // Report on loop
-  fprintf(stdout, "Evaluation took %lg [us]\n", t_eval);
+  fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
   fprintf(stdout, "Update took %lg [us]\n", t_update);
 
   // Output if the user has selected this option
   if (!args.output.empty()) {
-    err = source_handle.get(0, args.count, sources);
-    assert(err == dashmm::kSuccess);
-    output_results(args.output, sources, args.count);
+    size_t total_count = source_handle.length();
+    Particle *final_data = source_handle.collect();
+    output_results(args.output, final_data, total_count);
+    delete [] final_data;
   }
 
   // free up resources
   err = source_handle.destroy();
   assert(err == dashmm::kSuccess);
-
-  delete [] sources;
 }
 
 
+// Program entrypoint
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);
@@ -287,7 +332,6 @@ int main(int argc, char **argv) {
 
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
-
 
   if (!usage_error) {
     perform_time_stepping(inputargs);

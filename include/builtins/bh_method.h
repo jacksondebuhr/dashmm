@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -16,7 +27,7 @@
 #define __DASHMM_BH_METHOD_H__
 
 
-/// \file include/bh_method.h
+/// \file
 /// \brief Declaration of BH method
 
 
@@ -24,12 +35,14 @@
 
 #include <vector>
 
+#include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
+#include "dashmm/tree.h"
+
+#include "builtins/bhdistro.h"
 
 
 namespace dashmm {
@@ -53,9 +66,11 @@ class BH {
   using method_t = BH<Source, Target, Expansion>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, BH>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, BH>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, BH>;
-  using sourceref_t = SourceRef<Source>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
+  using sourceref_t = ArrayRef<Source>;
+
+  using distropolicy_t = BHDistro;
 
   BH() : theta_{0.0} { }
 
@@ -66,75 +81,66 @@ class BH {
   double theta() const {return theta_;}
 
   /// In generate, BH will call S->M on the sources in a leaf node.
-  void generate(sourcenode_t &curr, int n_digits) const {
-    double scale = 0.0;
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
-    sourceref_t sources = curr.parts();
-    currexp.S_to_M(Point{0.0, 0.0, 0.0}, sources, scale);
+  void generate(sourcenode_t *curr, DomainGeometry *domain) const {
+    curr->dag.add_parts();
+    assert(curr->dag.add_normal() == true);
+    curr->dag.StoM(&curr->dag,
+                   expansion_t::weight_estimate(Operation::StoM));
   }
 
   /// In aggregate, BH will call M->M to combine moments from the children
   /// of the current node.
-  void aggregate(sourcenode_t &curr, int n_digits) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
-    expansionlco_t currexp = curr.expansion();
+  void aggregate(sourcenode_t *curr, DomainGeometry *domain) const {
+    assert(curr->dag.add_normal() == true);
     for (size_t i = 0; i < 8; ++i) {
-      sourcenode_t kid = curr.child(i);
-      if (kid.is_valid()) {
-        expansionlco_t kexp = kid.expansion();
-        currexp.M_to_M(kexp, i, 0.0);
+      sourcenode_t *kid = curr->child[i];
+      if (kid != nullptr) {
+        curr->dag.MtoM(&kid->dag,
+                       expansion_t::weight_estimate(Operation::MtoM));
       }
     }
   }
 
   /// In inherit, BH does nothing.
-  void inherit(targetnode_t &curr, int n_digits, size_t which_child) const {
-    curr.set_expansion(std::unique_ptr<expansion_t>{
-        new expansion_t{Point{0.0, 0.0, 0.0}, n_digits}
-      });
+  void inherit(targetnode_t *curr, DomainGeometry *domain,
+               bool curr_is_leaf) const {
+    if (curr_is_leaf) {
+      curr->dag.add_parts();
+    }
   }
 
   /// In process, BH tests and uses multipole expansions.
-  void process(targetnode_t &curr, std::vector<sourcenode_t> &consider,
-               bool curr_is_leaf) const {
-    std::vector<sourcenode_t> newcons{ };
-    double unused = 0.0;
+  void process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
+               bool curr_is_leaf, DomainGeometry *domain) const {
+    std::vector<sourcenode_t *> newcons{ };
+    Point ccenter = domain->center_from_index(curr->idx);
+    double csize = domain->size_from_level(curr->idx.level());
 
     do {
       for (auto i = consider.begin(); i != consider.end(); ++i) {
-        Point comp_point = nearest(i->center(), curr.center(), curr.size());
-        bool can_use = MAC(i->center(), i->size(), comp_point);
+        Point icenter = domain->center_from_index((*i)->idx);
+        double isize = domain->size_from_level((*i)->idx.level());
+        Point comp_point = nearest(icenter, ccenter, csize);
+        bool can_use = MAC(icenter, isize, comp_point);
 
         if (can_use) {
           if (!curr_is_leaf) {
             newcons.push_back(*i);
           } else {
-            expansionlco_t expand = i->expansion();
-            targetlco_t targets = curr.parts();
-            expand.M_to_T(targets, unused);
+            (*i)->dag.MtoT(&curr->dag,
+                           expansion_t::weight_estimate(Operation::MtoT));
           }
-        } else if (i->is_leaf()) {
+        } else if ((*i)->is_leaf()) {
           if (curr_is_leaf) {
-            expansionlco_t expand = i->expansion();
-            targetlco_t targets = curr.parts();
-            sourceref_t sources = i->parts();
-            expand.S_to_T(sources, targets);
+            curr->dag.StoT(&(*i)->dag,
+                           expansion_t::weight_estimate(Operation::StoT));
           } else {
             newcons.push_back(*i);
           }
         } else {
           for (size_t j = 0; j < 8; ++j) {
-            // NOTE: This line will create the SourceNode, and then pull in a
-            // local version.
-            sourcenode_t kid = i->child(j);
-            if (kid.is_valid()) {
-              // NOTE: This will do the same thing. In distrib, that pull might
-              // be costly.
+            sourcenode_t *kid = (*i)->child[j];
+            if (kid != nullptr) {
               newcons.push_back(kid);
             }
           }
@@ -147,8 +153,8 @@ class BH {
   }
 
   // BH always calls for refinement
-  bool refine_test(bool same_sources_and_targets, const targetnode_t &curr,
-                   const std::vector<sourcenode_t> &consider) const {
+  bool refine_test(bool same_sources_and_targets, const targetnode_t *curr,
+                   const std::vector<sourcenode_t *> &consider) const {
     return true;
   }
 

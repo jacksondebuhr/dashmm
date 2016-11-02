@@ -33,7 +33,7 @@ Options available: [possible/values] (default value)
   --nsources=num               number of source points to generate (10000)
   --threshold=num              source and target tree partition refinement
                                  limit (40)
-  --nsteps=num                 number of steps to take (100)
+  --nsteps=num                 number of steps to take (20)
   --output=file                specify file for output (disabled)
 
 After running, the code will output some summary information. If an output file
@@ -50,3 +50,12 @@ available core on the system. In principle, the number of scheduler threads
 is limited only by the available system resources. In practice, you will not
 improve performance using more HPX-5 threads than there are cores on your
 system.
+
+
+---------------
+Important Notes
+---------------
+
+The purpose of this demo code is to illustrate how one might use DASHMM for
+time stepping. This code does _not_ have a good time integrator. This code is
+not using softened forces, so close encounters can cause very bad behavior.

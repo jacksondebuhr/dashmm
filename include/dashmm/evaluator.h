@@ -1,11 +1,22 @@
 // =============================================================================
+//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
 //  Copyright (c) 2015-2016, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  This software may be modified and distributed under the terms of the BSD
-//  license. See the LICENSE file for details.
+//  DASHMM is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  DASHMM is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -16,22 +27,22 @@
 #define __DASHMM_EVALUATOR_H__
 
 
-/// \file include/evaluator.h
+/// \file
 /// \brief Definition of DASHMM Evaluator object
 
 
 #include <hpx/hpx.h>
 
 #include "dashmm/array.h"
+#include "dashmm/arrayref.h"
+#include "dashmm/defaultpolicy.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/point.h"
-#include "dashmm/sourcenode.h"
-#include "dashmm/sourceref.h"
+#include "dashmm/rankwise.h"
+#include "dashmm/registrar.h"
 #include "dashmm/targetlco.h"
-#include "dashmm/targetnode.h"
-#include "dashmm/targetref.h"
-
+#include "dashmm/tree.h"
 
 
 namespace dashmm {
@@ -61,9 +72,8 @@ namespace dashmm {
 ///
 /// Finally, only one instance of an evaluator for a given set of types
 /// should be created. Multiple instances of a particular instance of an
-/// Evaluator will cause a fatal error.
-///
-/// In the future, this restriction may be enforced by the library.
+/// Evaluator will cause a fatal error. In the future, this restriction may
+/// be enforced by the library.
 ///
 /// This is a template class over the Source, Targer, Expansion and Method
 /// types. For a description of the requirements of these types, please see
@@ -78,142 +88,41 @@ class Evaluator {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
-  using sourceref_t = SourceRef<Source>;
-  using targetref_t = TargetRef<Target>;
+  using sourceref_t = ArrayRef<Source>;
+  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
-  using sourcenode_t = SourceNode<Source, Target, Expansion, Method>;
-  using targetnode_t = TargetNode<Source, Target, Expansion, Method>;
+  using sourcenode_t = Node<Source>;
+  using targetnode_t = Node<Target>;
+  using dualtree_t = DualTree<Source, Target, Expansion, Method>;
+  using distropolicy_t = typename method_t::distropolicy_t;
 
   /// The constuctor takes care of all action registration that DASHMM needs
   /// for one particular combination of Source, Target, Expansion and Method.
-  ///
-  /// For this to work, the related classes must mark Evaluator as a friend.
-  Evaluator() {
-    // TargetLCO related
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        targetlco_t::init_, targetlco_t::init_handler,
-                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        targetlco_t::operation_,
-                        targetlco_t::operation_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        targetlco_t::predicate_,
-                        targetlco_t::predicate_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-
-    // ExpansionLCO related
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        expansionlco_t::init_, expansionlco_t::init_handler,
-                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        expansionlco_t::operation_,
-                        expansionlco_t::operation_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_FUNCTION, 0,
-                        expansionlco_t::predicate_,
-                        expansionlco_t::predicate_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_m_,
-                        expansionlco_t::s_to_m_handler,
-                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
-                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_l_,
-                        expansionlco_t::s_to_l_handler,
-                        HPX_POINTER, HPX_INT, HPX_DOUBLE, HPX_DOUBLE,
-                        HPX_DOUBLE, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::m_to_m_,
-                        expansionlco_t::m_to_m_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        expansionlco_t::m_to_l_,
-                        expansionlco_t::m_to_l_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::l_to_l_,
-                        expansionlco_t::l_to_l_handler,
-                        HPX_ADDR, HPX_INT, HPX_INT, HPX_DOUBLE);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::m_to_t_,
-                        expansionlco_t::m_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::l_to_t_,
-                        expansionlco_t::l_to_t_handler,
-                        HPX_INT, HPX_DOUBLE, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        expansionlco_t::s_to_t_,
-                        expansionlco_t::s_to_t_handler,
-                        HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        expansionlco_t::add_,
-                        expansionlco_t::add_handler,
-                        HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-                        expansionlco_t::create_from_expansion_,
-                        expansionlco_t::create_from_expansion_handler,
-                        HPX_POINTER, HPX_SIZE_T);
-
-    // Source Node related
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        sourcenode_t::self_delete_,
-                        sourcenode_t::self_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        sourcenode_t::node_delete_,
-                        sourcenode_t::node_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED,
-                        sourcenode_t::child_done_,
-                        sourcenode_t::child_done_handler,
-                        HPX_POINTER, HPX_ADDR, HPX_INT);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
-                        sourcenode_t::partition_,
-                        sourcenode_t::partition_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-
-    // Target Node related
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        targetnode_t::self_delete_,
-                        targetnode_t::self_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        targetnode_t::node_delete_,
-                        targetnode_t::node_delete_handler,
-                        HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_PINNED | HPX_MARSHALLED,
-                        targetnode_t::partition_,
-                        targetnode_t::partition_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-
+  /// Much of the registration occurs via Registrar objects, of which Evaluator
+  /// had a number. Finally, a few Evaluator specific actions are registered
+  /// in this constructor.
+  Evaluator() : tlcoreg_{}, elcoreg_{}, snodereg_{}, tnodereg_{},
+                streereg_{}, ttreereg_{}, dtreereg_{} {
     // Actions for the evaluation
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         evaluate_, evaluate_handler,
                         HPX_POINTER, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        source_bounds_, source_bounds_handler,
-                        HPX_ADDR, HPX_SIZE_T);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, 0,
-                        target_bounds_, target_bounds_handler,
-                        HPX_ADDR, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        evaluate_rank_local_, evaluate_rank_local_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        evaluate_cleanup_, evaluate_cleanup_handler,
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
   }
-
-
-  // NOTE: the arrays are marked const, even though the data will be sorted
-  // and modified in both cases (just a sort of sources). The array object is
-  // a reference. And so the reference passed in will not change. Only the
-  // data that it is referring to will change.
 
   /// Perform a multipole moment evaluation
   ///
-  /// Given source, targets, a refinement_limit, a method and an expansion,
+  /// Given source, targets, a refinement_limit, a method, the accuracy
+  /// parameter, the kernel parameters, and an optional distribution policy,
   /// this routine performs a multipole method evaluation. The source and
   /// target arrays will likely be sorted by DASHMM during evaluation, so it
-  /// is imperative that users include some sort of identifying data in the
+  /// is important that users include some sort of identifying data in the
   /// given arrays.
   ///
   /// In addition to sorting the data, the records in the targets Array will
@@ -228,168 +137,247 @@ class Evaluator {
   /// portion of the domain will be subdivided if there are more than the
   /// given number of sources or targets in that region.
   ///
-  /// The provided method and expansion are used as prototypes for any other
-  /// copies of those objects that are required. Some methods have data
-  /// associated with them. Some expansions require an accuracy parameter to
-  /// fully specify the expansion, and so this argument will supply that
-  /// accuracy.
+  /// The provided method is used as prototypes for any other copies of those
+  /// objects that are required. Some methods have data associated with them.
+  /// In general, expansions might need an accuracy parameter and some other
+  /// parameters that control the potential. These are passed in as @p n_digits
+  /// and @p kernelparams.
+  ///
+  /// Finally, @distro is an optional parameter if the user would like the
+  /// provide a policy that is not default constructed.
   ///
   /// \param sources - a DASHMM Array of the source points
   /// \param targets - a DASHMM Array of the target points
   /// \param refinement_limint - the domain refinement limit
   /// \param method - a prototype of the method to use.
-  /// \param expansion - a prototpe of the expansion to use.
+  /// \param n_digits - the number of digits of accuracy required
+  /// \param kernelparams - the parameters needed by the kernel
+  /// \param distro - an instance of the distribution policy to use for this
+  ///                 execution.
   ///
   /// \returns - kSuccess on success; kRuntimeError if there is an error with
   ///            the runtime.
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
                       int refinement_limit, const method_t &method,
-                      const expansion_t &expansion) {
+                      int n_digits, const std::vector<double> &kernelparams,
+                      const distropolicy_t &distro = distropolicy_t { }) {
     // pack the arguments and call the action
-    EvaluateParams args{ };
-    args.sources = sources;
-    args.targets = targets;
-    args.refinement_limit = refinement_limit;
-    args.method = method;
-    args.n_digits = expansion.accuracy();
+    size_t n_params = kernelparams.size();
+    size_t total_size = sizeof(EvaluateParams) + n_params * sizeof(double);
+    EvaluateParams *args =
+        reinterpret_cast<EvaluateParams *>(new char[total_size]);
+    args->sources = sources;
+    args->targets = targets;
+    args->refinement_limit = refinement_limit;
+    args->method = method;
+    args->n_digits = n_digits;
+    args->distro = distro;
+    for (size_t i = 0; i < n_params; ++i) {
+      args->kernelparams[i] = kernelparams[i];
+    }
 
-    if (HPX_SUCCESS != hpx_run(&evaluate_, &args, sizeof(args))) {
+    if (HPX_SUCCESS != hpx_run(&evaluate_, nullptr, args, total_size)) {
       return kRuntimeError;
     }
+
+    delete [] args;
 
     return kSuccess;
   }
 
  private:
-  /// Action for evalutation
+  /// Registrars that will be needed for evaluate to operate.
+  TargetLCORegistrar<Source, Target, Expansion, Method> tlcoreg_;
+  ExpansionLCORegistrar<Source, Target, Expansion, Method> elcoreg_;
+  NodeRegistrar<Source> snodereg_;
+  NodeRegistrar<Target> tnodereg_;
+  TreeRegistrar<Source, Target, Source, Expansion, Method> streereg_;
+  TreeRegistrar<Source, Target, Target, Expansion, Method> ttreereg_;
+  DualTreeRegistrar<Source, Target, Expansion, Method> dtreereg_;
+
+  // The actions for evaluate
   static hpx_action_t evaluate_;
-  /// Action for finding the source bounds
-  static hpx_action_t source_bounds_;
-  /// Action for finding the target bounds
-  static hpx_action_t target_bounds_;
+  static hpx_action_t evaluate_rank_local_;
+  static hpx_action_t evaluate_cleanup_;
 
   /// Parameters to evaluations
   struct EvaluateParams {
     Array<source_t> sources;
     Array<target_t> targets;
-    int refinement_limit;
+    size_t refinement_limit;
     method_t method;
     int n_digits;
-  };
-
-  /// The result of finding bounds
-  struct BoundsResult {
-    Point low;
-    Point high;
+    distropolicy_t distro;
+    double kernelparams[];
   };
 
   /// The evaluation action implementation
+  ///
+  /// This action is a diffusive action that starts the evaluation process.
+  /// Here, all of the collective work is begun. In particular, the tree is
+  /// constructed and a few synchronization LCOs are created. After this,
+  /// a few dependent actions are set up for when the various operations are
+  /// complete.
+  ///
+  /// NOTE: This action does not call hpx_exit().
+  ///
+  /// \param parms - the input arguments
+  /// \param total_size - the size of the arguments
+  ///
+  /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    bool same_sandt = parms->sources.data() == parms->targets.data();
+    // BEGIN TREE CREATION
+    //hpx_time_t creation_begin = hpx_time_now();
+    RankWise<dualtree_t> global_tree =
+        dualtree_t::create(parms->refinement_limit, parms->sources,
+                           parms->targets);
+    hpx_addr_t partitiondone =
+        dualtree_t::partition(global_tree, parms->sources, parms->targets);
+    hpx_lco_wait(partitiondone);
+    hpx_lco_delete_sync(partitiondone);
+    //hpx_time_t creation_end = hpx_time_now();
+    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
+    //fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
+    // END TREE CREATION
 
-    // create source and target references
-    // NOTE: These will need to be updated once we change the way array works
-    // for distributed operation.
-    ArrayMetaData srcmeta;
-    hpx_gas_memget_sync(&srcmeta, parms->sources.data(), sizeof(srcmeta));
-    sourceref_t sources{srcmeta.data, srcmeta.count, srcmeta.count};
+    //auto local_tree = global_tree.here();
+    //fprintf(stdout, "UnifGridDistrib:");
+    //for (int i = 0; i < hpx_get_num_ranks(); ++i) {
+    //  fprintf(stdout, " %d", local_tree->last(i) - local_tree->first(i) + 1);
+    //}
+    //fprintf(stdout, "\n");
 
-    ArrayMetaData trgmeta;
-    hpx_gas_memget_sync(&trgmeta, parms->targets.data(), sizeof(trgmeta));
-    targetref_t targets{trgmeta.data, trgmeta.count, trgmeta.count};
+    // Allocate space for message buffer
+    size_t bcast_size = total_size + sizeof(hpx_addr_t) * 3;
+    char *data = new char[bcast_size];
+    assert(data != nullptr);
+    hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
+    EvaluateParams *postargs
+        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
 
-    // Get source bounds
-    hpx_addr_t srcbnd = hpx_lco_future_new(sizeof(BoundsResult));
-    assert(srcbnd != HPX_NULL);
-    hpx_call(srcmeta.data, source_bounds_, srcbnd,
-             &srcmeta.data, &srcmeta.count);
+    // Setup message
+    // The first is the alldone LCO
+    preargs[0] = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(preargs[0] != HPX_NULL);
+    // The second is the tree global address
+    preargs[1] = global_tree.data();
+    memcpy(postargs, parms, total_size);
+    // The third is the expansion creation done LCO
+    preargs[2] = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(preargs[2] != HPX_NULL);
 
-    BoundsResult bounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-    hpx_lco_get(srcbnd, sizeof(BoundsResult), &bounds);
-    hpx_lco_delete_sync(srcbnd);
+    hpx_bcast_lsync(evaluate_rank_local_, HPX_NULL, data, bcast_size);
 
-    // get target bounds - if targets != sources
-    if (!same_sandt) {
-      hpx_addr_t trgbnd = hpx_lco_future_new(sizeof(BoundsResult));
-      assert(trgbnd != HPX_NULL);
+    // set up dependent call on the broadcast to do evaluate cleanup
+    hpx_call_when(preargs[0], HPX_HERE, evaluate_cleanup_, HPX_NULL,
+                  &preargs[1], &preargs[0], &preargs[2]);
 
-      hpx_call(trgmeta.data, target_bounds_, trgbnd,
-               &trgmeta.data, &trgmeta.count);
+    delete [] data;
 
-      BoundsResult otherbounds{Point{0.0, 0.0, 0.0}, Point{0.0, 0.0, 0.0}};
-      hpx_lco_get(trgbnd, sizeof(BoundsResult), &otherbounds);
-      bounds.low.lower_bound(otherbounds.low);
-      bounds.high.upper_bound(otherbounds.high);
-
-      hpx_lco_delete_sync(trgbnd);
-    }
-
-    // Get the overall domain
-    DomainGeometry domain{bounds.low, bounds.high, 1.0002};
-
-    // create source tree, wait for partitioning of source to finish,
-    // partition target tree.
-    sourcenode_t source_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_addr_t partition_done =
-      source_root.partition(sources, parms->refinement_limit, parms->n_digits);
-
-    targetnode_t target_root{domain, Index{0, 0, 0, 0}, parms->method, nullptr};
-    hpx_lco_wait(partition_done);
-    hpx_lco_delete_sync(partition_done);
-
-    hpx_addr_t targetpartdone =
-      target_root.partition(targets, parms->refinement_limit,
-                            parms->n_digits, 0, same_sandt,
-                            std::vector<sourcenode_t>{source_root});
-
-
-    // deal with one pathological case:
-    expansionlco_t srootexpand = source_root.expansion();
-    hpx_lco_wait(srootexpand.data());
-
-    // deal with another pathological case:
-    hpx_lco_wait(targetpartdone);
-    hpx_lco_delete_sync(targetpartdone);
-
-    // clean up
-    source_root.destroy();
-    target_root.destroy();
-
-    // return
-    hpx_exit(HPX_SUCCESS);
+    return HPX_SUCCESS;
   }
 
-  /// The source bounds discovery action implementation.
-  static int source_bounds_handler(hpx_addr_t data, size_t count) {
-    source_t *user{nullptr};
-    assert(hpx_gas_try_pin(data, (void **)&user));
+  /// Action to perform rank-local work
+  ///
+  /// This action is the target of a broadcast. Each rank will compute the
+  /// DAG and start the evaluation proper. The passed in data contains a
+  /// few LCOs used for synchronization.
+  ///
+  /// \param data - the action arguments
+  /// \param msg_size - the size of the input data
+  ///
+  /// \returns - HPX_SUCCESS
+  static int evaluate_rank_local_handler(char *data, size_t msg_size) {
+    hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
+    EvaluateParams *parms
+        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
 
-    BoundsResult retval{Point{1.0e34, 1.0e34, 1.0e34},
-                        Point{-1.0e34, -1.0e34, -1.0e34}};
+    // Generate the table
+    RankWise<dualtree_t> global_tree{preargs[1]};
+    auto tree = global_tree.here();
+    double domain_size = tree->domain()->size();
+    size_t n_params = (msg_size - sizeof(EvaluateParams)) / sizeof(double);
+    std::vector<double> kernel_params(parms->kernelparams,
+                                      &parms->kernelparams[n_params]);
+    expansion_t::update_table(parms->n_digits, domain_size, kernel_params);
+    tree->set_method(parms->method);
 
-    for (size_t i = 0; i < count; ++i) {
-      retval.low.lower_bound(user[i].position);
-      retval.high.upper_bound(user[i].position);
-    }
+    // Get ready to evaluate
+    // BEGIN DISTRIBUTE
+    //hpx_time_t distribute_begin = hpx_time_now();
+    DAG *dag = tree->create_DAG();
+    parms->distro.compute_distribution(*dag);
+    //hpx_time_t distribute_end = hpx_time_now();
+    //double distribute_deltat = hpx_time_diff_us(distribute_begin,
+                                                distribute_end);
+    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
+    //        distribute_deltat);
+    // END DISTRIBUTE
 
-    return HPX_THREAD_CONTINUE(retval);
+    // BEGIN ALLOCATE
+    //hpx_time_t allocate_begin = hpx_time_now();
+    tree->create_expansions_from_DAG(preargs[1]);
+
+    // NOTE: the previous has to finish for the following. So the previous
+    // is a synchronous operation. The next three, however, are not. They all
+    // get their work going when they come to it and then they return.
+    hpx_lco_and_set(preargs[2], HPX_NULL);
+    hpx_lco_wait(preargs[2]);
+    //hpx_time_t allocate_end = hpx_time_now();
+    //double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
+    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
+    // END ALLOCATE
+
+
+    // BEGIN EVALUATE
+    //hpx_time_t evaluate_begin = hpx_time_now();
+    tree->setup_edge_lists(dag);
+    tree->start_DAG_evaluation(global_tree);
+    hpx_addr_t heredone = tree->setup_termination_detection(dag);
+    hpx_lco_wait(heredone);
+    //hpx_time_t evaluate_end = hpx_time_now();
+    //double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
+    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
+    // END EVALUATE
+
+    //fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
+    //        hpx_get_my_rank(),
+    //        distribute_deltat, allocate_deltat, evaluate_deltat);
+
+    // Delete some local stuff
+    hpx_lco_delete_sync(heredone);
+    tree->destroy_DAG_LCOs(*dag);
+    delete dag;
+
+    // Mark that we have finished the rank-local work
+    hpx_lco_and_set(preargs[0], HPX_NULL);
+
+    return HPX_SUCCESS;
   }
 
-  /// The target bounds discovery action implementation.
-  static int target_bounds_handler(hpx_addr_t data, size_t count) {
-    target_t *user{nullptr};
-    assert(hpx_gas_try_pin(data, (void **)&user));
+  /// Action that cleans up the tree
+  ///
+  /// This is called on a single locality, and will clean up the rest of the
+  /// allocated resources for this evaluation. This action also exits the
+  /// current HPX-5 epoch.
+  ///
+  /// \param rwaddr - global address of the DualTree
+  /// \param alldone - global address of completion detection LCO
+  /// \param middone - global address of synchronization LCO
+  ///
+  /// \returns HPX_SUCCESS
+  static int evaluate_cleanup_handler(hpx_addr_t rwaddr, hpx_addr_t alldone,
+                                      hpx_addr_t middone) {
+    hpx_lco_delete_sync(alldone);
+    hpx_lco_delete_sync(middone);
 
-    BoundsResult retval{Point{1.0e34, 1.0e34, 1.0e34},
-                        Point{-1.0e34, -1.0e34, -1.0e34}};
+    // clean up tree and table
+    RankWise<dualtree_t> global_tree{rwaddr};
+    dualtree_t::destroy(global_tree);
 
-    for (size_t i = 0; i < count; ++i) {
-      retval.low.lower_bound(user[i].position);
-      retval.high.upper_bound(user[i].position);
-    }
-
-    return HPX_THREAD_CONTINUE(retval);
+    // Exit from this HPX epoch
+    hpx_exit(0, nullptr);
   }
 };
 
@@ -404,13 +392,13 @@ template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::source_bounds_ = HPX_ACTION_NULL;
+hpx_action_t Evaluator<S, T, E, M>::evaluate_rank_local_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::target_bounds_ = HPX_ACTION_NULL;
+hpx_action_t Evaluator<S, T, E, M>::evaluate_cleanup_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm
