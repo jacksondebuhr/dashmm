@@ -23,15 +23,11 @@ the previous.
 \label{sec:advconcepts}
 
 This sections covers the conceptual framework of both DASHMM's implementation
-of general multipole methods and the parallelization of those methods with
-HPX-5.
-
-\subsection{Multipole method abstractions}
-
+of general multipole methods.
 The following abstractions form the basis for the implementation of multipole
 methods in DASHMM.
 
-\subsubsection{The Dual Tree}
+\subsection{The Dual Tree}
 
 The multipole method framework implemented in DASHMM is general enough to allow
 for situations where the sources of an interaction, and the locations where the
@@ -40,7 +36,8 @@ Tree construction. This involves a hierarchical partitioning of the problem
 domain for both the source and target points. This leads naturally to two
 trees, one each for sources and targets. These tree are constructed to be
 compatible with one another: the root of the source and target trees represent
-the same volume. Each node of both trees can have up to eight children.
+the same volume. Each node of both trees can have up to eight children,
+each having half the side length of the parent.
 
 When referring to particular volumes in the tree, DASHMM often uses an integer
 index giving which level of the tree and where on that level the node is. This
@@ -53,7 +50,7 @@ adaptive in DASHMM; a node is refined, adding up to eight children, until the
 number of points in a node is below some given threshold. In this way, the
 tree adapts to the distribution of source and target points.
 
-\subsubsection{The DAG}
+\subsection{The DAG}
 
 Ultimately, a multipole method computation is the creation and evaluation of
 a directed acyclic graph (DAG). This DAG encodes in its nodes the various
@@ -71,10 +68,10 @@ interconnections amoung the tasks that are performed in the actual computation.
 The explicit DAG is represented in DASHMM with objects that an advanced user of
 DASHMM might need to interact with. The implicit DAG comprises a number of
 HPX-5-aware objects that manage the parallel execution. The exact use and form
-of these objects is not necessary for even an advanced user; DASHMM hides the
-specific details of HPX-5 from its users.
+of these objects is not necessary for even an advanced user; DASHMM insulates
+the user from specific details of HPX-5.
 
-\subsubsection{Expansion Roles}
+\subsection{Expansion Roles}
 
 Each node of the DAG is associated with a node of either the source or target
 tree. This leads to the four expansion roles defined in DASHMM. Nodes
@@ -83,7 +80,7 @@ associated with the typical expansions (multipole and local) are termed
 such as merge-and-shift are called `intermediate' expansions. This leads to
 the four roles for expansions: two kinds for each of two trees.
 
-\subsubsection{Operations}
+\subsection{Operations}
 
 The abstraction of the multipole method in DASHMM allows for the following
 operations. Of course, for a particular use-case, these operations make take
@@ -109,18 +106,66 @@ into summaries that apply to larger volumes, or to larger number of sources.
 Typical uses of this operation produce a hierarchy of multipole expansions
 for every node of the source tree.
 
-The \texttt{M->L} operation
+The \texttt{M->L} operation is used to translate summaries of a set of sources
+into a summary that applies to a volume in the target tree. This is the
+operation that distinguishes FMM from BH; the creation of the local expansions
+allows for efficient evaluation of large parts of the source distribution.
 
-\subsubsection{Expansions and Views}
+The \texttt{L->L} operation is used to translate a local expansion that applies
+for a parent into a local expansion that applies in the child's volume.
 
-\subsubsection{Kernel details}
+The \texttt{M->T} operation computes the effect of a multipole expansion on
+a set of targets.
 
-scale, tables
+The \texttt{L->T} operation computes the effect of a local expansion on a
+set of targets.
 
-\subsection{Parallelization abstractions}
+The \texttt{S->T} operation computes the direct effect of a set of sources on
+a set of targets. If a method only schedules \texttt{S->T} operations, it will
+be the same as the direct summation method.
 
-locality
-outline of execution
+The \texttt{M->I} operation transforms the summary information on the source
+tree into another form that certain advanced methods might find useful. The use
+of these intermediate expansions is what distinguishes FMM and FMM97. The
+intermediate expansion is associated with a source tree node.
+
+The \texttt{I->I} operation translates the intermediate representation on the
+source tree into an intermediate representation on the target tree. The forms
+of these representations may well be different.
+
+The \texttt{I->L} operation translates the intermediate representSation on the
+target tree into a local expansion on the target tree.
+
+\subsection{Expansions and Views}
+
+There is a distinction between an Expansion in the mathematical sense, and the
+Expansions in DASHMM. An Expansion in DASHMM might contain multiple mathematical
+expansions. It can be the case that a given method might need to keep
+several versions of summary data for a given set of sources. In this case,
+a DASHMM expansion presents multiple Views. Each View is a single mathematical
+expansion. The various views that are implemented in an Expansion can be
+related to one another, but it can also support the ability to have unrelated
+mathematical expansions to allow for a single evaluation to compute for
+multiple kernels at the same time.
+
+\subsection{Kernel details}
+
+The mathematical concept of a Kernel is included in DASHMM's concept of an
+Expansion. Ultimately the Method does not care about how the operations are
+performed, just that they exist. So it is the Expansion that implements the
+kernel. In the most direct sense, the kernel can be seen in the implemented
+\texttt{S->T} operation.
+
+Some kernels will have parameters that control the exact shape of the potential.
+In particular, the built-in Yukawa kernel is scaling variant, and so the
+scale must be provided to DASHMM. These kernel parameters also impact the
+expansions that are employed in Expansion. Further, often there is some one-time
+precomputation that can occur that produces values that are used in the various
+operations. To allow for this precomputation, DASHMM employs the abstraction
+of a Kernel table. This table is created once before the operations are employed
+and is made available to all ranks. The table represents any values needed
+by the expansions and operations that does not change as the inputs to the
+operations change.
 
 
 
@@ -163,44 +208,45 @@ given level.
 Index::Index(int ix = 0, int iy = 0, int iz = 0, int lvl = 0)
 \end{lstlisting}
 
-Construct an Index with the given on-level position and level.
+\noindent Construct an Index with the given on-level position and level.
 
 \begin{lstlisting}
 int Index::x() const
 \end{lstlisting}
 
-Return the on-level position in the x direction.
+\noindent Return the on-level position in the x direction.
 
 \begin{lstlisting}
 int Index::y() const
 \end{lstlisting}
 
-Return the on-level position in the y direction.
+\noindent Return the on-level position in the y direction.
 
 \begin{lstlisting}
 int Index::z() const
 \end{lstlisting}
 
-Return the on-level position in the z direction.
+\noindent Return the on-level position in the z direction.
 
 \begin{lstlisting}
 int Index::level() const
 \end{lstlisting}
 
-Return the level of the index.
+\noindent Return the level of the index.
 
 \begin{lstlisting}
 Index Index::parent(int num = 1) const
 \end{lstlisting}
 
-Return the \texttt{num}-th parent of this \texttt{Index}. By default, this
-gives the index of the immediate parent.
+\noindent Return the \texttt{num}-th parent of this \texttt{Index}. By default,
+this gives the index of the immediate parent.
 
 \begin{lstlisting}
 Index Index::child(int which) const
 \end{lstlisting}
 
-Return the given child of this Index. \texttt{which} is a composite value
+\noindent Return the given child of this Index. \texttt{which} is a
+composite value
 that indicates with each bit if the child is on the left or right in that
 direction. For example for \texttt{which == 6}, the child is the left child
 in the z-direction, and the right child in both the y and x directions.
@@ -209,13 +255,13 @@ in the z-direction, and the right child in both the y and x directions.
 int Index::which_child() const
 \end{lstlisting}
 
-Return which child of its parent this node is.
+\noindent Return which child of its parent this node is.
 
 \begin{lstlisting}
 bool Index::operator==(const Index &other) const
 \end{lstlisting}
 
-Equality operator.
+\noindent Equality operator.
 
 
 \subsection{\texttt{DomainGeometry}}
@@ -230,80 +276,72 @@ regions.
 DomainGeometry::DomainGeometry()
 \end{lstlisting}
 
-
-Default construct a domain to begin at the origin, with a zero side length.
+\noindent Default construct a domain to begin at the origin, with a zero
+side length.
 
 \begin{lstlisting}
 DomainGeometry::DomainGeometry(Point low, double size)
 \end{lstlisting}
 
-
-Construct a domain with the given low corner, and the given side length.
+\noindent Construct a domain with the given low corner, and the given side
+length.
 
 \begin{lstlisting}
 DomainGeometry::DomainGeometry(Point low, Point high, double f = 1.0)
 \end{lstlisting}
 
-
-Construct a domain from the given low and high corners. The given region need
-not be cubical. The resulting object will represent the smallest cube that
-contains the specified volume. Additionally, the final parameter can be used
-to enlarge the resulting cube by a fixed fraction.
+\noindent Construct a domain from the given low and high corners. The given
+region need not be cubical. The resulting object will represent the smallest
+cube that contains the specified volume. Additionally, the final parameter can
+be used to enlarge the resulting cube by a fixed fraction.
 
 \begin{lstlisting}
 double DomainGeometry::size() const
 \end{lstlisting}
 
-
-Return the side length of the represented cubical volume.
+\noindent Return the side length of the represented cubical volume.
 
 \begin{lstlisting}
 Point DomainGeometry::low() const
 \end{lstlisting}
 
-
-Return the low corner of the represented volume.
+\noindent Return the low corner of the represented volume.
 
 \begin{lstlisting}
 Point DomainGeometry::high() const
 \end{lstlisting}
 
-Return the high corner of the represented volume.
+\noindent Return the high corner of the represented volume.
 
 \begin{lstlisting}
 Point DomainGeometry::center() const
 \end{lstlisting}
 
-
-Return the center of the represented volume.
+\noindent Return the center of the represented volume.
 
 \begin{lstlisting}
 Point DomainGeometry::low_from_index(Index idx) const
 \end{lstlisting}
 
-
-Return the low corner of the region represented by the given index.
+\noindent Return the low corner of the region represented by the given index.
 
 \begin{lstlisting}
 Point DomainGeometry::high_from_index(Index idx) const
 \end{lstlisting}
 
-
-Return the high corner of the region represented by the given index.
+\noindent Return the high corner of the region represented by the given index.
 
 \begin{lstlisting}
 Point DomainGeometry::center_from_index(Index idx) const
 \end{lstlisting}
 
-
-Return the center of the region represented by the given index.
+\noindent Return the center of the region represented by the given index.
 
 \begin{lstlisting}
 double DomainGeometry::size_from_index(Index idx) const
 \end{lstlisting}
 
-
-Return the size of the region represented by the given index.
+\noindent Return the size of the region represented by the given index.
 
 
 
@@ -325,13 +363,14 @@ The following HPX-5 command line arguments are the most relevant to DASHMM:
 --hpx-help
 \end{lstlisting}
 
-Display a help message giving a brief description of all available options.
+\noindent Display a help message giving a brief description of all
+available options.
 
 \begin{lstlisting}
 --hpx-threads
 \end{lstlisting}
 
-Specify the number of scheduler threads that HPX-5 will use per rank.
+\noindent Specify the number of scheduler threads that HPX-5 will use per rank.
 Typically, one thread per core gives best results, but fewer is sometimes
 useful in scalability studies.
 
@@ -339,10 +378,9 @@ useful in scalability studies.
 --hpx-heapsize
 \end{lstlisting}
 
-
-Specify the size in bytes of the amount of global address space available to
-each rank. The default is frequently too low for large problem sizes. This,
-however, should not be set to take all of the system memory.
+\noindent Specify the size in bytes of the amount of global address space
+available to each rank. The default is frequently too low for large problem
+sizes. This, however, should not be set to take all of the system memory.
 
 
 
@@ -385,8 +423,7 @@ to the template.
 
 The full declaration of \texttt{ArrayMapAction} is as follows:
 
-
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 template <typename T, typename E, int factor = 1>
 class ArrayMapAction;
 \end{lstlisting}
@@ -418,29 +455,26 @@ system. The full definition of \texttt{DAGEdge} is as follows:
 DAGNode *DAGEdge::source
 \end{lstlisting}
 
-
-Source node of the edge.
+\noindent Source node of the edge.
 
 \begin{lstlisting}
 DAGNode *DAGEdge::target
 \end{lstlisting}
 
-
-Target node of the edge.
+\noindent Target node of the edge.
 
 \begin{lstlisting}
 Operation DAGEdge::op
 \end{lstlisting}
 
-
-Operation to perform along edge.
+\noindent Operation to perform along edge.
 
 \begin{lstlisting}
 int DAGEdge::weight
 \end{lstlisting}
 
-
-Estimate of communication cost required if the edge were to span localities.
+\noindent Estimate of communication cost required if the edge were to span
+localities.
 
 
 \subsection{\texttt{DAGNode}}
@@ -452,48 +486,42 @@ contains the following public members:
 std::vector<DAGEdge> DAGNode::out_edges
 \end{lstlisting}
 
-
-The edges of the DAG that start at this node.
+\noindent The edges of the DAG that start at this node.
 
 \begin{lstlisting}
 std::vector<DAGEdge> DAGNode::in_edges
 \end{lstlisting}
 
-
-The edges of the DAG that end at this node.
+\noindent The edges of the DAG that end at this node.
 
 \begin{lstlisting}
 Index DAGNode::idx
 \end{lstlisting}
 
-
-The index of the tree node to which this DAG node is associated.
+\noindent The index of the tree node to which this DAG node is associated.
 
 \begin{lstlisting}
 int DAGNode::locality
 \end{lstlisting}
 
-
-The locality to which this node will be assigned by the distribution. Note
-that this will most often be set by the distribution policy. To indicate that
-the locality is not set, a value of \texttt{-1} should be used.
+\noindent The locality to which this node will be assigned by the
+distribution. Note that this will most often be set by the distribution policy.
+To indicate that the locality is not set, a value of \texttt{-1} should be used.
 
 \begin{lstlisting}
 int DAGNode::color
 \end{lstlisting}
 
-
-A color that might be used by the distribution policy. This has meaning only
-in the context of the distribution policy.
+\noindent A color that might be used by the distribution policy. This has
+meaning only in the context of the distribution policy.
 
 \begin{lstlisting}
 DAGNode::DAGNode(Index i)
 \end{lstlisting}
 
-
-Construct a DAG node. This will set the index to the given value, give the
-locality a value of \texttt{-1}, and default construct the remaining members
-of the node.
+\noindent Construct a DAG node. This will set the index to the given value,
+give the locality a value of \texttt{-1}, and default construct the remaining
+members of the node.
 
 
 \subsection{\texttt{DAG}}
@@ -509,34 +537,30 @@ The \texttt{DAG} object has the following members:
 std::vector<DAGNode *> source_leaves
 \end{lstlisting}
 
-
-Nodes of the DAG that are associated with leaves of the source tree. These
-nodes will have no incoming edges.
+\noindent Nodes of the DAG that are associated with leaves of the source tree.
+These nodes will have no incoming edges.
 
 \begin{lstlisting}
 std::vector<DAGNode *> source_nodes
 \end{lstlisting}
 
-
-All other DAG nodes that are associated with nodes of the source tree.
+\noindent All other DAG nodes that are associated with nodes of the source tree.
 
 \begin{lstlisting}
 std::vector<DAGNode *> target_leaves
 \end{lstlisting}
 
-
-Nodes of the DAG that are associated with leaves of the target tree. These
-nodes will have no outgoing edges. In some methods, these are not associated
-with the leaves of the target tree, but rather those nodes of the target
-tree after which more refinement for the method would only induce
+\noindent Nodes of the DAG that are associated with leaves of the target tree.
+These nodes will have no outgoing edges. In some methods, these are not
+associated with the leaves of the target tree, but rather those nodes of the
+target tree after which more refinement for the method would only induce
 unnecessary overhead.
 
 \begin{lstlisting}
 std::vector<DAGNode *> target_nodes
 \end{lstlisting}
 
-
-All other DAG nodes that are associated with node of the target tree.
+\noindent All other DAG nodes that are associated with node of the target tree.
 
 
 
@@ -569,191 +593,175 @@ covered below.
 Index DAGInfo::index() const
 \end{lstlisting}
 
-
-Return the index of the volume represented by the DAG nodes owned by this
-object.
+\noindent Return the index of the volume represented by the DAG nodes owned by
+this object.
 
 \begin{lstlisting}
 bool DAGInfo::add_normal()
 \end{lstlisting}
 
-Add a normal DAG node to this object. This will return \texttt{true} if this
-call added the node. Otherwise, if the \texttt{DAGNode} already owns a normal
-node, this call will do nothing, and return false.
+\noindent Add a normal DAG node to this object. This will return \texttt{true}
+if this call added the node. Otherwise, if the \texttt{DAGNode} already owns a
+normal node, this call will do nothing, and return false.
 
 \begin{lstlisting}
 bool DAGInfo::add_interm()
 \end{lstlisting}
 
-Add an intermediate DAG node to this object. This will return \texttt{true} if
-this call added the node. Otherwise, if the \texttt{DAGNode} already owns an
-intermediate node, this call will do nothing, and return \texttt{false}.
+\noindent Add an intermediate DAG node to this object. This will return
+\texttt{true} if this call added the node. Otherwise, if the \texttt{DAGNode}
+already owns an intermediate node, this call will do nothing, and return
+\texttt{false}.
 
 \begin{lstlisting}
 bool DAGInfo::add_parts()
 \end{lstlisting}
 
-
-Add a particles DAG node to this object. This will return \texttt{true} if this
-call added the node. Otherwise, if the \texttt{DAGNode} already owns a particles
-node, this call will do nothing, and return false.
+\noindent Add a particles DAG node to this object. This will return
+\texttt{true} if this call added the node. Otherwise, if the \texttt{DAGNode}
+already owns a particles node, this call will do nothing, and return false.
 
 \begin{lstlisting}
 bool DAGInfo::has_normal() const
 \end{lstlisting}
 
-Predicate returning if this object owns a normal DAG node.
+\noindent Predicate returning if this object owns a normal DAG node.
 
 \begin{lstlisting}
 bool DAGInfo::has_interm() const
 \end{lstlisting}
 
-
-Predicate returning if this object owns an intermediate DAG node.
+\noindent Predicate returning if this object owns an intermediate DAG node.
 
 \begin{lstlisting}
 bool DAGInfo::has_parts() const
 \end{lstlisting}
 
-
-Predicate returning of this object owns a particles DAG node.
+\noindent Predicate returning of this object owns a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::set_normal_locality(int loc)
 \end{lstlisting}
 
-
-Set the locality for the normal DAG node, if it exists, to the given
+\noindent Set the locality for the normal DAG node, if it exists, to the given
 locality, \texttt{loc}.
 
 \begin{lstlisting}
 void DAGInfo::set_interm_locality(int loc)
 \end{lstlisting}
 
-
-Set the locality for the intermediate DAG node, if it exists, to the given
-locality, \texttt{loc}.
+\noindent Set the locality for the intermediate DAG node, if it exists, to
+the given locality, \texttt{loc}.
 
 \begin{lstlisting}
 void DAGInfo::StoM(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the particles DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::StoM}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own a particles
-DAG node.
+\noindent Connect the particles DAG node of \texttt{source} to the normal DAG
+node of this object with \texttt{Operation::StoM}, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does not
+own a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::StoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the particles DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::StoL}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own a particles
-DAG node.
+\noindent Connect the particles DAG node of \texttt{source} to the normal DAG
+node of this object with \texttt{Operation::StoL}, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does not
+own a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::MtoM(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::MtoM}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own a normal
-DAG node.
+\noindent Connect the normal DAG node of \texttt{source} to the normal DAG
+node of this object with \texttt{Operation::MtoM}, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does not
+own a normal DAG node.
 
 \begin{lstlisting}
 void DAGInfo::MtoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::MtoL}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own a normal
-DAG node.
+\noindent Connect the normal DAG node of \texttt{source} to the normal DAG
+node of this object with \texttt{Operation::MtoL}, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does not
+own a normal DAG node.
 
 \begin{lstlisting}
 void DAGInfo::LtoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::LtoL}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a normal DAG node, and if the \texttt{source} does not own a normal
-DAG node.
+\noindent Connect the normal DAG node of \texttt{source} to the normal DAG
+node of this object with \texttt{Operation::LtoL}, and assign the resulting
+edge the given \texttt{weight}. It is an error to call this method if this
+object does not own a normal DAG node, and if the \texttt{source} does not
+own a normal DAG node.
 
 \begin{lstlisting}
 void DAGInfo::MtoT(DAGInfo *target, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of this object to the particles DAG node of
-\texttt{target} with \texttt{Operation::MtoT}, and assign the resulting edge
-the given \texttt{weight}. It is an error to call this method if this object
-does not own a normal DAG node, and if the \texttt{target} does not own a
-particles DAG node.
+\noindent Connect the normal DAG node of this object to the particles DAG
+node of \texttt{target} with \texttt{Operation::MtoT}, and assign the
+resulting edge the given \texttt{weight}. It is an error to call this method
+if this object does not own a normal DAG node, and if the \texttt{target}
+does not own a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::LtoT(DAGInfo *target, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of this object to the particles DAG node of
-\texttt{target} with \texttt{Operation::LtoT}, and assign the resulting edge
-the given \texttt{weight}. It is an error to call this method if this object
-does not own a normal DAG node, and if the \texttt{target} does not own a
-particles DAG node.
+\noindent Connect the normal DAG node of this object to the particles DAG
+node of \texttt{target} with \texttt{Operation::LtoT}, and assign the
+resulting edge the given \texttt{weight}. It is an error to call this method
+if this object does not own a normal DAG node, and if the \texttt{target}
+does not own a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::StoT(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the particles DAG node of \texttt{source} to the particles DAG node of
-this object with \texttt{Operation::StoT}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own a particles DAG node, and if the \texttt{source} does not own a
-particles DAG node.
+\noindent Connect the particles DAG node of \texttt{source} to the particles
+DAG node of this object with \texttt{Operation::StoT}, and assign the
+resulting edge the given \texttt{weight}. It is an error to call this method
+if this object does not own a particles DAG node, and if the \texttt{source}
+does not own a particles DAG node.
 
 \begin{lstlisting}
 void DAGInfo::MtoI(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the normal DAG node of \texttt{source} to the intermediate DAG node of
-this object with \texttt{Operation::MtoI}, and assign the resulting edge the
-given \texttt{weight}. It is an error to call this method if this object does
-not own an intermediate DAG node, and if the \texttt{source} does not own a
-normal DAG node.
+\noindent Connect the normal DAG node of \texttt{source} to the intermediate
+DAG node of this object with \texttt{Operation::MtoI}, and assign the
+resulting edge the given \texttt{weight}. It is an error to call this method
+if this object does not own an intermediate DAG node, and if the
+\texttt{source} does not own a normal DAG node.
 
 \begin{lstlisting}
 void DAGInfo::ItoI(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the intermediate DAG node of \texttt{source} to the intermediate DAG
-node of this object with \texttt{Operation::ItoI}, and assign the resulting
-edge the given \texttt{weight}. It is an error to call this method if this
-object does not own an intermediate DAG node, and if the \texttt{source} does
-not own an intermediate DAG node.
+\noindent Connect the intermediate DAG node of \texttt{source} to the
+intermediate DAG node of this object with \texttt{Operation::ItoI}, and
+assign the resulting edge the given \texttt{weight}. It is an error to call
+this method if this object does not own an intermediate DAG node, and if the
+\texttt{source} does not own an intermediate DAG node.
 
 \begin{lstlisting}
 void DAGInfo::ItoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
-
-Connect the intermediate DAG node of \texttt{source} to the normal DAG node of
-this object with \texttt{Operation::ItoL} operation, and assign the resulting
-edge the given \texttt{weight}. It is an error to call this method if this
-object does not own a normal DAG node, and if the \texttt{source} does
-not own an intermediate DAG node.
+\noindent Connect the intermediate DAG node of \texttt{source} to the normal
+DAG node of this object with \texttt{Operation::ItoL} operation, and assign
+the resulting edge the given \texttt{weight}. It is an error to call this
+method if this object does not own a normal DAG node, and if the
+\texttt{source} does not own an intermediate DAG node.
 
 
 
@@ -773,39 +781,35 @@ only with respect to the Expansion's implementation.
 ViewSet::ViewSet()
 \end{lstlisting}
 
-
-Default construct the object.
+\noindent Default construct the object.
 
 \begin{lstlisting}
 ViewSet::ViewSet(ExpansionRole role, const Point &center, double scale)
 \end{lstlisting}
 
-Create an empty \texttt{ViewSet}, while setting a few vital features: the
-\texttt{role} of the represented expansion, the \texttt{center} around which it
-is defined, and the scaling factor \texttt{scale} associated with the
+\noindent Create an empty \texttt{ViewSet}, while setting a few vital features:
+the \texttt{role} of the represented expansion, the \texttt{center} around
+which it is defined, and the scaling factor \texttt{scale} associated with the
 represented expansion.
 
 \begin{lstlisting}
 void ViewSet::clear()
 \end{lstlisting}
 
-
-Clear out the object. After \texttt{clear()}, it will be as if the object
-were default constructed.
+\noindent Clear out the object. After \texttt{clear()}, it will be as if the
+object were default constructed.
 
 \begin{lstlisting}
 void ViewSet::add_view(int index)
 \end{lstlisting}
 
-
-Add a view with the given \texttt{index}. This is an incomplete view.
+\noindent Add a view with the given \texttt{index}. This is an incomplete view.
 
 \begin{lstlisting}
 void ViewSet::add_view(int index, size_t bytes, char *data)
 \end{lstlisting}
 
-
-Add a view with the given \texttt{index}, size in \texttt{bytes} and
+\noindent Add a view with the given \texttt{index}, size in \texttt{bytes} and
 \texttt{data}. This is a complete view, indicating not only which index, but
 also the data backing the view.
 
@@ -815,100 +819,89 @@ NOTE: The \texttt{ViewSet} does not assume ownership of \texttt{data}.
 void ViewSet::set_bytes(int view, size_t bytes)
 \end{lstlisting}
 
-
-Set the size of a given view. \texttt{view} gives which view of this object to
-set the size of. That is, \texttt{view} is not an index into the original
-Expansion, but an index into the set of views represented in this object.
+\noindent Set the size of a given view. \texttt{view} gives which view of this
+object to set the size of. That is, \texttt{view} is not an index into the
+original Expansion, but an index into the set of views represented in this
+object.
 
 \begin{lstlisting}
 void ViewSet::set_data(int view, char *data)
 \end{lstlisting}
 
-
-Set the data for a given view. \texttt{view} gives which view of this object to
-set the size of. That is, \texttt{view} is not an index into the original
-Expansion, but an index into the set of views represented in this object.
+\noindent Set the data for a given view. \texttt{view} gives which view of this
+object to set the size of. That is, \texttt{view} is not an index into the
+original Expansion, but an index into the set of views represented in this
+object.
 
 \begin{lstlisting}
 void ViewSet::set_role(ExpansionRole role)
 \end{lstlisting}
 
-
-Set the \texttt{role} of this object.
+\noindent Set the \texttt{role} of this object.
 
 \begin{lstlisting}
 void ViewSet::set_center(const Point &center)
 \end{lstlisting}
 
-
-Set the \texttt{center} of this object. This represents the point around
-which the expansion is defined.
+\noindent Set the \texttt{center} of this object. This represents the point
+around which the expansion is defined.
 
 \begin{lstlisting}
 void ViewSet::set_scale(double s)
 \end{lstlisting}
 
-
-Set the \texttt{scale} of this object.
+\noindent Set the \texttt{scale} of this object.
 
 \begin{lstlisting}
 int ViewSet::view_index(int view) const
 \end{lstlisting}
 
-
-Return the index in the original Expansion that is represented by the
+\noindent Return the index in the original Expansion that is represented by the
 given \texttt{view}.
 
 \begin{lstlisting}
 size_t ViewSet::view_bytes(int view) const
 \end{lstlisting}
 
-
-Return the size in bytes of the given \texttt{view}.
+\noindent Return the size in bytes of the given \texttt{view}.
 
 \begin{lstlisting}
 char *ViewSet::view_data(int view) const
 \end{lstlisting}
 
-
-Return the data of the given \texttt{view}.
+\noindent Return the data of the given \texttt{view}.
 
 \begin{lstlisting}
 ExpansionRole ViewSet::role() const
 \end{lstlisting}
 
-
-Return the role of the represented expansion.
+\noindent Return the role of the represented expansion.
 
 \begin{lstlisting}
 Point ViewSet::center() const
 \end{lstlisting}
 
-
-Return the center of the represented expansion.
+\noindent Return the center of the represented expansion.
 
 \begin{lstlisting}
 double ViewSet::scale() const
 \end{lstlisting}
 
-
-Return the scale of the represented expansion.
+\noindent Return the scale of the represented expansion.
 
 \begin{lstlisting}
 int ViewSet::count() const
 \end{lstlisting}
 
-
-Return the number of views in this object.
+\noindent Return the number of views in this object.
 
 \begin{lstlisting}
 size_t ViewSet::bytes() const
 \end{lstlisting}
 
-
-Return the total size of the data represented by this object. This includes
-not only the data of the views themselves, but some metadata used during
-serialization of this object.
+\noindent Return the total size of the data represented by this object. This
+includes not only the data of the views themselves, but some metadata used
+during serialization of this object.
 
 
 \section{Tree nodes}
@@ -923,38 +916,34 @@ needed by implementers of new Methods are detailed below.
 Index Node<T>::idx
 \end{lstlisting}
 
-
-The index of the tree node.
+\noindent The index of the tree node.
 
 \begin{lstlisting}
 Node<T> *Node<T>::parent
 \end{lstlisting}
 
-
-The parent of this node in the tree. This is only \texttt{nullptr} for
+\noindent The parent of this node in the tree. This is only \texttt{nullptr} for
 the root.
 
 \begin{lstlisting}
 Node<T> *Node<T>::child[8]
 \end{lstlisting}
 
-
-The children of this node in the tree. These might be \texttt{nullptr}.
+\noindent The children of this node in the tree. These might be
+\texttt{nullptr}.
 
 \begin{lstlisting}
 DAGInfo Node<T>::dag
 \end{lstlisting}
 
-
-A \texttt{DAGInfo} object providing a handle to the relevant portions of the
-DAG for this node.
+\noindent A \texttt{DAGInfo} object providing a handle to the relevant portions
+of the DAG for this node.
 
 \begin{lstlisting}
 bool Node<T>::is_leaf() const
 \end{lstlisting}
 
-
-A utility predicate answering the question: Is this node a leaf?
+\noindent A utility predicate answering the question: Is this node a leaf?
 
 
 \section{Built-in distribution policies}
@@ -967,7 +956,7 @@ default policy defined that represents the current best all-around policy
 available in DASHMM. To make use of this default in a user-defined Method,
 one merely has to include the following in the class definition:
 
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 using distropolicy_t = dashmm::DefaultDistributionPolicy;
 \end{lstlisting}
 
@@ -986,50 +975,47 @@ The following distribution policies are included with DASHMM:
 SingleLocality
 \end{lstlisting}
 
-
-This distribution policy places all of the DAG nodes on a single locality in
-the system. The locality can be selected in the constructor, and has a default
-value of 0: \texttt{SingleLocality::SingleLocality(int loc = 0)}.
+\noindent This distribution policy places all of the DAG nodes on a single
+locality in the system. The locality can be selected in the constructor, and
+has a default value of 0: \texttt{SingleLocality::SingleLocality(int loc = 0)}.
 
 \begin{lstlisting}
 RandomDistro
 \end{lstlisting}
 
-
-This distribution places DAG nodes around the available localities at random.
-Note that this is generally speaking a bad idea, but the scaling of this
-distribution is not bad, even if the raw performance is bad. The seed for the
-RNG can be set using the constructor, which has a default value:
+\noindent This distribution places DAG nodes around the available localities at
+random. Note that this is generally speaking a bad idea, but the scaling of
+this distribution is not bad, even if the raw performance is bad. The seed for
+the RNG can be set using the constructor, which has a default value:
 \texttt{RandomDistro::RandomDistro(int seed = 137)}.
 
 \begin{lstlisting}
 BHDistro
 \end{lstlisting}
 
-
-This distribution policy, which is the policy used for the \texttt{BH} method,
-is compatible with any method; there is no dependence on its operation on the
-sorts of DAG nodes or the operations perfomed on the DAG edges. This policy
-works by starting at the target DAG nodes and working backwards through the
-rest of the DAG. The locality of a node being examined is set to the locality
-which minimizes the communication with other localities. In deciding what is
-the minimal communication, the weight of the DAG edges is used to approximate
-the cost of the message.
+\noindent This distribution policy, which is the policy used for the
+\texttt{BH} method, is compatible with any method; there is no dependence on
+its operation on the sorts of DAG nodes or the operations perfomed on the DAG
+edges. This policy works by starting at the target DAG nodes and working
+backwards through the rest of the DAG. The locality of a node being examined is
+set to the locality which minimizes the communication with other localities.
+In deciding what is the minimal communication, the weight of the DAG edges is
+used to approximate the cost of the message.
 
 \begin{lstlisting}
 FMM97Distro
 \end{lstlisting}
 
+\noindent This distribution policy only applies to the \texttt{FMM97} method.
+It explores the source and target tree structure within the DAG. The normal
+and intermediate DAG nodes associated with a node in the source tree, and
+the normal DAG node associated with a node in the target tree, are placed on
+the locality that contains the descendant source or target DAG nodes. To
+determine the placement of the intermediate DAG node associated with a node
+in the target tree, the policy considers the weight of the DAG edges to
+minimize communication cost, and the color of the DAG edges to increase slack
+time to hide communication latency.
 
-This distribution policy only applies to the \texttt{FMM97} method. It explores
-the source and target tree structure within the DAG. The normal and intermediate
-DAG nodes associated with a node in the source tree, and the normal DAG node
-associated with a node in the target tree, are placed on the locality that
-contains the descendant source or target DAG nodes. To determine the placement
-of the intermediate DAG node associated with a node in the target tree, the
-policy considers the weight of the DAG edges to minimize communication cost, and
-the color of the DAG edges to increase slack time to hide communication
-latency.
 
 \section{User-defined Expansions}
 
@@ -1046,7 +1032,7 @@ be \texttt{Expansion}, but one can use any other name that one wishes.
 Expansions are template types with two parameters, the Source and Target
 types. The following would be the declaration of the user-defined Expansion:
 
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 template <typename Source, typename Target>
 class Expansion;
 \end{lstlisting}
@@ -1054,7 +1040,7 @@ class Expansion;
 \noindent It is not required, but the following aliases will be assumed to be
 have been defined in the following description of the Expansion interface:
 
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 using source_t = Source;
 using target_t = Target;
 using expansion_t = Expansion<Source, Target>;
@@ -1068,11 +1054,10 @@ they allow for retrieving the Source and Target type.
 Expansion::Expansion(Point center, double scale, ExpansionRole role)
 \end{lstlisting}
 
-This constructor creates the expansion object with the given \texttt{center},
-\texttt{scale} and \texttt{role}. There is no obligation on the part of the
-expansion to use these inputs, but they will be provided for those expansions
-that will need these data.
-
+\noindent This constructor creates the expansion object with the given
+\texttt{center}, \texttt{scale} and \texttt{role}. There is no obligation on
+the part of the expansion to use these inputs, but they will be provided for
+those expansions that will need these data.
 The scale provided to this constructor will be produced by
 \texttt{Expansion::compute\_scale}.
 
@@ -1080,9 +1065,10 @@ The scale provided to this constructor will be produced by
 Expansion::Expansion(const ViewSet &views)
 \end{lstlisting}
 
-This constructor interprets the provided \texttt{views} as the data serving
-this expansion. Unlike the previous constructor, this constructor produces an
-object that does not own any data. Instead, it interprets existing data.
+\noindent This constructor interprets the provided \texttt{views} as the data
+serving this expansion. Unlike the previous constructor, this constructor
+produces an object that does not own any data. Instead, it interprets existing
+data.
 
 Further, this constructor must be able to operate in a mode where \texttt{views}
 is empty. This `shallow' mode of construction is for cases where the
@@ -1093,22 +1079,21 @@ some of the kernel parameters might be needed.
 Expansion::~Expansion()
 \end{lstlisting}
 
-
-The destructor should free the data of the expansion. In some instances, the
-expansion will not own any data, and so this should do nothing. Only if the
-expansion is \texttt{valid()} should this ever delete allocated memory.
+\noindent The destructor should free the data of the expansion. In some
+instances, the expansion will not own any data, and so this should do nothing.
+Only if the expansion is \texttt{valid()} should this ever delete allocated
+memory.
 
 \begin{lstlisting}
 void Expansion::release()
 \end{lstlisting}
 
-
-This will release the internal data for an expansion. These objects need to
-support the ability to export the data making the expansion, losing ownership
-of the data in the process. Further, expansion objects need to be able to be
-constructed in a shallow way from existing data. \texttt{release()} breaks the
-association. After \texttt{release()}, calls to \texttt{valid()} must return
-false.
+\noindent This will release the internal data for an expansion. These objects
+need to support the ability to export the data making the expansion, losing
+ownership of the data in the process. Further, expansion objects need to be
+able to be constructed in a shallow way from existing data. \texttt{release()}
+breaks the association. After \texttt{release()}, calls to \texttt{valid()}
+must return false.
 
 The simplest implementation of this is to have the object store a pointer to
 memory allocated on the heap (as in \texttt{new char [size]}), and
@@ -1118,217 +1103,191 @@ memory allocated on the heap (as in \texttt{new char [size]}), and
 bool Expansion::valid(const ViewSet &views) const
 \end{lstlisting}
 
-
-Returns if the indicated views are valid. An expansion is valid if it has
-data associated with it. If \texttt{views} is empty, this will check all
+\noindent Returns if the indicated views are valid. An expansion is valid if it
+has data associated with it. If \texttt{views} is empty, this will check all
 views.
 
 \begin{lstlisting}
 int Expansion::view_count() const
 \end{lstlisting}
 
-
-Return the current number of views for this object. This will either be the
-full number for an object created with the first constructor, or a smaller
-number for an expansion created by interpretation in the second constructor.
+\noindent Return the current number of views for this object. This will either
+be the full number for an object created with the first constructor, or a
+smaller number for an expansion created by interpretation in the second
+constructor.
 
 \begin{lstlisting}
 void Expansion::get_views(ViewSet &views) const
 \end{lstlisting}
 
-
-Fill in data in the \texttt{views} object. Given a \texttt{ViewSet} that
-contains the view indicies, this will populate the size and data members of
-\texttt{views}. Note that this does not perform a copy of the data in the
+\noindent Fill in data in the \texttt{views} object. Given a \texttt{ViewSet}
+that contains the view indicies, this will populate the size and data members
+of \texttt{views}. Note that this does not perform a copy of the data in the
 views.
 
 \begin{lstlisting}
 ViewSet Expansion::get_all_views() const
 \end{lstlisting}
 
-
-Get all current views of this object.
+\noindent Get all current views of this object.
 
 \begin{lstlisting}
 ExpansionRole Expansion::role() const
 \end{lstlisting}
 
-
-Return the expansion role of this object.
+\noindent Return the expansion role of this object.
 
 \begin{lstlisting}
 Point Expansion::center() const
 \end{lstlisting}
 
-
-Return the point around which the expansion is defined.
+\noindent Return the point around which the expansion is defined.
 
 \begin{lstlisting}
 size_t Expansion::view_size(int view) const
 \end{lstlisting}
 
-
-Return the view size for the specified \texttt{view}. This returns the number
-of terms in the expansion for the given view. Do not confuse this with the
-size in bytes of the data in a given view, which can be obtained with
+\noindent Return the view size for the specified \texttt{view}. This returns
+the number of terms in the expansion for the given view. Do not confuse this
+with the size in bytes of the data in a given view, which can be obtained with
 \texttt{get\_views()}.
 
 \begin{lstlisting}
 dcomplex_t Expansion::view_term(int view, size_t i) const
 \end{lstlisting}
 
-
-Get term \texttt{i} of the given \texttt{view}. The term is returned as a
-complex number, so real-valued expansions must return a complex number.
+\noindent Get term \texttt{i} of the given \texttt{view}. The term is returned
+as a complex number, so real-valued expansions must return a complex number.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::S_to_M(Point center, source_t *first, source_t *last) const
 \end{lstlisting}
 
-
-Create a multipole expansion for a given set of sources. The expansion will
-have the given \texttt{center}, and the sources are gives as pointers to the
-\texttt{first} and one past the \texttt{last} record.
-
+\noindent Create a multipole expansion for a given set of sources. The
+expansion will have the given \texttt{center}, and the sources are gives as
+pointers to the \texttt{first} and one past the \texttt{last} record.
 The returned expansion will have a role of \texttt{kSourcePrimary}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::S_to_L(Point center, source_t *first, source_t *last) const
 \end{lstlisting}
 
-Create a local expansion for a given set of sources. The expansion will
-have the given \texttt{center}, and the sources are gives as pointers to the
-\texttt{first} and one past the \texttt{last} record.
-
+\noindent Create a local expansion for a given set of sources. The expansion
+will have the given \texttt{center}, and the sources are gives as pointers to
+the \texttt{first} and one past the \texttt{last} record.
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::M_to_M(int from_child, double s_size) const
 \end{lstlisting}
 
-Change the center of a multipole expansion. The shift in the center is
-specified through \texttt{from\_child}, which indicates the child from which
+\noindent Change the center of a multipole expansion. The shift in the center
+is specified through \texttt{from\_child}, which indicates the child from which
 the expansion is being converted. \texttt{s\_size} is the size of that child
 node.
-
 This expansion will have a role of \texttt{kSourcePrimary}.
-
 The returned expansion will have a role of \texttt{kSourcePrimary}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::M_to_L(Index s_index, double s_size, Index t_index) const
 \end{lstlisting}
 
-Convert a multipole expansion to a local expansion. To specify the change the
-source and target indices (\texttt{s\_index} and \texttt{t\_index}), as well
-as the size of the source (\texttt{s\_size}) are provided.
-
+\noindent Convert a multipole expansion to a local expansion. To specify the
+change the source and target indices (\texttt{s\_index} and \texttt{t\_index}),
+as well as the size of the source (\texttt{s\_size}) are provided.
 This expansion will have a role of \texttt{kSourcePrimary}.
-
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::L_to_L(int to_child, double t_size) const
 \end{lstlisting}
 
-Convert a local expansion to a local expansion for a child. The child is
-specified by \texttt{to\_child}, which gives the child of the tree node
-associated with this expansion that the resulting expansion should be
+\noindent Convert a local expansion to a local expansion for a child. The
+child is specified by \texttt{to\_child}, which gives the child of the tree
+node associated with this expansion that the resulting expansion should be
 associated with.
-
 This expansion will have a role of \texttt{kTargetPrimary}.
-
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
 void Expansion::M_to_T(target_t *first, target_t *last) const}}
 \end{lstlisting}
 
-Apply the effect of a multipole expansion to a set of targets, specified by
-a pointer to the \texttt{first} and one past the \texttt{last} target.
-
+\noindent Apply the effect of a multipole expansion to a set of targets,
+specified by a pointer to the \texttt{first} and one past the \texttt{last}
+target.
 This expansion will have a role of \texttt{kSourcePrimary}.
 
 \begin{lstlisting}
 void Expansion::L_to_T(target_t *first, target_t *last) const}}
 \end{lstlisting}
 
-Apply the effect of a local expansion to a set of targets, specified by
-a pointer to the \texttt{first} and one past the \texttt{last} target.
-
+\noindent Apply the effect of a local expansion to a set of targets, specified
+by a pointer to the \texttt{first} and one past the \texttt{last} target.
 This expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
-void Expansion::S_to_T(source_t *s_first, source_t *s_last, 
+void Expansion::S_to_T(source_t *s_first, source_t *s_last,
                        target_t *t_first, target_t *t_last) const
 \end{lstlisting}
 
-Apply the direct interaction of a set of sources to a set of targets. The
-sources and targets are specified by pointers to the first and one past the
+\noindent Apply the direct interaction of a set of sources to a set of targets.
+The sources and targets are specified by pointers to the first and one past the
 last record.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t> Expansion::M_to_I(Index s_index) const
 \end{lstlisting}
 
-
-Create an intermediate expansion from a multipole expansion. \texttt{s\_index}
-is the index of the tree node being represented by both the multipole and
-intermediate expansions.
-
+\noindent Create an intermediate expansion from a multipole expansion.
+\texttt{s\_index} is the index of the tree node being represented by both the
+multipole and intermediate expansions.
 This expansion will have a role of \texttt{kSourcePrimary}.
-
 The returned expansion will have a role of \texttt{kSourceIntermediate}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::I_to_I(Index s_index, double s_size, Index t_index) const
 \end{lstlisting}
 
-Translate a source-side intermediate expansion into a target-side intermediate
-expansion. The \texttt{s\_index} and \texttt{t\_index} are the index of the
-tree nodes that are represented by this object, and the resulting expansion,
-respectively. Additionally, the \texttt{s\_size} gives the size of the source
-tree node.
-
+\noindent Translate a source-side intermediate expansion into a target-side
+intermediate expansion. The \texttt{s\_index} and \texttt{t\_index} are the
+index of the tree nodes that are represented by this object, and the
+resulting expansion, respectively. Additionally, the \texttt{s\_size} gives
+the size of the source tree node.
 This expansion will have a role of \texttt{kSourceIntermediate}.
-
 The returned expansion will have a role of \texttt{kTargetIntermediate}.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> 
+std::unique_ptr<expansion_t>
 Expansion::I_to_L(Index t_index, double t_size) const
 \end{lstlisting}
 
-
-Translate a target-side intermediate expansion into a local expansion. The
-target tree node's index, \texttt{t\_index}, and size, \texttt{t\_size},
-are provided.
-
+\noindent Translate a target-side intermediate expansion into a local
+expansion. The target tree node's index, \texttt{t\_index}, and size,
+\texttt{t\_size}, are provided.
 This expansion will have a role of \texttt{kTargetIntermediate}.
-
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
 void Expansion::add_expansion(const expansion_t *temp)
 \end{lstlisting}
 
-
-Add the given expansion to this expansion. Typically this involves summing the
-coefficients, but can be more involved in some cases.
+\noindent Add the given expansion to this expansion. Typically this involves
+summing the coefficients, but can be more involved in some cases.
 
 \begin{lstlisting}
-static void Expansion::update_table(int n_digits, double domain_size, 
+static void Expansion::update_table(int n_digits, double domain_size,
                                    const std::vector<double> &kernel_params)
 \end{lstlisting}
 
-
-Update a kernel table. This should generate or update a kernel table associated
+\noindent Update a kernel table. This should generate or update a kernel table
+associated
 with this expansion type. The kernel table is a mechanism for precomputing
 values that are required by expansion operations. As the same table should
 serve every instance of this class, the table should be a static member of the
@@ -1339,33 +1298,33 @@ necessarily reallocating the memory for the table (if this is a subsequent call
 to this function).
 
 The value of \texttt{n\_digits} and \texttt{kernel\_params} are ultimately
-provided by the user's call to \texttt{Evaluator::evaluate()}. The
+provided by the call to \texttt{evaluate()}. The
 \texttt{domain\_size} is computed by DASHMM after the tree is constructed.
 
 \begin{lstlisting}
 static void Expansion::delete_table()
 \end{lstlisting}
 
-Destroy the kernel table. This should destroy any tables that exist that are
-associated with this type of expansion.
+\noindent Destroy the kernel table. This should destroy any tables that exist
+that are associated with this type of expansion.
 
 \begin{lstlisting}
 static double Expansion::compute_scale(Index index)
 \end{lstlisting}
 
-
-Compute the scale to pass into expansion constructors. The will only be called
+\noindent Compute the scale to pass into expansion constructors. The will only
+be called
 after the table exists, so the implementation can rely on the existence of the
 table. In particular, kernel parameters needed by this routine should be
 stored in the table.
 
 \begin{lstlisting}
-static int Expansion::weight_estimate(Operation op, Index s = Index{}, 
+static int Expansion::weight_estimate(Operation op, Index s = Index{},
                                       Index t = Index{})
 \end{lstlisting}
 
-
-Compute an estimate of the cost to send the result of the given operation
+\noindent Compute an estimate of the cost to send the result of the given
+operation
 across the network. In some expansions, the operation is enough to determing
 the cost. In others, the source and target indices, \texttt{s} and \texttt{t}.
 
@@ -1386,7 +1345,7 @@ In the following we shall take the name of the user-defined Method to be
 Methods are templates over three parameters, the Source, Target and Expansion
 types. The following is the full declaration of a user-defined Method:
 
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 template <typename Source, typename Target,
           template <typename, typename> class Expansion>
 class Method;
@@ -1395,7 +1354,7 @@ class Method;
 \noindent It is helpful to also define the following aliases as members of
 any Method:
 
-\begin{lstlisting}
+\begin{lstlisting}[frame=]
 using source_t = Source;
 using target_t = Target;
 using expansion_t = Expansion<Source, Target>;
@@ -1410,7 +1369,7 @@ using targetnode_t = Node<Target>;
 Method::distropolicy_t
 \end{lstlisting}
 
-
+\noindent
 Any method must define this type to specify the distribution policy that is to
 be used with the method. This allows for the possibility that special details
 of the implemented \texttt{Method} might allow for better distribution of the
@@ -1423,7 +1382,7 @@ one can use \texttt{dashmm::DefaultDistributionPolicy} defined in
 Method::Method()
 \end{lstlisting}
 
-
+\noindent
 Methods must have a default constructor. Note that other constructors are
 allowed. Methods instances used for particular evaluations are copied so
 methods can support runtime parameters.
@@ -1432,7 +1391,7 @@ methods can support runtime parameters.
 void Method::generate(sourcenode_t *curr, DomainGeometry *domain) const
 \end{lstlisting}
 
-
+\noindent
 This routine is called at the leaves of the source tree to generate the initial
 expansions from the source data. The leaf node in question is provided via
 \texttt{curr}. For use in cases where the size of the node is relevant,
@@ -1450,7 +1409,7 @@ these nodes should be scheduled during \texttt{generate} (via the many
 void Method::aggregate(sourcenode_t *curr, DomainGeometry *domain) const
 \end{lstlisting}
 
-
+\noindent
 This routine is called for the internal nodes of the source tree to generate
 any expansions needed by the method that are associated with non-leaf source
 tree nodes. The current node, \texttt{curr}, and the overall \texttt{domain}
@@ -1461,10 +1420,11 @@ requires. Further, operations between nodes should be scheduled. The typical
 operation for \texttt{aggregate} is \texttt{Operation::MtoM}.
 
 \begin{lstlisting}
-void Method::inherit(targetnode_t *curr, DomainGeometry *domain, 
+void Method::inherit(targetnode_t *curr, DomainGeometry *domain,
                      bool curr_is_leaf) const
 \end{lstlisting}
 
+\noindent
 In \texttt{inherit} information from parents in the target tree are propagated
 to children. In addition to the node, \texttt{curr} and the \texttt{domain},
 whether is the current node is a leaf if indicated with
@@ -1477,10 +1437,11 @@ operation for \texttt{inherit} is \texttt{Operation::LtoL}.
 
 
 \begin{lstlisting}
-void Method::process(targetnode_t *curr, std::vector<sourcenode_t *> &consider, 
+void Method::process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
                      bool curr_is_leaf, DomainGeometry *domain) const
 \end{lstlisting}
 
+\noindent
 The most complex work of the method often takes place in \texttt{process}. In
 addition to the current node, the domain geometry, and if this leaf is a node,
 a vector of source tree nodes are provided. This vector, \texttt{consider},
@@ -1501,11 +1462,12 @@ was true. In that case, it should be that \texttt{consider} will have been
 completely used by the call to \texttt{process}.
 
 \begin{lstlisting}
-void Method::refine_test(bool same_sources_and_targets, 
-                         const targetnode_t *curr, 
+void Method::refine_test(bool same_sources_and_targets,
+                         const targetnode_t *curr,
                          const std::vector<sourcenode_t *> &consider) const
 \end{lstlisting}
 
+\noindent
 This method determines if the given target tree node should be refined, or if
 it represents a leaf of the DAG. This decision is based on \texttt{curr},
 \texttt{consider} and if the sources and targets are identical in this
@@ -1530,6 +1492,7 @@ but one can give any name to the policy.
 Policy::Policy()
 \end{lstlisting}
 
+\noindent
 Distribution policies require either a default constructor, or a constructor
 with all arguments given default values.
 
@@ -1537,6 +1500,7 @@ with all arguments given default values.
 void Policy::compute_distribution(DAG &dag)
 \end{lstlisting}
 
+\noindent
 This is the main distribution method. After the DAG is fully discovered, it will
 be passed into this function where the localities of every DAG node need to be
 given a value. Because DASHMM sets a few localities in a fixed way, only those
@@ -1554,6 +1518,7 @@ is much easier to overrun a thread's stack.
 void Policy::assign_for_source(DAGInfo &dag, int locality)
 \end{lstlisting}
 
+\noindent
 The routine is called for every source tree node during DAG discovery. It is an
 opportunity to set localities when the DAG nodes are created, and not all at
 once in \texttt{compute\_distribution}.
@@ -1569,6 +1534,7 @@ of the DASHMM API; it may be removed in the future.
 void Policy::assign_for_target(DAGInfo &dag, int locality)
 \end{lstlisting}
 
+\noindent
 The routine is called for every target tree node during DAG discovery. It is an
 opportunity to set localities when the DAG nodes are created, and not all at
 once in \texttt{compute\_distribution}.
