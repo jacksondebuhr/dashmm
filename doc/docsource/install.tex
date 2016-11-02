@@ -6,7 +6,7 @@ gives a brief sketch of the demo programs included with DASHMM.
 
 \section{Prerequisites}
 
-DASHMM v. 1.0.0 depends on one external library: HPX-5. The current
+DASHMM v.\ 1.0.0 depends on one external library: HPX-5. The current
 version of DASHMM depends on version 4.0.0 of HPX-5 or later, which
 may be found at \url{https://hpx.crest.iu.edu/}. Please see the
 official HPX-5 documentation for instructions on how to build, install
@@ -19,9 +19,9 @@ important to add the correct path for HPX-5 to your {\tt
 is installed in {\tt /path/to/hpx}, this can be accomplished using
 {\tt bash} with:
 
-\begin{verbatim}
+\begin{lstlisting}[language=bash, frame=]
 export PKG_CONFIG_PATH=/path/to/hpx/lib/pkgconfig:$PKG_CONFIG_PATH
-\end{verbatim}
+\end{lstlisting}
 
 \section{Building DASHMM}
 
@@ -54,7 +54,7 @@ of DASHMM is worth the minor increase in compilation time.
 \section{Linking against DASHMM}
 
 To build a program using the DASHMM library, only a few things need to
-be done. DASHMM builds in place, so when compiling codoe that used the
+be done. DASHMM builds in place, so when compiling code that used the
 library, one must specify where to look for the header files, and
 where to look for the built library. Further, because DASHMM relies on
 HPX-5, one must also specify how to find HPX-5. For HPX-5 this is the
@@ -64,15 +64,15 @@ Assuming that DASHMM was built in {\tt /path/to/dashmm}, to compile
 code (with, for example {\tt g++}) one must specify the following
 arguments for compilation:
 
-\begin{verbatim}
+\begin{lstlisting}[language=bash, frame=]
 -I/path/to/dashmm/include $(shell pkg-config --cflags hpx)
-\end{verbatim}
+\end{lstlisting}
 
 \noindent Similarly, one must specify the following arguments for linking:
 
-\begin{verbatim}
+\begin{lstlisting}[language=bash, frame=]
 -L/path/to/dashmm/lib -ldashmm $(shell pkg-config --libs hpx)
-\end{verbatim}
+\end{lstlisting}
 
 \noindent Examples of this can be found in the demo programs included with
 DASHMM.

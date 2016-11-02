@@ -22,7 +22,7 @@ the previous.
 \section{DASHMM Concepts}
 \label{sec:advconcepts}
 
-This sections covers the conceptual framework of both DASHMM's implementation
+This sections covers the conceptual framework of DASHMM's implementation
 of general multipole methods.
 The following abstractions form the basis for the implementation of multipole
 methods in DASHMM.
@@ -63,7 +63,7 @@ computation: the first is an explicit representation that is used during the
 discovery of the overall structure of the DAG and which is used to distribute
 the work among the available localities; the second is an implicit
 representation that lives in the data, synchronization objects, and the
-interconnections amoung the tasks that are performed in the actual computation.
+interconnections among the tasks that are performed in the actual computation.
 
 The explicit DAG is represented in DASHMM with objects that an advanced user of
 DASHMM might need to interact with. The implicit DAG comprises a number of
@@ -83,9 +83,9 @@ the four roles for expansions: two kinds for each of two trees.
 \subsection{Operations}
 
 The abstraction of the multipole method in DASHMM allows for the following
-operations. Of course, for a particular use-case, these operations make take
+operations. Of course, for a particular use-case, these operations may take
 on meanings different from the typical meaning for FMM or BH. The notation for
-the following operations all take the form \texttt{A->B}, where \texttt{A} is
+the following operations all take the form \texttt{AtoB}, where \texttt{A} is
 one of \texttt{\{S, M, L, I\}} and \texttt{B} is one of the
 following \texttt{\{M, L, I, T\}}. \texttt{S} is a node of the DAG that
 represents the leaves of a source tree; it represents a set of sources.
@@ -97,43 +97,43 @@ the intermediate expansions on either the source or target trees (no
 distinction is made in this notation as the source or target side of the
 \texttt{I} can be inferred from the operation).
 
-The \texttt{S->M} operation is any operation that produces an approximation
+The \texttt{StoM} operation is any operation that produces an approximation
 or summary version of the source data in a given node. These operations
 generate multipole moments from sources in typical use cases.
 
-The \texttt{M->M} operation is used to combine summaries of a set of sources
+The \texttt{MtoM} operation is used to combine summaries of a set of sources
 into summaries that apply to larger volumes, or to larger number of sources.
 Typical uses of this operation produce a hierarchy of multipole expansions
 for every node of the source tree.
 
-The \texttt{M->L} operation is used to translate summaries of a set of sources
+The \texttt{MtoL} operation is used to translate summaries of a set of sources
 into a summary that applies to a volume in the target tree. This is the
 operation that distinguishes FMM from BH; the creation of the local expansions
 allows for efficient evaluation of large parts of the source distribution.
 
-The \texttt{L->L} operation is used to translate a local expansion that applies
+The \texttt{LtoL} operation is used to translate a local expansion that applies
 for a parent into a local expansion that applies in the child's volume.
 
-The \texttt{M->T} operation computes the effect of a multipole expansion on
+The \texttt{MtoT} operation computes the effect of a multipole expansion on
 a set of targets.
 
-The \texttt{L->T} operation computes the effect of a local expansion on a
+The \texttt{LtoT} operation computes the effect of a local expansion on a
 set of targets.
 
-The \texttt{S->T} operation computes the direct effect of a set of sources on
-a set of targets. If a method only schedules \texttt{S->T} operations, it will
+The \texttt{StoT} operation computes the direct effect of a set of sources on
+a set of targets. If a method only schedules \texttt{StoT} operations, it will
 be the same as the direct summation method.
 
-The \texttt{M->I} operation transforms the summary information on the source
+The \texttt{MtoI} operation transforms the summary information on the source
 tree into another form that certain advanced methods might find useful. The use
 of these intermediate expansions is what distinguishes FMM and FMM97. The
 intermediate expansion is associated with a source tree node.
 
-The \texttt{I->I} operation translates the intermediate representation on the
+The \texttt{ItoI} operation translates the intermediate representation on the
 source tree into an intermediate representation on the target tree. The forms
 of these representations may well be different.
 
-The \texttt{I->L} operation translates the intermediate representSation on the
+The \texttt{ItoL} operation translates the intermediate representation on the
 target tree into a local expansion on the target tree.
 
 \subsection{Expansions and Views}
@@ -154,7 +154,7 @@ The mathematical concept of a Kernel is included in DASHMM's concept of an
 Expansion. Ultimately the Method does not care about how the operations are
 performed, just that they exist. So it is the Expansion that implements the
 kernel. In the most direct sense, the kernel can be seen in the implemented
-\texttt{S->T} operation.
+\texttt{StoT} operation.
 
 Some kernels will have parameters that control the exact shape of the potential.
 In particular, the built-in Yukawa kernel is scaling variant, and so the
@@ -193,7 +193,7 @@ members: \texttt{kSourcePrimary}, \texttt{kSourceIntermediate},
 \texttt{kTargetPrimary}, \texttt{kTargetIntermediate} and
 \texttt{kNoRoleNeeded}. The latter is for situations that that require an
 operation from the Expansion type, but which do not require expansion data.
-The prototypical example of this is \texttt{Operation::StoT}.
+The prototypical example of this is \texttt{StoT}.
 
 \subsection{\texttt{Index}}
 
@@ -201,7 +201,7 @@ Each node of both the source and target trees can be identified with four
 integers: the level of the tree (starting with 0 for the root), and the
 position of the low corner of the node in units of the node size at the given
 level. The index allows DASHMM to not only perform accurate positional
-comparisions, but also to provide an ordering of the nodes of the tree at a
+comparisons, but also to provide an ordering of the nodes of the tree at a
 given level.
 
 \begin{lstlisting}
@@ -311,7 +311,7 @@ Point DomainGeometry::low() const
 Point DomainGeometry::high() const
 \end{lstlisting}
 
-\noindent Return the high corner of the represented volume.
+\noindent Return the high corner of the represented volume.\\
 
 \begin{lstlisting}
 Point DomainGeometry::center() const
@@ -571,7 +571,7 @@ for each node of the source and target trees. These objects will be the
 primary means by which a Method interacts with the DAG.
 
 Each \texttt{DAGInfo} object represents up to three DAG nodes: a particles
-node, the normal DAG node, and an intemediate DAG node. The particles node
+node, the normal DAG node, and an intermediate DAG node. The particles node
 represents the terminal nodes of the DAG: either the information about
 the sources, or the information about the targets. These DAG nodes do not
 represent expansions. The normal
@@ -658,7 +658,7 @@ void DAGInfo::StoM(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the particles DAG node of \texttt{source} to the normal DAG
-node of this object with \texttt{Operation::StoM}, and assign the resulting
+node of this object with operation \texttt{StoM}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does not
 own a particles DAG node.
@@ -668,7 +668,7 @@ void DAGInfo::StoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the particles DAG node of \texttt{source} to the normal DAG
-node of this object with \texttt{Operation::StoL}, and assign the resulting
+node of this object with operation \texttt{StoL}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does not
 own a particles DAG node.
@@ -678,7 +678,7 @@ void DAGInfo::MtoM(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of \texttt{source} to the normal DAG
-node of this object with \texttt{Operation::MtoM}, and assign the resulting
+node of this object with operation \texttt{MtoM}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does not
 own a normal DAG node.
@@ -688,7 +688,7 @@ void DAGInfo::MtoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of \texttt{source} to the normal DAG
-node of this object with \texttt{Operation::MtoL}, and assign the resulting
+node of this object with operation \texttt{MtoL}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does not
 own a normal DAG node.
@@ -698,7 +698,7 @@ void DAGInfo::LtoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of \texttt{source} to the normal DAG
-node of this object with \texttt{Operation::LtoL}, and assign the resulting
+node of this object with operation \texttt{LtoL}, and assign the resulting
 edge the given \texttt{weight}. It is an error to call this method if this
 object does not own a normal DAG node, and if the \texttt{source} does not
 own a normal DAG node.
@@ -708,7 +708,7 @@ void DAGInfo::MtoT(DAGInfo *target, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of this object to the particles DAG
-node of \texttt{target} with \texttt{Operation::MtoT}, and assign the
+node of \texttt{target} with operation \texttt{MtoT}, and assign the
 resulting edge the given \texttt{weight}. It is an error to call this method
 if this object does not own a normal DAG node, and if the \texttt{target}
 does not own a particles DAG node.
@@ -718,7 +718,7 @@ void DAGInfo::LtoT(DAGInfo *target, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of this object to the particles DAG
-node of \texttt{target} with \texttt{Operation::LtoT}, and assign the
+node of \texttt{target} with operation \texttt{LtoT}, and assign the
 resulting edge the given \texttt{weight}. It is an error to call this method
 if this object does not own a normal DAG node, and if the \texttt{target}
 does not own a particles DAG node.
@@ -728,7 +728,7 @@ void DAGInfo::StoT(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the particles DAG node of \texttt{source} to the particles
-DAG node of this object with \texttt{Operation::StoT}, and assign the
+DAG node of this object with operation \texttt{StoT}, and assign the
 resulting edge the given \texttt{weight}. It is an error to call this method
 if this object does not own a particles DAG node, and if the \texttt{source}
 does not own a particles DAG node.
@@ -738,7 +738,7 @@ void DAGInfo::MtoI(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the normal DAG node of \texttt{source} to the intermediate
-DAG node of this object with \texttt{Operation::MtoI}, and assign the
+DAG node of this object with operation \texttt{MtoI}, and assign the
 resulting edge the given \texttt{weight}. It is an error to call this method
 if this object does not own an intermediate DAG node, and if the
 \texttt{source} does not own a normal DAG node.
@@ -748,7 +748,7 @@ void DAGInfo::ItoI(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the intermediate DAG node of \texttt{source} to the
-intermediate DAG node of this object with \texttt{Operation::ItoI}, and
+intermediate DAG node of this object with operation \texttt{ItoI}, and
 assign the resulting edge the given \texttt{weight}. It is an error to call
 this method if this object does not own an intermediate DAG node, and if the
 \texttt{source} does not own an intermediate DAG node.
@@ -758,7 +758,7 @@ void DAGInfo::ItoL(DAGInfo *source, int weight)
 \end{lstlisting}
 
 \noindent Connect the intermediate DAG node of \texttt{source} to the normal
-DAG node of this object with \texttt{Operation::ItoL} operation, and assign
+DAG node of this object with operation \texttt{ItoL} operation, and assign
 the resulting edge the given \texttt{weight}. It is an error to call this
 method if this object does not own a normal DAG node, and if the
 \texttt{source} does not own an intermediate DAG node.
@@ -977,7 +977,7 @@ SingleLocality
 
 \noindent This distribution policy places all of the DAG nodes on a single
 locality in the system. The locality can be selected in the constructor, and
-has a default value of 0: \texttt{SingleLocality::SingleLocality(int loc = 0)}.
+has a default value of 0: \texttt{SingleLocality(int loc = 0)}.
 
 \begin{lstlisting}
 RandomDistro
@@ -987,7 +987,7 @@ RandomDistro
 random. Note that this is generally speaking a bad idea, but the scaling of
 this distribution is not bad, even if the raw performance is bad. The seed for
 the RNG can be set using the constructor, which has a default value:
-\texttt{RandomDistro::RandomDistro(int seed = 137)}.
+\texttt{RandomDistro(int seed = 137)}.
 
 \begin{lstlisting}
 BHDistro
@@ -995,7 +995,7 @@ BHDistro
 
 \noindent This distribution policy, which is the policy used for the
 \texttt{BH} method, is compatible with any method; there is no dependence on
-its operation on the sorts of DAG nodes or the operations perfomed on the DAG
+its operation on the sorts of DAG nodes or the operations performed on the DAG
 edges. This policy works by starting at the target DAG nodes and working
 backwards through the rest of the DAG. The locality of a node being examined is
 set to the locality which minimizes the communication with other localities.
@@ -1072,7 +1072,7 @@ data.
 
 Further, this constructor must be able to operate in a mode where \texttt{views}
 is empty. This `shallow' mode of construction is for cases where the
-expansion data is not needed, such as \texttt{Operation::StoT}, but where
+expansion data is not needed, such as \texttt{StoT}, but where
 some of the kernel parameters might be needed.
 
 \begin{lstlisting}
@@ -1121,7 +1121,7 @@ void Expansion::get_views(ViewSet &views) const
 \end{lstlisting}
 
 \noindent Fill in data in the \texttt{views} object. Given a \texttt{ViewSet}
-that contains the view indicies, this will populate the size and data members
+that contains the view indices, this will populate the size and data members
 of \texttt{views}. Note that this does not perform a copy of the data in the
 views.
 
@@ -1215,7 +1215,7 @@ This expansion will have a role of \texttt{kTargetPrimary}.
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
-void Expansion::M_to_T(target_t *first, target_t *last) const}}
+void Expansion::M_to_T(target_t *first, target_t *last) const
 \end{lstlisting}
 
 \noindent Apply the effect of a multipole expansion to a set of targets,
@@ -1224,7 +1224,7 @@ target.
 This expansion will have a role of \texttt{kSourcePrimary}.
 
 \begin{lstlisting}
-void Expansion::L_to_T(target_t *first, target_t *last) const}}
+void Expansion::L_to_T(target_t *first, target_t *last) const
 \end{lstlisting}
 
 \noindent Apply the effect of a local expansion to a set of targets, specified
@@ -1325,7 +1325,7 @@ static int Expansion::weight_estimate(Operation op, Index s = Index{},
 
 \noindent Compute an estimate of the cost to send the result of the given
 operation
-across the network. In some expansions, the operation is enough to determing
+across the network. In some expansions, the operation is enough to determine
 the cost. In others, the source and target indices, \texttt{s} and \texttt{t}.
 
 
@@ -1402,7 +1402,7 @@ the problem \texttt{domain} is also provided. The typical interaction with
 requires for the given source tree leaf node. Further, any operations between
 these nodes should be scheduled during \texttt{generate} (via the many
 \texttt{DAGInfo} methods). The typical operation scheduled during
-\texttt{generate} is \texttt{Operation::StoM}.
+\texttt{generate} is \texttt{StoM}.
 
 
 \begin{lstlisting}
@@ -1417,7 +1417,7 @@ are provided.
 
 \texttt{aggregate} is responsible for creating the DAG nodes that the method
 requires. Further, operations between nodes should be scheduled. The typical
-operation for \texttt{aggregate} is \texttt{Operation::MtoM}.
+operation for \texttt{aggregate} is \texttt{MtoM}.
 
 \begin{lstlisting}
 void Method::inherit(targetnode_t *curr, DomainGeometry *domain,
@@ -1433,7 +1433,7 @@ internal target tree nodes to nonetheless act as if they were leaves.
 
 \texttt{inherit} is responsible for creating the DAG nodes that the method
 requires, and for scheduling the operations between DAG nodes. The typical
-operation for \texttt{inherit} is \texttt{Operation::LtoL}.
+operation for \texttt{inherit} is \texttt{LtoL}.
 
 
 \begin{lstlisting}
@@ -1450,7 +1450,7 @@ the potential for the target locations represented by this node.
 
 \texttt{consider} should be examined, and where possible elements should be
 removed from the vector when their effect on the targets in \texttt{curr} can
-be computed. That is, if some opaeration is scheduled between a node in
+be computed. That is, if some operation is scheduled between a node in
 \texttt{consider} and \texttt{curr}, then that source node has been handled,
 and can be removed. In some instances, a node might be removed from
 \texttt{consider} and the children of that node will be added to consider.
