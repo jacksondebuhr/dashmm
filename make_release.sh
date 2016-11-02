@@ -3,17 +3,14 @@ BASENAME=dashmm-$VERSION
 FILENAME=$BASENAME.tar
 
 
-echo "Did you remove the comments in evaluator.h?"
-echo "If not, please go remove them now."
-
-
 mkdir $BASENAME
 cp AUTHORS $BASENAME/
 cp INSTALL $BASENAME/
 cp Makefile $BASENAME/
 cp README $BASENAME/
 cp LICENSE $BASENAME/
-cp -r doc/ $BASENAME/
+mkdir $BASENAME/doc
+cp doc/DASHMMUserGuide.pdf $BASENAME/doc/.
 cp -r demo/ $BASENAME/
 cp -r include/ $BASENAME/
 cp -r src/ $BASENAME/
