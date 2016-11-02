@@ -227,8 +227,6 @@ class Evaluator {
   ///
   /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    // BEGIN TREE CREATION
-    //hpx_time_t creation_begin = hpx_time_now();
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
                            parms->targets);
@@ -236,17 +234,6 @@ class Evaluator {
         dualtree_t::partition(global_tree, parms->sources, parms->targets);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
-    //hpx_time_t creation_end = hpx_time_now();
-    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    //fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
-    // END TREE CREATION
-
-    //auto local_tree = global_tree.here();
-    //fprintf(stdout, "UnifGridDistrib:");
-    //for (int i = 0; i < hpx_get_num_ranks(); ++i) {
-    //  fprintf(stdout, " %d", local_tree->last(i) - local_tree->first(i) + 1);
-    //}
-    //fprintf(stdout, "\n");
 
     // Allocate space for message buffer
     size_t bcast_size = total_size + sizeof(hpx_addr_t) * 3;
@@ -304,19 +291,9 @@ class Evaluator {
     tree->set_method(parms->method);
 
     // Get ready to evaluate
-    // BEGIN DISTRIBUTE
-    //hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
-    //hpx_time_t distribute_end = hpx_time_now();
-    //double distribute_deltat = hpx_time_diff_us(distribute_begin,
-                                                distribute_end);
-    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-    //        distribute_deltat);
-    // END DISTRIBUTE
 
-    // BEGIN ALLOCATE
-    //hpx_time_t allocate_begin = hpx_time_now();
     tree->create_expansions_from_DAG(preargs[1]);
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -324,26 +301,13 @@ class Evaluator {
     // get their work going when they come to it and then they return.
     hpx_lco_and_set(preargs[2], HPX_NULL);
     hpx_lco_wait(preargs[2]);
-    //hpx_time_t allocate_end = hpx_time_now();
-    //double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
-    // END ALLOCATE
 
 
-    // BEGIN EVALUATE
-    //hpx_time_t evaluate_begin = hpx_time_now();
     tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation(global_tree);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
     hpx_lco_wait(heredone);
-    //hpx_time_t evaluate_end = hpx_time_now();
-    //double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
-    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
-    // END EVALUATE
 
-    //fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
-    //        hpx_get_my_rank(),
-    //        distribute_deltat, allocate_deltat, evaluate_deltat);
 
     // Delete some local stuff
     hpx_lco_delete_sync(heredone);
