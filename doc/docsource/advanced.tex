@@ -577,7 +577,7 @@ the sources, or the information about the targets. These DAG nodes do not
 represent expansions. The normal
 DAG node represents expansions with a role of \texttt{kSourcePrimary} or
 \texttt{kTargetPrimary}. The intermediate node represents expansions with a
-role of \texttt{kSouceIntermediate} or \texttt{kTargetIntermediate}. A
+role of \texttt{kSourceIntermediate} or \texttt{kTargetIntermediate}. A
 particular method might not use certain expansion roles, so a
 \texttt{DAGInfo} object might not contain the normal or intermediate DAG node.
 Further, not all tree nodes are leaves, and so only some \texttt{DAGInfo}
@@ -1336,7 +1336,7 @@ To create a user-defined Method, one must create a class with that conforms
 to the following interface. For a description of the four primary routines
 of a Method, please see~\ref{sec:advconcepts}. To implement a user-defined
 Method, one must be familiar with the following DASHMM constructs: the
-\texttt{Expansion} concept, nodes of the tree (both souce and target),
+\texttt{Expansion} concept, nodes of the tree (both source and target),
 \texttt{DomainGeometry} and \texttt{DAGInfo}.
 
 In the following we shall take the name of the user-defined Method to be
