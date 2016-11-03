@@ -310,7 +310,7 @@ class Evaluator {
     parms->distro.compute_distribution(*dag);
     //hpx_time_t distribute_end = hpx_time_now();
     //double distribute_deltat = hpx_time_diff_us(distribute_begin,
-    //                                            distribute_end);
+                                                distribute_end);
     //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
     //        distribute_deltat);
     // END DISTRIBUTE

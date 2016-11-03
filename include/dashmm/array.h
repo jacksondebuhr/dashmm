@@ -33,8 +33,6 @@
 
 #include <cstdlib>
 
-#include <memory>
-
 #include <hpx/hpx.h>
 
 #include "dashmm/arraymetadata.h"
@@ -344,13 +342,13 @@ class Array {
   /// local segment. This is predominantly intended as an ease-of-use method,
   /// and should not be expected to perform well.
   ///
-  /// Only rank zero will return data. All other ranks will receive nullptr
-  /// from this routine.
+  /// The caller assumes ownership of the returned data. Further, only rank
+  /// zero will return data. All other ranks will receive nullptr from this
+  /// routine.
   ///
-  /// \returns - smart pointer containing the local allocation; Note the
-  ///            return type -- it is suggested to use auto when calling this
-  ///            rotuine.
-  std::unique_ptr<T[], void(*)(T *)> collect() {
+  /// \returns - address of local memory holding a copy of the records if this
+  ///            is rank zero; nullptr otherwise
+  T *collect() {
     assert(valid());
 
     hpx_addr_t lcos[2];
@@ -358,12 +356,7 @@ class Array {
 
     T *retval{nullptr};
     hpx_run_spmd(&array_collect_action, &retval, &data_, &lcos[0], &lcos[1]);
-
-    // We have to specify a deleter here because internally HPX does not know
-    // the type T, so it allocates as an array of char.
-    return std::unique_ptr<T[], void(*)(T *)>(retval, [](T *ptr) {
-      delete [] reinterpret_cast<char *>(ptr);
-    });
+    return retval;
   }
 
  private:

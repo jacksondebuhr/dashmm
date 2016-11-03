@@ -510,9 +510,9 @@ void perform_evaluation_test(InputArguments args) {
 
     //Get the results from the global address space
     args.target_count = target_handle.length();
-    auto targets = target_handle.collect();
+    TargetData *targets = target_handle.collect();
     if (targets) {
-      std::sort(&targets[0], &targets[args.target_count],
+      std::sort(targets, &targets[args.target_count],
                 [] (const TargetData &a, const TargetData &b) -> bool {
                   return (a.index < b.index);
                 });
@@ -556,14 +556,15 @@ void perform_evaluation_test(InputArguments args) {
     }
 
     // Retrieve the test results
-    auto test_results = test_handle.collect();
+    test_targets = test_handle.collect();
 
     //Test error
-    compare_results(targets.get(), args.target_count,
-                    test_results.get(), test_count);
+    compare_results(targets, args.target_count, test_targets, test_count);
 
     err = test_handle.destroy();
     assert(err == dashmm::kSuccess);
+    delete [] test_targets;
+    delete [] targets;
   }
 
   //free up resources
