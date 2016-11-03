@@ -1,9 +1,6 @@
 THIS BRANCH TODO
 
 
-TODO: Update tutorial
-TODO: Update User Expansion documentation; in particular ViewSet needs to be
-      explained.
 TODO: Make the way that Expansions manage their data not suck as much as it
       does now. Really. There is a strange complicated dance happening with
       all of this, and it will be easy for a user to muck it up.
@@ -11,6 +8,8 @@ TODO: Make the way that Expansions manage their data not suck as much as it
                    2.0.0.
       -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
                    first grant likely.
+TODO: be more clear about when an expansion needs to own data and when not.
+
 TODO: Make S->* static members of Expansion.
 TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
       like an inelegant solution, and perhaps one that relies on the
@@ -54,7 +53,7 @@ TODO: Another thing might be to send this to the tree and not the LCO. Then the
 
 
 
-TODO: be more clear about when an expansion needs to own data and when not.
+
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
@@ -113,8 +112,6 @@ Future feature TODO pulled from the source
    an ArrayRef. This would then need ArrayRef to have an allocation form.
    Then, a new resum() or something method would need to bind the whole thing
    together. No use yet, but could be nice.
- * Array::allocate() ::get() and ::put() all can now return different codes on
-   different ranks.
  * The expansion concept does not allow for access of the kernel parameters.
    They end up in the table, and cannot be accessed later. Not sure if this is
    a problem, but it could be.
