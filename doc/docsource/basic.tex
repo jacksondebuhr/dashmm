@@ -581,18 +581,16 @@ is an error with the runtime; \texttt{kDomainError} if the provided index
 range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 
 \begin{lstlisting}
-T *Array<T>::collect()
+std::unique_ptr<T[], void(*)(T *)> Array<T>::collect()
 \end{lstlisting}
 
 \noindent This method collects all of the records in the array and returns a
-new local
-allocation containing the records at locality 0. This is, largely speaking, a
-convenience feature. Note that this will allocate a copy of the entirety of the
-array on one locality. Note also that the caller assumes ownership of the
-returned data.
+new local allocation containing the records at locality 0. This is, largely
+speaking, a convenience feature. Note that this will allocate a copy of the
+entirety of the array on one locality.
 
-This is a collective call. The returned pointer will only be valid on locality
-zero. All other ranks will receive \texttt{nullptr}.
+This is a collective call. The returned smart pointer will only be valid on
+locality zero. All other ranks will receive a null pointer.
 
 Note that this provides a copy of the data; changes to the returned data will
 not be reflected in the array object.

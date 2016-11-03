@@ -313,9 +313,8 @@ void perform_time_stepping(InputArguments args) {
   // Output if the user has selected this option
   if (!args.output.empty()) {
     size_t total_count = source_handle.length();
-    Particle *final_data = source_handle.collect();
-    output_results(args.output, final_data, total_count);
-    delete [] final_data;
+    auto final_data = source_handle.collect();
+    output_results(args.output, final_data.get(), total_count);
   }
 
   // free up resources
