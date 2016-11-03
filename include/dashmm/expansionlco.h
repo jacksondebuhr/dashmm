@@ -264,33 +264,30 @@ class ExpansionLCO {
   ///
   /// \param edges - the out edge data
   void set_out_edge_data(std::vector<DAGEdge> &edges) {
-    // TODO reduce a copy here using the parcel interface
-    int n_out = edges.size();
-    size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
-    char *input_data = new char[bytes];
-    assert(input_data);
+    void *lco_lva{nullptr}; 
+    assert(hpx_gas_try_pin(data_, &lco_lva)); 
+    Header *lco_data = 
+      static_cast<Header *>(hpx_lco_user_get_user_data(lco_lva)); 
 
-    int *codes = reinterpret_cast<int *>(input_data);
-    codes[0] = SetOpCodes::kOutEdges;
-    codes[1] = n_out;
-
+    int n_out = edges.size(); 
     if (n_out) {
       std::sort(edges.begin(), edges.end(), DAG::compare_edge_locality);
 
-      OutEdgeRecord *records =
-          reinterpret_cast<OutEdgeRecord *>(input_data + sizeof(int) * 2);
-
+      OutEdgeRecord *records = reinterpret_cast<OutEdgeRecord *>
+        (&lco_data->payload[lco_data->expansion_size]);
+      
       for (int i = 0; i < n_out; ++i) {
-        records[i].op = edges[i].op;
-        records[i].target = edges[i].target->global_addx;
-        records[i].tidx = edges[i].target->idx;
-        records[i].locality = edges[i].target->locality;
+        records[i].op = edges[i].op; 
+        records[i].target = edges[i].target->global_addx; 
+        records[i].tidx = edges[i].target->idx; 
+        records[i].locality = edges[i].target->locality; 
       }
     }
 
-    hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);
+    hpx_gas_unpin(data_); 
 
-    delete [] input_data;
+    int code = SetOpCodes::kOutEdges; 
+    hpx_lco_set_lsync(data_, sizeof(int), &code, HPX_NULL); 
   }
 
   /// Reset the underlying LCO
@@ -414,21 +411,6 @@ class ExpansionLCO {
         }
         break;
       case SetOpCodes::kOutEdges:
-        {
-          int n_edges{};
-          input.read(&n_edges);
-
-          if (n_edges) {
-            // Usage Check
-            assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
-            // We use out edge count here for the size so that an incorrect use
-            // does not write outside of bounds.
-            WriteBuffer dest{&lhs->payload[lhs->expansion_size],
-                             sizeof(OutEdgeRecord) * lhs->out_edge_count};
-            dest.write(input);
-          }
-        }
-
         break;
     }
   }
