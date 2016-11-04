@@ -17,6 +17,8 @@
 
 #include "hpx/hpx.h"
 
+#include "moments.h"
+
 
 //void partition_node_sync(hpx_addr_t node, hpx_addr_t parts, int n_parts,
 //                         int n_partition);
@@ -25,13 +27,6 @@
 //                                 double theta);
 
 
-//struct Moment {
-//  double mtot;
-//  double xcom;
-//  double Q00;
-//
-//  Moment() : mtot{0.0}, xcom{0.0}, Q00{0.0} { }
-//};
 
 
 struct Particle {
@@ -42,7 +37,7 @@ struct Particle {
 
 
 
-struct Node {
+struct Node : public MomentMixIn<Node> {
  public:
   Node(double l, double h)
     : left{nullptr}, right{nullptr},
