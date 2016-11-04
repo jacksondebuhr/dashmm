@@ -86,7 +86,7 @@ HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_ident_op, int_max_ident_handler,
 void int_max_op_handler(int *lhs, const int *rhs, size_t bytes) {
   size_t count = bytes / sizeof(int);
   for (size_t i = 0; i < count; ++i) {
-    lhs[i] = std::max(lhs[i], rhs[i] + 1);
+    lhs[i] = std::max(lhs[i], rhs[i]);
   }
 }
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_op, int_max_op_handler,

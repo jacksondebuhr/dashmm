@@ -91,7 +91,7 @@ HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, pred_action, pred_handler,
 /// \param UNWANTED - an unwanted argument
 ///
 /// \returns - HPX_SUCCESS
-int allocate_array_meta_handler(void *UNUSED, size_t UNWANTED) {
+int allocate_array_meta_handler() {
   ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
 
   int ranks = hpx_get_num_ranks();
@@ -102,18 +102,27 @@ int allocate_array_meta_handler(void *UNUSED, size_t UNWANTED) {
   }
 
   retval.reducer = hpx_lco_reduce_new(ranks, sizeof(size_t) * ranks,
-                                          size_sum_ident, size_sum_op);
+                                      size_sum_ident, size_sum_op);
   if (retval.reducer == HPX_NULL) {
     hpx_gas_free_sync(retval.meta);
     retval.meta = HPX_NULL;
     retval.code = kAllocationError;
   }
 
+  retval.retcode = hpx_lco_reduce_new(ranks, sizeof(int),
+                                      int_max_ident_op, int_max_op);
+  if (retval.retcode == HPX_NULL) {
+    hpx_gas_free_sync(retval.meta);
+    hpx_lco_delete_sync(retval.reducer);
+    retval.meta = HPX_NULL;
+    retval.reducer = HPX_NULL;
+    retval.code = kAllocationError;
+  }
+
   hpx_exit(sizeof(retval), &retval);
 }
-HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
-           allocate_array_meta_action, allocate_array_meta_handler,
-           HPX_POINTER, HPX_SIZE_T);
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           allocate_array_meta_action, allocate_array_meta_handler);
 
 
 /// Action for allocation rank-local segments of an Array
@@ -130,6 +139,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
 ///
 /// \returns - HPX_SUCCESS
 int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
+                                hpx_addr_t retcode,
                                 size_t record_size, size_t record_count) {
   int ranks = hpx_get_num_ranks();
   int my_rank = hpx_get_my_rank();
@@ -167,12 +177,15 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
     }
   }
 
+  hpx_lco_set_lsync(retcode, sizeof(int), &retval, HPX_NULL);
+  hpx_lco_get(retcode, sizeof(int), &retval);
+
   hpx_gas_unpin(global);
   hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_local_work_action, allocate_local_work_handler,
-           HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T);
+           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T);
 
 
 /// Action to deallocate the reduction LCO used during Array allocation
@@ -180,14 +193,16 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 /// \param reducer - the global address of the reduction LCO
 ///
 /// \returns - HPX_SUCCESS
-int allocate_array_destroy_reducer_handler(hpx_addr_t reducer) {
+int allocate_array_destroy_reducer_handler(hpx_addr_t reducer,
+                                           hpx_addr_t retcode) {
   hpx_lco_delete_sync(reducer);
+  hpx_lco_delete_sync(retcode);
   hpx_exit(0, nullptr);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_array_destroy_reducer_action,
            allocate_array_destroy_reducer_handler,
-           HPX_ADDR);
+           HPX_ADDR, HPX_ADDR);
 
 
 /// Action that deletes the local portion of an Array
@@ -235,6 +250,37 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
+/// Action that allocates a reducer for return codes
+///
+/// To be very careful, we collect the returns codes from each rank and
+/// take the maximum value.
+///
+/// \returns - HPX_SUCCESS
+int get_or_put_retcode_reducer_handler(void) {
+  hpx_addr_t retval = hpx_lco_reduce_new(hpx_get_num_ranks(),
+      sizeof(int), int_max_ident_op, int_max_op);
+  hpx_exit(sizeof(retval), &retval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           get_or_put_retcode_reducer_action,
+           get_or_put_retcode_reducer_handler);
+
+
+/// Action that deletes a reducer for return codes
+///
+/// \param lco - the LCO's address
+///
+/// \returns - HPX_SUCCESS
+int get_or_put_reducer_delete_handler(hpx_addr_t lco) {
+  hpx_lco_delete_sync(lco);
+  hpx_exit(0, nullptr);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           get_or_put_reducer_delete_action,
+           get_or_put_reducer_delete_handler,
+           HPX_ADDR);
+
+
 /// Put data into an array object
 ///
 /// This will fill records in a global array with @p in_data. This
@@ -248,7 +294,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 ///
 /// \returns - HPX_SUCCESS
 int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
-                      void *in_data) {
+                      void *in_data, hpx_addr_t reducer) {
   int retval = kSuccess;
 
   hpx_addr_t global = hpx_addr_add(obj,
@@ -257,39 +303,36 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
     retval = kRuntimeError;
-    hpx_exit(sizeof(retval), &retval);
-  }
+  } else {
+    if (last > local->local_count || last < first) {
+      retval = kDomainError;
+    } else {
+      if (local->local_count) {
+        assert(local->data != HPX_NULL);
 
-  char *data{nullptr};
-  if (local->data == HPX_NULL) {
+        char *data{nullptr};
+        if (!hpx_gas_try_pin(local->data, (void **)&data)) {
+          retval = kRuntimeError;
+        } else {
+          char *beginning = data + first * local->size;
+          size_t copy_size = (last - first) * local->size;
+          memcpy(beginning, in_data, copy_size);
+
+          hpx_gas_unpin(local->data);
+        }
+      }
+    }
+
     hpx_gas_unpin(global);
-    hpx_exit(sizeof(retval), &retval);
-  }
-  if (!hpx_gas_try_pin(local->data, (void **)&data)) {
-    hpx_gas_unpin(global);
-    retval = kRuntimeError;
-    hpx_exit(sizeof(retval), &retval);
   }
 
-  // Do some simple bounds checking
-  if (last > local->local_count || last < first) {
-    retval = kDomainError;
-    hpx_gas_unpin(local->data);
-    hpx_gas_unpin(global);
-    hpx_exit(sizeof(retval), &retval);
-  }
-
-  char *beginning = data + first * local->size;
-  size_t copy_size = (last - first) * local->size;
-  memcpy(beginning, in_data, copy_size);
-
-  hpx_gas_unpin(local->data);
-  hpx_gas_unpin(global);
+  hpx_lco_set_lsync(reducer, sizeof(int), &retval, HPX_NULL);
+  hpx_lco_get(reducer, sizeof(int), &retval);
 
   hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_put_action, array_put_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_ADDR);
 
 
 /// Get data from an array object
@@ -305,7 +348,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_put_action, array_put_handler,
 ///
 /// \returns - HPX_SUCCESS
 int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
-                      void *out_data) {
+                      void *out_data, hpx_addr_t reducer) {
   int retval = kSuccess;
 
   hpx_addr_t global = hpx_addr_add(obj,
@@ -314,39 +357,37 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
   ArrayMetaData *local{nullptr};
   if (!hpx_gas_try_pin(global, (void **)&local)) {
     retval = kRuntimeError;
-    hpx_exit(sizeof(retval), &retval);;
-  }
+  } else {
+    if (last > local->local_count || last < first) {
+      retval = kDomainError;
+    } else {
+      if (local->local_count) {
+        assert(local->data != HPX_NULL);
 
-  char *data{nullptr};
-  if (local->data == HPX_NULL) {
+        char *data{nullptr};
+        if (!hpx_gas_try_pin(local->data, (void **)&data)) {
+          retval = kRuntimeError;
+        } else {
+          char *beginning = data + first * local->size;
+          size_t copy_size = (last - first) * local->size;
+          memcpy(out_data, beginning, copy_size);
+
+          hpx_gas_unpin(local->data);
+        }
+      }
+    }
+
     hpx_gas_unpin(global);
-    hpx_exit(sizeof(retval), &retval);;
-  }
-  if (!hpx_gas_try_pin(local->data, (void **)&data)) {
-    retval = kRuntimeError;
-    hpx_gas_unpin(global);
-    hpx_exit(sizeof(retval), &retval);;
   }
 
-  // Do some simple bounds checking
-  if (last > local->local_count || last < first) {
-    retval = kDomainError;
-    hpx_gas_unpin(local->data);
-    hpx_gas_unpin(global);
-    hpx_exit(sizeof(retval), &retval);;
-  }
+  // reduce on error condition
+  hpx_lco_set_lsync(reducer, sizeof(int), &retval, HPX_NULL);
+  hpx_lco_get(reducer, sizeof(int), &retval);
 
-  char *beginning = data + first * local->size;
-  size_t copy_size = (last - first) * local->size;
-  memcpy(out_data, beginning, copy_size);
-
-  hpx_gas_unpin(local->data);
-  hpx_gas_unpin(global);
-
-  hpx_exit(sizeof(retval), &retval);;
+  hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_get_action, array_get_handler,
-           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER);
+           HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T, HPX_POINTER, HPX_ADDR);
 
 
 /// Action to return the local length of the Array

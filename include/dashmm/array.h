@@ -56,6 +56,12 @@ extern hpx_action_t allocate_array_destroy_reducer_action;
 /// Action for Array deallocation
 extern hpx_action_t deallocate_array_action;
 
+/// Action for return code reducer creation
+extern hpx_action_t get_or_put_retcode_reducer_action;
+
+/// Action to delete the reducer once done
+extern hpx_action_t get_or_put_reducer_delete_action;
+
 /// Action for putting data into an Array
 extern hpx_action_t array_put_action;
 
@@ -78,6 +84,7 @@ extern hpx_action_t array_collect_action;
 struct ArrayMetaAllocRunReturn {
   hpx_addr_t meta;
   hpx_addr_t reducer;
+  hpx_addr_t retcode;
   int code;
 };
 
@@ -167,8 +174,8 @@ class Array {
       return kDomainError;
     }
 
-    ArrayMetaAllocRunReturn metadata{HPX_NULL, HPX_NULL, 0};
-    hpx_run(&allocate_array_meta_action, &metadata, nullptr, 0);
+    ArrayMetaAllocRunReturn metadata{HPX_NULL, HPX_NULL, HPX_NULL, 0};
+    hpx_run(&allocate_array_meta_action, &metadata);
     if (metadata.code != kSuccess) {
       return static_cast<ReturnCode>(metadata.code);
     }
@@ -179,12 +186,14 @@ class Array {
     size_t size = sizeof(T);
     int runcode{0};
     hpx_run_spmd(&allocate_local_work_action, &runcode,
-                 &metadata.meta, &metadata.reducer, &size, &record_count);
+                 &metadata.meta, &metadata.reducer, &metadata.retcode,
+                 &size, &record_count);
     if (runcode != kSuccess) {
       retval = kAllocationError;
     }
 
-    hpx_run(&allocate_array_destroy_reducer_action, nullptr, &metadata.reducer);
+    hpx_run(&allocate_array_destroy_reducer_action, nullptr,
+            &metadata.reducer, &metadata.retcode);
 
     return retval;
   }
@@ -227,8 +236,16 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode get(size_t first, size_t last, T *out_data) {
     assert(valid());
-    int runcode = kSuccess;
-    hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data);
+
+    hpx_addr_t reducer{HPX_NULL};
+    hpx_run(&get_or_put_retcode_reducer_action, &reducer);
+
+    int runcode{kSuccess};
+    hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data,
+                 &reducer);
+
+    hpx_run(&get_or_put_reducer_delete_action, nullptr, &reducer);
+
     return static_cast<ReturnCode>(runcode);
   }
 
@@ -253,8 +270,16 @@ class Array {
   ///            inconsistent with the Array object.
   ReturnCode put(size_t first, size_t last, T *in_data) {
     assert(valid());
+
+    hpx_addr_t reducer{HPX_NULL};
+    hpx_run(&get_or_put_retcode_reducer_action, &reducer);
+
     int runcode = kSuccess;
-    hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data);
+    hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data,
+                 &reducer);
+
+    hpx_run(&get_or_put_reducer_delete_action, nullptr, &reducer);
+
     return static_cast<ReturnCode>(runcode);
   }
 
