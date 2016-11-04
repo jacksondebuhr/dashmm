@@ -18,69 +18,8 @@
 
 #include "hpx/hpx.h"
 
-#include "particle.h"
 
-
-static double domain_size_;
-static int domain_count_;
-
-
-struct Moment {
-  double mtot;
-  double xcom;
-  double Q00;
-};
-
-
-struct Node {
-  hpx_addr_t left;
-  hpx_addr_t right;
-  double low;
-  double high;
-  Moment moments;
-  hpx_addr_t parts;
-  int count;
-};
-
-
-/////////////////////////////////////////////////////////////////////
-// Internal Utilities
-/////////////////////////////////////////////////////////////////////
-
-
-double domain_low_bound(int which) {
-  return (domain_size_ / domain_count_) * which;
-}
-
-
-double domain_high_bound(int which) {
-  return (domain_size_ / domain_count_) * (which + 1);
-}
-
-
-int map_bounds_to_locality(double low, double high) {
-  double domain_span = domain_size_ / domain_count_;
-  int low_idx = (int)floor(low / domain_span);
-  int high_idx = (int)floor(high / domain_span);
-  assert(high_idx >= low_idx);
-
-  //Easiest case first - only one choice really
-  if (low_idx == high_idx) {
-    return low_idx;
-  }
-
-  //harder case - pick the one with the most overlap
-  if (high_idx - low_idx == 1) {
-    double delta_low = domain_low_bound(high_idx) - low;
-    double delta_high = high - domain_low_bound(high_idx);
-    return (delta_high > delta_low ? high_idx : low_idx);
-  }
-
-  //hardest case - that means the most possible answers. We just pick the
-  // first. There is a potential for a better choice here.
-  return low_idx;
-}
-
+#if 0
 
 void compute_moments(Node *node, Particle *P, int n_parts) {
   node->moments.mtot = 0.0;
@@ -125,21 +64,6 @@ double node_compute_direct(Particle *P, int count, double pos) {
 }
 
 
-/////////////////////////////////////////////////////////////////////
-// Actions
-/////////////////////////////////////////////////////////////////////
-
-
-int broadcast_domain_handler(double size) {
-  domain_size_ = size;
-  domain_count_ = hpx_get_num_ranks();
-  return HPX_SUCCESS;
-}
-HPX_ACTION(HPX_DEFAULT, 0,
-           broadcast_domain_action, broadcast_domain_handler,
-           HPX_DOUBLE);
-
-
 void moment_reduction_ident_handler(Moment *ident, size_t bytes) {
   ident->mtot = 0.0;
   ident->xcom = 0.0;
@@ -173,99 +97,6 @@ void moment_reduction_op_handler(Moment *lhs,
 HPX_ACTION(HPX_FUNCTION, 0,
            moment_reduction_op, moment_reduction_op_handler,
            HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
-
-
-int save_and_continue_moments_handler(Node *node, hpx_addr_t moments) {
-  hpx_lco_get(moments, sizeof(Moment), &node->moments);
-  hpx_lco_delete_sync(moments);
-  return HPX_THREAD_CONTINUE(node->moments);
-}
-HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
-           save_and_continue_moments_action, save_and_continue_moments_handler,
-           HPX_POINTER, HPX_ADDR);
-
-
-int partition_node_handler(Node *node, hpx_addr_t parts, int n_parts,
-                           int n_partition);
-HPX_ACTION(HPX_DEFAULT, HPX_PINNED,
-           partition_node_action, partition_node_handler,
-           HPX_POINTER, HPX_ADDR, HPX_INT, HPX_INT);
-
-int partition_node_handler(Node *node, hpx_addr_t parts, int n_parts,
-                           int n_partition) {
-  if (n_parts <= n_partition) {
-    node->parts = parts;
-    node->count = n_parts;
-
-    Particle *P;
-    assert(hpx_gas_try_pin(parts, (void **)&P));
-    compute_moments(node, P, n_parts);
-    hpx_gas_unpin(parts);
-
-    return HPX_THREAD_CONTINUE(node->moments);
-  } else {
-    // find split point for the particles particles
-    Particle *P_begin;
-    assert(hpx_gas_try_pin(parts, (void **)&P_begin));
-    Particle *P_end = &P_begin[n_parts];
-
-    double x_split = 0.5 * (node->low + node->high);
-    auto x_comp = [x_split](Particle &a) {
-      return a.pos < x_split;
-    };
-    Particle *splitter = std::partition(P_begin, P_end, x_comp);
-    int n_parts_left = splitter - P_begin;
-    int n_parts_right = P_end - splitter;
-    hpx_gas_unpin(parts);
-
-    //get a reduction to combine moments once partitioning is finished
-    hpx_addr_t reduce = hpx_lco_reduce_new(2, sizeof(Moment),
-                          moment_reduction_ident, moment_reduction_op);
-    assert(reduce != HPX_NULL);
-
-    // call partition on the children, using that reduction as the result
-    if (n_parts_left) {
-      node->left = create_node(node->low, x_split);
-      hpx_addr_t parts_left = hpx_gas_alloc_local_at_sync(1,
-                    sizeof(Particle) * n_parts_left, 0, node->left);
-      hpx_addr_t cpy_done = hpx_lco_future_new(0);
-      assert(cpy_done != HPX_NULL);
-      hpx_gas_memcpy(parts_left, parts, sizeof(Particle) * n_parts_left,
-                     cpy_done);
-      hpx_lco_wait(cpy_done);
-      hpx_lco_delete_sync(cpy_done);
-      hpx_call(node->left, partition_node_action, reduce,
-               &parts_left, &n_parts_left, &n_partition);
-    } else {
-      Moment empty{0.0, 0.0, 0.0};
-      hpx_lco_set_rsync(reduce, sizeof(Moment), &empty);
-    }
-
-    if (n_parts_right) {
-      node->right = create_node(x_split, node->high);
-      hpx_addr_t parts_right = hpx_gas_alloc_local_at_sync(1,
-                    sizeof(Particle) * n_parts_right, 0, node->right);
-      hpx_addr_t from_addx = hpx_addr_add(parts,
-                                          sizeof(Particle) * n_parts_left,
-                                          sizeof(Particle) * n_parts);
-      hpx_addr_t cpy_done = hpx_lco_future_new(0);
-      assert(cpy_done != HPX_NULL);
-      hpx_gas_memcpy(parts_right, from_addx,
-                     sizeof(Particle) * n_parts_right, cpy_done);
-      hpx_lco_wait(cpy_done);
-      hpx_lco_delete_sync(cpy_done);
-      hpx_call(node->right, partition_node_action, reduce,
-               &parts_right, &n_parts_right, &n_partition);
-    } else {
-      Moment empty{0.0, 0.0, 0.0};
-      hpx_lco_set_rsync(reduce, sizeof(Moment), &empty);
-    }
-
-    return hpx_call_when_cc(reduce, hpx_thread_current_target(),
-                            save_and_continue_moments_action,
-                            &reduce);
-  }
-}
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -406,38 +237,96 @@ int spawn_computation_handler(Node *node, hpx_addr_t root, hpx_addr_t sync,
 }
 
 
+#endif
+
+
 /////////////////////////////////////////////////////////////////////
-// Interface
+// Moving to a Node class
 /////////////////////////////////////////////////////////////////////
 
 
-void broadcast_domain_size(double domain_size) {
-  hpx_bcast_rsync(broadcast_domain_action, &domain_size);
+hpx_action_t Node::partition_ = HPX_ACTION_NULL;
+
+
+Node::~Node() {
+  if (left) {
+    delete left;
+  }
+  if (right) {
+    delete right;
+  }
 }
 
 
-hpx_addr_t create_node(double low, double high) {
-  int where = map_bounds_to_locality(low, high);
-  hpx_addr_t retval = hpx_gas_alloc_local_at_sync(1,
-                          sizeof(Node), 0, HPX_THERE(where));
-  Node vals{HPX_NULL, HPX_NULL, low, high,
-              Moment{0.0, 0.0, 0.0}, HPX_NULL, 0};
-  hpx_gas_memput_rsync(retval, &vals, sizeof(Node));
-  return retval;
+void Node::partition(Particle *parts, int n_parts, int thresh,
+                     hpx_addr_t sync) {
+  hpx_addr_t done = sync;
+  if (sync == HPX_NULL) {
+    done = hpx_lco_future_new(0);
+    assert(done != HPX_NULL);
+  }
+
+  Node *thisptr = this;
+  hpx_call(HPX_HERE, partition_, done, &thisptr, &parts, &n_parts, &thresh);
 }
 
 
-void partition_node_sync(hpx_addr_t node, hpx_addr_t parts, int n_parts,
-                         int n_partition) {
-  hpx_addr_t done = hpx_lco_future_new(sizeof(Moment));
-  assert(done != HPX_NULL);
-  hpx_call(node, partition_node_action, done, &parts, &n_parts, &n_partition);
-  hpx_lco_wait(done);
-  hpx_lco_delete_sync(done);
+
+/////////////////////////////////////////////////////////////////////
+// Node actions
+/////////////////////////////////////////////////////////////////////
+
+
+void Node::register_actions() {
+  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                      Node::partition_,
+                      Node::partition_handler,
+                      HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT);
 }
 
 
-void spawn_potential_computation(hpx_addr_t root, hpx_addr_t sync,
-                                 double theta) {
-  hpx_call(root, spawn_computation_action, HPX_NULL, &root, &sync, &theta);
+int Node::partition_handler(Node *node, Particle *parts, int n_parts,
+                            int thresh) {
+  if (n_parts <= thresh) {
+    node->parts = parts;
+    node->count = n_parts;
+    return HPX_SUCCESS;
+  } else {
+    // find split point for the particles
+    Particle *P_begin{parts};
+    Particle *P_end{&P_begin[n_parts]};
+
+    double x_split = 0.5 * (node->low + node->high);
+    auto x_comp = [x_split](Particle &a) {
+      return a.pos < x_split;
+    };
+    Particle *splitter = std::partition(P_begin, P_end, x_comp);
+    int n_parts_left = splitter - P_begin;
+    int n_parts_right = P_end - splitter;
+
+    // Completion detection
+    hpx_addr_t part_done = hpx_lco_and_new(2);
+    assert(part_done != HPX_NULL);
+
+    // call partition on the children, using that reduction as the result
+    if (n_parts_left) {
+      node->left = new Node(node->low, x_split);
+      node->left->partition(P_begin, n_parts_left, thresh, part_done);
+    } else {
+      hpx_lco_and_set(part_done, HPX_NULL);
+    }
+
+    if (n_parts_right) {
+      node->right = new Node(x_split, node->high);
+      node->right->partition(splitter, n_parts_right, thresh, part_done);
+    } else {
+      hpx_lco_and_set(part_done, HPX_NULL);
+    }
+
+    // This passes completion information up the chain to the top, as well
+    // as deleting the synchronization objects.
+    return hpx_call_when_cc(part_done, part_done, hpx_lco_delete_action,
+                            nullptr, 0);
+  }
 }
+

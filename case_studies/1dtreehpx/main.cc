@@ -16,7 +16,6 @@
 
 #include "hpx/hpx.h"
 
-#include "particle.h"
 #include "tree.h"
 
 
@@ -26,47 +25,36 @@ void print_usage(FILE *fd, char *prog) {
 }
 
 
-hpx_addr_t generate_parts(int n_parts, double domain_length, hpx_addr_t where) {
-  //generate n_parts over the given domain length
-  hpx_addr_t parts_gas = hpx_gas_alloc_local_at_sync(1,
-                            sizeof(Particle) * n_parts, 0, where);
-  assert(parts_gas != HPX_NULL);
-  Particle *parts = NULL;
-  assert(hpx_gas_try_pin(parts_gas, (void **)&parts));
+Particle *generate_parts(int n_parts, double domain_length) {
+  Particle *parts = new Particle[n_parts];
 
   for (int i = 0; i < n_parts; ++i) {
     parts[i].pos = ((double)rand() / (double)RAND_MAX) * domain_length;
     parts[i].mass = ((double)rand() / (double)RAND_MAX) * 0.9 + 0.1;
   }
 
-  hpx_gas_unpin(parts_gas);
-
-  return parts_gas;
+  return parts;
 }
 
 
 int hpx_main(int n_parts, int n_partition, double theta_c,
              double domain_size) {
-  broadcast_domain_size(domain_size);
+  Node *root = new Node(0.0, domain_size);
+  Particle *parts = generate_parts(n_parts, domain_size);
 
-  hpx_addr_t root = create_node(0.0, domain_size);
-  hpx_addr_t parts = generate_parts(n_parts, domain_size, root);
 
-  hpx_time_t t_start = hpx_time_now();
+  // Create the tree
+  root->partition(parts, n_parts, n_partition);
+  fprintf(stdout, "Done with partitioning!\n");
 
-  partition_node_sync(root, parts, n_parts, n_partition);
 
-  hpx_addr_t alldone = hpx_lco_and_new(n_parts);
-  assert(alldone != HPX_NULL);
-  spawn_potential_computation(root, alldone, theta_c);
-  hpx_lco_wait(alldone);
-  hpx_lco_delete_sync(alldone);
+  // Destroy the tree
+  delete root;
+  fprintf(stdout, "Done with tree deletion.\n");
 
-  hpx_time_t t_end = hpx_time_now();
 
-  fprintf(stdout, "Time to compute %d potentials across %d localities:\n",
-            n_parts, hpx_get_num_ranks());
-  fprintf(stdout, "      %lg [ms]\n", hpx_time_diff_ms(t_start, t_end));
+  // Destroy particles
+  delete [] parts;
 
   hpx_exit(0, NULL);
 }
@@ -75,6 +63,8 @@ HPX_ACTION(HPX_DEFAULT, 0, hpx_main_action, hpx_main,
 
 
 int main(int argc, char **argv) {
+  Node::register_actions();
+
   if (hpx_init(&argc, &argv)) {
     hpx_print_help();
     return -1;
@@ -89,6 +79,7 @@ int main(int argc, char **argv) {
   int n_partition = atoi(argv[2]);
   double theta_c = atof(argv[3]);
   double domain_size = atof(argv[4]);
+
 
   int err = hpx_run(&hpx_main_action, NULL, &n_parts, &n_partition,
                     &theta_c, &domain_size);

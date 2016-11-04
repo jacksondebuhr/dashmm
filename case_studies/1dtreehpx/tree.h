@@ -18,16 +18,58 @@
 #include "hpx/hpx.h"
 
 
-void broadcast_domain_size(double domain_size);
+//void partition_node_sync(hpx_addr_t node, hpx_addr_t parts, int n_parts,
+//                         int n_partition);
+
+//void spawn_potential_computation(hpx_addr_t root, hpx_addr_t sync,
+//                                 double theta);
 
 
-hpx_addr_t create_node(double low, double high);
+//struct Moment {
+//  double mtot;
+//  double xcom;
+//  double Q00;
+//
+//  Moment() : mtot{0.0}, xcom{0.0}, Q00{0.0} { }
+//};
 
-void partition_node_sync(hpx_addr_t node, hpx_addr_t parts, int n_parts,
-                         int n_partition);
 
-void spawn_potential_computation(hpx_addr_t root, hpx_addr_t sync,
-                                 double theta);
+struct Particle {
+  double pos;
+  double mass;
+  double phi;
+};
+
+
+
+struct Node {
+ public:
+  Node(double l, double h)
+    : left{nullptr}, right{nullptr},
+      low(l), high(h), parts{nullptr}, count{0} { }
+  ~Node();
+
+
+  void partition(Particle *parts, int n_parts, int thresh,
+                 hpx_addr_t sync = HPX_NULL);
+
+
+  // Action handlers
+  static void register_actions();
+  static int partition_handler(Node *node, Particle *parts, int n_parts,
+                               int thresh);
+
+  // Action ids
+  static hpx_action_t partition_;
+
+  // The data
+  Node *left;
+  Node *right;
+  double low;
+  double high;
+  Particle *parts;
+  int count;
+};
 
 
 #endif // __1DTREE_TUTORIAL_TREE_H__
