@@ -126,7 +126,7 @@ class ExpansionLCO {
     ViewSet views = expand->get_all_views(); 
     size_t bytes = views.bytes(); 
 
-    data_ = hpx_lco_user_new(sizeof(Header), init_, operation, predicate_, 
+    data_ = hpx_lco_user_new(sizeof(Header), init_, operation_, predicate_, 
                              &bytes, sizeof(bytes)); 
     assert(data_ != HPX_NULL); 
 
@@ -329,9 +329,9 @@ class ExpansionLCO {
   /// Part of the internal representation of the Expansion LCO
   ///
   /// Expansion are user-defined LCOs. The data they contain are this object
-  /// and the serialized expansion. The payload contains the serialized form
-  /// of the expansion. This is done through the ViewSet object, and details
-  /// on the exact format can be found with the ViewSet documentation.
+  /// and the serialized expansion. The expansion_data points to the serialized
+  /// form of the expansion. This is done through the ViewSet object, and 
+  /// details on the exact format can be found with the ViewSet documentation. 
   struct Header {
     int yet_to_arrive;
     int out_edge_count;
@@ -341,7 +341,6 @@ class ExpansionLCO {
     hpx_addr_t rwaddr;
     OutEdgeRecord *out_edge_records; 
     char *expansion_data; 
-    //char payload[];
   };
 
   /// Operation codes for the LCOs set operation
@@ -368,7 +367,7 @@ class ExpansionLCO {
   static void init_handler(Header *head, size_t bytes,
                            size_t *init, size_t init_bytes) {
     head->expansion_size = *init; 
-    memset(head->expansion_data, 0, *init); 
+    //memset(head->expansion_data, 0, *init); 
   }
 
   /// The set operation handler for the Expansion LCO
@@ -473,12 +472,14 @@ class ExpansionLCO {
     memcpy(scratch, head, sizeof(Header)); 
 
     // Fill in the expansion data
-    mempcy(temp + sizeof(Header), head->expansion_data, 
+    memcpy(temp + sizeof(Header), head->expansion_data, 
            head->expansion_size); 
 
     // Address for storing out edges
     scratch->out_edge_records = 
       reinterpret_cast<OutEdgeRecord *>(temp + edgeless); 
+
+    OutEdgeRecord *out_edges = head->out_edge_records;
 
     // Loop over the sorted edges 
     int my_rank = hpx_get_my_rank(); 
@@ -689,7 +690,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_M_to_T(head->expansion_size, head->payload);
+    destination.contribute_M_to_T(head->expansion_size, head->expansion_data);
   }
 
   /// Serve an L->T edge
@@ -700,7 +701,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_L_to_T(head->expansion_size, head->payload);
+    destination.contribute_L_to_T(head->expansion_size, head->expansion_data);
   }
 
   /// Serve an M->I edge
