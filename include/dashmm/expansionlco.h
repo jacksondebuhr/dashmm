@@ -356,9 +356,8 @@ class ExpansionLCO {
 
   /// Initialization handler for Expansion LCOs
   ///
-  /// The input header is copied directly into the LCO's header. This copies
-  /// the metadata as well as the payload (the initial value of the expansion
-  /// and the out edges).
+  /// This updates the expansion size, and also zeros out the expansion 
+  /// data if the pointer is valid. 
   ///
   /// \param head - the address of the LCO data
   /// \param bytes - the size of the LCO data
@@ -367,21 +366,23 @@ class ExpansionLCO {
   static void init_handler(Header *head, size_t bytes,
                            size_t *init, size_t init_bytes) {
     head->expansion_size = *init; 
-    //memset(head->expansion_data, 0, *init); 
+    
+    // This is useful only when LCO is reset 
+    if (head->expansion_data) 
+      memset(head->expansion_data, 0, *init); 
   }
 
   /// The set operation handler for the Expansion LCO
   ///
-  /// Set will either save the out edges, or add the input expansion to
-  /// the expansion stored in this LCO.
-  ///
-  /// The input to this function is either an expansion or a set of out edge
-  /// records. In either case, @p rhs begins with an integer indicating which
-  /// sort of set was called. Then, for a contribution, the rest of the
-  /// input buffer is a serialized ViewSet, which can be deserialized into
-  /// an expansion, which is then added to the expansion represented by this
-  /// LCO. For the case of setting the out edges, the rest of the inpute buffer
-  /// is an array of OutEdgeRecord.
+  /// Set will either add the input expansion to the expansion referenced in
+  /// this LCO, or simply decrement the counter that monitors the status of the
+  /// LCO 
+  /// 
+  /// In both cases, @p rhs begins with an integer indicating which sort of set
+  /// was called. If the set is to accumulate expansion, then there is a
+  /// serialized ViewSet following the integer code. This buffer is deserialized
+  /// into an expansion, and then added to the expansion referenced by this
+  /// LCO. 
   ///
   /// \param lhs - the address of this LCO's data
   /// \param rhs - the input buffer
