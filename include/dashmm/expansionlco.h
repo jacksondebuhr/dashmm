@@ -122,33 +122,32 @@ class ExpansionLCO {
                Index index, std::unique_ptr<expansion_t> expand,
                hpx_addr_t rwtree) {
     assert(expand != nullptr); 
-    
+
     ViewSet views = expand->get_all_views(); 
     size_t bytes = views.bytes(); 
-    size_t total = sizeof(Header) + bytes; 
-    
-    data_ = hpx_lco_user_new(total, init_, operation_, predicate_, 
+
+    data_ = hpx_lco_user_new(sizeof(Header), init_, operation_, predicate_, 
                              &bytes, sizeof(bytes)); 
     assert(data_ != HPX_NULL); 
 
-    void *lco_lva{nullptr}; 
-    assert(hpx_gas_try_pin(data_, &lco_lva)); 
-    Header *input_data = 
-      static_cast<Header *>(hpx_lco_user_get_user_data(lco_lva)); 
+    void *lva{nullptr}; 
+    assert(hpx_gas_try_pin(data_, &lva)); 
+    Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva)); 
 
-    input_data->yet_to_arrive = n_in + 1; // to account for setting out edges
-    input_data->domain = domain; 
-    input_data->index = index; 
-    input_data->rwaddr = rwtree; 
-    input_data->out_edge_count = n_out; 
-    input_data->out_edge_records = new OutEdgeRecord[n_out]; 
+    ldata->yet_to_arrive = n_in + 1; // to account for setting out edges
+    ldata->domain = domain; 
+    ldata->index = index; 
+    ldata->rwaddr = rwtree; 
+    ldata->out_edge_count = n_out; 
+    ldata->out_edge_records = new OutEdgeRecord[n_out]; 
+    ldata->expansion_data = new char[bytes]; 
 
-    WriteBuffer inbuf{input_data->payload, bytes}; 
+    WriteBuffer inbuf{ldata->expansion_data, bytes}; 
     views.serialize(inbuf); 
-    
+
     hpx_gas_unpin(data_); 
 
-    // setup the out edge action
+    // setup the out edge action 
     if (n_out != 0) {
       int unused = 0; 
       hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL, &unused); 
@@ -162,6 +161,7 @@ class ExpansionLCO {
       assert(hpx_gas_try_pin(data_, &lva)); 
       Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva)); 
       delete [] ldata->out_edge_records; 
+      delete [] ldata->expansion_data; 
       hpx_gas_unpin(data_); 
       
       hpx_lco_delete_sync(data_); 
@@ -329,9 +329,9 @@ class ExpansionLCO {
   /// Part of the internal representation of the Expansion LCO
   ///
   /// Expansion are user-defined LCOs. The data they contain are this object
-  /// and the serialized expansion. The payload contains the serialized form
-  /// of the expansion. This is done through the ViewSet object, and details
-  /// on the exact format can be found with the ViewSet documentation.
+  /// and the serialized expansion. The expansion_data points to the serialized
+  /// form of the expansion. This is done through the ViewSet object, and 
+  /// details on the exact format can be found with the ViewSet documentation. 
   struct Header {
     int yet_to_arrive;
     int out_edge_count;
@@ -340,7 +340,7 @@ class ExpansionLCO {
     Index index;
     hpx_addr_t rwaddr;
     OutEdgeRecord *out_edge_records; 
-    char payload[];
+    char *expansion_data; 
   };
 
   /// Operation codes for the LCOs set operation
@@ -356,9 +356,8 @@ class ExpansionLCO {
 
   /// Initialization handler for Expansion LCOs
   ///
-  /// The input header is copied directly into the LCO's header. This copies
-  /// the metadata as well as the payload (the initial value of the expansion
-  /// and the out edges).
+  /// This updates the expansion size, and also zeros out the expansion 
+  /// data if the pointer is valid. 
   ///
   /// \param head - the address of the LCO data
   /// \param bytes - the size of the LCO data
@@ -366,22 +365,24 @@ class ExpansionLCO {
   /// \param init_bytes - the size of the initialization data for the LCO
   static void init_handler(Header *head, size_t bytes,
                            size_t *init, size_t init_bytes) {
-    head->expansion_size = *init;
-    memset(head->payload, 0, *init);
+    head->expansion_size = *init; 
+    
+    // This is useful only when LCO is reset 
+    if (head->expansion_data) 
+      memset(head->expansion_data, 0, *init); 
   }
 
   /// The set operation handler for the Expansion LCO
   ///
-  /// Set will either save the out edges, or add the input expansion to
-  /// the expansion stored in this LCO.
-  ///
-  /// The input to this function is either an expansion or a set of out edge
-  /// records. In either case, @p rhs begins with an integer indicating which
-  /// sort of set was called. Then, for a contribution, the rest of the
-  /// input buffer is a serialized ViewSet, which can be deserialized into
-  /// an expansion, which is then added to the expansion represented by this
-  /// LCO. For the case of setting the out edges, the rest of the inpute buffer
-  /// is an array of OutEdgeRecord.
+  /// Set will either add the input expansion to the expansion referenced in
+  /// this LCO, or simply decrement the counter that monitors the status of the
+  /// LCO 
+  /// 
+  /// In both cases, @p rhs begins with an integer indicating which sort of set
+  /// was called. If the set is to accumulate expansion, then there is a
+  /// serialized ViewSet following the integer code. This buffer is deserialized
+  /// into an expansion, and then added to the expansion referenced by this
+  /// LCO. 
   ///
   /// \param lhs - the address of this LCO's data
   /// \param rhs - the input buffer
@@ -402,8 +403,7 @@ class ExpansionLCO {
           views.interpret(input);
           expansion_t incoming{views};
 
-          // create the expansion from the payload
-          ReadBuffer here{lhs->payload, lhs->expansion_size};
+          ReadBuffer here{lhs->expansion_data, lhs->expansion_size}; 
           ViewSet here_views{};
           here_views.interpret(here);
           expansion_t expand{here_views};
@@ -468,16 +468,20 @@ class ExpansionLCO {
 
     char *temp = new char[total]; 
     Header *scratch = reinterpret_cast<Header *>(temp); 
-    
-    // Fill in the common part 
-    memcpy(scratch, head, edgeless); 
 
-    // Address for storing out edges 
+    // Fill in the header 
+    memcpy(scratch, head, sizeof(Header)); 
+
+    // Fill in the expansion data
+    memcpy(temp + sizeof(Header), head->expansion_data, 
+           head->expansion_size); 
+
+    // Address for storing out edges
     scratch->out_edge_records = 
       reinterpret_cast<OutEdgeRecord *>(temp + edgeless); 
 
-    OutEdgeRecord *out_edges = head->out_edge_records; 
- 
+    OutEdgeRecord *out_edges = head->out_edge_records;
+
     // Loop over the sorted edges 
     int my_rank = hpx_get_my_rank(); 
     int begin = 0; 
@@ -493,28 +497,28 @@ class ExpansionLCO {
 
       if (curr_rank == my_rank) {
         // Short cut to do work 
-        spawn_out_edges_work(head, begin, curr - 1);
+        spawn_out_edges_work(head, begin, curr - 1); 
       } else {
         int curr_rank_out_edge_count = curr - begin; 
-
-        // Update the edge count information 
+        
+        // Update the edge count information
         scratch->out_edge_count = curr_rank_out_edge_count; 
 
         // Copy the edge information into scratch 
         memcpy(scratch->out_edge_records, &out_edges[begin], 
                sizeof(OutEdgeRecord) * curr_rank_out_edge_count); 
 
-        // Prepare parcel 
+        // Prepare parcel
         size_t message_size = edgeless + 
           sizeof(OutEdgeRecord) * curr_rank_out_edge_count; 
-        // TODO + (1/2) x hpx_addr_t eventually 
+        // TODO + (1/2) x hpx_addr_t eventually
 
         hpx_parcel_t *parc = hpx_parcel_acquire(temp, message_size); 
         hpx_parcel_set_action(parc, spawn_out_edges_from_remote_); 
         hpx_parcel_set_target(parc, HPX_THERE(curr_rank)); 
 
         // NOTE: we need to wait for local completion because we are going to
-        // modify the buffer in place for the next locality
+        // modify the buffer in place for the next locality 
         hpx_parcel_send_sync(parc); 
       }
 
@@ -522,7 +526,7 @@ class ExpansionLCO {
       begin = curr; 
     }
 
-    delete [] temp;
+    delete [] temp; 
 
     // done
     return HPX_SUCCESS;
@@ -550,15 +554,16 @@ class ExpansionLCO {
     RankWise<dualtree_t> global_tree{head->rwaddr};
     auto tree = global_tree.here();
 
-    // \p head->out_edge_records currently stores the address from the sender
-    // side, which is invalid on the receiver side. Do offset arithmetic to set
-    // the pointer with the correct address. 
+    // \p head->expansion_data and \p head->out_edge_records currently store the
+    // addresses of the sender's side, which are invalid on the receiver's
+    // side. Compute correct offsets to set these pointers correctly. 
     char *temp = reinterpret_cast<char *>(head); 
+    head->expansion_data = temp + sizeof(Header); 
     head->out_edge_records = 
       reinterpret_cast<OutEdgeRecord *>(temp + sizeof(Header) + 
                                         head->expansion_size); 
     OutEdgeRecord *out_edges = head->out_edge_records; 
- 
+
     for (int i = 0; i < head->out_edge_count; ++i) {
       if (out_edges[i].target == HPX_NULL) {
         out_edges[i].target = tree->lookup_lco_addx(out_edges[i].tidx,
@@ -581,8 +586,9 @@ class ExpansionLCO {
   /// \param last - the last edge to be proceed
   static void spawn_out_edges_work(Header *head, int first, int last) {
     ViewSet views{};
+
     if (head->out_edge_count > 0) {
-      ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+      ReadBuffer inbuf{head->expansion_data, head->expansion_size}; 
       views.interpret(inbuf);
     }
 
@@ -685,7 +691,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_M_to_T(head->expansion_size, head->payload);
+    destination.contribute_M_to_T(head->expansion_size, head->expansion_data);
   }
 
   /// Serve an L->T edge
@@ -696,7 +702,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_L_to_T(head->expansion_size, head->payload);
+    destination.contribute_L_to_T(head->expansion_size, head->expansion_data);
   }
 
   /// Serve an M->I edge
