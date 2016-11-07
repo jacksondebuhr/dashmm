@@ -160,3 +160,13 @@ FUTURE BUILT-INs
  * Is there some room for performance improvement in BH where we might use
    single particles for the decision? Is this just a matter of using a smaller
    threshold? Will that pay any dividends?
+
+
+
+IDEAS TO TRY
+  * If we get the tree decoupled from the execution, could we perhaps use
+    GADGET or AREPO or GIZMO or whatever to build the tree, and then just sub
+    in our execution? That would be a pretty damn good comparison to make.
+    It would mean that design of our decoupling would need to be such that
+    we could do this. But that would be a really cool comparison to make.
+    Really cool.

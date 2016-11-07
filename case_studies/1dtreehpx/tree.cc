@@ -21,23 +21,6 @@
 
 #if 0
 
-void compute_moments(Node *node, Particle *P, int n_parts) {
-  node->moments.mtot = 0.0;
-  node->moments.xcom = 0.0;
-  node->moments.Q00 = 0.0;
-  for (int i = 0; i < n_parts; ++i) {
-    node->moments.mtot += P[i].mass;
-    node->moments.xcom += P[i].pos * P[i].mass;
-  }
-  if (node->moments.mtot > 0.0) {
-    node->moments.xcom /= node->moments.mtot;
-    for (int i = 0; i < n_parts; ++i) {
-      double dx = P[i].pos - node->moments.xcom;
-      node->moments.Q00 += 2.0 * P[i].mass * dx * dx;
-    }
-  }
-}
-
 
 bool is_leaf(Node *node) {
   return node->left == HPX_NULL && node->right == HPX_NULL;
@@ -62,41 +45,6 @@ double node_compute_direct(Particle *P, int count, double pos) {
   }
   return retval;
 }
-
-
-void moment_reduction_ident_handler(Moment *ident, size_t bytes) {
-  ident->mtot = 0.0;
-  ident->xcom = 0.0;
-  ident->Q00  = 0.0;
-}
-HPX_ACTION(HPX_FUNCTION, 0,
-           moment_reduction_ident, moment_reduction_ident_handler,
-           HPX_POINTER, HPX_SIZE_T);
-
-
-void moment_reduction_op_handler(Moment *lhs,
-                                 const Moment *rhs, size_t bytes) {
-  double newtot = lhs->mtot + rhs->mtot;
-  double newcom{0.0};
-  double newQ00{0.0};
-  if (newtot > 0.0) {
-    newcom = lhs->mtot * lhs->xcom + rhs->mtot * rhs->xcom;
-    newcom /= newtot;
-
-    double dxl{lhs->xcom - newcom};
-    newQ00 = 2.0 * lhs->mtot * dxl * dxl + lhs->Q00;
-
-    double dxr{rhs->xcom - newcom};
-    newQ00 += 2.0 * rhs->mtot * dxr * dxr + rhs->Q00;
-  }
-
-  lhs->mtot = newtot;
-  lhs->xcom = newcom;
-  lhs->Q00  = newQ00;
-}
-HPX_ACTION(HPX_FUNCTION, 0,
-           moment_reduction_op, moment_reduction_op_handler,
-           HPX_POINTER, HPX_POINTER, HPX_SIZE_T);
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -268,6 +216,11 @@ void Node::partition(Particle *parts, int n_parts, int thresh,
 
   Node *thisptr = this;
   hpx_call(HPX_HERE, partition_, done, &thisptr, &parts, &n_parts, &thresh);
+
+  if (sync == HPX_NULL) {
+    hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
+  }
 }
 
 
@@ -277,11 +230,24 @@ void Node::partition(Particle *parts, int n_parts, int thresh,
 /////////////////////////////////////////////////////////////////////
 
 
+// TODO: for that matter, come up with a way to make this automatic too
+//
+// You could put this in the constructor at the cost of an extra static variable
+// to check if registration has occurred. But that is not actually good enough.
+// we need registration to be before hpx_init(). So the user would need to
+// explicitly create a node just for the purposes of registration.
+// Or we could stick with the Registrar scheme from DASHMM. That is not too
+// weird.
 void Node::register_actions() {
   HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                      Node::partition_,
-                      Node::partition_handler,
+                      partition_,
+                      partition_handler,
                       HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT);
+
+  // Now register for our mix-in
+  //
+  // TODO: come up with a way to make this automatic
+  MomentMixIn<Node>::register_actions();
 }
 
 

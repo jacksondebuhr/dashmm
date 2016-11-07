@@ -45,6 +45,9 @@ struct Node : public MomentMixIn<Node> {
   ~Node();
 
 
+  bool is_leaf() const {return (left == nullptr && right == nullptr);}
+
+
   void partition(Particle *parts, int n_parts, int thresh,
                  hpx_addr_t sync = HPX_NULL);
 

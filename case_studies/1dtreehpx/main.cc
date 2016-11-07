@@ -48,6 +48,10 @@ int hpx_main(int n_parts, int n_partition, double theta_c,
   fprintf(stdout, "Done with partitioning!\n");
 
 
+  root->compute_moments();
+  fprintf(stdout, "Done computing moments.\n");
+
+
   // Destroy the tree
   delete root;
   fprintf(stdout, "Done with tree deletion.\n");
