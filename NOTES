@@ -5,14 +5,12 @@ THIS BRANCH TODO
 Things that likely would not break the API
 ==========================================
 
+TODO: Think about if there are places that RDMA could improve the performance.
+      That might have us putting more into the GAS.
 
-TODO: Make the way that Expansions manage their data not suck as much as it
-      does now. Really. There is a strange complicated dance happening with
-      all of this, and it will be easy for a user to muck it up.
-      -----> NOTE: this will mean breaking changes, and a definite bump to
-                   2.0.0.
-      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
-                   first grant likely.
+TODO: take the particle data out of the global address space? Array's are just
+      the metadata, but with local addresses as the local segment.
+      This would mean the get and put could be quick shortcuts really.
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
       like an inelegant solution, and perhaps one that relies on the
@@ -107,6 +105,13 @@ This that definitely would break the API
 ========================================
 
 
+TODO: Make the way that Expansions manage their data not suck as much as it
+      does now. Really. There is a strange complicated dance happening with
+      all of this, and it will be easy for a user to muck it up.
+      -----> NOTE: this will mean breaking changes, and a definite bump to
+                   2.0.0.
+      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
+                   first grant likely.
 TODO: Make S->* static members of Expansion.
 TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
       and so on. Extending this, should we do the same thing for other
