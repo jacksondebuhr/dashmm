@@ -361,6 +361,8 @@ struct CSVEdge {
   Operation op;
   Index t_idx;
   int t_loc;
+  DAGNode *source;
+  DAGNode *target;
 };
 
 
@@ -369,7 +371,8 @@ void add_out_edges_from_node(DAGNode *node, std::vector<CSVEdge> &edges) {
     edges.emplace_back(CSVEdge{node->idx, node->locality,
                                node->out_edges[i].op,
                                node->out_edges[i].target->idx,
-                               node->out_edges[i].target->locality});
+                               node->out_edges[i].target->locality,
+                               node, node->out_edges[i].target});
   }
 }
 
@@ -401,11 +404,12 @@ void print_edges_to_file(std::vector<CSVEdge> &edges, std::string fname) {
 
   for (size_t i = 0; i < edges.size(); ++i) {
     std::string opstr = edge_code_to_print(edges[i].op);
-    fprintf(ofd, "%d %d %d %d - %d - %s - %d %d %d %d - %d\n",
+    fprintf(ofd, "%d %d %d %d - %d - %s - %d %d %d %d - %d - %p %p\n",
             edges[i].s_idx.x(), edges[i].s_idx.y(), edges[i].s_idx.z(),
             edges[i].s_idx.level(), edges[i].s_loc, opstr.c_str(),
             edges[i].t_idx.x(), edges[i].t_idx.y(), edges[i].t_idx.z(),
-            edges[i].t_idx.level(), edges[i].t_loc);
+            edges[i].t_idx.level(), edges[i].t_loc,
+            edges[i].source, edges[i].target);
   }
 
   fclose(ofd);
