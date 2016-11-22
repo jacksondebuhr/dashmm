@@ -1,173 +1,75 @@
 #include <cassert>
 #include <cstdio>
 
+#include <algorithm>
 #include <map>
 #include <vector>
 
 
-struct Index {
-  int x;
-  int y;
-  int z;
-  int level;
-  int source;
+struct Triple {
+  int gid;
+  int sid;
+  int tid;
+
+  int loc;
+  int sorted;
+
+  Triple() : gid{-1}, sid{-1}, tid{-1}, loc{-1}, sorted{-1} { }
 };
-
-
-enum class Operation {
-  StoT = 0,
-  StoM = 1,
-  StoL = 2,
-  MtoM = 3,
-  MtoL = 4,
-  MtoT = 5,
-  MtoI = 6,
-  ItoI = 7,
-  ItoL = 8,
-  LtoL = 9,
-  LtoT = 10
-};
-
 
 struct Edge {
-  Index source;
-  Index target;
-  Operation op;
+  uint64_t source;
+  uint64_t target;
   int sloc;
   int tloc;
+  int op;
+};
+
+struct NodeLocality {
+  uint64_t node;
+  int loc;
 };
 
 
-struct IdTriple {
-  int global;
-  int source;
-  int target;
-};
-
-
-bool operator<(const Index &a, const Index &b) {
-  if (a.x < b.x) return true;
-  if (a.y < b.y) return true;
-  if (a.z < b.z) return true;
-  if (a.level < b.level) return true;
-  if (a.source < b.source) return true;
-  return false;
+bool compare_node_locality(const NodeLocality &a, const NodeLocality &b) {
+  return a.loc < b.loc;
 }
 
 
-// decide what is the operation
-Operation string_to_op(char *code) {
+int op_from_code(char *code) {
   if (code[0] == 'S') {
     if (code[3] == 'T') {
-      return Operation::StoT;
+      return 1;
     } else if (code[3] == 'M') {
-      return Operation::StoM;
+      return 2;
     } else if (code[3] == 'L') {
-      return Operation::StoL;
+      return 3;
     }
   } else if (code[0] == 'M') {
     if (code[3] == 'M') {
-      return Operation::MtoM;
+      return 4;
     } else if (code[3] == 'L') {
-      return Operation::MtoL;
+      return 5;
     } else if (code[3] == 'T') {
-      return Operation::MtoT;
+      return 6;
     } else if (code[3] == 'I') {
-      return Operation::MtoI;
+      return 7;
     }
   } else if (code[0] == 'I') {
     if (code[3] == 'I') {
-      return Operation::ItoI;
+      return 8;
     } else if (code[3] == 'L') {
-      return Operation::ItoL;
+      return 9;
     }
   } else if (code[0] == 'L') {
     if (code[3] == 'L') {
-      return Operation::LtoL;
+      return 10;
     } else if (code[3] == 'T') {
-      return Operation::LtoT;
+      return 11;
     }
   }
   assert(0 && "Bad code");
-  return Operation::StoT;
-}
-
-
-// Decide if the operation is from a source node
-int source_is_source(Operation op) {
-  int retval{0};
-  switch (op) {
-    case Operation::StoT:
-    case Operation::StoM:
-    case Operation::StoL:
-      retval = 0;
-      break;
-    case Operation::MtoM:
-    case Operation::MtoL:
-    case Operation::MtoT:
-    case Operation::MtoI:
-      retval = 1;
-      break;
-    case Operation::ItoI:
-      retval = 2;
-      break;
-    case Operation::ItoL:
-      retval = 5;
-      break;
-    case Operation::LtoL:
-    case Operation::LtoT:
-      retval = 4;
-      break;
-    default:
-      assert(0 && "Say what?");
-      break;
-  }
-  return retval;
-}
-
-
-// Decide if the operation is to a source node
-int target_is_source(Operation op) {
-  int retval{0};
-  switch (op) {
-    case Operation::StoT:
-      retval = 3;
-      break;
-    case Operation::StoM:
-      retval = 1;
-      break;
-    case Operation::StoL:
-      retval = 4;
-      break;
-    case Operation::MtoM:
-      retval = 1;
-      break;
-    case Operation::MtoL:
-      retval = 4;
-      break;
-    case Operation::MtoT:
-      retval = 3;
-      break;
-    case Operation::MtoI:
-      retval = 2;
-      break;
-    case Operation::ItoI:
-      retval = 5;
-      break;
-    case Operation::ItoL:
-      retval = 4;
-      break;
-    case Operation::LtoL:
-      retval = 4;
-      break;
-    case Operation::LtoT:
-      retval = 3;
-      break;
-    default:
-      assert(0 && "No way...");
-      break;
-  }
-  return retval;
+  return 0;
 }
 
 
@@ -182,13 +84,12 @@ std::vector<Edge> read_edges_from_file(char *fname) {
 
   int a, b, c, d, e, f, g, h, i, j;
   char code[20];
-  while (11 == fscanf(ifd, "%d %d %d %d - %d - %s - %d %d %d %d - %d",
-                      &a, &b, &c, &d, &e, code, &f, &g, &h, &i, &j)) {
+  uint64_t sptr, tptr;
+  while (13 == fscanf(ifd, "%d %d %d %d - %d - %s - %d %d %d %d - %d - %lx %lx",
+                      &a, &b, &c, &d, &e, code, &f, &g, &h, &i, &j,
+                      &sptr, &tptr)) {
     // convert string to code
-    Operation op = string_to_op(code);
-    retval.push_back(Edge{Index{a, b, c, d, source_is_source(op)},
-                          Index{f, g, h, i, target_is_source(op)},
-                          op, e, j});
+    retval.push_back(Edge{sptr, tptr, e, j, op_from_code(code)});
   }
 
   fclose(ifd);
@@ -196,71 +97,126 @@ std::vector<Edge> read_edges_from_file(char *fname) {
   return retval;
 }
 
+// map from node address to indices
+std::map<uint64_t, Triple> map_node_to_id(const std::vector<Edge> &edges,
+                                          int &n_total, int &n_source,
+                                          int &n_target) {
+  std::map<uint64_t, Triple> retval{};
 
-std::map<Index, IdTriple> map_index_to_id(const std::vector<Edge> &edges,
-                                          int &nnodes, int &nsource,
-                                          int &ntarget) {
-  std::map<Index, IdTriple> retval{};
-  int globalid{0};    // running id for the global list
-  int sourceid{0};    // running id for the source list
-  int targetid{0};    // running id for the target list
-
-  for (auto i = edges.begin(); i != edges.end(); ++i) {
-    auto selem = retval.find(i->source);
+  // assign global index
+  for (size_t i = 0; i < edges.size(); ++i) {
+    auto selem = retval.find(edges[i].source);
     if (selem == retval.end()) {
-      auto value = IdTriple{globalid++, sourceid++, -1};
-      retval[i->source] = value;
-    } else if (selem->second.source == -1) {
-      selem->second.source = sourceid++;
+      retval[edges[i].source].gid = n_total++;
+      retval[edges[i].source].loc = edges[i].sloc;
     }
 
-    auto telem = retval.find(i->target);
+    auto telem = retval.find(edges[i].target);
     if (telem == retval.end()) {
-      auto value = IdTriple{globalid++, -1, targetid++};
-      retval[i->target] = value;
-    } else if (telem->second.target == -1) {
-      telem->second.target = targetid++;
+      retval[edges[i].target].gid = n_total++;
+      retval[edges[i].target].loc = edges[i].tloc;
     }
   }
 
-  nnodes = globalid;
-  nsource = sourceid;
-  ntarget = targetid;
+  // assign source and target
+  for (size_t i = 0; i < edges.size(); ++i) {
+    assert(retval.count(edges[i].source));
+    if (retval[edges[i].source].sid == -1) {
+      retval[edges[i].source].sid = n_source++;
+    }
+    assert(retval.count(edges[i].target));
+    if (retval[edges[i].target].tid == -1) {
+      retval[edges[i].target].tid = n_target++;
+    }
+  }
 
   return retval;
 }
-
 
 size_t xy_to_index(int s, int t, int n_target) {
   return s * n_target + t;
 }
 
 
-std::vector<int> create_unsorted_matrix(const std::vector<Edge> &edges,
-                                        const std::map<Index, IdTriple> &ids,
+std::vector<int> create_sourcetarget_matrix(const std::vector<Edge> &edges,
+                                        const std::map<uint64_t, Triple> &ids,
                                         int n_source, int n_target) {
   std::vector<int> retval(n_source * n_target, 0);
 
-  for (auto i = edges.begin(); i != edges.end(); ++i) {
+  for (size_t i = 0; i < edges.size(); ++i) {
     // find source and target ids
-    auto selem = ids.find(i->source);
-    assert(selem != ids.end());
-    auto telem = ids.find(i->target);
-    assert(telem != ids.end());
+    auto selem = ids.find(edges[i].source);
+    assert(!(selem == ids.end()));
+    auto sidx = selem->second.sid;
+
+    auto telem = ids.find(edges[i].target);
+    assert(!(telem == ids.end()));
+    auto tidx = telem->second.tid;
 
     // set appropriate element of retval
-    size_t idx = xy_to_index(selem->second.source, telem->second.target,
-                             n_target);
-    retval[idx] = 1;
+    size_t idx = xy_to_index(sidx, tidx, n_target);
+    retval[idx] = edges[i].op;
   }
 
   return retval;
 }
 
 
-void print_unsorted_matrix(const std::vector<int> &mat,
-                           int n_source, int n_target, char *fname) {
-  FILE *ofd = fopen(fname, "w");
+std::vector<int> create_unsorted_matrix(const std::vector<Edge> &edges,
+                                        const std::map<uint64_t, Triple> &ids,
+                                        int n_total) {
+  std::vector<int> retval(n_total * n_total, 0);
+
+  for (size_t i = 0; i < edges.size(); ++i) {
+    // find source and target ids
+    auto selem = ids.find(edges[i].source);
+    assert(!(selem == ids.end()));
+    auto sidx = selem->second.gid;
+
+    auto telem = ids.find(edges[i].target);
+    assert(!(telem == ids.end()));
+    auto tidx = telem->second.gid;
+
+    // set appropriate element of retval
+    size_t idx = xy_to_index(sidx, tidx, n_total);
+    retval[idx] = edges[i].op;
+  }
+
+  return retval;
+}
+
+std::vector<int> create_sorted_matrix(const std::vector<Edge> &edges,
+                                      const std::map<uint64_t, Triple> &ids,
+                                      int n_total) {
+  std::vector<int> retval(n_total * n_total, 0);
+
+  for (size_t i = 0; i < edges.size(); ++i) {
+    // find source and target ids
+    auto selem = ids.find(edges[i].source);
+    assert(!(selem == ids.end()));
+    auto sidx = selem->second.sorted;
+
+    auto telem = ids.find(edges[i].target);
+    assert(!(telem == ids.end()));
+    auto tidx = telem->second.sorted;
+
+    // set appropriate element of retval
+    size_t idx = xy_to_index(sidx, tidx, n_total);
+    assert(edges[i].tloc > -1);
+    assert(edges[i].sloc > -1);
+    retval[idx] = edges[i].tloc + 6 * edges[i].sloc + 1;
+  }
+
+  return retval;
+}
+
+
+void print_matrix(const std::vector<int> &mat,
+                  int n_source, int n_target, char *fname, char *extend) {
+  char buffer[300];
+  sprintf(buffer, "%s-%s", fname, extend);
+
+  FILE *ofd = fopen(buffer, "w");
   assert(ofd != nullptr);
 
   size_t offset = 0;
@@ -269,15 +225,37 @@ void print_unsorted_matrix(const std::vector<int> &mat,
       fprintf(ofd, "%d ", mat[offset]);
       offset++;
     }
+    fprintf(ofd, "\n");
   }
 
   fclose(ofd);
 }
 
 
+void fill_in_sorted_ids(std::map<uint64_t, Triple> &ids) {
+  std::vector<NodeLocality> shuffle{};
+
+  // put pairs into a vector
+  for (auto i = ids.begin(); i != ids.end(); ++i) {
+    shuffle.emplace_back(NodeLocality{i->first, i->second.loc});
+  }
+
+  // sort by locality
+  std::sort(shuffle.begin(), shuffle.end(), compare_node_locality);
+
+  // assign sorted ids to the original map
+  int sortedid{0};
+  for (size_t i = 0; i < shuffle.size(); ++i) {
+    auto elem = ids.find(shuffle[i].node);
+    assert(elem != ids.end());
+    elem->second.sorted = sortedid++;
+  }
+}
+
+
 int main(int argc, char **argv) {
   if (argc < 3) {
-    fprintf(stdout, "usage: %s <input csv edge file> <out csv>\n", argv[0]);
+    fprintf(stdout, "usage: %s <input csv edge file> <out csv base>\n", argv[0]);
     return 0;
   }
 
@@ -288,11 +266,22 @@ int main(int argc, char **argv) {
   int n_total{0};
   int n_source{0};
   int n_target{0};
-  auto idxmap = map_index_to_id(edges, n_total, n_source, n_target);
+  auto idx = map_node_to_id(edges, n_total, n_source, n_target);
 
-  // print out the matrix
-  auto unsort = create_unsorted_matrix(edges, idxmap, n_source, n_target);
-  print_unsorted_matrix(unsort, n_source, n_target, argv[2]);
+  // print out the matrix arranged by source and target
+  auto stmat = create_sourcetarget_matrix(edges, idx, n_source, n_target);
+  print_matrix(stmat, n_source, n_target, argv[2], "st.txt");
+
+  // print out the unsorted global matrix
+  auto unsort = create_unsorted_matrix(edges, idx, n_total);
+  print_matrix(unsort, n_total, n_total, argv[2], "g.txt");
+
+  // Create the node and locality map
+  fill_in_sorted_ids(idx);
+
+  // print out the sorted global matrix
+  auto sortmat = create_sorted_matrix(edges, idx, n_total);
+  print_matrix(sortmat, n_total, n_total, argv[2], "sort.txt");
 
   return 0;
 }
