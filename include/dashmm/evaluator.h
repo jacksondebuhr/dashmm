@@ -88,8 +88,6 @@ class Evaluator {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
-  using sourceref_t = ArrayRef<Source>;
-  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
   using sourcenode_t = Node<Source>;

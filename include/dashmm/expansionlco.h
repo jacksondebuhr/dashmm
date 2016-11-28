@@ -92,8 +92,6 @@ class ExpansionLCO {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
 
-  using sourceref_t = ArrayRef<Source>;
-  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 

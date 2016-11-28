@@ -43,7 +43,7 @@ namespace dashmm {
 /// The Array points to the meta data which is the information below.
 /// Somewhere else in the global address space will be the data itself.
 struct ArrayMetaData {
-  hpx_addr_t data;      /// global address of the array data
+  char *data;           /// address of local segment of the array
   size_t local_count;   /// the number of records in the local portion
   size_t total_count;   /// the total number of records in all portions
   size_t size;          /// the size (bytes) of each record

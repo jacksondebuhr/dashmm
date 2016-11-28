@@ -129,7 +129,9 @@ TODO: Perhaps we want to parameterize the nodes with some user data? So
   just do the DAG and so on. This would also allow us to try other constructions
   more easily. We basically would be able to hot swap implementations. Also,
   this might make it simpler to make a tree that can update adiabadically.
-
+TODO: Should we use exceptions in the main interface to return errors? This is
+  probably cleaner. the catch is that I would need to work out what happens
+  when I emit an exception in an HPX action.
 
 
 

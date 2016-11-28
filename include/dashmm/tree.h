@@ -235,8 +235,7 @@ class Node {
       double center_z = geo->low().z() + (idx.z() + 0.5) * h;
 
       // Get the local data
-      auto p_local = parts.pin();
-      record_t *p = p_local.value();
+      record_t *p = parts.data();
 
       // Sort the particles among the children
       record_t *splits[9]{};
@@ -908,10 +907,9 @@ class Tree {
       }
 
       if (num_points > 0) {
-        hpx_addr_t sorted_gas = hpx_gas_alloc_local(
-            1, sizeof(record_t) * num_points, 0);
-        assert(sorted_gas != HPX_NULL);
-        sorted_ref = arrayref_t{sorted_gas, num_points, num_points};
+        record_t *sorted_data = reinterpret_cast<record_t *>(
+                                    new char[num_points * sizeof(record_t)]);
+        sorted_ref = arrayref_t{sorted_data, num_points};
 
         for (int i = first; i <= last; ++i) {
           node_t *curr = &n[i];
@@ -921,8 +919,8 @@ class Tree {
           if (local_count[i]) {
             // Copy local points before merging remote points
             curr->lock();
-            auto sorted = curr->parts.pin();
-            memcpy(sorted.value() + curr->first(),
+            auto sorted = curr->parts.data();
+            memcpy(sorted + curr->first(),
                    &temp[local_offset[i]],
                    sizeof(record_t) * local_count[i]);
 
@@ -971,7 +969,6 @@ class Tree {
       const DomainGeometry *geo, int threshold, const record_t *temp,
       node_t *n, sourcenode_t *snodes, sourcetree_t *source_tree) {
     int range = last - first + 1;
-    arrayref_t sorted_ref{};
 
     if (range > 0) {
       // Compute global_offset
@@ -990,7 +987,7 @@ class Tree {
           node_t *curr = &n[i];
           sourcenode_t *curr_source = &snodes[i];
           ArrayRef<Source> sparts = curr_source->parts;
-          curr->parts = arrayref_t{sparts.data(), sparts.n(), sparts.n_tot()};
+          curr->parts = arrayref_t{(record_t *)sparts.data(), sparts.n()};
 
           if (local_count[i]) {
             curr->lock();
@@ -1014,7 +1011,7 @@ class Tree {
 
     // Again, the target tree reuses the data from the source tree
     ArrayRef<Source> ssort = source_tree->sorted();
-    tree->sorted_ = arrayref_t{ssort.data(), ssort.n(), ssort.n_tot()};
+    tree->sorted_ = arrayref_t{(record_t *)ssort.data(), ssort.n()};
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
   }
 
@@ -1038,8 +1035,7 @@ class Tree {
     // Note: all the pointers are local to the calling rank.
     n->lock();
     size_t first = n->first();
-    auto localp = n->parts.pin();
-    record_t *p = localp.value();
+    record_t *p = n->parts.data();
     memcpy(p + first, temp, sizeof(record_t) * n_arrived);
 
     if (n->increment_first(n_arrived)) {
@@ -1279,9 +1275,7 @@ class DualTree {
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
   using sourceref_t = ArrayRef<Source>;
-  using sourcearraydata_t = ArrayData<Source>;
   using targetref_t = ArrayRef<Target>;
-  using targetarraydata_t = ArrayData<Target>;
   using sourcetree_t = Tree<Source, Target, Source, Expansion, Method>;
   using targettree_t = Tree<Source, Target, Target, Expansion, Method>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method>;
@@ -1326,16 +1320,16 @@ class DualTree {
   targetnode_t *unif_grid_target() {return target_tree_->unif_grid_;}
 
   /// Return the number of post-sorting sources.
-  size_t sorted_src_count() const {return source_tree_->sorted_.n_tot();}
+  size_t sorted_src_count() const {return source_tree_->sorted_.n();}
 
   /// Return the number of post-sorting targets.
-  size_t sorted_tar_count() const {return target_tree_->sorted_.n_tot();}
+  size_t sorted_tar_count() const {return target_tree_->sorted_.n();}
 
   /// Return the sorted sources.
-  sourcearraydata_t sorted_src() const {return source_tree_->sorted_.pin();}
+  source_t *sorted_src() const {return source_tree_->sorted_.data();}
 
   /// Return the sorted targets.
-  targetarraydata_t sorted_tar() const {return target_tree_->sorted_.pin();}
+  target_t *sorted_tar() const {return target_tree_->sorted_.data();}
 
   /// Return the method this object will use for DAG operations.
   const method_t &method() const {return method_;}
@@ -1706,8 +1700,7 @@ class DualTree {
                                          int same_sandt) {
     Array<source_t> sources{sources_gas};
     sourceref_t src_ref = sources.ref();
-    sourcearraydata_t src_data = src_ref.pin();
-    Source *s = src_data.value();
+    Source *s = src_ref.data();
 
     double var[6] = {1e50, -1e50, 1e50, -1e50, 1e50, -1e50};
 
@@ -1724,8 +1717,7 @@ class DualTree {
     if (!same_sandt) {
       Array<target_t> targets{targets_gas};
       targetref_t trg_ref = targets.ref();
-      targetarraydata_t trg_data = trg_ref.pin();
-      Target *t = trg_data.value();
+      Target *t = trg_ref.data();
 
       for (size_t i = 0; i < trg_ref.n(); ++i) {
         var[0] = fmin(var[0], t[i].position.x());
@@ -2238,14 +2230,12 @@ class DualTree {
     Array<target_t> targets{targets_gas};
 
     {
-      sourceref_t src_ref = sources.ref(rank);
-      sourcearraydata_t src_data = src_ref.pin();
-      source_t *p_s = src_data.value();
+      sourceref_t src_ref = sources.ref();
+      source_t *p_s = src_ref.data();
       int n_sources = src_ref.n();
 
-      targetref_t trg_ref = targets.ref(rank);
-      targetarraydata_t trg_data = trg_ref.pin();
-      target_t *p_t = trg_data.value();
+      targetref_t trg_ref = targets.ref();
+      target_t *p_t = trg_ref.data();
       int n_targets = trg_ref.n();
 
       // Assign points to uniform grid
@@ -2305,7 +2295,7 @@ class DualTree {
             if (*(tree->unif_count_src(i)) == 0) {
               hpx_lco_and_set(dual_tree_complete, HPX_NULL);
             } else {
-              source_t *arg = tree->sorted_src().value();
+              source_t *arg = tree->sorted_src();
               int typearg = 0;
               assert(ns[i].complete() != HPX_NULL);
               hpx_call_when_with_continuation(ns[i].complete(),
@@ -2317,7 +2307,7 @@ class DualTree {
             if (*(tree->unif_count_tar(i)) == 0) {
               hpx_lco_and_set(dual_tree_complete, HPX_NULL);
             } else {
-              target_t *arg = tree->sorted_tar().value();
+              target_t *arg = tree->sorted_tar();
               int typearg = 1;
               assert(nt[i].complete() != HPX_NULL);
               hpx_call_when_with_continuation(nt[i].complete(),
@@ -2360,14 +2350,15 @@ class DualTree {
     }
 
     // Replace segment in the array
-    hpx_addr_t old_src_data = sources.replace(tree->source_tree_->sorted_);
-    if (old_src_data != HPX_NULL) {
-      hpx_gas_free_sync(old_src_data);
+    // TODO: Fix these
+    char *old_src_data = sources.replace(tree->source_tree_->sorted_);
+    if (old_src_data != nullptr) {
+      delete [] old_src_data;
     }
     if (!tree->same_sandt_) {
-      hpx_addr_t old_tar_data = targets.replace(tree->target_tree_->sorted_);
-      if (old_tar_data != HPX_NULL) {
-        hpx_gas_free_sync(old_tar_data);
+      char *old_tar_data = targets.replace(tree->target_tree_->sorted_);
+      if (old_tar_data != nullptr) {
+        delete [] old_tar_data;
       }
     }
 
@@ -2487,8 +2478,6 @@ class DualTree {
       hpx_call_when(cdone, cdone, hpx_lco_delete_action,
                     done, nullptr, 0);
     } else {
-      node->dag.set_sourceref(node->parts.data(), node->parts.n());
-
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
     }
 
@@ -2649,12 +2638,12 @@ class DualTree {
       assert(scratch != nullptr);
 
       // Copy source data
-      auto sref = sources.pin();
+      auto sref = sources.data();
       {
         WriteBuffer headdata(scratch, header_size);
         assert(headdata.write(sources.n()));
 
-        ReadBuffer sourcedata((char *)sref.value(), source_size);
+        ReadBuffer sourcedata((char *)sref, source_size);
         assert(headdata.write(sourcedata));
 
         assert(headdata.write(rwtree));
@@ -2689,7 +2678,7 @@ class DualTree {
 
         // Send parcel or do the work
         if (curr_rank == my_rank) {
-          instigate_dag_eval_work(sources.n(), sref.value(), tree->domain_,
+          instigate_dag_eval_work(sources.n(), sref, tree->domain_,
                                   *edgecount, edgerecords);
         } else {
           size_t parcel_size = header_size + sizeof(size_t)

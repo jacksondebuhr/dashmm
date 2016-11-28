@@ -318,22 +318,6 @@ class DAGInfo {
     }
   }
 
-  /// Sets the data for the source particle DAG node
-  ///
-  /// Source nodes of the DAG are not associated with an LCO; the source data
-  /// is ready at the beginning of the evaluation. However, it is useful for
-  /// this object to collect the global address of the sources in question.
-  /// This routine collects that information.
-  ///
-  /// \param src - a reference to the source particles represented by the
-  ///              particle DAG node of this object.
-  void set_sourceref(const hpx_addr_t addx, const int num) {
-    if (parts_ != nullptr) {
-      parts_->global_addx = addx;
-      parts_->n_parts = num;
-    }
-  }
-
   /// Sets locality on the particle node
   void set_parts_locality(int loc) {
     if (parts_ != nullptr) {

@@ -87,9 +87,6 @@ HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, pred_action, pred_handler,
 /// data that is needed to allocate an array. The returned information is
 /// broadcast back to every rank during hpx_exit().
 ///
-/// \param UNUSED - an unused argument
-/// \param UNWANTED - an unwanted argument
-///
 /// \returns - HPX_SUCCESS
 int allocate_array_meta_handler() {
   ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
@@ -165,14 +162,15 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
   local->local_count = record_count;
   local->total_count = contrib[ranks - 1];
   local->size = record_size;
-  local->data = HPX_NULL;
+  local->data = nullptr;
 
   delete [] contrib;
 
   int retval{0};
   if (record_count) {
-    local->data = hpx_gas_alloc_local(1, record_count * record_size, 0);
-    if (local->data == HPX_NULL) {
+    try {
+      local->data = new char [record_count * record_size];
+    } catch (std::bad_alloc &ba) {
       retval = kAllocationError;
     }
   }
@@ -221,7 +219,7 @@ int deallocate_array_local_handler(hpx_addr_t meta) {
   assert(hpx_gas_try_pin(global, (void **)&local));
 
   if (local->data != HPX_NULL) {
-    hpx_gas_free_sync(local->data);
+    delete [] local->data;
   }
 
   hpx_gas_unpin(global);
@@ -291,6 +289,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 /// \param first - the first record to put data into
 /// \param last - the last (exclusive) record to put data into
 /// \param in_data - the data to copy into the records
+/// \param reducer - the LCO that will combine error codes from each rank
 ///
 /// \returns - HPX_SUCCESS
 int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
@@ -306,21 +305,12 @@ int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
   } else {
     if (last > local->local_count || last < first) {
       retval = kDomainError;
-    } else {
-      if (local->local_count) {
-        assert(local->data != HPX_NULL);
+    } else if (local->local_count) {
+      assert(local->data != nullptr);
 
-        char *data{nullptr};
-        if (!hpx_gas_try_pin(local->data, (void **)&data)) {
-          retval = kRuntimeError;
-        } else {
-          char *beginning = data + first * local->size;
-          size_t copy_size = (last - first) * local->size;
-          memcpy(beginning, in_data, copy_size);
-
-          hpx_gas_unpin(local->data);
-        }
-      }
+      char *beginning = local->data + first * local->size;
+      size_t copy_size = (last - first) * local->size;
+      memcpy(beginning, in_data, copy_size);
     }
 
     hpx_gas_unpin(global);
@@ -345,6 +335,7 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, array_put_action, array_put_handler,
 /// \param first - the first record to read
 /// \param last - the last (exclusive) record to read
 /// \param out_data - a buffer into which the read data is stored
+/// \param reducer - the LCO that will reduce the error codes from each rank
 ///
 /// \returns - HPX_SUCCESS
 int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
@@ -360,21 +351,12 @@ int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
   } else {
     if (last > local->local_count || last < first) {
       retval = kDomainError;
-    } else {
-      if (local->local_count) {
-        assert(local->data != HPX_NULL);
+    } else if (local->local_count) {
+      assert(local->data != nullptr);
 
-        char *data{nullptr};
-        if (!hpx_gas_try_pin(local->data, (void **)&data)) {
-          retval = kRuntimeError;
-        } else {
-          char *beginning = data + first * local->size;
-          size_t copy_size = (last - first) * local->size;
-          memcpy(out_data, beginning, copy_size);
-
-          hpx_gas_unpin(local->data);
-        }
-      }
+      char *beginning = local->data + first * local->size;
+      size_t copy_size = (last - first) * local->size;
+      memcpy(out_data, beginning, copy_size);
     }
 
     hpx_gas_unpin(global);
@@ -434,110 +416,107 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            HPX_ADDR);
 
 
-/// Action to prepare for an Array collection
-///
-/// This action will create a couple LCO's used to aggregate the needed
-/// information to prepare a collection of the Array's records.
-///
-/// \param UNUSED - is unused
-///
-/// \returns - HPX_SUCCESS
-int array_collect_prep_handler(hpx_addr_t UNUSED) {
-  // This is used to signal that prep is done
-  hpx_addr_t retval[2];
-  int n_ranks = hpx_get_num_ranks();
-  retval[0] = hpx_lco_reduce_new(n_ranks, sizeof(size_t) * n_ranks,
-                                 size_sum_ident, size_sum_op);
-  int nonsense{0};
-  retval[1] = hpx_lco_user_new(
-        sizeof(hpx_addr_t) * n_ranks + sizeof(AddrMergeData), init_action,
-        op_action, pred_action, &nonsense, sizeof(nonsense));
-  hpx_exit(sizeof(hpx_addr_t) * 2, &retval);
+static int array_collect_receive_handler(char *data, size_t size) {
+  char *location = *(reinterpret_cast<char **>(data));
+  memcpy(location, data + sizeof(char *), size - sizeof(char *));
+  return HPX_SUCCESS;
 }
-HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-           array_collect_prep_action, array_collect_prep_handler,
-           HPX_ADDR);
+HPX_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+           array_collect_receive_action,
+           array_collect_receive_handler,
+           HPX_POINTER, HPX_SIZE_T);
 
 
-/// Action to collect an Array
-///
-/// This action will both set the collection LCO's as well as perform the
-/// collection (when rank zero).
-///
-/// \param data - global address of the Array's meta data
-/// \param offsets - the address of the LCO to reduce the offsets in the final
-///                  local array.
-/// \param addxes - the address of the LCO used to reduce the local segment
-///                 addresses.
-///
-/// \returns - HPX_SUCCESS
-int array_collect_handler(hpx_addr_t data, hpx_addr_t offsets,
-                          hpx_addr_t addxes) {
-  // get local meta data
-  int my_rank = hpx_get_my_rank();
-  int n_ranks = hpx_get_num_ranks();
-
+static int array_collect_request_handler(hpx_addr_t data, hpx_addr_t done,
+                                         char *location) {
   hpx_addr_t global = hpx_addr_add(data,
-                                   sizeof(ArrayMetaData) * my_rank,
+                                   sizeof(ArrayMetaData) * hpx_get_my_rank(),
                                    sizeof(ArrayMetaData));
   ArrayMetaData *local{nullptr};
   assert(hpx_gas_try_pin(global, (void **)&local));
 
-  // Reduce the offsets
-  size_t *contrib = new size_t[n_ranks];
-  for (int i = 0; i < n_ranks; ++i) {
-    if (i >= my_rank) {
-      contrib[i] = local->local_count;
-    } else {
-      contrib[i] = 0;
-    }
-  }
-  hpx_lco_set_lsync(offsets, sizeof(size_t) * n_ranks, contrib, HPX_NULL);
+  // get a parcel of the right size
+  size_t arrsize = local->size * local->local_count;
+  size_t msgsize = sizeof(char *) + arrsize;
+  hpx_parcel_t *p = hpx_parcel_acquire(nullptr, msgsize);
+  char *parc_data = (char *)hpx_parcel_get_data(p);
+  char **loc = reinterpret_cast<char **>(parc_data);
+  *loc = location;
 
-  // reduce the data locations
-  AddrMergeArgs args{my_rank, local->data};
-  hpx_lco_set_lsync(addxes, sizeof(args), &args, HPX_NULL);
+  // copy data into it
+  char *arrdata = parc_data + sizeof(char *);
+  memcpy(arrdata, local->data, arrsize);
 
-  // Rank zero will then collect the information
-  char *retval{nullptr};
-  if (my_rank == 0) {
-    retval = new char[local->size * local->total_count];
+  // send parcel
+  hpx_parcel_set_action(p, array_collect_receive_action);
+  hpx_parcel_set_target(p, HPX_THERE(0));
+  hpx_parcel_set_cont_action(p, hpx_lco_set_action);
+  hpx_parcel_set_cont_target(p, done);
+  hpx_parcel_send_sync(p);
 
-    // compute offsets
-    hpx_lco_get(offsets, sizeof(size_t) * n_ranks, contrib);
-    size_t *counts = new size_t[n_ranks];
-    counts[0] = contrib[0];
-    for (int i = 1; i < n_ranks; ++i) {
-      counts[i] = contrib[i] - contrib[i - 1];
-    }
-
-    // loop over ranks memget
-    size_t datasize = sizeof(AddrMergeData) + sizeof(hpx_addr_t) * n_ranks;
-    AddrMergeData *where =
-        reinterpret_cast<AddrMergeData *>(new char[datasize]);
-    hpx_lco_get(addxes, datasize, where);
-
-    hpx_gas_memget_sync(retval, where->addr[0], local->size * counts[0]);
-    for (int i = 1; i < n_ranks; ++i) {
-      hpx_gas_memget_sync(&retval[contrib[i-1] * local->size],
-                          where->addr[i],
-                          local->size * counts[i]);
-    }
-
-    delete [] counts;
-    delete [] where;
-
-    hpx_lco_delete_sync(offsets);
-    hpx_lco_delete_sync(addxes);
-  }
-
-  delete [] contrib;
   hpx_gas_unpin(global);
+
+  return HPX_SUCCESS;
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_collect_request_action,
+           array_collect_request_handler,
+           HPX_ADDR, HPX_ADDR, HPX_POINTER);
+
+
+int array_collect_handler(hpx_addr_t data) {
+  // collect counts from GAS
+  int my_rank = hpx_get_my_rank();
+  int n_rank = hpx_get_num_ranks();
+
+  ArrayMetaData *meta = (ArrayMetaData *)hpx_malloc_registered(
+                                            sizeof(ArrayMetaData) * n_rank);
+  for (int i = 0; i < n_rank; ++i) {
+    hpx_addr_t target = hpx_addr_add(data, sizeof(ArrayMetaData) * i,
+                                     sizeof(ArrayMetaData));
+    hpx_gas_memget_sync(&meta[i], target, sizeof(ArrayMetaData));
+  }
+
+  // do some arithmetic
+  size_t *offsets = new size_t[n_rank];
+  offsets[0] = 0;
+  for (int i = 1; i < n_rank; ++i) {
+    offsets[i] = offsets[i - 1] + meta[i].local_count;
+  }
+
+  // create AND gate for completion detection
+  hpx_addr_t done = hpx_lco_and_new(n_rank);
+
+  // allocate space for result
+  char *retval{nullptr};
+  retval = new char[meta[my_rank].size * meta[my_rank].total_count];
+
+  // call on each rank with location and and gate and data
+  for (int i = 0; i < n_rank; ++i) {
+    if (i != my_rank) {
+      char *location = retval + meta[i].size * offsets[i];
+      hpx_call(HPX_THERE(i), array_collect_request_action, HPX_NULL,
+               &data, &done, &location);
+    }
+  }
+
+  memcpy(retval + meta[my_rank].size * offsets[my_rank],
+         meta[my_rank].data,
+         meta[my_rank].size * meta[my_rank].local_count);
+  hpx_lco_and_set(done, HPX_NULL);
+
+  // wait for results
+  hpx_lco_wait(done);
+  hpx_lco_delete_sync(done);
+
+  hpx_free_registered(meta);
+  delete [] offsets;
+
   hpx_exit(sizeof(retval), &retval);
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_collect_action, array_collect_handler,
-           HPX_ADDR, HPX_ADDR, HPX_ADDR);
+           HPX_ADDR);
 
 
 } // namespace dashmm

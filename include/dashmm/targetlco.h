@@ -94,8 +94,6 @@ class TargetLCO {
   /// \param n_inputs - the number of inputs to the LCO
   /// \param targets - ArrayRef indicating the global memory that the LCO is
   ///                  representing
-  /// \param where - global address which should be local to the allocated
-  ///                LCO
   TargetLCO(size_t n_inputs, const targetref_t &targets) {
     Data init{static_cast<int>(n_inputs), targets};
     lco_ = hpx_lco_user_new(sizeof(init), init_, operation_,
@@ -222,7 +220,7 @@ class TargetLCO {
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
-    if (lhs->targets.data() == HPX_NULL) {
+    if (lhs->targets.data() == nullptr) {
       return;
     }
 
@@ -231,60 +229,39 @@ class TargetLCO {
       StoT *input = static_cast<StoT *>(rhs);
 
       if (input->count) {
-        // The LCO data contains the reference to the targets, which must be
-        // pinned.
-        target_t *targets{nullptr};
-        // NOTE: This should succeed because we place the LCO at the same
-        // locality as the actual target data.
-        assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+        target_t *targets{lhs->targets.data()};
 
         expansion_t expand(ViewSet{});
         expand.S_to_T(input->sources, &input->sources[input->count],
                        targets, &targets[lhs->targets.n()]);
 
-        hpx_gas_unpin(lhs->targets.data());
       }
     } else if (*code == kMtoT) {
       readbuf.interpret<MtoT>();
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      target_t *targets{lhs->targets.data()};
 
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
       expand.M_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
-
-      hpx_gas_unpin(lhs->targets.data());
     } else if (*code == kLtoT) {
       readbuf.interpret<LtoT>();
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      target_t *targets{lhs->targets.data()};
 
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
       expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
-
-      hpx_gas_unpin(lhs->targets.data());
     } else {
       assert(0 && "Incorrect code to TargetLCO");
     }
   }
 
-  /// The LCO is set if it has been finalized, and all scheduled operations
-  /// have taken place.
+  /// The LCO is set if all scheduled operations have taken place.
   static bool predicate_handler(Data *i, size_t bytes) {
     return (i->yet_to_arrive == 0);
   }
