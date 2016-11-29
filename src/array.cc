@@ -481,7 +481,7 @@ int array_collect_handler(hpx_addr_t data) {
   size_t *offsets = new size_t[n_rank];
   offsets[0] = 0;
   for (int i = 1; i < n_rank; ++i) {
-    offsets[i] = offsets[i - 1] + meta[i].local_count;
+    offsets[i] = offsets[i - 1] + meta[i - 1].local_count;
   }
 
   // create AND gate for completion detection

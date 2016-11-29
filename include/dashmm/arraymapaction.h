@@ -208,7 +208,7 @@ class ArrayMapAction {
                            hpx_action_t leaf, const E *env, char *data) {
     if (count <= chunk_size) {
       map_function_t lfunc = (map_function_t)hpx_action_get_handler(leaf);
-      lfunc(data, count, env);
+      lfunc((T *)data, count, env);
       hpx_lco_set_lsync(alldone, 0, nullptr, HPX_NULL);
     } else {
       size_t num_chunks = count / chunk_size;
@@ -219,7 +219,7 @@ class ArrayMapAction {
       size_t num_left = num_chunks / 2;
       size_t count_left = num_left * chunk_size;
       size_t count_right = count - count_left;
-      char *data_right = data = sizeof(T) * count_left;
+      char *data_right = data + sizeof(T) * count_left;
 
       hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_left, &total_count,
                &chunk_size, &alldone, &leaf, &env, &data);
