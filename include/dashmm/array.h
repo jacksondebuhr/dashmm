@@ -77,6 +77,9 @@ extern hpx_action_t array_total_count_action;
 /// Action for collection
 extern hpx_action_t array_collect_action;
 
+/// Action for segment request
+extern hpx_action_t array_segment_request_action;
+
 
 /// Return data from allocation action
 struct ArrayMetaAllocRunReturn {
@@ -84,6 +87,13 @@ struct ArrayMetaAllocRunReturn {
   hpx_addr_t reducer;
   hpx_addr_t retcode;
   int code;
+};
+
+
+/// Return data from segment request
+struct SegmentReturn {
+  char *segment;
+  size_t count;
 };
 
 
@@ -159,14 +169,24 @@ class Array {
   /// provided distribution of records. One or more of these counts can be
   /// zero provided there is at least one non-zero count from some rank.
   ///
+  /// Optionally, memory that has already been allocated can be provided as
+  /// a second argument to this function, which will then be used as the
+  /// local segment of the array for the calling rank. DASHMM will assume
+  /// ownership of a segment provided in this fashion.  Each rank can provide
+  /// a segment and the resulting Array will be formed of the provided
+  /// segments. If this options is omitted or is nullptr, DASHMM will allocate
+  /// memory, which must be accessed via other methods.
+  ///
   /// \param record_count - the number of records that will be in the array
   ///                       for this locality.
+  /// \param segment - some previously allocated memory to use as the segment
+  ///                  of the array for this rank.
   ///
   /// \returns - kDomainError if the object already has an allocation;
   ///            kAllocationError if the global memory cannot be allocated;
   ///            kRuntimeError if there is an error in the runtime; or
   ///            kSuccess otherwise.
-  ReturnCode allocate(size_t record_count) {
+  ReturnCode allocate(size_t record_count, T *segment = nullptr) {
     if (data_ != HPX_NULL) {
       // If the object already has data, do not allocate new data.
       return kDomainError;
@@ -185,7 +205,7 @@ class Array {
     int runcode{0};
     hpx_run_spmd(&allocate_local_work_action, &runcode,
                  &metadata.meta, &metadata.reducer, &metadata.retcode,
-                 &size, &record_count);
+                 &size, &record_count, &segment);
     if (runcode != kSuccess) {
       retval = kAllocationError;
     }
@@ -279,6 +299,29 @@ class Array {
     hpx_run(&get_or_put_reducer_delete_action, nullptr, &reducer);
 
     return static_cast<ReturnCode>(runcode);
+  }
+
+  /// Get access to the local segment
+  ///
+  /// This will return the value of segment to be the address of the local
+  /// segment of the array on this rank. This is a collective call, and so
+  /// each rank will receive the address of its segment. Further, as it is
+  /// possible that other DASHMM routines will sort and rearrange Array data,
+  /// the length of the segment is also returned.
+  ///
+  /// Calls to other DASHMM routines may invalidate the address returned by
+  /// this routine.
+  ///
+  /// \param count [out] - length of segment
+  ///
+  /// \returns - address of local segment; this can be nullptr when the segment
+  ///            is empty.
+  T *segment(size_t &count) {
+    SegmentReturn retval{nullptr, 0};
+    hpx_run_spmd(&array_segment_request_action, &retval, &data_);
+
+    count = retval.count;
+    return (T *)retval.segment;
   }
 
   /// Produce an ArrayRef from the Array

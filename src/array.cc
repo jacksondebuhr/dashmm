@@ -137,7 +137,8 @@ HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
 /// \returns - HPX_SUCCESS
 int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
                                 hpx_addr_t retcode,
-                                size_t record_size, size_t record_count) {
+                                size_t record_size, size_t record_count,
+                                char *segment) {
   int ranks = hpx_get_num_ranks();
   int my_rank = hpx_get_my_rank();
   size_t *contrib = new size_t [ranks];
@@ -162,12 +163,12 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
   local->local_count = record_count;
   local->total_count = contrib[ranks - 1];
   local->size = record_size;
-  local->data = nullptr;
+  local->data = segment;
 
   delete [] contrib;
 
   int retval{0};
-  if (record_count) {
+  if (record_count && local->data == nullptr) {
     try {
       local->data = new char [record_count * record_size];
     } catch (std::bad_alloc &ba) {
@@ -183,7 +184,8 @@ int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            allocate_local_work_action, allocate_local_work_handler,
-           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T);
+           HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T,
+           HPX_POINTER);
 
 
 /// Action to deallocate the reduction LCO used during Array allocation
@@ -516,6 +518,27 @@ int array_collect_handler(hpx_addr_t data) {
 }
 HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
            array_collect_action, array_collect_handler,
+           HPX_ADDR);
+
+
+int array_segment_request_handler(hpx_addr_t data) {
+  hpx_addr_t global = hpx_addr_add(data,
+                                   sizeof(ArrayMetaData) * hpx_get_my_rank(),
+                                   sizeof(ArrayMetaData));
+  ArrayMetaData *local{nullptr};
+  assert(hpx_gas_try_pin(global, (void **)&local));
+
+  // collect info
+  SegmentReturn retval{};
+  retval.segment = local->data;
+  retval.count = local->local_count;
+
+  hpx_gas_unpin(global);
+
+  hpx_exit(sizeof(retval), &retval);
+}
+HPX_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+           array_segment_request_action, array_segment_request_handler,
            HPX_ADDR);
 
 

@@ -8,9 +8,6 @@ Things that likely would not break the API
 TODO: Think about if there are places that RDMA could improve the performance.
       That might have us putting more into the GAS.
 
-TODO: take the particle data out of the global address space? Array's are just
-      the metadata, but with local addresses as the local segment.
-      This would mean the get and put could be quick shortcuts really.
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
       like an inelegant solution, and perhaps one that relies on the
@@ -82,11 +79,6 @@ TODO: Finish interface
       from an HPX thread.
     - As a corollary to that, add assertions to routines that have
       inside / outside HPX restrictions
-TODO: Have a mechanism to build an array up from parts on each rank. The overall
-   organizational thing might be collective, but each rank then replaces with
-   an ArrayRef. This would then need ArrayRef to have an allocation form.
-   Then, a new resum() or something method would need to bind the whole thing
-   together. No use yet, but could be nice.
 TODO: The expansion concept does not allow for access of the kernel parameters.
    They end up in the table, and cannot be accessed later. Not sure if this is
    a problem, but it could be.
