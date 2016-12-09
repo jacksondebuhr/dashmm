@@ -45,6 +45,7 @@
 #include "builtins/laplace_com_acc.h"
 #include "builtins/laplace.h"
 #include "builtins/yukawa.h"
+#include "builtins/helmholtz.h"
 
 // The built in distribution policies
 #include "builtins/bhdistro.h"
