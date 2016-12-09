@@ -176,7 +176,7 @@ public:
                                       Source *last) const {
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{center, scale, kSourcePrimary}}; 
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0)); 
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
     double omega = builtin_helmholtz_table_->omega(); 

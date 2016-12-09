@@ -217,7 +217,7 @@ double Gamma(double x) {
     res = xnum / xden + 1.0;
 
     if (y1 < y) {
-      res = res / y;
+      res = res / y1;
     } else if (y1 > y) {
       for (int i = 0; i < n; ++i) {
         res *= y;
@@ -239,7 +239,7 @@ double Gamma(double x) {
     }
   }
 
-  if (parity){
+  if (parity) {
     res = -res;
   }
   if (fact != 1.0) {
