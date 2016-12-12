@@ -426,6 +426,38 @@ class Node {
     }
   }
 
+  /// Remove a given child from this node
+  void remove_child(const node_t *target) {
+    bool found{false};
+    for (int i = 0; i < 8; ++i) {
+      if (child[i] == target) {
+        child[i] = nullptr;
+        found = true;
+        break;
+      }
+    }
+    assert(found);
+  }
+
+  /// This will recurse down to the uniform level and remove pointless nodes
+  ///
+  /// This returns true if this node has no children after the work is
+  /// completed for this node.
+  ///
+  /// NOTE: This should be a safe recursion because the depth of the top
+  /// part of the tree grows very slowly.
+  bool remove_downward_links(int limit, int level) {
+    if (level < limit) {
+      for (int i = 0; i < 8; ++i) {
+        if (child[i] && child[i]->remove_downward_links(limit, level + 1)) {
+          child[i]->parent = nullptr; // Remove upward link
+          child[i] = nullptr;         // Remove downward link
+        }
+      }
+    }
+    return (is_leaf() && parts.n() == 0);
+  }
+
   /// Destroy the data in a branch
   ///
   /// This is only ever called on the local nodes. This will traverse the
@@ -1577,15 +1609,18 @@ class DualTree {
 
     DAGNode **data = dag.target_leaves.data();
     size_t n_data = dag.target_leaves.size();
-    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+    int type = 1;
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data, &type);
 
     data = dag.target_nodes.data();
     n_data = dag.target_nodes.size();
-    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+    type = 0;
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data, &type);
 
     data = dag.source_nodes.data();
     n_data = dag.source_nodes.size();
-    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data);
+    type = 0;
+    hpx_call(HPX_HERE, destroy_DAG_LCOs_, done, &data, &n_data, &type);
 
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
@@ -2207,6 +2242,23 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  /// This will prune links in the top part of the tree that are not needed
+  ///
+  /// After exchanging counts, there could be some nodes at the uniform level
+  /// that will not have any particles under them. In this case, the links to
+  /// these nodes from higher levels should be culled to avoid sending Methods
+  /// into pointless work, and potentially scheduling pointless work.
+  ///
+  /// TODO: At the moment, this is done in serial. It might be useful to
+  /// get some parallelism here. Probably the easiest is to do this work
+  /// as its own task.
+  void prune_topnodes() {
+    // Now descend from above and remove any empty nodes, stopping at
+    // unif_level_
+    source_tree_->root_->remove_downward_links(unif_level_, 0);
+    target_tree_->root_->remove_downward_links(unif_level_, 0);
+  }
+
   /// The action responsible for dual tree partitioning
   ///
   /// This action is the target of a broadcast and manages all the work
@@ -2344,13 +2396,20 @@ class DualTree {
       hpx_lco_wait(dual_tree_complete);
       hpx_lco_delete_sync(dual_tree_complete);
 
+      // TODO: I think this is where I can remove pointless links in the
+      // top of the tree.
+      //
+      // unif_count_src() is going to be the totals for the uniform level
+      // unif_count_tar() is the set of counts for the target tree
+      //
+      tree->prune_topnodes();
+
       delete [] local_count;
       delete [] local_offset_s;
       delete [] local_offset_t;
     }
 
     // Replace segment in the array
-    // TODO: Fix these
     char *old_src_data = sources.replace(tree->source_tree_->sorted_);
     if (old_src_data != nullptr) {
       delete [] old_src_data;
@@ -3013,12 +3072,21 @@ class DualTree {
   /// \param n_nodes - the number of nodes
   ///
   /// \returns - HPX_SUCCESS
-  static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes) {
+  static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes,
+                                      int type) {
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_nodes; ++i) {
       if (nodes[i]->locality == myrank) {
         assert(nodes[i]->global_addx != HPX_NULL);
-        hpx_lco_delete_sync(nodes[i]->global_addx);
+        if (type) {
+          // NOTE: destroy() does not care about the second argument to the
+          // constructor, so we put in some junk
+          auto temp = targetlco_t{nodes[i]->global_addx, 0};
+          temp.destroy();
+        } else {
+          auto temp = expansionlco_t{nodes[i]->global_addx};
+          temp.destroy();
+        }
       }
     }
 

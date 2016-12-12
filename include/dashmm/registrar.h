@@ -222,7 +222,7 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::destroy_DAG_LCOs_,
                         dualtree_t::destroy_DAG_LCOs_handler,
-                        HPX_POINTER, HPX_SIZE_T);
+                        HPX_POINTER, HPX_SIZE_T, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::termination_detection_,
                         dualtree_t::termination_detection_handler,
