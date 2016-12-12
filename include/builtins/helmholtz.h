@@ -366,18 +366,18 @@ public:
     // Get rotation angle
     double alpha = tab_alpha[to_child] * M_PI_4;
 
-    int p = builtin_yukawa_table_->p();
+    int p = builtin_helmholtz_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (to_child < 4 ?
-                        builtin_yukawa_table_->dmat_plus(1.0 / sqrt(3)) :
-                        builtin_yukawa_table_->dmat_plus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3)));
     const double *d2 = (to_child < 4 ?
-                        builtin_yukawa_table_->dmat_minus(1.0 / sqrt(3)) :
-                        builtin_yukawa_table_->dmat_minus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_minus(-1.0 / sqrt(3)));
 
     // Get precomputed coefficients for shifting along z-axis
-    const double *coeff = builtin_yukawa_table_->l2l(scale);
+    const double *coeff = builtin_helmholtz_table_->l2l(scale);
 
     // Get local expansion of the parent box
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
