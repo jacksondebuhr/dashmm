@@ -6,12 +6,13 @@
 #include <string>
 #include <vector>
 
+#include "locality.h"
 #include "traceevent.h"
 #include "tracefile.h"
 #include "worker.h"
 
 
-void file_report(const char *fname, const File &file) {
+void file_report(const char *fname, const trace::File &file) {
   fprintf(stdout, "File '%s' opened...\n", fname);
   fprintf(stdout, "  Locality: %d\n", file.locality());
   fprintf(stdout, "  Worker: %d\n", file.worker());
@@ -36,20 +37,18 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  // now try to create a TraceFile object
   try {
     trace::File first_file{std::string(argv[1])};
     file_report(argv[1], first_file);
-    trace::Worker worker{first_file};
+    trace::Locality locality{first_file};
 
     for (int which = 2; which < argc; ++which) {
       trace::File in_file{std::string(argv[which])};
       file_report(argv[which], in_file);
-
-      worker.add_file(in_file);
+      locality.add_file(in_file);
     }
 
-    fprintf(stdout, "\nFiles contained %lu events\n", worker.num_events());
+    fprintf(stdout, "\n Files contained %lu events\n", locality.num_events());
 
     //do_output(events);
 

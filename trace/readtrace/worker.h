@@ -28,10 +28,12 @@ to search? I think that is probably a good one.
 
 
 class Worker {
-public:
-  // TODO: A constructor taking a File object?
+ public:
   Worker(File &stream);
-  Worker(int id, int loc) noexcept : id_{id}, loc_{loc}, events_{} { }
+  Worker(int id = -1, int loc = -1) noexcept : id_{id}, loc_{loc}, events_{} { }
+
+  // Make sure we get the default move
+  Worker &operator=(Worker &&other) = default;
 
   // Simple queries
   int id() const {return id_;}
@@ -39,12 +41,14 @@ public:
   size_t num_events() const {return events_.size();}
 
   // This could throw an exception std::runtime_error if the File object
-  // throws one.
+  // throws one. this can throw std::invalid_argument if the stream's
+  // worker ID does not match, or if the locality does not match.
   void add_file(File &stream);
 
   // Query the data in various ways
-
-private:
+  // TODO: This is where we shall have to add the ability to search for
+  // specific windows and things.
+ private:
   int id_;  // Which worker is this (numbered per locality)
   int loc_; // Which locality for which this was a worker
   std::vector<std::unique_ptr<Event>> events_;

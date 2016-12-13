@@ -108,7 +108,7 @@ File::File(const std::string &fname)
 
 
 File::~File() {
-  fclose(ifd_);
+  close();
 }
 
 
@@ -116,6 +116,14 @@ File::~File() {
 // This returns null when done
 std::unique_ptr<Event> File::next() {
   return proto_->read_from_file(ifd_);
+}
+
+
+void File::close() {
+  if (ifd_) {
+    fclose(ifd_);
+    ifd_ = nullptr;
+  }
 }
 
 

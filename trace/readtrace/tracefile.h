@@ -37,6 +37,9 @@ class File {
   int worker() const noexcept {return worker_;}
   int locality() const noexcept {return locality_;}
 
+  // Allow something to close it early
+  void close();
+
  private:
   // utility function to pull name apart to get class and event of the file
   // as well as the worker and the locality
