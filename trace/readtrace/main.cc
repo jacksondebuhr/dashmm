@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include <algorithm>
 #include <exception>
 #include <memory>
 #include <string>
@@ -7,6 +8,26 @@
 
 #include "traceevent.h"
 #include "tracefile.h"
+#include "worker.h"
+
+
+void file_report(const char *fname, const File &file) {
+  fprintf(stdout, "File '%s' opened...\n", fname);
+  fprintf(stdout, "  Locality: %d\n", file.locality());
+  fprintf(stdout, "  Worker: %d\n", file.worker());
+  fprintf(stdout, "  Event Class: '%s'\n", file.event_class().c_str());
+  fprintf(stdout, "  Event Type: '%s'\n", file.event_type().c_str());
+}
+
+
+void do_output(const std::vector<std::unique_ptr<trace::Event>> &events) {
+  FILE *ofd = fopen("eventlog.txt","w");
+  for (size_t i = 0; i < events.size(); ++i) {
+    fprintf(ofd, "%lu %s\n", events[i]->stamp(),
+            events[i]->event_type().c_str());
+  }
+  fclose(ofd);
+}
 
 
 int main(int argc, char **argv) {
@@ -17,21 +38,20 @@ int main(int argc, char **argv) {
 
   // now try to create a TraceFile object
   try {
-    trace::File in_file{std::string(argv[1])};
+    trace::File first_file{std::string(argv[1])};
+    file_report(argv[1], first_file);
+    trace::Worker worker{first_file};
 
-    fprintf(stdout, "File '%s' opened...\n", argv[1]);
-    fprintf(stdout, "  Locality: %d\n", in_file.locality());
-    fprintf(stdout, "  Worker: %d\n", in_file.worker());
-    fprintf(stdout, "  Event Class: '%s'\n", in_file.event_class().c_str());
-    fprintf(stdout, "  Event Type: '%s'\n", in_file.event_type().c_str());
+    for (int which = 2; which < argc; ++which) {
+      trace::File in_file{std::string(argv[which])};
+      file_report(argv[which], in_file);
 
-    std::vector<std::unique_ptr<trace::Event>> events{};
-    do {
-      events.push_back(in_file.next());
-    } while (events[events.size() - 1] != nullptr);
-    events.pop_back();
+      worker.add_file(in_file);
+    }
 
-    fprintf(stdout, "  File contained %lu events\n", events.size());
+    fprintf(stdout, "\nFiles contained %lu events\n", worker.num_events());
+
+    //do_output(events);
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());
