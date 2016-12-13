@@ -3,7 +3,7 @@
 #include <exception>
 
 
-namespace trace {
+namespace traceutils {
 
 namespace network {
 
@@ -108,6 +108,6 @@ std::unique_ptr<Event> ProgressEnd::read_from_file(FILE *fd) const {
 
 
 
-} // trace::network
+} // traceutils::network
 
-} // trace
+} // traceutils

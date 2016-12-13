@@ -1,5 +1,5 @@
-#ifndef __TRACE_WORKER_H__
-#define __TRACE_WORKER_H__
+#ifndef __TRACEUTILS_WORKER_H__
+#define __TRACEUTILS_WORKER_H__
 
 
 #include <memory>
@@ -9,7 +9,7 @@
 #include "tracefile.h"
 
 
-namespace trace {
+namespace traceutils {
 
 
 /*
@@ -31,6 +31,7 @@ class Worker {
  public:
   Worker(File &stream);
   Worker(int id = -1, int loc = -1) noexcept : id_{id}, loc_{loc}, events_{} { }
+  Worker(Worker &&other) = default;
 
   // Make sure we get the default move
   Worker &operator=(Worker &&other) = default;
@@ -55,7 +56,7 @@ class Worker {
 };
 
 
-} // trace
+} // traceutils
 
 
-#endif // __TRACE_WORKER_H__
+#endif // __TRACEUTILS_WORKER_H__

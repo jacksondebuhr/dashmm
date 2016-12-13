@@ -1,11 +1,11 @@
-#ifndef __TRACE_NETWORK_EVENTS_H__
-#define __TRACE_NETWORK_EVENTS_H__
+#ifndef __TRACEUTILS_NETWORK_EVENTS_H__
+#define __TRACEUTILS_NETWORK_EVENTS_H__
 
 
 #include "traceevent.h"
 
 
-namespace trace {
+namespace traceutils {
 
 namespace network {
 
@@ -48,9 +48,9 @@ class ProgressEnd : public Event {
 };
 
 
-} // trace::network
+} // traceutils::network
 
-} // trace
+} // traceutils
 
 
-#endif // __TRACE_NETWORK_EVENTS_H__
+#endif // __TRACEUTILS_NETWORK_EVENTS_H__

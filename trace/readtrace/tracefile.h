@@ -1,5 +1,5 @@
-#ifndef __TRACE_FILE_H__
-#define __TRACE_FILE_H__
+#ifndef __TRACEUTILS_FILE_H__
+#define __TRACEUTILS_FILE_H__
 
 
 #include <cstdio>
@@ -10,7 +10,7 @@
 #include "traceevent.h"
 
 
-namespace trace {
+namespace traceutils {
 
 
 class File {
@@ -55,7 +55,7 @@ class File {
 };
 
 
-} // trace
+} // traceutils
 
 
-#endif // __TRACE_FILE_H__
+#endif // __TRACEUTILS_FILE_H__

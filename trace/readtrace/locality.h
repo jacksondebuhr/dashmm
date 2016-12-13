@@ -1,5 +1,5 @@
-#ifndef __TRACE_LOCALITY_H__
-#define __TRACE_LOCALITY_H__
+#ifndef __TRACEUTILS_LOCALITY_H__
+#define __TRACEUTILS_LOCALITY_H__
 
 
 #include <map>
@@ -8,13 +8,18 @@
 #include "worker.h"
 
 
-namespace trace {
+namespace traceutils {
 
 
 class Locality {
  public:
   Locality(File &stream);
-  Locality(int loc) : locality_{loc}, workers_{} { }
+  Locality(int loc = -1) : locality_{loc}, workers_{} { }
+  Locality(Locality &&other) = default;
+
+  // Make sure default move operator exists
+  Locality &operator=(Locality &&other) = default;
+
 
   int locality() const {return locality_;}
   // The number of workers currently.
@@ -34,7 +39,7 @@ class Locality {
 };
 
 
-} // trace
+} // traceutils
 
 
-#endif // __TRACE_LOCALITY_H__
+#endif // __TRACEUTILS_LOCALITY_H__

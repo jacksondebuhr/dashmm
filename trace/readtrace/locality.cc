@@ -3,7 +3,7 @@
 #include <exception>
 
 
-namespace trace {
+namespace traceutils {
 
 
 Locality::Locality(File &stream) : locality_{stream.locality()}, workers_{} {
@@ -35,4 +35,4 @@ void Locality::add_file(File &stream) {
 }
 
 
-} // trace
+} // traceutils

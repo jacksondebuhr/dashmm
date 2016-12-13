@@ -9,10 +9,11 @@
 #include "locality.h"
 #include "traceevent.h"
 #include "tracefile.h"
+#include "trace.h"
 #include "worker.h"
 
 
-void file_report(const char *fname, const trace::File &file) {
+void file_report(const char *fname, const traceutils::File &file) {
   fprintf(stdout, "File '%s' opened...\n", fname);
   fprintf(stdout, "  Locality: %d\n", file.locality());
   fprintf(stdout, "  Worker: %d\n", file.worker());
@@ -21,7 +22,7 @@ void file_report(const char *fname, const trace::File &file) {
 }
 
 
-void do_output(const std::vector<std::unique_ptr<trace::Event>> &events) {
+void do_output(const std::vector<std::unique_ptr<traceutils::Event>> &events) {
   FILE *ofd = fopen("eventlog.txt","w");
   for (size_t i = 0; i < events.size(); ++i) {
     fprintf(ofd, "%lu %s\n", events[i]->stamp(),
@@ -37,18 +38,16 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  try {
-    trace::File first_file{std::string(argv[1])};
-    file_report(argv[1], first_file);
-    trace::Locality locality{first_file};
+  traceutils::Trace runtrace;
 
-    for (int which = 2; which < argc; ++which) {
-      trace::File in_file{std::string(argv[which])};
+  try {
+    for (int which = 1; which < argc; ++which) {
+      traceutils::File in_file{std::string(argv[which])};
       file_report(argv[which], in_file);
-      locality.add_file(in_file);
+      runtrace.add_file(in_file);
     }
 
-    fprintf(stdout, "\n Files contained %lu events\n", locality.num_events());
+    fprintf(stdout, "\n Files contained %lu events\n", runtrace.num_events());
 
     //do_output(events);
 

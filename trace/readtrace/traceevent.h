@@ -1,5 +1,5 @@
-#ifndef __TRACE_EVENT_H__
-#define __TRACE_EVENT_H__
+#ifndef __TRACEUTILS_EVENT_H__
+#define __TRACEUTILS_EVENT_H__
 
 
 #include <cstdint>
@@ -8,7 +8,7 @@
 #include <string>
 
 
-namespace trace {
+namespace traceutils {
 
 
 // The classes of events that HPX-5 provides
@@ -73,7 +73,7 @@ bool event_compare_uptr(const std::unique_ptr<Event> &a,
                         const std::unique_ptr<Event> &b);
 
 
-} //trace
+} //traceutils
 
 
-#endif // __TRACE_EVENT_H__
+#endif // __TRACEUTILS_EVENT_H__

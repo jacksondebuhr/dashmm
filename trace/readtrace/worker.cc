@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <exception>
 
-namespace trace {
+
+namespace traceutils {
 
 
 Worker::Worker(File &stream)
@@ -44,4 +45,4 @@ void Worker::add_file(File &stream) {
 }
 
 
-} // trace
+} // traceutils

@@ -1,7 +1,7 @@
 #include "traceevent.h"
 
 
-namespace trace {
+namespace traceutils {
 
 
 EventClass event_class_from_name(const std::string &name) {
@@ -35,4 +35,4 @@ bool event_compare_uptr(const std::unique_ptr<Event> &a,
 }
 
 
-} // trace
+} // traceutils

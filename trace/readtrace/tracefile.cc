@@ -8,7 +8,7 @@
 #include "allevents.h"
 
 
-namespace trace {
+namespace traceutils {
 
 namespace {
 
@@ -189,4 +189,4 @@ void File::check_and_skip_header() {
 }
 
 
-} // trace
+} // traceutils
