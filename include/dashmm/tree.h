@@ -2253,10 +2253,24 @@ class DualTree {
   /// get some parallelism here. Probably the easiest is to do this work
   /// as its own task.
   void prune_topnodes() {
+    // Go over uniform level and remove link to any no particle nodes
+    int *s_counts = unif_count_src();
+    int *t_counts = unif_count_tar();
+    sourcenode_t *s_nodes = source_tree_->unif_grid_;
+    targetnode_t *t_nodes = target_tree_->unif_grid_;
+    for (int i = 0; i < dim3_; ++i) {
+      if (s_counts[i] == 0) {
+        s_nodes[i].parent->remove_child(&s_nodes[i]);
+      }
+      if (t_counts[i] == 0) {
+        t_nodes[i].parent->remove_child(&t_nodes[i]);
+      }
+    }
+
     // Now descend from above and remove any empty nodes, stopping at
-    // unif_level_
-    source_tree_->root_->remove_downward_links(unif_level_, 0);
-    target_tree_->root_->remove_downward_links(unif_level_, 0);
+    // unif_level_ - 1
+    source_tree_->root_->remove_downward_links(unif_level_ - 1, 0);
+    target_tree_->root_->remove_downward_links(unif_level_ - 1, 0);
   }
 
   /// The action responsible for dual tree partitioning
@@ -2396,12 +2410,7 @@ class DualTree {
       hpx_lco_wait(dual_tree_complete);
       hpx_lco_delete_sync(dual_tree_complete);
 
-      // TODO: I think this is where I can remove pointless links in the
-      // top of the tree.
-      //
-      // unif_count_src() is going to be the totals for the uniform level
-      // unif_count_tar() is the set of counts for the target tree
-      //
+      // This will prune pointless nodes from the top of the tree.
       tree->prune_topnodes();
 
       delete [] local_count;
