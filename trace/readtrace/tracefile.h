@@ -42,6 +42,9 @@ class File {
   // as well as the worker and the locality
   void interpret_filename(const std::string &fname);
 
+  // utility function to skip the header information
+  void check_and_skip_header();
+
   FILE *ifd_;
   std::unique_ptr<Event> proto_;
   int worker_;

@@ -59,9 +59,15 @@ const std::string &ProgressBegin::event_type() const {
 
 std::unique_ptr<Event> ProgressBegin::read_from_file(FILE *fd) const {
   uint64_t rval{0};
+  auto before = ftell(fd);
   if (1 != fread(&rval, sizeof(rval), 1, fd)) {
+    auto after = ftell(fd);
     if (feof(fd)) {
-      return std::unique_ptr<Event>{nullptr};
+      if (before == after) {
+        return std::unique_ptr<Event>{nullptr};
+      } else {
+        throw std::runtime_error("incomplete read, suggesting format error");
+      }
     } else if (ferror(fd)) {
       // TODO make this a bit more meaningful
       throw std::runtime_error("error during read.");
@@ -83,9 +89,15 @@ const std::string &ProgressEnd::event_type() const {
 
 std::unique_ptr<Event> ProgressEnd::read_from_file(FILE *fd) const {
   uint64_t rval{0};
+  auto before = ftell(fd);
   if (1 != fread(&rval, sizeof(rval), 1, fd)) {
+    auto after = ftell(fd);
     if (feof(fd)) {
-      return std::unique_ptr<Event>{nullptr};
+      if (before == after) {
+        return std::unique_ptr<Event>{nullptr};
+      } else {
+        throw std::runtime_error("incomplete read, suggesting format error");
+      }
     } else if (ferror(fd)) {
       // TODO make this a bit more meaningful
       throw std::runtime_error("error during read.");

@@ -1,17 +1,18 @@
 #include "tracefile.h"
 
+#include <cstring>
+
 #include <exception>
-#include <string>
 #include <vector>
 
 #include "allevents.h"
-#include "traceevent.h"
 
 
 namespace trace {
 
 namespace {
 
+  char file_magic_number[] = "HPXnpy";
 
   std::vector<std::string> split_once(const std::string &orig,
                                       const std::string &delim) {
@@ -97,6 +98,7 @@ File::File(const std::string &fname)
 
   try {
     interpret_filename(fname);
+    check_and_skip_header();
   } catch (...) {
     // Some exception occurred, pass it along, after cleaning up resources
     fclose(ifd_);
@@ -155,6 +157,28 @@ void File::interpret_filename(const std::string &fname) {
   }
 }
 
+
+void File::check_and_skip_header() {
+  // read in the first 6 bytes
+  char magic[6];
+  if (6 != fread(magic, sizeof(char), 6, ifd_)) {
+    throw std::runtime_error("Error reading header information.");
+  }
+  if (strncmp(magic, file_magic_number, 6)) {
+    throw std::runtime_error("Format error: magic number is wrong");
+  }
+
+  if (fseek(ifd_, 2, SEEK_CUR)) {
+    throw std::runtime_error("Error reading header information.");
+  }
+  uint16_t header_size{0};
+  if (1 != fread(&header_size, sizeof(header_size), 1, ifd_)) {
+    throw std::runtime_error("Error reading header information.");
+  }
+  if (fseek(ifd_, header_size, SEEK_CUR)) {
+    throw std::runtime_error("Error reading header information.");
+  }
+}
 
 
 } // trace
