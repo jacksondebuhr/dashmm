@@ -53,6 +53,12 @@ class Event {
   // Retrieve the extra fields
   virtual uint64_t field(int i) const noexcept = 0;
 
+  // Is the event the beginning of a segment
+  virtual bool start() const noexcept = 0;
+
+  // Is the event the end of a segment
+  virtual bool end() const noexcept = 0;
+
   // A factory method that will produce a new event from a given file
   //
   // This will emit an exception at the end of file during a incomplet read

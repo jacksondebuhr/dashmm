@@ -31,6 +31,8 @@ class ProgressBegin : public Event {
   const std::string &event_type() const override;
   int num_fields() const noexcept override {return 0;}
   uint64_t field(int i) const noexcept override {return 0;}
+  bool start() const noexcept override {return true;}
+  bool end() const noexcept override {return false;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 
@@ -44,6 +46,8 @@ class ProgressEnd : public Event {
   const std::string &event_type() const override;
   int num_fields() const noexcept override {return 0;}
   uint64_t field(int i) const noexcept override {return 0;}
+  bool start() const noexcept override {return false;}
+  bool end() const noexcept override {return true;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 

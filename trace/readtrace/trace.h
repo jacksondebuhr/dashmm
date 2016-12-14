@@ -13,7 +13,7 @@ namespace traceutils {
 
 class Trace {
  public:
-  Trace() : locs_{} { }
+  Trace() : locked_{false}, locs_{} { }
 
   int localities() const {return locs_.size();}
   int max_locality() const {return locs_.rbegin()->first;}
@@ -27,8 +27,14 @@ class Trace {
 
   void add_file(File &stream);
 
-  // TODO: more complicated queries
+  // This finalizes additions and creates the trees
+  void finalize();
+
+  // Get the min and max record time of any locality
+  uint64_t max_ns() const;
+  uint64_t min_ns() const;
  private:
+  bool locked_;
   std::map<int, Locality> locs_;
 };
 

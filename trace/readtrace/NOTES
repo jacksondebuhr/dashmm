@@ -1,0 +1,7 @@
+So the next step is to work out how to make this stuff useful.
+
+ * Do I want to have a means to replace things with segments?
+ * I do want to be able to overlay a tree on the event data, so do we 
+   finalize in some way the objects. That makes further additions to the
+   data impossible, and will then build the tree on top of the existing 
+   data.

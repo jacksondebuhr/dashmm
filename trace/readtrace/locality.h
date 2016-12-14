@@ -14,14 +14,14 @@ namespace traceutils {
 class Locality {
  public:
   Locality(File &stream);
-  Locality(int loc = -1) : locality_{loc}, workers_{} { }
+  Locality(int loc = -1) : locality_{loc}, workers_{}, locked_{false} { }
   Locality(Locality &&other) = default;
 
   // Make sure default move operator exists
   Locality &operator=(Locality &&other) = default;
 
 
-  int locality() const {return locality_;}
+  int locality() const noexcept {return locality_;}
   // The number of workers currently.
   int num_workers() const {return workers_.size();}
   // The maximum id of any workers.
@@ -32,10 +32,17 @@ class Locality {
   // This could throw std::runtime_error or std::invalid_argument
   void add_file(File &stream);
 
+  // This finalizes input and builds the trees
+  void finalize(uint64_t min, uint64_t max);
+
   // TODO: more complicated queries - not really sure what I need yet
+
+  uint64_t max_ns() const;
+  uint64_t min_ns() const;
  private:
   int locality_;
   std::map<int, Worker> workers_;
+  bool locked_;
 };
 
 

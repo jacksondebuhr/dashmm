@@ -1,4 +1,4 @@
-CXX = mpicxx
+CXX = g++
 CXXFLAGS = -std=c++11 -Wall -O0 -g
 INCLUDE =
 LIBS =
