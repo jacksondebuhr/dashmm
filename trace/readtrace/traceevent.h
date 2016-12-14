@@ -59,6 +59,8 @@ class Event {
   // Is the event the end of a segment
   virtual bool end() const noexcept = 0;
 
+  virtual int segment_type() const noexcept = 0;
+
   // A factory method that will produce a new event from a given file
   //
   // This will emit an exception at the end of file during a incomplet read

@@ -9,3 +9,8 @@ So the next step is to work out how to make this stuff useful.
 
    Probably it would be required that the events of paired type would have
    to alternate start() end() and so on.
+
+ * One thing that has to happen is that this needs to become much more
+   resilient in error conditions. Eventually it would be nice to use this
+   stuff in an interactive visualization tool, and so we would want graceful
+   error situations.

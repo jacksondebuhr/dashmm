@@ -33,6 +33,7 @@ class ProgressBegin : public Event {
   uint64_t field(int i) const noexcept override {return 0;}
   bool start() const noexcept override {return true;}
   bool end() const noexcept override {return false;}
+  int segment_type() const noexcept override {return 1;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 
@@ -48,6 +49,7 @@ class ProgressEnd : public Event {
   uint64_t field(int i) const noexcept override {return 0;}
   bool start() const noexcept override {return false;}
   bool end() const noexcept override {return true;}
+  int segment_type() const noexcept override {return 1;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 
