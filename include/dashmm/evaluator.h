@@ -32,6 +32,7 @@
 
 
 #include <hpx/hpx.h>
+#include <libhpx/libhpx.h>
 
 #include "dashmm/array.h"
 #include "dashmm/arrayref.h"
@@ -329,6 +330,8 @@ class Evaluator {
 
 
     // BEGIN EVALUATE
+    libhpx_inst_phase_begin();
+
     hpx_time_t evaluate_begin = hpx_time_now();
     tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation(global_tree);
@@ -337,6 +340,8 @@ class Evaluator {
     hpx_time_t evaluate_end = hpx_time_now();
     double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
     //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
+
+    libhpx_inst_phase_end();
     // END EVALUATE
 
     fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",

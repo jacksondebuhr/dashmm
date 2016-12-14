@@ -22,12 +22,23 @@ void file_report(const char *fname, const traceutils::File &file) {
 }
 
 
-void do_output(const std::vector<std::unique_ptr<traceutils::Event>> &events) {
-  FILE *ofd = fopen("eventlog.txt","w");
-  for (size_t i = 0; i < events.size(); ++i) {
-    fprintf(ofd, "%lu %s\n", events[i]->stamp(),
-            events[i]->event_type().c_str());
+void do_output(FILE *ofd, traceutils::iter_t begin, traceutils::iter_t end,
+               uint64_t span_start) {
+  for (auto i = begin; i != end; ++i) {
+    fprintf(ofd, "%.12lg %s\n", ((*i)->stamp() - span_start) / 1.0e6,
+            (*i)->event_type().c_str());
   }
+}
+
+void output_window(const traceutils::window_t &window, uint64_t span_start) {
+  FILE *ofd = fopen("eventlog.txt", "w");
+
+  for (auto i = window.begin(); i != window.end(); ++i) {
+    for (auto j = i->second.begin(); j != i->second.end(); ++j) {
+      do_output(ofd, j->second.first, j->second.second, span_start);
+    }
+  }
+
   fclose(ofd);
 }
 
@@ -46,19 +57,15 @@ int main(int argc, char **argv) {
       file_report(argv[which], in_file);
       runtrace.add_file(in_file);
     }
+    runtrace.finalize();
 
     fprintf(stdout, "\nFiles contained %lu events\n", runtrace.num_events());
     fprintf(stdout, "Time window: [%lg %lg] (ms)\n",
             runtrace.min_ns() / 1.0e6, runtrace.max_ns() / 1.0e6);
 
-    fprintf(stdout, "Finalizing..."); fflush(stdout);
-    runtrace.finalize();
-    fprintf(stdout, "done\n"); fflush(stdout);
-
-    //do_output(events);
-
     // Get a window of events from 1s to 2s
-    auto window = runtrace.window(1000000000, 2000000000);
+    auto window = runtrace.window(0, 20000000000);
+    output_window(window, runtrace.min_ns());
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());

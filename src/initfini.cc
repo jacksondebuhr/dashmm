@@ -28,6 +28,7 @@
 
 
 #include <hpx/hpx.h>
+#include <libhpx/libhpx.h>
 
 #include "dashmm/types.h"
 
@@ -38,6 +39,10 @@ namespace dashmm {
 ReturnCode init(int *argc, char ***argv) {
   if (HPX_SUCCESS != hpx_init(argc, argv)) {
     return kRuntimeError;
+  }
+
+  if (libhpx_inst_tracer_active()) {
+    libhpx_inst_phase_end();
   }
 
   return kSuccess;
