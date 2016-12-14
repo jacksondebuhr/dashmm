@@ -7,7 +7,7 @@
 namespace traceutils {
 
 
-Locality::Locality(File &stream) 
+Locality::Locality(File &stream)
     : locality_{stream.locality()}, workers_{}, locked_{false} {
   Worker to_add{stream};
   workers_[stream.worker()] = std::move(to_add);
@@ -25,7 +25,7 @@ size_t Locality::num_events() const {
 
 void Locality::add_file(File &stream) {
   if (locked_) {
-    throw // TODO: something appropriate
+    throw std::invalid_argument("Cannot add file to locked object");
   }
   if (stream.locality() != locality_) {
     throw std::invalid_argument("File does not match locality");
@@ -52,7 +52,7 @@ void Locality::finalize(uint64_t min, uint64_t max) {
 
 
 uint64_t Locality::max_ns() const {
-  uint64_t retval{std::numeric_limits<uint64_t>::min};
+  uint64_t retval{std::numeric_limits<uint64_t>::min()};
   for (auto iter = workers_.begin(); iter != workers_.end(); ++iter) {
     retval = std::max(retval, iter->second.max_ns());
   }
@@ -61,9 +61,22 @@ uint64_t Locality::max_ns() const {
 
 
 uint64_t Locality::min_ns() const {
-  uint64_t retval{std::numeric_limits<uint64_t>::max};
+  uint64_t retval{std::numeric_limits<uint64_t>::max()};
   for (auto iter = workers_.begin(); iter != workers_.end(); ++iter) {
     retval = std::min(retval, iter->second.min_ns());
+  }
+  return retval;
+}
+
+
+span_t Locality::span(uint64_t start, uint64_t end) const {
+  if (!locked_) {
+    throw std::invalid_argument("Cannot span unless locked");
+  }
+
+  span_t retval{};
+  for (auto iter = workers_.begin(); iter != workers_.end(); ++iter) {
+    retval[iter->first] = iter->second.range(start, end);
   }
   return retval;
 }

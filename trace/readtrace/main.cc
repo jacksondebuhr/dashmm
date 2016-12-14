@@ -47,9 +47,18 @@ int main(int argc, char **argv) {
       runtrace.add_file(in_file);
     }
 
-    fprintf(stdout, "\n Files contained %lu events\n", runtrace.num_events());
+    fprintf(stdout, "\nFiles contained %lu events\n", runtrace.num_events());
+    fprintf(stdout, "Time window: [%lg %lg] (ms)\n",
+            runtrace.min_ns() / 1.0e6, runtrace.max_ns() / 1.0e6);
+
+    fprintf(stdout, "Finalizing..."); fflush(stdout);
+    runtrace.finalize();
+    fprintf(stdout, "done\n"); fflush(stdout);
 
     //do_output(events);
+
+    // Get a window of events from 1s to 2s
+    auto window = runtrace.window(1000000000, 2000000000);
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());

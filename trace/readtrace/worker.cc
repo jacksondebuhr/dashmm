@@ -1,5 +1,7 @@
 #include "worker.h"
 
+#include <cassert>
+
 #include <algorithm>
 #include <exception>
 
@@ -8,8 +10,8 @@ namespace traceutils {
 
 
 Worker::Worker(File &stream)
-    : id_{stream.worker()}, loc_{stream.locality()}, events_{}, 
-      locked_{false}, root_{nullptr} {
+    : id_{stream.worker()}, loc_{stream.locality()}, events_{},
+      locked_{false} {
   std::vector<std::unique_ptr<Event>> trial{};
   do {
     trial.push_back(stream.next());
@@ -28,7 +30,7 @@ Worker::Worker(File &stream)
 
 void Worker::add_file(File &stream) {
   if (locked_) {
-    throw // TODO: pick an appropriate exception
+    throw std::invalid_argument("File cannot be added to locked object");
   }
 
   if (stream.worker() != id_ || stream.locality() != loc_) {
@@ -52,16 +54,14 @@ void Worker::add_file(File &stream) {
 
 void Worker::finalize(uint64_t min, uint64_t max) {
   if (locked_) return;
-
   locked_ = true;
-  build_tree(min, max);
 }
 
 
 // Because we keep the events sorted, the min and max times must be from the
 // start and end of the vector of events.
 uint64_t Worker::max_ns() const {
-  return events_[events.size() - 1]->stamp();
+  return events_[events_.size() - 1]->stamp();
 }
 
 uint64_t Worker::min_ns() const {
@@ -69,44 +69,43 @@ uint64_t Worker::min_ns() const {
 }
 
 
-void Worker::build_tree(uint64_t min, uint64_t max) {
-  root_ = std::unique_ptr<node_t>{
-                  new node_t{min, max, events_.begin(), events_.end()}};
-  root_->partition();
-}
-
-
-Worker::node_t::node_t(uint64_t l, uint64_t h, iter_t f, iter_t l) 
-    : left{nullptr}, right{nullptr}, low{l}, high{h}, first{f}, last{l} { }
-
-
-uint64_t Worker::node_t::middle() const {
-  return (low + high) / 2;
-}
-
-
-void Worker::node_t::partition() {
-  // Are we done?
-  if (last - first <= kTreePartitionLimit) {
-    return;
+range_t Worker::range(uint64_t start, uint64_t end) const {
+  if (!locked_) {
+    throw std::invalid_argument("Cannot range unless locked");
+  }
+  if (start > end) {
+    throw std::invalid_argument("inverted intervals are not allowed");
   }
 
-  // if not, find split points
-  uint64_t midpoint = middle();
-  auto comp = [&middle](const std::unique_ptr<Event> &a) {
-    return a->stamp() < midpoint;
-  }
-  iter_t split = std::partition_point(first, last, comp);
+  auto first = events_.begin();
+  auto last = events_.end();
+  auto low = events_[0]->stamp();
+  auto high = events_[events_.size() - 1]->stamp();
 
-  // create new nodes
-  if (split - first) {
-    left = std::unique_ptr<node_t>{new node_t{low, middle, first, split}};
-    left->partition();
+  // Deal with two easy cases first
+  if (end < low) {
+    return make_pair(first, first);
   }
-  if (last - split) {
-    right = std::unique_ptr<node_t>{new node_t{middle, high, split, last}};
-    right->partition();
+  if (start >= high) {
+    return make_pair(last, last);
   }
+
+  // Map range onto possible range (doing so excludes no events)
+  start = std::max(start, low);
+  end = std::min(end, high);
+
+  // Find the range
+  auto comp_s = [&start](const std::unique_ptr<Event> &a) {
+    return a->stamp() < start;
+  };
+  iter_t one = std::partition_point(first, last, comp_s);
+
+  auto comp_e = [&end](const std::unique_ptr<Event> &a) {
+    return a->stamp() < end;
+  };
+  iter_t two = std::partition_point(first, last, comp_e);
+
+  return make_pair(one, two);
 }
 
 

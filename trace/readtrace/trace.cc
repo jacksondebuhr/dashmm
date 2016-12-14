@@ -1,6 +1,9 @@
 #include "trace.h"
 
 
+#include <limits>
+
+
 namespace traceutils {
 
 
@@ -44,7 +47,7 @@ size_t Trace::num_events() const {
 
 void Trace::add_file(File &stream) {
   if (locked_) {
-    throw // TODO: something appropriate
+    throw std::invalid_argument("Cannot add file to locked object");
   }
 
   auto iter = locs_.find(stream.locality());
@@ -62,16 +65,15 @@ void Trace::finalize() {
 
   locked_ = true;
   uint64_t begin = min_ns();
-  uint64_t end = max_ns();
+  uint64_t end = max_ns() + 1;
   for (auto i = locs_.begin(); i != locs_.end(); ++i) {
-    i->finalize(begin, end);
+    i->second.finalize(begin, end);
   }
 }
 
 
 uint64_t Trace::max_ns() const {
-  // TODO: check this limits thing
-  uint64_t retval{std::numeric_limits<uint64_t>::min};
+  uint64_t retval{std::numeric_limits<uint64_t>::min()};
   for (auto iter = locs_.begin(); iter != locs_.end(); ++iter) {
     retval = std::max(retval, iter->second.max_ns());
   }
@@ -80,10 +82,22 @@ uint64_t Trace::max_ns() const {
 
 
 uint64_t Trace::min_ns() const {
-  // TODO: check this limits thing
-  uint64_t retval{std::numeric_limits<uint64_t>::max};
+  uint64_t retval{std::numeric_limits<uint64_t>::max()};
   for (auto iter = locs_.begin(); iter != locs_.end(); ++iter) {
     retval = std::min(retval, iter->second.min_ns());
+  }
+  return retval;
+}
+
+
+window_t Trace::window(uint64_t start, uint64_t end) const {
+  if (!locked_) {
+    throw std::invalid_argument("Cannot window unless locked");
+  }
+
+  window_t retval{};
+  for (auto iter = locs_.begin(); iter != locs_.end(); ++iter) {
+    retval[iter->first] = iter->second.span(start, end);
   }
   return retval;
 }

@@ -11,6 +11,9 @@
 namespace traceutils {
 
 
+using window_t = std::map<int, span_t>;
+
+
 class Trace {
  public:
   Trace() : locked_{false}, locs_{} { }
@@ -21,7 +24,6 @@ class Trace {
   int num_workers(int loc) const;
   int max_worker(int loc) const;
 
-  // TODO do we want both here?
   size_t num_events(int loc) const;
   size_t num_events() const;
 
@@ -33,6 +35,10 @@ class Trace {
   // Get the min and max record time of any locality
   uint64_t max_ns() const;
   uint64_t min_ns() const;
+
+  // Get a window of events
+  window_t window(uint64_t start, uint64_t end) const;
+
  private:
   bool locked_;
   std::map<int, Locality> locs_;

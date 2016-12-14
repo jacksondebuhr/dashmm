@@ -11,6 +11,9 @@
 namespace traceutils {
 
 
+using span_t = std::map<int, range_t>;
+
+
 class Locality {
  public:
   Locality(File &stream);
@@ -35,10 +38,13 @@ class Locality {
   // This finalizes input and builds the trees
   void finalize(uint64_t min, uint64_t max);
 
-  // TODO: more complicated queries - not really sure what I need yet
-
+  // Min and max times in this Locality
   uint64_t max_ns() const;
   uint64_t min_ns() const;
+
+  // Grab a span
+  span_t span(uint64_t start, uint64_t end) const;
+
  private:
   int locality_;
   std::map<int, Worker> workers_;
