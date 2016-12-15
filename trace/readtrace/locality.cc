@@ -14,6 +14,15 @@ Locality::Locality(File &stream)
 }
 
 
+std::map<int, int> Locality::worker_map() const {
+  std::map<int, int> retval{};
+  for (auto i = workers_.begin(); i != workers_.end(); ++i) {
+    retval[i->first] = 0;
+  }
+  return retval;
+}
+
+
 size_t Locality::num_events() const {
   size_t retval{};
   for (auto i = workers_.begin(); i != workers_.end(); ++i) {

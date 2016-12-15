@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -std=c++11 -Wall -O0 -g
-INCLUDE =
-LIBS =
+INCLUDE = -I/usr/local/include `freetype-config --cflags`
+LIBS = -L/usr/local/lib -lpng -lpngwriter -lz -lfreetype
 
 SRC = $(shell ls *.cc)
 OBJ = $(SRC:.cc=.o)

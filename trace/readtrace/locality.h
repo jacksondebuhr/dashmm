@@ -29,6 +29,10 @@ class Locality {
   int num_workers() const {return workers_.size();}
   // The maximum id of any workers.
   int max_worker() const {return workers_.rbegin()->first;}
+  // Get a map from worker id to integers. This is initialized with zeros
+  // Maybe make this functional by taking a template parameter for a callable
+  // type. That could be the thing that sets the value.
+  std::map<int, int> worker_map() const;
 
   size_t num_events() const;
 

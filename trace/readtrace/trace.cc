@@ -1,5 +1,6 @@
 #include "trace.h"
 
+#include <cassert>
 
 #include <limits>
 
@@ -25,6 +26,25 @@ int Trace::max_worker(int loc) const {
     return -1;
   }
 }
+
+
+int Trace::total_workers() const {
+  int retval{0};
+  for (auto iter = locs_.begin(); iter != locs_.end(); ++iter) {
+    retval += iter->second.num_workers();
+  }
+  return retval;
+}
+
+
+std::map<int, std::map<int, int>> Trace::worker_map() const {
+  std::map<int, std::map<int, int>> retval{};
+  for (auto i = locs_.begin(); i != locs_.end(); ++i) {
+    retval[i->first] = i->second.worker_map();
+  }
+  return retval;
+}
+
 
 size_t Trace::num_events(int loc) const {
   auto iter = locs_.find(loc);
@@ -98,6 +118,60 @@ window_t Trace::window(uint64_t start, uint64_t end) const {
   window_t retval{};
   for (auto iter = locs_.begin(); iter != locs_.end(); ++iter) {
     retval[iter->first] = iter->second.span(start, end);
+  }
+  return retval;
+}
+
+
+namespace {
+  double range_coverage(const range_t &range, int type,
+                        uint64_t start, uint64_t end) {
+    // Shortcut for no entries
+    if (range.second - range.first == 0) return 0.0;
+
+    uint64_t total{end - start};
+    uint64_t cover{0};
+    int64_t previous_start = start;
+    int64_t previous_end = start - 1;
+    for (auto i = range.first; i != range.second; ++i) {
+      if ((*i)->segment_type() == type) {
+        if ((*i)->start()) {
+          // make sure the segments are alternating start/stop
+          previous_start = (*i)->stamp();
+          assert(previous_end < previous_start);
+        } else {
+          // make sure if we are not a start we are an end
+          assert((*i)->end());
+          // make sure the segments are alternating start and end
+          previous_end = (*i)->stamp();
+          assert(previous_end >= previous_start);
+          cover += previous_end - previous_start;
+        }
+      }
+    }
+    // Deal with a start but no end here
+    if (previous_end < previous_start) {
+      cover += end - previous_start;
+    }
+    return ((double)cover) / total;
+  }
+
+  std::map<int, double> span_coverage(const span_t &span, int type,
+                                      uint64_t start, uint64_t end) {
+    std::map<int, double> retval{};
+    for (auto i = span.begin(); i != span.end(); ++i) {
+      retval[i->first] = range_coverage(i->second, type, start, end);
+    }
+    return retval;
+  }
+} // anonymous
+
+
+cover_t coverage_of_segment_type(const window_t &window, int type,
+                                 uint64_t start, uint64_t end) {
+  cover_t retval{};
+  for (auto i = window.begin(); i != window.end(); ++i) {
+    retval[i->first] = span_coverage(i->second, type, start, end);
   }
   return retval;
 }

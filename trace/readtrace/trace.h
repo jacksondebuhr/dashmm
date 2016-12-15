@@ -23,6 +23,11 @@ class Trace {
 
   int num_workers(int loc) const;
   int max_worker(int loc) const;
+  int total_workers() const;
+  // TODO
+  // Same idea. Make it functional, taking a template parameter which sets
+  // the value.
+  std::map<int, std::map<int, int>> worker_map() const;
 
   size_t num_events(int loc) const;
   size_t num_events() const;
@@ -43,6 +48,13 @@ class Trace {
   bool locked_;
   std::map<int, Locality> locs_;
 };
+
+
+// The first is locality, the second is worker
+using cover_t = std::map<int, std::map<int, double>>;
+
+cover_t coverage_of_segment_type(const window_t &window, int type,
+                                 uint64_t start, uint64_t end);
 
 
 } // traceutils

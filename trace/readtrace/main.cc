@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "locality.h"
+#include "plotter.h"
 #include "traceevent.h"
 #include "tracefile.h"
 #include "trace.h"
@@ -59,19 +60,42 @@ int main(int argc, char **argv) {
     }
     runtrace.finalize();
 
+    uint64_t minns = runtrace.min_ns();
+    uint64_t maxns = runtrace.max_ns();
     fprintf(stdout, "\nFiles contained %lu events\n", runtrace.num_events());
     fprintf(stdout, "Time window: [%lg %lg] (ms)\n",
-            runtrace.min_ns() / 1.0e6, runtrace.max_ns() / 1.0e6);
+            minns / 1.0e6, maxns / 1.0e6);
 
     // Get a window of events from 1s to 2s
-    auto window = runtrace.window(0, 20000000000);
-    output_window(window, runtrace.min_ns());
+    //auto window = runtrace.window(minns, maxns);
+    //output_window(window, runtrace.min_ns());
+
+    //auto coverage = coverage_of_segment_type(window, 1,
+    //                                         minns, maxns);
+
+    //for (auto i = coverage.begin(); i != coverage.end(); ++i) {
+    //  for (auto j = i->second.begin(); j != i->second.end(); ++j) {
+    //    fprintf(stdout, "coverage of (%d,%d): %lg\n", i->first, j->first,
+    //            (coverage[i->first])[j->first]);
+    //  }
+    //}
+
+    traceutils::Plotter maker{runtrace};
+    maker(1000, 251, 0, minns, maxns, "tryit.png", 0);
+    maker(1000, 251, 0, 0.9 * maxns, maxns, "tryitend.png", 0);
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());
   } catch (...) {
     fprintf(stderr, "Some other exception...\n");
   }
+
+
+  // Testing out the thing somewhat
+  //pngwriter testimage{100, 100, 1.0, "checker.png"};
+  //testimage.setcompressionlevel(0);
+  //testimage.filledsquare(10, 10, 50, 50, 1.0, 0.0, 0.0);
+  //testimage.close();
 
   return 0;
 }
