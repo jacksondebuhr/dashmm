@@ -172,6 +172,9 @@ class Evaluator {
     args->method = method;
     args->n_digits = n_digits;
     args->distro = distro;
+    args->rwaddr = HPX_NULL;
+    args->alldone = HPX_NULL;
+    args->middone = HPX_NULL;
     for (size_t i = 0; i < n_params; ++i) {
       args->kernelparams[i] = kernelparams[i];
     }
@@ -208,6 +211,9 @@ class Evaluator {
     method_t method;
     int n_digits;
     distropolicy_t distro;
+    hpx_addr_t rwaddr;
+    hpx_addr_t alldone;
+    hpx_addr_t middone;
     double kernelparams[];
   };
 
@@ -247,32 +253,21 @@ class Evaluator {
     //}
     //fprintf(stdout, "\n");
 
-    // Allocate space for message buffer
-    size_t bcast_size = total_size + sizeof(hpx_addr_t) * 3;
-    char *data = new char[bcast_size];
-    assert(data != nullptr);
-    hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
-    EvaluateParams *postargs
-        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
-
-    // Setup message
-    // The first is the alldone LCO
-    preargs[0] = hpx_lco_and_new(hpx_get_num_ranks());
-    assert(preargs[0] != HPX_NULL);
-    // The second is the tree global address
-    preargs[1] = global_tree.data();
-    memcpy(postargs, parms, total_size);
+    // Save tree global address in message
+    parms->rwaddr = global_tree.data();
+    // Save alldone LCO into message
+    parms->alldone = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(parms->alldone != HPX_NULL);
     // The third is the expansion creation done LCO
-    preargs[2] = hpx_lco_and_new(hpx_get_num_ranks());
-    assert(preargs[2] != HPX_NULL);
+    parms->middone = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(parms->middone != HPX_NULL);
 
-    hpx_bcast_lsync(evaluate_rank_local_, HPX_NULL, data, bcast_size);
+    // Start the work everywhere
+    hpx_bcast_lsync(evaluate_rank_local_, HPX_NULL, parms, total_size);
 
     // set up dependent call on the broadcast to do evaluate cleanup
-    hpx_call_when(preargs[0], HPX_HERE, evaluate_cleanup_, HPX_NULL,
-                  &preargs[1], &preargs[0], &preargs[2]);
-
-    delete [] data;
+    hpx_call_when(parms->alldone, HPX_HERE, evaluate_cleanup_, HPX_NULL,
+                  &parms->rwaddr, &parms->alldone, &parms->middone);
 
     return HPX_SUCCESS;
   }
@@ -287,13 +282,10 @@ class Evaluator {
   /// \param msg_size - the size of the input data
   ///
   /// \returns - HPX_SUCCESS
-  static int evaluate_rank_local_handler(char *data, size_t msg_size) {
-    hpx_addr_t *preargs = reinterpret_cast<hpx_addr_t *>(data);
-    EvaluateParams *parms
-        = reinterpret_cast<EvaluateParams *>(data + sizeof(hpx_addr_t) * 3);
-
+  static int evaluate_rank_local_handler(EvaluateParams *parms,
+                                         size_t msg_size) {
     // Generate the table
-    RankWise<dualtree_t> global_tree{preargs[1]};
+    RankWise<dualtree_t> global_tree{parms->rwaddr};
     auto tree = global_tree.here();
     double domain_size = tree->domain()->size();
     size_t n_params = (msg_size - sizeof(EvaluateParams)) / sizeof(double);
@@ -316,13 +308,13 @@ class Evaluator {
 
     // BEGIN ALLOCATE
     hpx_time_t allocate_begin = hpx_time_now();
-    tree->create_expansions_from_DAG(preargs[1]);
+    tree->create_expansions_from_DAG(parms->rwaddr);
 
     // NOTE: the previous has to finish for the following. So the previous
     // is a synchronous operation. The next three, however, are not. They all
     // get their work going when they come to it and then they return.
-    hpx_lco_and_set(preargs[2], HPX_NULL);
-    hpx_lco_wait(preargs[2]);
+    hpx_lco_and_set(parms->middone, HPX_NULL);
+    hpx_lco_wait(parms->middone);
     hpx_time_t allocate_end = hpx_time_now();
     double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
     //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
@@ -354,7 +346,7 @@ class Evaluator {
     delete dag;
 
     // Mark that we have finished the rank-local work
-    hpx_lco_and_set(preargs[0], HPX_NULL);
+    hpx_lco_and_set(parms->alldone, HPX_NULL);
 
     return HPX_SUCCESS;
   }
