@@ -324,6 +324,11 @@ class Evaluator {
     // BEGIN EVALUATE
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_begin();
+    // This is repeated, because the previous call is an atomic operation with
+    // a relaxed memory model. That means the first of these only sometimes
+    // will emit an event. In (simple and likely incomplete) testing, two
+    // is sufficient to always emit at least one.
+    EVENT_TRACE_DASHMM_ZEROREF();
     EVENT_TRACE_DASHMM_ZEROREF();
 #endif
 
