@@ -226,6 +226,7 @@ class TargetLCO {
 
     if (*code == kStoT) {
       // The input contains the sources
+      EVENT_TRACE_DASHMM_STOT_BEGIN();
       StoT *input = static_cast<StoT *>(rhs);
 
       if (input->count) {
@@ -236,7 +237,9 @@ class TargetLCO {
                        targets, &targets[lhs->targets.n()]);
 
       }
+      EVENT_TRACE_DASHMM_STOT_END();
     } else if (*code == kMtoT) {
+      EVENT_TRACE_DASHMM_MTOT_BEGIN();
       readbuf.interpret<MtoT>();
 
       target_t *targets{lhs->targets.data()};
@@ -246,7 +249,9 @@ class TargetLCO {
       expansion_t expand(views);
       expand.M_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
+      EVENT_TRACE_DASHMM_MTOT_END();
     } else if (*code == kLtoT) {
+      EVENT_TRACE_DASHMM_LTOT_BEGIN();
       readbuf.interpret<LtoT>();
 
       target_t *targets{lhs->targets.data()};
@@ -256,6 +261,7 @@ class TargetLCO {
       expansion_t expand(views);
       expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
+      EVENT_TRACE_DASHMM_LTOT_END();
     } else {
       assert(0 && "Incorrect code to TargetLCO");
     }

@@ -1,0 +1,26 @@
+The following events are added to the DASHMM specific tracing HPX.
+
+These will all be added to the TRACE class of event. This is to make it
+easiest to change HPX.
+
+
+All of the following should have TRACE_DASHMM_ prepended (that is the TRACE
+class of events). To use them, just call EVENT_TRACE_DASHMM_*() with 
+whatever to send in as the arguments.
+
+ZEROREF - this is used to indicate a zero reference point to be used in the 
+  trace files
+
+STOT_BEGIN/END - S->T events
+STOM_BEGIN/END - S->M events
+STOL_BEGIN/END - S->L events
+MTOT_BEGIN/END - M->T events
+MTOM_BEGIN/END - M->M events
+MTOL_BEGIN/END - M->L events
+MTOI_BEGIN/END - M->I events
+LTOL_BEGIN/END - L->L events
+LTOT_BEGIN/END - L->T events
+ITOI_BEGIN/END - I->I events
+ITOL_BEGIN/END - I->L events
+
+ELCO_OP_BEGIN/END - Expansion LCO operation begin and end
