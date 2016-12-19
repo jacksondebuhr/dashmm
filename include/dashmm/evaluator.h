@@ -322,7 +322,10 @@ class Evaluator {
 
 
     // BEGIN EVALUATE
+#ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_begin();
+    EVENT_TRACE_DASHMM_ZEROREF();
+#endif
 
     hpx_time_t evaluate_begin = hpx_time_now();
     tree->setup_edge_lists(dag);
@@ -333,7 +336,9 @@ class Evaluator {
     double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
     //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
 
+#ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_end();
+#endif
     // END EVALUATE
 
     fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
