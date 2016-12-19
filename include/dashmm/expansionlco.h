@@ -46,6 +46,7 @@
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
 #include "dashmm/targetlco.h"
+#include "dashmm/traceevents.h"
 #include "dashmm/types.h"
 #include "dashmm/viewset.h"
 

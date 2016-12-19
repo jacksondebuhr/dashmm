@@ -36,6 +36,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arrayref.h"
+#include "dashmm/traceevents.h"
 #include "dashmm/viewset.h"
 
 
