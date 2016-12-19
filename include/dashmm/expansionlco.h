@@ -188,11 +188,13 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param idx - the index of the node for which this is an expansion
   void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+    EVENT_TRACE_DASHMM_STOM_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_M(center, sources, &sources[n_src]);
     contribute(std::move(multi));
+    EVENT_TRACE_DASHMM_STOM_END();
   }
 
   /// Set this expansion with the local expansion of the given sources
@@ -211,11 +213,13 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param idx - the index of the node for which this is an expansion
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+    EVENT_TRACE_DASHMM_STOL_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));
+    EVENT_TRACE_DASHMM_STOL_END();
   }
 
   /// Apply effect of sources to targets
@@ -397,6 +401,7 @@ class ExpansionLCO {
     switch (*code) {
       case SetOpCodes::kContribute:
         {
+          EVENT_TRACE_DASHMM_ELCO_BEGIN();
           ViewSet views{};
           views.interpret(input);
           expansion_t incoming{views};
@@ -412,6 +417,7 @@ class ExpansionLCO {
           // release the data, because these objects do not actually own it
           expand.release();
           incoming.release();
+          EVENT_TRACE_DASHMM_ELCO_END();
         }
         break;
       case SetOpCodes::kOutEdges:
@@ -632,6 +638,7 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
+    EVENT_TRACE_DASHMM_MTOM_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
@@ -641,6 +648,7 @@ class ExpansionLCO {
 
     expansionlco_t destination{target};
     destination.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOM_END();
   }
 
   /// Serve an M->L edge
@@ -651,6 +659,7 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void m_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
+    EVENT_TRACE_DASHMM_MTOL_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
 
     // translate the source expansion
@@ -660,6 +669,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOL_END();
   }
 
   /// Serve an L->L edge
@@ -670,6 +680,7 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void l_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
+    EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
     double t_size = head->domain.size_from_level(tidx.level());
 
@@ -679,6 +690,7 @@ class ExpansionLCO {
 
     expansionlco_t total{target};
     total.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_LTOL_END();
   }
 
   /// Serve an M->T edge
@@ -710,12 +722,14 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   static void m_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
+    EVENT_TRACE_DASHMM_MTOI_BEGIN();
     expansion_t lexp{views};
     auto translated = lexp.M_to_I(head->index);
     lexp.release();
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOI_END();
   }
 
   /// Serve an I->I edge
@@ -726,6 +740,7 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
+    EVENT_TRACE_DASHMM_ITOI_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
 
     expansion_t lexp{views};
@@ -734,6 +749,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_ITOI_END();
   }
 
   /// Serve an I->L edge
@@ -744,6 +760,7 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void i_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
+    EVENT_TRACE_DASHMM_ITOL_BEGIN();
     double t_size = head->domain.size_from_level(tidx.level());
 
     expansion_t lexp{views};
@@ -752,6 +769,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_ITOL_END();
   }
 
 
