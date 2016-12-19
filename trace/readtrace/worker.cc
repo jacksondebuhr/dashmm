@@ -37,7 +37,8 @@ void Worker::add_file(File &stream) {
     throw std::invalid_argument("File does not match worker");
   }
 
-  auto endnow{events_.size()};
+  //auto endnow{events_.size()};
+  // TODO: Could it be that the input is not sorted?
 
   do {
     events_.push_back(stream.next());
@@ -47,14 +48,16 @@ void Worker::add_file(File &stream) {
   // Release the file object.
   stream.close();
 
-  std::inplace_merge(events_.begin(), events_.begin() + endnow, events_.end(),
-                     event_compare_uptr);
+  //std::inplace_merge(events_.begin(), events_.begin() + endnow, events_.end(),
+  //                   event_compare_uptr);
+  std::sort(events_.begin(), events_.end(), event_compare_uptr);
 }
 
 
 void Worker::finalize(uint64_t min, uint64_t max) {
   if (locked_) return;
   locked_ = true;
+  //std::sort(events_.begin(), events_.end(), event_compare_uptr);
 }
 
 
