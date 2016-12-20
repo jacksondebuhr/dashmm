@@ -41,9 +41,11 @@ ReturnCode init(int *argc, char ***argv) {
     return kRuntimeError;
   }
 
+#ifdef DASHMM_INSTRUMENTATION
   if (libhpx_inst_tracer_active()) {
     libhpx_inst_phase_end();
   }
+#endif
 
   return kSuccess;
 }
