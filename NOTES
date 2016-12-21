@@ -5,6 +5,50 @@ THIS BRANCH TODO
 Things that likely would not break the API
 ==========================================
 
+TODO: remove DomainGeometry from ExpansionLCO
+      - we would need to have a way to access the single domain for the current
+      evaluation. One method here would be to just save the global address of
+      a RankWise object instead of the full domain geometry. That would save
+      3/4 of the data. However, is there some better way for this?
+
+      To do otherwise means having a known address for the thing, which is
+      essentially a global variable. This could make some things simpler, but
+      that would necessarily limit the use of DASHMM to performing only a
+      single evaluation at a time. That is perhaps not a real restriction, as
+      expansions can be combined, and run simultaneously. But is is something
+      we want to do? It likely is not a good use of the system to have multiple
+      going at once. So perhaps it is not a real restriction?
+
+      So do we then provide a known location for this via some new element of
+      the interface (not the user interface). This known location could be
+      set up during dashmm::init. For the moment, this really is just the
+      DomainGeometry. But we could perhaps put other things there as well. It
+      might need a status flag or something to indicate if the domain is
+      actually set and valid. This could be set once the thing is set during
+      the evaluation, and then reset once the evaluation ends.
+
+TODO: Consider using only a single allocation for the expansion data, and thus
+      only a single pointer inside ExpansionLCO
+
+      This is not hard to do. It would just require some arithmetic.
+
+TODO: Consider reducing capacity in DAG member vectors; potentially just
+      use counts of tree nodes to estimate the size of these
+
+      There would be a number of ways to accomplish this. It could be that
+      inside collect_DAG_nodes() (tree.h) we just use temporaries, and then
+      construct the DAG object into vectors of the correct size. Or
+      variations on this. It could also be that we can just go ahead and
+      use the number of tree nodes to estimate an upper bound on the number
+      of DAG nodes, and reserve that much space.
+
+TODO: This is likely the big limiter in the short term on problem size. We
+      need to improve the memory use of the explicit DAG. If there were a way
+      to perhaps clean that up before we really begin the execution that would
+      be awesome, or to start to delete it when it begins. But there is a good
+      deal of waste and repetition there. The fact of the explicit DAG is nice,
+      but it needs to be made more efficient.
+
 TODO: Think about if there are places that RDMA could improve the performance.
       That might have us putting more into the GAS.
 

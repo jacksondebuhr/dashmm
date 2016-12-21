@@ -45,6 +45,7 @@
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
+#include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/traceevents.h"
 #include "dashmm/types.h"
@@ -134,7 +135,7 @@ class ExpansionLCO {
     Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
 
     ldata->yet_to_arrive = n_in + 1; // to account for setting out edges
-    ldata->domain = domain;
+    //ldata->domain = domain;
     ldata->index = index;
     ldata->rwaddr = rwtree;
     ldata->out_edge_count = n_out;
@@ -641,6 +642,7 @@ class ExpansionLCO {
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
+    //double s_size = shared::geo().size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
     expansion_t lexp{views};
@@ -662,6 +664,7 @@ class ExpansionLCO {
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_MTOL_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
+    //double s_size = shared::geo().size_from_level(head->index.level());
 
     // translate the source expansion
     expansion_t lexp{views};
@@ -684,6 +687,7 @@ class ExpansionLCO {
     EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
     double t_size = head->domain.size_from_level(tidx.level());
+    //double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
@@ -743,6 +747,7 @@ class ExpansionLCO {
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_ITOI_BEGIN();
     double s_size = head->domain.size_from_level(head->index.level());
+    //double s_size = shared::geo().size_from_level(head->index.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_I(head->index, s_size, tidx);
@@ -763,6 +768,7 @@ class ExpansionLCO {
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_ITOL_BEGIN();
     double t_size = head->domain.size_from_level(tidx.level());
+    //double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_L(tidx, t_size);

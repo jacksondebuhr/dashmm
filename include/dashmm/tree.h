@@ -49,12 +49,13 @@
 // DASHMM
 #include "dashmm/array.h"
 #include "dashmm/dag.h"
+#include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
-#include "dashmm/domaingeometry.h"
 #include "dashmm/rankwise.h"
 #include "dashmm/reductionops.h"
+#include "dashmm/shareddata.h"
 
 
 namespace dashmm {
@@ -1878,6 +1879,9 @@ class DualTree {
                              (var[3] + var[2] - length) / 2,
                              (var[5] + var[4] - length) / 2}, length};
     tree->domain_ = geo;
+
+    // Set the shared version
+    //shared::set_geo(geo);
 
     // Wait for setup to be done
     hpx_lco_wait(setup_done);
