@@ -6,11 +6,6 @@ Things that likely would not break the API
 ==========================================
 
 
-TODO: Consider using only a single allocation for the expansion data, and thus
-      only a single pointer inside ExpansionLCO
-
-      This is not hard to do. It would just require some arithmetic.
-
 TODO: Consider reducing capacity in DAG member vectors; potentially just
       use counts of tree nodes to estimate the size of these
 
