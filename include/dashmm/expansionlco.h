@@ -138,13 +138,8 @@ class ExpansionLCO {
     ldata->rwaddr = rwtree;
     ldata->out_edge_count = n_out;
     ldata->data = new char[bytes + sizeof(OutEdgeRecord) * n_out];
-    // REMOVE
-    //ldata->out_edge_records = new OutEdgeRecord[n_out];
-    //ldata->expansion_data = new char[bytes];
 
     WriteBuffer inbuf{ldata->data, bytes};
-    // REMOVE
-    //WriteBuffer inbuf{ldata->expansion_data, bytes};
     views.serialize(inbuf);
 
     hpx_gas_unpin(data_);
@@ -163,9 +158,6 @@ class ExpansionLCO {
       assert(hpx_gas_try_pin(data_, &lva));
       Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
       delete [] ldata->data;
-      // REMOVE
-      //delete [] ldata->out_edge_records;
-      //delete [] ldata->expansion_data;
       hpx_gas_unpin(data_);
 
       hpx_lco_delete_sync(data_);
@@ -290,8 +282,6 @@ class ExpansionLCO {
 
       OutEdgeRecord *records =
         reinterpret_cast<OutEdgeRecord *>(ldata->data + ldata->expansion_size);
-      // REMOVE
-      //OutEdgeRecord *records = ldata->out_edge_records;
 
       for (int i = 0; i < n_out; ++i) {
         records[i].op = edges[i].op;
@@ -350,9 +340,6 @@ class ExpansionLCO {
     Index index;
     hpx_addr_t rwaddr;
     char *data;
-    // REMOVE
-    //OutEdgeRecord *out_edge_records;
-    //char *expansion_data;
   };
 
   /// Operation codes for the LCOs set operation
@@ -413,8 +400,6 @@ class ExpansionLCO {
           expansion_t incoming{views};
 
           ReadBuffer here{lhs->data, lhs->expansion_size};
-          // REMOVE
-          //ReadBuffer here{lhs->expansion_data, lhs->expansion_size};
           ViewSet here_views{};
           here_views.interpret(here);
           expansion_t expand{here_views};
@@ -487,21 +472,13 @@ class ExpansionLCO {
 
     // Fill in the expansion data
     memcpy(temp + sizeof(Header), head->data, head->expansion_size);
-    // REMOVE
-    //memcpy(temp + sizeof(Header), head->expansion_data,
-    //       head->expansion_size);
 
     // Address for storing out edges
     OutEdgeRecord *scratch_edges =
         reinterpret_cast<OutEdgeRecord *>(temp + edgeless);
-    // REMOVE
-    //scratch->out_edge_records =
-    //  reinterpret_cast<OutEdgeRecord *>(temp + edgeless);
 
     OutEdgeRecord *out_edges =
         reinterpret_cast<OutEdgeRecord *>(head->data + head->expansion_size);
-    // REMOVE
-    //OutEdgeRecord *out_edges = head->out_edge_records;
 
     // Loop over the sorted edges
     int my_rank = hpx_get_my_rank();
@@ -580,12 +557,6 @@ class ExpansionLCO {
     // side. Compute correct offsets to set these pointers correctly.
     char *temp = reinterpret_cast<char *>(head);
     head->data = temp + sizeof(Header);
-    // REMOVE
-    //head->expansion_data = temp + sizeof(Header);
-    //head->out_edge_records =
-    //  reinterpret_cast<OutEdgeRecord *>(temp + sizeof(Header) +
-    //                                    head->expansion_size);
-    //OutEdgeRecord *out_edges = head->out_edge_records;
     OutEdgeRecord *out_edges =
       reinterpret_cast<OutEdgeRecord *>(temp + sizeof(Header) +
                                         head->expansion_size);
@@ -615,15 +586,11 @@ class ExpansionLCO {
 
     if (head->out_edge_count > 0) {
       ReadBuffer inbuf{head->data, head->expansion_size};
-      // REMOVE
-      //ReadBuffer inbuf{head->expansion_data, head->expansion_size};
       views.interpret(inbuf);
     }
 
     OutEdgeRecord *out_edges =
         reinterpret_cast<OutEdgeRecord *>(head->data + head->expansion_size);
-    // REMOVE
-    //OutEdgeRecord *out_edges = head->out_edge_records;
 
     for (int i = first; i <= last; ++i) {
       switch(out_edges[i].op) {
