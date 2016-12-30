@@ -1488,8 +1488,7 @@ class DualTree {
     hpx_lco_wait(tdone);
     hpx_lco_delete_sync(tdone);
 
-    DAG *retval = new DAG{};
-    collect_DAG_nodes(retval);
+    DAG *retval = collect_DAG_nodes();
     return retval;
   }
 
@@ -1503,11 +1502,22 @@ class DualTree {
   /// This is a synchronous operation.
   ///
   /// \param dag - a DAG object to be populated
-  void collect_DAG_nodes(DAG *dag) {
-    collect_DAG_nodes_from_S_node(source_tree_->root_, dag->source_leaves,
-                                  dag->source_nodes);
-    collect_DAG_nodes_from_T_node(target_tree_->root_, dag->target_leaves,
-                                  dag->target_nodes);
+  DAG *collect_DAG_nodes() {
+    DAG *retval = new DAG{};
+
+    collect_DAG_nodes_from_S_node(source_tree_->root_, retval->source_leaves,
+                                  retval->source_nodes);
+    collect_DAG_nodes_from_T_node(target_tree_->root_, retval->target_leaves,
+                                  retval->target_nodes);
+
+    // TODO: Note that these are non-binding requests, but this is the most
+    // clear we can write this.
+    retval->source_leaves.shrink_to_fit();
+    retval->source_nodes.shrink_to_fit();
+    retval->target_nodes.shrink_to_fit();
+    retval->target_leaves.shrink_to_fit();
+
+    return retval;
   }
 
   /// Create the LCOs from the DAG
