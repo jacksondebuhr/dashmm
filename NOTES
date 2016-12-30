@@ -5,27 +5,6 @@ THIS BRANCH TODO
 Things that likely would not break the API
 ==========================================
 
-TODO: remove DomainGeometry from ExpansionLCO
-      - we would need to have a way to access the single domain for the current
-      evaluation. One method here would be to just save the global address of
-      a RankWise object instead of the full domain geometry. That would save
-      3/4 of the data. However, is there some better way for this?
-
-      To do otherwise means having a known address for the thing, which is
-      essentially a global variable. This could make some things simpler, but
-      that would necessarily limit the use of DASHMM to performing only a
-      single evaluation at a time. That is perhaps not a real restriction, as
-      expansions can be combined, and run simultaneously. But is is something
-      we want to do? It likely is not a good use of the system to have multiple
-      going at once. So perhaps it is not a real restriction?
-
-      So do we then provide a known location for this via some new element of
-      the interface (not the user interface). This known location could be
-      set up during dashmm::init. For the moment, this really is just the
-      DomainGeometry. But we could perhaps put other things there as well. It
-      might need a status flag or something to indicate if the domain is
-      actually set and valid. This could be set once the thing is set during
-      the evaluation, and then reset once the evaluation ends.
 
 TODO: Consider using only a single allocation for the expansion data, and thus
       only a single pointer inside ExpansionLCO

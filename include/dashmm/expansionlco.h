@@ -112,13 +112,12 @@ class ExpansionLCO {
   ///
   /// \param n_in - the number of input edges to the expansion
   /// \param n_out - the number of output edges from the expansion
-  /// \param domain - the domain geometry
   /// \param index - the index of the node containing this expansion
   /// \param expand - initial data for the expansion object
   /// \param where - an addess at the locality where the expansion LCO should be
   ///                created
   /// \param rwtree - the global address of the dual tree
-  ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
+  ExpansionLCO(int n_in, int n_out,
                Index index, std::unique_ptr<expansion_t> expand,
                hpx_addr_t rwtree) {
     assert(expand != nullptr);
@@ -135,7 +134,6 @@ class ExpansionLCO {
     Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
 
     ldata->yet_to_arrive = n_in + 1; // to account for setting out edges
-    //ldata->domain = domain;
     ldata->index = index;
     ldata->rwaddr = rwtree;
     ldata->out_edge_count = n_out;
@@ -340,7 +338,6 @@ class ExpansionLCO {
     int yet_to_arrive;
     int out_edge_count;
     size_t expansion_size;
-    DomainGeometry domain;
     Index index;
     hpx_addr_t rwaddr;
     OutEdgeRecord *out_edge_records;
@@ -641,8 +638,7 @@ class ExpansionLCO {
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
-    double s_size = head->domain.size_from_level(head->index.level());
-    //double s_size = shared::geo().size_from_level(head->index.level());
+    double s_size = shared::geo().size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
     expansion_t lexp{views};
@@ -663,8 +659,7 @@ class ExpansionLCO {
   static void m_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_MTOL_BEGIN();
-    double s_size = head->domain.size_from_level(head->index.level());
-    //double s_size = shared::geo().size_from_level(head->index.level());
+    double s_size = shared::geo().size_from_level(head->index.level());
 
     // translate the source expansion
     expansion_t lexp{views};
@@ -686,8 +681,7 @@ class ExpansionLCO {
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
-    double t_size = head->domain.size_from_level(tidx.level());
-    //double t_size = shared::geo().size_from_level(tidx.level());
+    double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
@@ -746,8 +740,7 @@ class ExpansionLCO {
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_ITOI_BEGIN();
-    double s_size = head->domain.size_from_level(head->index.level());
-    //double s_size = shared::geo().size_from_level(head->index.level());
+    double s_size = shared::geo().size_from_level(head->index.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_I(head->index, s_size, tidx);
@@ -767,8 +760,7 @@ class ExpansionLCO {
   static void i_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_ITOL_BEGIN();
-    double t_size = head->domain.size_from_level(tidx.level());
-    //double t_size = shared::geo().size_from_level(tidx.level());
+    double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_L(tidx, t_size);

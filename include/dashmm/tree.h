@@ -2512,7 +2512,7 @@ class DualTree {
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
-                            tree->domain_, node->idx, std::move(input_expand),
+                            node->idx, std::move(input_expand),
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
@@ -2525,7 +2525,7 @@ class DualTree {
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
-                                tree->domain_, node->idx,
+                                node->idx,
                                 std::move(interm_expand),
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
@@ -2584,7 +2584,7 @@ class DualTree {
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
-                            tree->domain_, node->idx, std::move(input_expand),
+                            node->idx, std::move(input_expand),
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
@@ -2597,7 +2597,7 @@ class DualTree {
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
-                                tree->domain_, node->idx,
+                                node->idx,
                                 std::move(interm_expand),
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
