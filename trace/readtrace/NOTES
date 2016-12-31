@@ -14,3 +14,11 @@ So the next step is to work out how to make this stuff useful.
    resilient in error conditions. Eventually it would be nice to use this
    stuff in an interactive visualization tool, and so we would want graceful
    error situations.
+
+
+
+NOTE:
+
+This needs to have access to PNGWriter
+
+http://pngwriter.sourceforge.net/

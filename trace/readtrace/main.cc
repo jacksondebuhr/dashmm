@@ -81,8 +81,12 @@ int main(int argc, char **argv) {
     //}
 
     traceutils::Plotter maker{runtrace};
-    maker(1000, 251, 0, minns, maxns, "tryit.png", 0);
-    maker(1000, 251, 0, 0.9 * maxns, maxns, "tryitend.png", 0);
+    auto dt = maxns - minns;
+    maker(1000, 512, 0, minns, maxns, "full.png", 0);
+    maker(1000, 512, 0, minns, minns + dt * 0.25, "first.png", 0);
+    maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5, "second.png", 0);
+    maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75, "third.png", 0);
+    maker(1000, 512, 0, minns + dt * 0.75, maxns, "fourth.png", 0);
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());
