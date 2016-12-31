@@ -112,4 +112,20 @@ range_t Worker::range(uint64_t start, uint64_t end) const {
 }
 
 
+uint64_t Worker::get_zeroref() const {
+  if (events_[0]->event_type() == std::string("dashmm zero ref")) {
+    return events_[0]->stamp();
+  } else {
+    return (uint64_t)(-1);
+  }
+}
+
+
+void Worker::reset_zero(uint64_t zero) {
+  for (size_t i = 0; i < events_.size(); ++i) {
+    events_[i]->set_stamp(events_[i]->stamp() - zero);
+  }
+}
+
+
 } // traceutils

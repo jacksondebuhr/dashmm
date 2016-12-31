@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
       file_report(argv[which], in_file);
       runtrace.add_file(in_file);
     }
+    runtrace.find_and_reset_zero();
     runtrace.finalize();
 
     uint64_t minns = runtrace.min_ns();
@@ -67,8 +68,8 @@ int main(int argc, char **argv) {
             minns / 1.0e6, maxns / 1.0e6);
 
     // Get a window of events from 1s to 2s
-    //auto window = runtrace.window(minns, maxns);
-    //output_window(window, runtrace.min_ns());
+    auto window = runtrace.window(minns, maxns);
+    output_window(window, runtrace.min_ns());
 
     //auto coverage = coverage_of_segment_type(window, 1,
     //                                         minns, maxns);
@@ -80,13 +81,13 @@ int main(int argc, char **argv) {
     //  }
     //}
 
-    traceutils::Plotter maker{runtrace};
-    auto dt = maxns - minns;
-    maker(1000, 512, 0, minns, maxns, "full.png", 0);
-    maker(1000, 512, 0, minns, minns + dt * 0.25, "first.png", 0);
-    maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5, "second.png", 0);
-    maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75, "third.png", 0);
-    maker(1000, 512, 0, minns + dt * 0.75, maxns, "fourth.png", 0);
+    //traceutils::Plotter maker{runtrace};
+    //auto dt = maxns - minns;
+    //maker(1000, 512, 0, minns, maxns, "full.png", 0);
+    //maker(1000, 512, 0, minns, minns + dt * 0.25, "first.png", 0);
+    //maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5, "second.png", 0);
+    //maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75, "third.png", 0);
+    //maker(1000, 512, 0, minns + dt * 0.75, maxns, "fourth.png", 0);
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());

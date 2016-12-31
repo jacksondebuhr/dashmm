@@ -73,6 +73,8 @@ namespace {
       case EventClass::kProcess:
       case EventClass::kMemory:
       case EventClass::kTrace:
+        return dashmm::prototype_from_name(ename);
+        break;
       case EventClass::kGAS:
       case EventClass::kCollective:
       case EventClass::kUnknown:

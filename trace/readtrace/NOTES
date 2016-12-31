@@ -1,3 +1,20 @@
+TODO:
+
+SOON
+* Add the ability to ignore impulsive events (not a begin or end) when using
+  the plotter or other output things. Perhaps we need to make a segmented
+  intermediate representation.
+* Make the plotter accept a list of segment types that are of interest
+* Make the output class that will produce the percent utilization data
+
+LATER
+* Work out if the ZEROREF thing actually does anything. If it does not, remove
+  it
+* Add the ability to handle the Trace IO events to the system. To avoid some
+  annoyance, we will probably put those also in the traceutils::dashmm
+  namespace.
+
+
 So the next step is to work out how to make this stuff useful.
 
  * Do I want to have a means to replace things with segments?

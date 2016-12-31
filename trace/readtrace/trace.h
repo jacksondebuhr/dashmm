@@ -34,7 +34,11 @@ class Trace {
 
   void add_file(File &stream);
 
-  // This finalizes additions and creates the trees
+  // For each locality, find the zeroref event and if it exists, shift each
+  // event to start from the given zero.
+  void find_and_reset_zero();
+
+  // This finalizes additions
   void finalize();
 
   // Get the min and max record time of any locality

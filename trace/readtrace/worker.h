@@ -50,6 +50,11 @@ class Worker {
   // Get a range of events
   range_t range(uint64_t start, uint64_t end) const;
 
+  // Get the zeroref if present; returns -1 is not present
+  uint64_t get_zeroref() const;
+
+  void reset_zero(uint64_t zero);
+
  private:
   int id_;  // Which worker is this (numbered per locality)
   int loc_; // Which locality for which this was a worker

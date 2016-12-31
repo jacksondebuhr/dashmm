@@ -21,7 +21,7 @@ namespace {
   static std::string kStoMBeginType{"dashmm stom begin"};
   static std::string kStoMEndType{"dashmm stom end"};
   static std::string kStoLBeginType{"dashmm stol begin"};
-  static std::string kStoLEndType{"dashmm stl end"};
+  static std::string kStoLEndType{"dashmm stol end"};
   static std::string kELCOBeginType{"dashmm elco begin"};
   static std::string kELCOEndType{"dashmm elco end"};
   static std::string kMtoMBeginType{"dashmm mtom begin"};

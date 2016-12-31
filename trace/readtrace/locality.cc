@@ -50,6 +50,30 @@ void Locality::add_file(File &stream) {
 }
 
 
+void Locality::zero_reset() {
+  // First look over each worker - if there is one, it will be the first
+  // event
+  uint64_t zero{0};
+  uint64_t negative_one = -1;
+  for (auto i = workers_.begin(); i != workers_.end(); ++i) {
+    zero = i->second.get_zeroref();
+    if (zero != negative_one) {
+      break;
+    }
+  }
+
+fprintf(stdout, "DEBUG: locality %d has zero = %lu\n", locality_, zero);
+
+  // Then if found, go ahead and offset all events in all workers
+  // We also skip this work if zero is equal to 0.
+  if (zero != negative_one && zero != 0) {
+    for (auto i = workers_.begin(); i != workers_.end(); ++i) {
+      i->second.reset_zero(zero);
+    }
+  }
+}
+
+
 void Locality::finalize(uint64_t min, uint64_t max) {
   if (locked_) return;
 

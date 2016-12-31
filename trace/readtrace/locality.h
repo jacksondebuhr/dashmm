@@ -39,6 +39,10 @@ class Locality {
   // This could throw std::runtime_error or std::invalid_argument
   void add_file(File &stream);
 
+  // This will search for a zero ref event, and perform the offset if one
+  // is found.
+  void zero_reset();
+
   // This finalizes input and builds the trees
   void finalize(uint64_t min, uint64_t max);
 

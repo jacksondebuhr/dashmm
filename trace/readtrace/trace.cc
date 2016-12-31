@@ -80,6 +80,13 @@ void Trace::add_file(File &stream) {
 }
 
 
+void Trace::find_and_reset_zero() {
+  for (auto i = locs_.begin(); i != locs_.end(); ++i) {
+    i->second.zero_reset();
+  }
+}
+
+
 void Trace::finalize() {
   if (locked_) return;
 
