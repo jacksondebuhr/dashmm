@@ -2,14 +2,11 @@
 #define __TRACEUTILS_NETWORK_EVENTS_H__
 
 
+#include "segmentids.h"
 #include "traceevent.h"
 
 
 namespace traceutils {
-
-
-// The segment identifiers for the events defined here.
-constexpr int kNetworkProgress = 1;
 
 
 namespace network {
@@ -38,7 +35,9 @@ class ProgressBegin : public Event {
   uint64_t field(int i) const noexcept override {return 0;}
   bool start() const noexcept override {return true;}
   bool end() const noexcept override {return false;}
-  int segment_type() const noexcept override {return kNetworkProgress;}
+  int segment_type() const noexcept override {
+    return segment::kNetworkProgress;
+  }
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 
@@ -54,7 +53,9 @@ class ProgressEnd : public Event {
   uint64_t field(int i) const noexcept override {return 0;}
   bool start() const noexcept override {return false;}
   bool end() const noexcept override {return true;}
-  int segment_type() const noexcept override {return kNetworkProgress;}
+  int segment_type() const noexcept override {
+    return segment::kNetworkProgress;
+  }
   std::unique_ptr<Event> read_from_file(FILE *fd) const override;
 };
 

@@ -8,6 +8,7 @@
 
 #include "locality.h"
 #include "plotter.h"
+#include "segmentids.h"
 #include "traceevent.h"
 #include "tracefile.h"
 #include "trace.h"
@@ -68,8 +69,8 @@ int main(int argc, char **argv) {
             minns / 1.0e6, maxns / 1.0e6);
 
     // Get a window of events from 1s to 2s
-    auto window = runtrace.window(minns, maxns);
-    output_window(window, runtrace.min_ns());
+    //auto window = runtrace.window(minns, maxns);
+    //output_window(window, runtrace.min_ns());
 
     //auto coverage = coverage_of_segment_type(window, 1,
     //                                         minns, maxns);
@@ -81,13 +82,22 @@ int main(int argc, char **argv) {
     //  }
     //}
 
-    //traceutils::Plotter maker{runtrace};
-    //auto dt = maxns - minns;
-    //maker(1000, 512, 0, minns, maxns, "full.png", 0);
-    //maker(1000, 512, 0, minns, minns + dt * 0.25, "first.png", 0);
-    //maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5, "second.png", 0);
-    //maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75, "third.png", 0);
-    //maker(1000, 512, 0, minns + dt * 0.75, maxns, "fourth.png", 0);
+    for (int segment = traceutils::segment::kNetworkProgress;
+         segment <= traceutils::segment::kDASHMMItoL; ++segment) {
+      traceutils::Plotter maker{runtrace};
+      auto dt = maxns - minns;
+      std::string segtype = traceutils::segment::name(segment);
+
+      maker(1000, 512, 0, minns, maxns, segtype + "full.png", segment, 0);
+      maker(1000, 512, 0, minns, minns + dt * 0.25, segtype + "first.png",
+            segment, 0);
+      maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5,
+            segtype + "second.png", segment, 0);
+      maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75,
+            segtype + "third.png", segment, 0);
+      maker(1000, 512, 0, minns + dt * 0.75, maxns,
+            segtype + "fourth.png", segment, 0);
+    }
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());

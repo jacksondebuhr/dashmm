@@ -21,7 +21,7 @@ class Plotter {
   // TODO: eventially we add segment types and colors to this. For now, we
   //  are fixed with red and network progress
   void operator()(int px, int py, int padding, uint64_t t0, uint64_t t1,
-                  const std::string &fname, int compress = -1);
+                  const std::string &fname, int segment, int compress = -1);
 
  private:
   struct image_data_t {
@@ -41,7 +41,7 @@ class Plotter {
     int bar_bottom(int idx);
     int bar_top(int idx);
     // TODO routine to get a certain bar's location
-    void plot(const Trace &trace);
+    void plot(const Trace &trace, int segment);
   };
 
   const Trace &trace_;

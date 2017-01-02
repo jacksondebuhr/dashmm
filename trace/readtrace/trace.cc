@@ -140,8 +140,10 @@ namespace {
     uint64_t cover{0};
     int64_t previous_start = start;
     int64_t previous_end = start - 1;
+    uint64_t type_count{0};
     for (auto i = range.first; i != range.second; ++i) {
       if ((*i)->segment_type() == type) {
+        ++type_count;
         if ((*i)->start()) {
           // make sure the segments are alternating start/stop
           previous_start = (*i)->stamp();
@@ -157,7 +159,7 @@ namespace {
       }
     }
     // Deal with a start but no end here
-    if (previous_end < previous_start) {
+    if (type_count && (previous_end < previous_start)) {
       cover += end - previous_start;
     }
     return ((double)cover) / total;

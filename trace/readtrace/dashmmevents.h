@@ -2,25 +2,11 @@
 #define __TRACEUTILS_DASHMM_EVENTS_H__
 
 
+#include "segmentids.h"
 #include "traceevent.h"
 
 
 namespace traceutils {
-
-
-// The segment identifiers for the events defined here
-constexpr int kDASHMMStoT = 2;
-constexpr int kDASHMMMtoT = 3;
-constexpr int kDASHMMLtoT = 4;
-constexpr int kDASHMMStoM = 5;
-constexpr int kDASHMMStoL = 6;
-constexpr int kDASHMMELCO = 7;
-constexpr int kDASHMMMtoM = 8;
-constexpr int kDASHMMMtoL = 9;
-constexpr int kDASHMMLtoL = 10;
-constexpr int kDASHMMMtoI = 11;
-constexpr int kDASHMMItoI = 12;
-constexpr int kDASHMMItoL = 13;
 
 
 namespace dashmm {
@@ -77,7 +63,7 @@ class StoTBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMStoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -88,7 +74,7 @@ class StoTEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMStoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -101,7 +87,7 @@ class MtoTBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMMtoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -112,7 +98,7 @@ class MtoTEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMMtoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -125,7 +111,7 @@ class LtoTBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMLtoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMLtoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -136,7 +122,7 @@ class LtoTEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMLtoT;}
+  int segment_type() const noexcept final {return segment::kDASHMMLtoT;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -149,7 +135,7 @@ class StoMBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMStoM;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoM;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -160,7 +146,7 @@ class StoMEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMStoM;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoM;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -173,7 +159,7 @@ class StoLBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMStoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -184,7 +170,7 @@ class StoLEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMStoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMStoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -197,7 +183,7 @@ class ELCOBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMELCO;}
+  int segment_type() const noexcept final {return segment::kDASHMMELCO;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -208,7 +194,7 @@ class ELCOEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMELCO;}
+  int segment_type() const noexcept final {return segment::kDASHMMELCO;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -221,7 +207,7 @@ class MtoMBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMMtoM;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoM;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -232,7 +218,7 @@ class MtoMEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMMtoM;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoM;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -245,7 +231,7 @@ class MtoLBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMMtoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -256,7 +242,7 @@ class MtoLEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMMtoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -269,7 +255,7 @@ class LtoLBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMLtoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMLtoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -280,7 +266,7 @@ class LtoLEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMLtoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMLtoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -293,7 +279,7 @@ class MtoIBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMMtoI;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoI;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -304,7 +290,7 @@ class MtoIEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMMtoI;}
+  int segment_type() const noexcept final {return segment::kDASHMMMtoI;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -317,7 +303,7 @@ class ItoIBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMItoI;}
+  int segment_type() const noexcept final {return segment::kDASHMMItoI;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -328,7 +314,7 @@ class ItoIEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMItoI;}
+  int segment_type() const noexcept final {return segment::kDASHMMItoI;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -341,7 +327,7 @@ class ItoLBegin : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return true;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return kDASHMMItoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMItoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -352,7 +338,7 @@ class ItoLEnd : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return true;}
-  int segment_type() const noexcept final {return kDASHMMItoL;}
+  int segment_type() const noexcept final {return segment::kDASHMMItoL;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 
@@ -365,7 +351,7 @@ class ZeroRef : public DASHMMEvent {
   const std::string &event_type() const final;
   bool start() const noexcept final {return false;}
   bool end() const noexcept final {return false;}
-  int segment_type() const noexcept final {return 0;}
+  int segment_type() const noexcept final {return segment::kNoSegment;}
   std::unique_ptr<Event> read_from_file(FILE *fd) const final;
 };
 

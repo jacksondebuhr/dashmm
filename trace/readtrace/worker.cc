@@ -50,14 +50,14 @@ void Worker::add_file(File &stream) {
 
   //std::inplace_merge(events_.begin(), events_.begin() + endnow, events_.end(),
   //                   event_compare_uptr);
-  std::sort(events_.begin(), events_.end(), event_compare_uptr);
+  //std::sort(events_.begin(), events_.end(), event_compare_uptr);
 }
 
 
 void Worker::finalize(uint64_t min, uint64_t max) {
   if (locked_) return;
   locked_ = true;
-  //std::sort(events_.begin(), events_.end(), event_compare_uptr);
+  std::sort(events_.begin(), events_.end(), event_compare_uptr);
 }
 
 

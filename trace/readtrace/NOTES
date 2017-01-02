@@ -1,11 +1,27 @@
 TODO:
 
+KNOWN LIMITATIONS:
+* There is a chance that an extremely long segment will not show up on the
+  resulting images. If a segment extends off either side of the timespan
+  represented by a given pixel in the image, the current code will not color
+  it at all. This is, of course, an error. To sort that out, we likely have
+  to invert the way we collect the information into the image. Instead of
+  gathering into the bin, we should scatter the segment into the various bins.
+
 SOON
-* Add the ability to ignore impulsive events (not a begin or end) when using
-  the plotter or other output things. Perhaps we need to make a segmented
-  intermediate representation.
+* With the reorganization of the sort, we now have nothing that happens with the
+  find and reset zero thing. Perhaps we need to just be okay with the
+  modification of the stamp after finalization?
+* Work out a specific file type for preprocessed events. The sort takes a huge
+  amount of time. It is unacceptably long probably.
 * Make the plotter accept a list of segment types that are of interest
+   Currently, we take in a single segment, and will produce images only of that
+   segment type. That will be enough for now. But this is not really done.
 * Make the output class that will produce the percent utilization data
+   This will be able to reuse much of the existing stuff. The only difference
+   is that instead of an image, it will put it out to a text file. There is
+   something to work out about the format of the file that makes it easy to
+   plot from.
 
 LATER
 * Work out if the ZEROREF thing actually does anything. If it does not, remove
@@ -13,6 +29,49 @@ LATER
 * Add the ability to handle the Trace IO events to the system. To avoid some
   annoyance, we will probably put those also in the traceutils::dashmm
   namespace.
+* Send email to Daniel and cc Luke with a list of requests for the tracing
+  system. This includes making it easy to add user events like I have done,
+  and a way to remove events that also removes the file output and all of that.
+  It would not have to be perfect, but having to go through what I go through
+  is obnoxious mostly.
+
+
+LATER STILL
+* I think we do want to work out how to make an interactive visualization tool.
+  It will, of course, be called Clouseau
+  - The likely use case would be to preprocess the trace files into a set of
+    more usable segment files or something. For a realistic run, there is a
+    good deal of initial processing that must occur.
+      Indeed, the sort takes a looooong time with the full trace loaded. This
+      is a cost that should be paid but one time.
+  - This would then subsume all of the current capabilities here: it would be
+    able to make PNG files; it could make different collations of the data
+    (so do for a given worker, all the event types); it could print out
+    frequency and so on; it would do the summary information by rank, or
+    over the whole set of traces.
+  - Surely Qt is the right approach here. It is cross-platform, and it handles
+    a good deal of the stuff we would need to do manually otherwise.
+  - This is an opportunity to leave something for HPX-5. It could be a more
+    general utility. DASHMM has some extra events, but we could perhaps have
+    a system that will translated the events into segments and impulsive
+    events with special metadata set up. So a user could use the original
+    events, or add to those custom events like we are doing.
+  - The main interface would be a big window where the events are drawn. We
+    likely cannot just draw segments, as that would be a huge number of events
+    to process all the time. It might need to be a bit of a combination or
+    something. Or, we just need to have users aware that there are lots of
+    events, and so the interactivity is a little constrained. Or perhaps there
+    is an exploration mode that will give an approximation, and then an
+    accurate mode that gives more exact images.
+      - Or maybe, we just do the summary lines to start. Those are 'quick' to
+        compute, and then from there, an interesting section could be selected
+        for more careful analysis.
+      - Anyway, dealing with the volume of data is a big problem.
+      - Perhaps there is some DB stuff I could do. Not sure.
+      - Or maybe, preprocessing will also create some downsamples of the data
+        to make the higher level views faster to produce.
+  -
+
 
 
 So the next step is to work out how to make this stuff useful.
@@ -39,3 +98,14 @@ NOTE:
 This needs to have access to PNGWriter
 
 http://pngwriter.sourceforge.net/
+
+
+
+
+
+
+DONE * Add the ability to ignore impulsive events (not a begin or end) when using
+  the plotter or other output things. Perhaps we need to make a segmented
+  intermediate representation.
+      Actually, it already does this. It looks for a segment type, and so
+      any event not in the segment is ignored. Nice.

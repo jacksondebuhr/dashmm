@@ -5,10 +5,10 @@ namespace traceutils {
 
 
 void Plotter::operator()(int px, int py, int padding, uint64_t t0, uint64_t t1,
-                         const std::string &fname, int compress) {
+                         const std::string &fname, int segment, int compress) {
   image_data_t img{px, py, padding, 0, t0, t1, trace_.total_workers(),
                    fname, compress};
-  img.plot(trace_);
+  img.plot(trace_, segment);
 }
 
 
@@ -47,7 +47,7 @@ int Plotter::image_data_t::bar_top(int idx) {
 }
 
 
-void Plotter::image_data_t::plot(const Trace &trace) {
+void Plotter::image_data_t::plot(const Trace &trace, int segment) {
   // compute some one time things
   double dx = (double)(t1 - t0) / px;
   std::map<int, std::map<int, int>> wmap = trace.worker_map();
@@ -63,7 +63,7 @@ void Plotter::image_data_t::plot(const Trace &trace) {
     uint64_t tstart = (uint64_t)(dx * ix + 0.5) + t0;
     uint64_t tend = (uint64_t)(dx * (ix + 1) + 0.5) + t0;
     auto window = trace.window(tstart, tend);
-    auto coverage = coverage_of_segment_type(window, 1, tstart, tend);
+    auto coverage = coverage_of_segment_type(window, segment, tstart, tend);
 
     for (auto i = coverage.begin(); i != coverage.end(); ++i) {
       for (auto j = i->second.begin(); j != i->second.end(); ++j) {
