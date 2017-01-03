@@ -1,5 +1,7 @@
 TODO:
 
+* Test branch hpx-1000 which uses a different scheduler
+
 KNOWN LIMITATIONS:
 * There is a chance that an extremely long segment will not show up on the
   resulting images. If a segment extends off either side of the timespan

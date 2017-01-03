@@ -12,6 +12,7 @@
 #include "traceevent.h"
 #include "tracefile.h"
 #include "trace.h"
+#include "utilization.h"
 #include "worker.h"
 
 
@@ -82,6 +83,7 @@ int main(int argc, char **argv) {
     //  }
     //}
 
+    /*
     for (int segment = traceutils::segment::kNetworkProgress;
          segment <= traceutils::segment::kDASHMMItoL; ++segment) {
       traceutils::Plotter maker{runtrace};
@@ -98,11 +100,24 @@ int main(int argc, char **argv) {
       maker(1000, 512, 0, minns + dt * 0.75, maxns,
             segtype + "fourth.png", segment, 0);
     }
+    */
+
+    std::vector<int> segs{};
+    for (int seg = traceutils::segment::kDASHMMStoT;
+         seg <= traceutils::segment::kDASHMMItoL; ++seg) {
+      segs.push_back(seg);
+    }
+
+    traceutils::Utilization util{runtrace};
+    util("test.txt", minns, maxns, 100, segs);
+
 
   } catch (std::runtime_error &err) {
     fprintf(stderr, "Exception: %s\n", err.what());
+  } catch (std::invalid_argument &err) {
+    fprintf(stderr, "Exception: %s\n", err.what());
   } catch (...) {
-    fprintf(stderr, "Some other exception...\n");
+    fprintf(stderr, "Who knows...\n");
   }
 
 
