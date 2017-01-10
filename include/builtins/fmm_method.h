@@ -54,11 +54,8 @@ class FMM {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = FMM<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, FMM>;
-  using sourceref_t = ArrayRef<Source>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, FMM>;
 
   using distropolicy_t = BHDistro;
 

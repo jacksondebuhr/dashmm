@@ -59,11 +59,8 @@ class Direct {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = Direct<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Direct>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, Direct>;
-  using sourceref_t = ArrayRef<Source>;
 
   using distropolicy_t = BHDistro;
 

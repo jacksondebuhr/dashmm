@@ -440,8 +440,8 @@ The possible return values are \texttt{kSuccess} when there is no problem, and
 
 
 \section{DASHMM array}
-DASHMM provides an array construct that represents a collection of records in
-the global address space provided by HPX-5. The \texttt{Array} object is a template
+DASHMM provides an array construct that represents a distributed collection of
+records. The \texttt{Array} object is a template
 type over the record. The only requirement on the record type is that it is
 trivially copyable. When an \texttt{Array} is created, as in
 
@@ -449,8 +449,8 @@ trivially copyable. When an \texttt{Array} is created, as in
 Array<T> source_data{};
 \end{lstlisting}
 
-\noindent no global memory is yet allocated for the array. To allocate the
-global memory that will serve the array, one must use \texttt{allocate()}.
+\noindent no memory is yet allocated for the array. To allocate the
+memory that will serve the array, one must use \texttt{allocate()}.
 Array objects can be thought of as a traditional array,
 but which is broken into one part for each locality in the system. The parts,
 or \emph{segments} of the array, could have different lengths. Some segments can
@@ -466,14 +466,12 @@ Array<T>::Array()
 
 \noindent \texttt{Array} objects have a single constructor, which does not
 allocate any
-global memory. It takes a single optional argument that is not needed for basic
-use of DASHMM. When default constructed, an \texttt{Array} will be invalid (see
+memory. When default constructed, an \texttt{Array} will be invalid (see
 \texttt{valid()} below).
 
 This is not a collective operation. To use an array, each locality must create
 an \texttt{Array} object. The individual \texttt{Array} objects will be bound
-into a unified object referring to the global address space using
-\texttt{allocate()}.
+into a unified object using \texttt{allocate()}.
 
 \begin{lstlisting}
 bool Array<T>::valid() const
@@ -482,8 +480,7 @@ bool Array<T>::valid() const
 \noindent This returns if the array is valid, that is, it refers to some global
 memory.
 When initially constructed, an \texttt{Array} will be invalid, and can only be
-made valid by allocating global memory for the records (see
-\texttt{allocate()}).
+made valid by allocating memory for the records (see \texttt{allocate()}).
 
 This method is not collective.
 
@@ -507,31 +504,38 @@ each rank. This is a collective call, and it is an error to call this method
 on an invalid array.
 
 \begin{lstlisting}
-ReturnCode Array<T>::allocate(size_t record_count)
+ReturnCode Array<T>::allocate(size_t record_count, T *segment = nullptr)
 \end{lstlisting}
 
-\noindent This allocates the global memory to serve an array with the given
-counts on
-each locality. After this call the array will be valid unless there is an
-error, which will be indicated by the return code. Possible return values are:
-\texttt{kSuccess} if the array is successfully allocated; \texttt{kDomainError}
-is the object already has an allocation; \texttt{kAllocationError} is the
-global memory cannot be allocated; or \texttt{kRuntimeError} if there is some
-error in the runtime.
+\noindent This allocates the memory to serve an array with the given
+counts on each locality. After this call the array will be valid unless
+there is an error, which will be indicated by the return code. Possible
+return values are: \texttt{kSuccess} if the array is successfully allocated;
+\texttt{kDomainError} is the object already has an allocation;
+\texttt{kAllocationError} is the global memory cannot be allocated; or
+\texttt{kRuntimeError} if there is some error in the runtime.
 
 This is a collective call. Each locality can provided a different number of
 records to allocate via the \texttt{record\_count} parameter. The resulting
-global allocation will match the input of \texttt{allocate()}. A locality can
+allocation will match the input of \texttt{allocate()}. A locality can
 provide \texttt{0} as an argument, so long as at least one rank asks for a
 non-zero number of records. For instance, one locality might allocate all of
 the records for an array, or each locality might own a portion of the overall
 records.
 
+The optional second argument allows users to provide the data that will make
+up the segments of the array. If this argument is \texttt{nullptr} (the
+default), then DASHMM will allocate the memory for each segment. If this
+argument is not null, then DASHMM will assume ownership of the provided
+memory, and will build the resulting array with the provided data.
+Providing an incorrect \texttt{record\_count} for this use case will cause
+undefined behavior.
+
 \begin{lstlisting}
 ReturnCode Array<T>::destroy()
 \end{lstlisting}
 
-\noindent This will destroy the global memory allocated for this array object.
+\noindent This will destroy the memory allocated for this array object.
 It is
 an error to call this on an invalid array. This is a collective call. The
 result of the method will be either \texttt{kRuntimeError} if there is an error
@@ -552,12 +556,14 @@ placed. \texttt{first} and \texttt{last} are given in terms of the segment of
 the array on this locality. To discover the number of records on the calling
 locality, use \texttt{count()}.
 
-Note that this is a copy of the global data; changes to the retrieved values
+Note that this is a copy of the data; changes to the retrieved values
 will not be reflected in the array object.
 
 This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index range
 is inconsistent with the array object; or \texttt{kSuccess} otherwise.
+
+{\bf NOTE: Are we going to deprecate this?}
 
 \begin{lstlisting}
 ReturnCode Array<T>::put(size_t first, size_t last, T *in)
@@ -573,12 +579,14 @@ placed. \texttt{first} and \texttt{last} are given in terms of the segment of
 the array on this locality. To discover the capacity of the array on the
 calling locality, use \texttt{count()}.
 
-Note that this places a copy of the records into the global address space;
+Note that this places a copy of the records into the address space;
 subsequent changes in the local data will not be reflected in the array object.
 
 This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index
 range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
+
+{\bf NOTE: Are we going to deprecate this?}
 
 \begin{lstlisting}
 std::unique_ptr<T[], void(*)(T *)> Array<T>::collect()
@@ -594,6 +602,27 @@ locality zero. All other ranks will receive a null pointer.
 
 Note that this provides a copy of the data; changes to the returned data will
 not be reflected in the array object.
+
+\begin{lstlisting}
+T *Array<T>::segment(size_t &count)
+\end{lstlisting}
+
+\noindent This method provides direct access to the local segment of an array.
+Because some DASHMM rountines will modify the segments of arrays, the length
+of the returned array data cannot be known ahead of time. So, in addition to
+the segment's address, the number of records is returned via the \texttt{count}
+paramter. It is possible that this will return \texttt{nullptr}, but this will
+occur only when \texttt{count} is zero.
+
+This is a collective call. Each rank will receive the address and count of its
+own segment.
+
+Note that this provides direct access to the data; changes to the data will
+persist in the object.
+
+Note that calls to some other DASHMM routines will invalidate the address
+returned by this method.
+
 
 \section{Array map actions}
 

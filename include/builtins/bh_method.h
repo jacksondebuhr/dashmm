@@ -64,11 +64,8 @@ class BH {
   using target_t = Target;
   using expansion_t = Expansion<Source, Target>;
   using method_t = BH<Source, Target, Expansion>;
-  using expansionlco_t = ExpansionLCO<Source, Target, Expansion, BH>;
-  using targetlco_t = TargetLCO<Source, Target, Expansion, BH>;
   using sourcenode_t = Node<Source>;
   using targetnode_t = Node<Target>;
-  using sourceref_t = ArrayRef<Source>;
 
   using distropolicy_t = BHDistro;
 

@@ -34,7 +34,6 @@
 #include <map>
 #include <memory>
 #include <string>
-
 #include "dashmm/dashmm.h"
 
 // The type used for source data. This meets all the requiremenets of the
@@ -71,6 +70,10 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
+dashmm::Evaluator<SourceData, TargetData, 
+                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{}; 
+dashmm::Evaluator<SourceData, TargetData, 
+                  dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{}; 
 
 // This type collects the input arguments to the program.
 struct InputArguments {
@@ -104,7 +107,7 @@ void print_usage(char *progname) {
           "number of digits of accuracy for fmm (3)\n"
           "--verify=[yes/no]           "
           "perform an accuracy test comparing to direct summation (yes)\n"
-          "--kernel=[laplace/yukawa]   "
+          "--kernel=[laplace/yukawa/helmholtz]   "
           "particle interaction type (laplace)\n"
           , progname);
 }
@@ -226,6 +229,17 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     } else if (retval.accuracy != 3 && retval.accuracy != 6) {
       fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
               " for yukawa kernel using fmm97\n");
+      return -1;
+    }
+  }
+
+  if (retval.kernel == "helmholtz") {
+    if (retval.method != "fmm97") {
+      fprintf(stderr, "Usage ERROR: helmholtz kernel must use fmm97\n");
+      return -1;
+    } else if (retval.accuracy != 3 && retval.accuracy != 6) {
+      fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
+              " for helmholtz kernel using fmm97\n");
       return -1;
     }
   }
@@ -491,6 +505,18 @@ void perform_evaluation_test(InputArguments args) {
       err = yukawa_fmm97.evaluate(source_handle, target_handle,
                                   args.refinement_limit, method,
                                   args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
+      tf = getticks();
+    }
+  } else if (args.kernel == std::string{"helmholtz"}) {
+    if (args.method == std::string{"fmm97"}) {
+      dashmm::FMM97<SourceData, TargetData, dashmm::Helmholtz> method{};
+      std::vector<double> kernelparms(1, 0.1); 
+
+      t0 = getticks(); 
+      err = helmholtz_fmm97.evaluate(source_handle, target_handle, 
+                                     args.refinement_limit, method, 
+                                     args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     }

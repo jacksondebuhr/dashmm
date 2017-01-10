@@ -45,7 +45,9 @@
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
+#include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
+#include "dashmm/traceevents.h"
 #include "dashmm/types.h"
 #include "dashmm/viewset.h"
 
@@ -92,8 +94,6 @@ class ExpansionLCO {
   using expansion_t = Expansion<Source, Target>;
   using method_t = Method<Source, Target, Expansion>;
 
-  using sourceref_t = ArrayRef<Source>;
-  using targetref_t = ArrayRef<Target>;
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
@@ -112,38 +112,34 @@ class ExpansionLCO {
   ///
   /// \param n_in - the number of input edges to the expansion
   /// \param n_out - the number of output edges from the expansion
-  /// \param domain - the domain geometry
   /// \param index - the index of the node containing this expansion
   /// \param expand - initial data for the expansion object
   /// \param where - an addess at the locality where the expansion LCO should be
   ///                created
   /// \param rwtree - the global address of the dual tree
-  ExpansionLCO(int n_in, int n_out, DomainGeometry &domain,
+  ExpansionLCO(int n_in, int n_out,
                Index index, std::unique_ptr<expansion_t> expand,
                hpx_addr_t rwtree) {
     assert(expand != nullptr);
 
     ViewSet views = expand->get_all_views();
     size_t bytes = views.bytes();
-    size_t less_edges = sizeof(Header) + bytes;
-    size_t total = less_edges + sizeof(OutEdgeRecord) * n_out;
 
-    data_ = hpx_lco_user_new(total, init_, operation_, predicate_,
+    data_ = hpx_lco_user_new(sizeof(Header), init_, operation_, predicate_,
                              &bytes, sizeof(bytes));
     assert(data_ != HPX_NULL);
 
-    void *lco_lva{nullptr};
-    assert(hpx_gas_try_pin(data_, &lco_lva));
-    Header *input_data =
-        static_cast<Header *>(hpx_lco_user_get_user_data(lco_lva));
+    void *lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lva));
+    Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
 
-    input_data->yet_to_arrive = n_in + 1; // to account for setting out edges
-    input_data->domain = domain;
-    input_data->index = index;
-    input_data->rwaddr = rwtree;
-    input_data->out_edge_count = n_out;
+    ldata->yet_to_arrive = n_in + 1; // to account for setting out edges
+    ldata->index = index;
+    ldata->rwaddr = rwtree;
+    ldata->out_edge_count = n_out;
+    ldata->data = new char[bytes + sizeof(OutEdgeRecord) * n_out];
 
-    WriteBuffer inbuf{input_data->payload, bytes};
+    WriteBuffer inbuf{ldata->data, bytes};
     views.serialize(inbuf);
 
     hpx_gas_unpin(data_);
@@ -158,6 +154,12 @@ class ExpansionLCO {
   /// Destroy the GAS data referred by the object.
   void destroy() {
     if (data_ != HPX_NULL) {
+      void *lva{nullptr};
+      assert(hpx_gas_try_pin(data_, &lva));
+      Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
+      delete [] ldata->data;
+      hpx_gas_unpin(data_);
+
       hpx_lco_delete_sync(data_);
       data_ = HPX_NULL;
     }
@@ -184,11 +186,13 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param idx - the index of the node for which this is an expansion
   void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+    EVENT_TRACE_DASHMM_STOM_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_M(center, sources, &sources[n_src]);
     contribute(std::move(multi));
+    EVENT_TRACE_DASHMM_STOM_END();
   }
 
   /// Set this expansion with the local expansion of the given sources
@@ -207,11 +211,13 @@ class ExpansionLCO {
   /// \param n_src - the number of sources
   /// \param idx - the index of the node for which this is an expansion
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+    EVENT_TRACE_DASHMM_STOL_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
     expansion_t local{views};
     auto multi = local.S_to_L(center, sources, &sources[n_src]);
     contribute(std::move(multi));
+    EVENT_TRACE_DASHMM_STOL_END();
   }
 
   /// Apply effect of sources to targets
@@ -264,21 +270,18 @@ class ExpansionLCO {
   ///
   /// \param edges - the out edge data
   void set_out_edge_data(std::vector<DAGEdge> &edges) {
-    // TODO reduce a copy here using the parcel interface
-    int n_out = edges.size();
-    size_t bytes = sizeof(OutEdgeRecord) * n_out + sizeof(int) * 2;
-    char *input_data = new char[bytes];
-    assert(input_data);
+    void *lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lva));
+    Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
 
-    int *codes = reinterpret_cast<int *>(input_data);
-    codes[0] = SetOpCodes::kOutEdges;
-    codes[1] = n_out;
+    int n_out = edges.size();
+    assert(ldata->out_edge_count == n_out);
 
     if (n_out) {
       std::sort(edges.begin(), edges.end(), DAG::compare_edge_locality);
 
       OutEdgeRecord *records =
-          reinterpret_cast<OutEdgeRecord *>(input_data + sizeof(int) * 2);
+        reinterpret_cast<OutEdgeRecord *>(ldata->data + ldata->expansion_size);
 
       for (int i = 0; i < n_out; ++i) {
         records[i].op = edges[i].op;
@@ -288,9 +291,9 @@ class ExpansionLCO {
       }
     }
 
-    hpx_lco_set_lsync(data_, bytes, input_data, HPX_NULL);
-
-    delete [] input_data;
+    hpx_gas_unpin(data_);
+    int code = SetOpCodes::kOutEdges;
+    hpx_lco_set_lsync(data_, sizeof(int), &code, HPX_NULL);
   }
 
   /// Reset the underlying LCO
@@ -316,28 +319,27 @@ class ExpansionLCO {
   // Types used internally
   ///////////////////////////////////////////////////////////////////
 
-  /// Part of the internal representation of the Expansion LCO
-  ///
-  /// Expansion are user-defined LCOs. The data they contain are this object
-  /// and the serialized expansion. The payload contains the serialized form
-  /// of the expansion. This is done through the ViewSet object, and details
-  /// on the exact format can be found with the ViewSet documentation.
-  struct Header {
-    int yet_to_arrive;
-    int out_edge_count;
-    size_t expansion_size;
-    DomainGeometry domain;
-    Index index;
-    hpx_addr_t rwaddr;
-    char payload[];
-  };
-
   /// This stores the data needed to serve the out edge once the LCO is set
   struct OutEdgeRecord {
     Operation op;
     hpx_addr_t target;
     Index tidx;
     int locality;
+  };
+
+  /// Part of the internal representation of the Expansion LCO
+  ///
+  /// Expansion are user-defined LCOs. The data they contain are this object
+  /// and the serialized expansion. The expansion_data points to the serialized
+  /// form of the expansion. This is done through the ViewSet object, and
+  /// details on the exact format can be found with the ViewSet documentation.
+  struct Header {
+    int yet_to_arrive;
+    int out_edge_count;
+    size_t expansion_size;
+    Index index;
+    hpx_addr_t rwaddr;
+    char *data;
   };
 
   /// Operation codes for the LCOs set operation
@@ -353,32 +355,29 @@ class ExpansionLCO {
 
   /// Initialization handler for Expansion LCOs
   ///
-  /// The input header is copied directly into the LCO's header. This copies
-  /// the metadata as well as the payload (the initial value of the expansion
-  /// and the out edges).
+  /// This updates the expansion size, and also zeros out the expansion
+  /// data if the pointer is valid.
   ///
   /// \param head - the address of the LCO data
   /// \param bytes - the size of the LCO data
-  /// \param inti - the initialization data for the LCO
+  /// \param init - the initialization data for the LCO
   /// \param init_bytes - the size of the initialization data for the LCO
   static void init_handler(Header *head, size_t bytes,
                            size_t *init, size_t init_bytes) {
     head->expansion_size = *init;
-    memset(head->payload, 0, *init);
   }
 
   /// The set operation handler for the Expansion LCO
   ///
-  /// Set will either save the out edges, or add the input expansion to
-  /// the expansion stored in this LCO.
+  /// Set will either add the input expansion to the expansion referenced in
+  /// this LCO, or simply decrement the counter that monitors the status of the
+  /// LCO
   ///
-  /// The input to this function is either an expansion or a set of out edge
-  /// records. In either case, @p rhs begins with an integer indicating which
-  /// sort of set was called. Then, for a contribution, the rest of the
-  /// input buffer is a serialized ViewSet, which can be deserialized into
-  /// an expansion, which is then added to the expansion represented by this
-  /// LCO. For the case of setting the out edges, the rest of the inpute buffer
-  /// is an array of OutEdgeRecord.
+  /// In both cases, @p rhs begins with an integer indicating which sort of set
+  /// was called. If the set is to accumulate expansion, then there is a
+  /// serialized ViewSet following the integer code. This buffer is deserialized
+  /// into an expansion, and then added to the expansion referenced by this
+  /// LCO.
   ///
   /// \param lhs - the address of this LCO's data
   /// \param rhs - the input buffer
@@ -395,12 +394,12 @@ class ExpansionLCO {
     switch (*code) {
       case SetOpCodes::kContribute:
         {
+          EVENT_TRACE_DASHMM_ELCO_BEGIN();
           ViewSet views{};
           views.interpret(input);
           expansion_t incoming{views};
 
-          // create the expansion from the payload
-          ReadBuffer here{lhs->payload, lhs->expansion_size};
+          ReadBuffer here{lhs->data, lhs->expansion_size};
           ViewSet here_views{};
           here_views.interpret(here);
           expansion_t expand{here_views};
@@ -411,24 +410,10 @@ class ExpansionLCO {
           // release the data, because these objects do not actually own it
           expand.release();
           incoming.release();
+          EVENT_TRACE_DASHMM_ELCO_END();
         }
         break;
       case SetOpCodes::kOutEdges:
-        {
-          int n_edges{};
-          input.read(&n_edges);
-
-          if (n_edges) {
-            // Usage Check
-            assert(sizeof(OutEdgeRecord) * n_edges + sizeof(int) * 2 == bytes);
-            // We use out edge count here for the size so that an incorrect use
-            // does not write outside of bounds.
-            WriteBuffer dest{&lhs->payload[lhs->expansion_size],
-                             sizeof(OutEdgeRecord) * lhs->out_edge_count};
-            dest.write(input);
-          }
-        }
-
         break;
     }
   }
@@ -468,56 +453,65 @@ class ExpansionLCO {
 
     // Shortcut to the work in the case of a single locality
     if (hpx_get_num_ranks() == 1) {
-      spawn_out_edges_work(head);
+      spawn_out_edges_work(head, 0, head->out_edge_count - 1);
       hpx_lco_release(lco_, head);
       return HPX_SUCCESS;
     }
 
     // Make a scratch space for the sends
-    size_t total_size = sizeof(Header) + head->expansion_size +
-                        sizeof(OutEdgeRecord) * head->out_edge_count;
-    Header *scratch = reinterpret_cast<Header *>(new char [total_size]);
-    memcpy(scratch, head, total_size);
+    size_t edgeless = sizeof(Header) + head->expansion_size;
+    int out_edge_count = head->out_edge_count;
+    size_t edge_size = sizeof(OutEdgeRecord) * out_edge_count;
+    size_t total = edgeless + edge_size;
 
-    // Once we have the copy, we are done with the LCO data
-    hpx_lco_release(lco_, head);
+    char *temp = new char[total];
+    Header *scratch = reinterpret_cast<Header *>(temp);
 
-    // Get reference to out edges
-    OutEdgeRecord *out_edges = reinterpret_cast<OutEdgeRecord *>(
-        &scratch->payload[scratch->expansion_size]);
+    // Fill in the header
+    memcpy(scratch, head, sizeof(Header));
 
-    // make a local copy of the edge count
-    int save_count = scratch->out_edge_count;
+    // Fill in the expansion data
+    memcpy(temp + sizeof(Header), head->data, head->expansion_size);
 
-    // loop over the sorted edges
+    // Address for storing out edges
+    OutEdgeRecord *scratch_edges =
+        reinterpret_cast<OutEdgeRecord *>(temp + edgeless);
+
+    OutEdgeRecord *out_edges =
+        reinterpret_cast<OutEdgeRecord *>(head->data + head->expansion_size);
+
+    // Loop over the sorted edges
     int my_rank = hpx_get_my_rank();
-    OutEdgeRecord *begin = out_edges;
-    OutEdgeRecord *end = &out_edges[save_count];
-    while (begin != end) {
-      int curr_rank = begin->locality;
+    int begin = 0;
 
-      // Find end of current locality's edges
-      OutEdgeRecord *curr = begin;
-      while (curr != end && curr->locality == curr_rank) {
-        curr += 1;    // look at next record
+    while (begin != out_edge_count) {
+      int curr_rank = out_edges[begin].locality;
+
+      int curr = begin;
+      while (curr != out_edge_count &&
+             out_edges[curr].locality == curr_rank) {
+        curr++; // look at next record
       }
 
-      //move into start of range
-      scratch->out_edge_count = curr - begin;
-      size_t send_edges_size = sizeof(OutEdgeRecord) * scratch->out_edge_count;
-      if (begin != out_edges) {
-        std::move(begin, curr, out_edges);
-      }
-
-      // Now send the parcel or do the work
       if (curr_rank == my_rank) {
-        spawn_out_edges_work(scratch);
+        // Short cut to do work
+        spawn_out_edges_work(head, begin, curr - 1);
       } else {
-        size_t message_size = sizeof(Header) + scratch->expansion_size
-                                           + send_edges_size;
-                                    // TODO + (1/2) x hpx_addr_t eventually
+        int curr_rank_out_edge_count = curr - begin;
 
-        hpx_parcel_t *parc = hpx_parcel_acquire(scratch, message_size);
+        // Update the edge count information
+        scratch->out_edge_count = curr_rank_out_edge_count;
+
+        // Copy the edge information into scratch
+        memcpy(scratch_edges, &out_edges[begin],
+               sizeof(OutEdgeRecord) * curr_rank_out_edge_count);
+
+        // Prepare parcel
+        size_t message_size = edgeless +
+          sizeof(OutEdgeRecord) * curr_rank_out_edge_count;
+        // TODO + (1/2) x hpx_addr_t eventually
+
+        hpx_parcel_t *parc = hpx_parcel_acquire(temp, message_size);
         hpx_parcel_set_action(parc, spawn_out_edges_from_remote_);
         hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
 
@@ -526,11 +520,11 @@ class ExpansionLCO {
         hpx_parcel_send_sync(parc);
       }
 
-      //advance
+      // Advance
       begin = curr;
     }
 
-    delete [] scratch;
+    delete [] temp;
 
     // done
     return HPX_SUCCESS;
@@ -557,8 +551,16 @@ class ExpansionLCO {
     // correct edges
     RankWise<dualtree_t> global_tree{head->rwaddr};
     auto tree = global_tree.here();
+
+    // \p head->expansion_data and \p head->out_edge_records currently store the
+    // addresses of the sender's side, which are invalid on the receiver's
+    // side. Compute correct offsets to set these pointers correctly.
+    char *temp = reinterpret_cast<char *>(head);
+    head->data = temp + sizeof(Header);
     OutEdgeRecord *out_edges =
-      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+      reinterpret_cast<OutEdgeRecord *>(temp + sizeof(Header) +
+                                        head->expansion_size);
+
     for (int i = 0; i < head->out_edge_count; ++i) {
       if (out_edges[i].target == HPX_NULL) {
         out_edges[i].target = tree->lookup_lco_addx(out_edges[i].tidx,
@@ -566,7 +568,7 @@ class ExpansionLCO {
       }
     }
 
-    spawn_out_edges_work(head);
+    spawn_out_edges_work(head, 0, head->out_edge_count - 1);
 
     return HPX_SUCCESS;
   }
@@ -577,18 +579,20 @@ class ExpansionLCO {
   /// edges local to the initiating LCO.
   ///
   /// \param head - the message data
-  static void spawn_out_edges_work(Header *head) {
+  /// \param first - the first edge to be processed
+  /// \param last - the last edge to be proceed
+  static void spawn_out_edges_work(Header *head, int first, int last) {
     ViewSet views{};
+
     if (head->out_edge_count > 0) {
-      ReadBuffer inbuf{(char *)head->payload, head->expansion_size};
+      ReadBuffer inbuf{head->data, head->expansion_size};
       views.interpret(inbuf);
     }
 
-    // Loop over the out edges, and spawn the work
     OutEdgeRecord *out_edges =
-      reinterpret_cast<OutEdgeRecord *>(&head->payload[head->expansion_size]);
+        reinterpret_cast<OutEdgeRecord *>(head->data + head->expansion_size);
 
-    for (int i = 0; i < head->out_edge_count; ++i) {
+    for (int i = first; i <= last; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
           m_to_m_out_edge(head, views, out_edges[i].target);
@@ -628,7 +632,8 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
-    double s_size = head->domain.size_from_level(head->index.level());
+    EVENT_TRACE_DASHMM_MTOM_BEGIN();
+    double s_size = shared::geo().size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
     expansion_t lexp{views};
@@ -637,6 +642,7 @@ class ExpansionLCO {
 
     expansionlco_t destination{target};
     destination.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOM_END();
   }
 
   /// Serve an M->L edge
@@ -647,7 +653,8 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void m_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    double s_size = head->domain.size_from_level(head->index.level());
+    EVENT_TRACE_DASHMM_MTOL_BEGIN();
+    double s_size = shared::geo().size_from_level(head->index.level());
 
     // translate the source expansion
     expansion_t lexp{views};
@@ -656,6 +663,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOL_END();
   }
 
   /// Serve an L->L edge
@@ -666,8 +674,9 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void l_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
+    EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
-    double t_size = head->domain.size_from_level(tidx.level());
+    double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.L_to_L(to_child, t_size);
@@ -675,6 +684,7 @@ class ExpansionLCO {
 
     expansionlco_t total{target};
     total.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_LTOL_END();
   }
 
   /// Serve an M->T edge
@@ -685,7 +695,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_M_to_T(head->expansion_size, head->payload);
+    destination.contribute_M_to_T(head->expansion_size, head->data);
   }
 
   /// Serve an L->T edge
@@ -696,7 +706,7 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target, 0};
-    destination.contribute_L_to_T(head->expansion_size, head->payload);
+    destination.contribute_L_to_T(head->expansion_size, head->data);
   }
 
   /// Serve an M->I edge
@@ -706,12 +716,14 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   static void m_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
+    EVENT_TRACE_DASHMM_MTOI_BEGIN();
     expansion_t lexp{views};
     auto translated = lexp.M_to_I(head->index);
     lexp.release();
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_MTOI_END();
   }
 
   /// Serve an I->I edge
@@ -722,7 +734,8 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    double s_size = head->domain.size_from_level(head->index.level());
+    EVENT_TRACE_DASHMM_ITOI_BEGIN();
+    double s_size = shared::geo().size_from_level(head->index.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_I(head->index, s_size, tidx);
@@ -730,6 +743,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_ITOI_END();
   }
 
   /// Serve an I->L edge
@@ -740,7 +754,8 @@ class ExpansionLCO {
   /// \param tidx - index of target LCO
   static void i_to_l_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
-    double t_size = head->domain.size_from_level(tidx.level());
+    EVENT_TRACE_DASHMM_ITOL_BEGIN();
+    double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
     auto translated = lexp.I_to_L(tidx, t_size);
@@ -748,6 +763,7 @@ class ExpansionLCO {
 
     expansionlco_t lco{target};
     lco.contribute(std::move(translated));
+    EVENT_TRACE_DASHMM_ITOL_END();
   }
 
 
