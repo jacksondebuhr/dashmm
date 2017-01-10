@@ -139,6 +139,10 @@ class DAG {
   /// Count edges in the full DAG
   size_t edge_count() const;
 
+  /// Return the average out degree of each class of node and the overall
+  // NOTE: source leaves, source nodes, target nodes, target leaves, overall
+  std::vector<double> average_out_degree() const;
+
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
   std::vector<DAGNode *> target_nodes;

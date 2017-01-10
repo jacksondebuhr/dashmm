@@ -122,6 +122,8 @@ TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
       subsystems?
 TODO: Array collect really ought to return a smart pointer, right?
       (DONE in dev-v2)
+TODO: The operators do not really need their centers. So the interface has this
+      pointless member. Remove them all.
 TODO: We will need a better explicit dag representation - it uses a huge
       amount of memory.
 TODO: Perhaps we want to parameterize the nodes with some user data? So

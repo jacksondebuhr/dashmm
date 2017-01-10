@@ -468,6 +468,41 @@ size_t DAG::node_count() const {
 }
 
 
+std::vector<double> DAG::average_out_degree() const {
+  size_t s_total{0};
+  size_t s_count = source_leaves.size();
+  for (size_t i = 0; i < s_count; ++i) {
+    s_total += source_leaves[i].out_edges.size();
+  }
+
+  size_t sn_total{0};
+  size_t sn_count = source_nodes.size();
+  for (size_t i = 0; i < sn_count; ++i) {
+    sn_total += source_nodes[i].out_edges.size();
+  }
+
+  size_t t_total{0};
+  size_t t_count = target_leaves.size();
+  for (size_t i = 0; i < t_count; ++i) {
+    t_total += target_leaves[i].out_edges.size();
+  }
+
+  size_t tn_total{0};
+  size_t tn_count = target_nodes.size();
+  for (size_t i = 0; i < tn_count; ++i) {
+    tn_total += target_nodes[i].out_edges.size();
+  }
+
+  double s_od_mean = (double)s_total / s_count;
+  double sn_od_mean = (double)sn_total / sn_count;
+  double tn_od_mean = (double)tn_total / tn_count;
+  double t_od_mean = (double)t_total / t_count;
+  double od_mean = (double)(s_total + sn_total + tn_total + t_total) / 
+                      (s_count + sn_count + tn_count + t_count);
+
+}
+
+
 size_t DAG::edge_count() const {
   size_t retval{0};
 
