@@ -5,6 +5,10 @@ THIS BRANCH TODO
 Things that likely would not break the API
 ==========================================
 
+TODO: We should transform the out edge spawn into actions for each now that
+      we know how to do that cheaply.
+TODO: The remote stuff should be a future. That way a no-copy parallel spawn
+      is possible. It has to 'live' somewhere.
 
 TODO: Decide if the current solution for the DAG vector capacity problem is
       good enough, or if we should instead work toward collecting the tree
