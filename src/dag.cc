@@ -529,7 +529,7 @@ std::pair<int, int> DAG::min_max_out_degree_S() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_leaves.size(); ++i) {
-    size_t val = source_leaves[i].out_edges.size();
+    size_t val = source_leaves[i]->out_edges.size();
     if (val < min) min = val;
     if (val > max) max = val;
   }
@@ -541,7 +541,7 @@ std::pair<int, int> DAG::min_max_in_degree_T() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < target_leaves.size(); ++i) {
-    size_t val = target_leaves[i].in_edges.size();
+    size_t val = target_leaves[i]->in_edges.size();
     if (val < min) min = val;
     if (val > max) max = val;
   }
@@ -554,13 +554,13 @@ std::pair<int, int> DAG::min_max_out_degree_SI() const {
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_nodes.size(); ++i) {
     // determine if we are M, and skip
-    auto item = std::find(source_nodes[i].in_edges.begin(), 
-                          source_nodes[i].in_edges.end(),
+    auto item = std::find(source_nodes[i]->in_edges.begin(), 
+                          source_nodes[i]->in_edges.end(),
                           [](const DAGEdge &a)->bool {
                             return a.op == Operation::MtoI;
                           });
-    if (item != source_nodes[i].in_edges.end()) {
-      size_t val = source_nodes[i].out_edges.size();
+    if (item != source_nodes[i]->in_edges.end()) {
+      size_t val = source_nodes[i]->out_edges.size();
       if (val < min) min = val;
       if (val > max) max = val;
     }
@@ -573,13 +573,13 @@ std::pair<int, int> DAG::min_max_in_degree_TI() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < target_nodes.size(); ++i) {
-    auto item = std::find(target_nodes[i].out_edges.begin(),
-                          target_nodes[i].out_edges.end(),
+    auto item = std::find(target_nodes[i]->out_edges.begin(),
+                          target_nodes[i]->out_edges.end(),
                           [](const DAGEdge &a)->bool {
                             return a.op == Operation::ItoL;
                           });
-    if (item != target_nodes[i].out_edges.end()) {
-      size_t val = target_nodes[i].in_edges.size();
+    if (item != target_nodes[i]->out_edges.end()) {
+      size_t val = target_nodes[i]->in_edges.size();
       if (val < min) min = val;
       if (val > max) max = val;
     }
