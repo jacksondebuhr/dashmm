@@ -182,8 +182,7 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child,
-                                      double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     assert(valid(ViewSet{}));
     expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
                                         kSourcePrimary);

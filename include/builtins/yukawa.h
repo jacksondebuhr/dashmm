@@ -79,24 +79,26 @@ public:
     int p = builtin_yukawa_table_->p();
     int nsh = (p + 1) * (p + 2) / 2;
 
-    // View size for each exponential expansion at the current scale level
-    int nexp = builtin_yukawa_table_->nexp(scale);
-
     if (role == kSourcePrimary || role == kTargetPrimary) {
       size_t bytes = sizeof(dcomplex_t) * nsh;
       char *data = new char[bytes]();
       views_.add_view(0, bytes, data);
-    } else if (role == kSourceIntermediate) {
-      size_t bytes = sizeof(dcomplex_t) * nexp;
-      for (int i = 0; i < 6; ++i) {
-        char *data = new char[bytes]();
-        views_.add_view(i, bytes, data);
-      }
-    } else if (role == kTargetIntermediate) {
-      size_t bytes = sizeof(dcomplex_t) * nexp;
-      for (int i = 0; i < 28; ++i) {
-        char *data = new char[bytes]();
-        views_.add_view(i, bytes, data);
+    } else {
+      // View size for each exponential expansion at the current scale level
+      int nexp = builtin_yukawa_table_->nexp(scale);
+
+      if (role == kSourceIntermediate) {
+        size_t bytes = sizeof(dcomplex_t) * nexp;
+        for (int i = 0; i < 6; ++i) {
+          char *data = new char[bytes]();
+          views_.add_view(i, bytes, data);
+        }
+      } else { // role == kTargetIntermediate
+        size_t bytes = sizeof(dcomplex_t) * nexp;
+        for (int i = 0; i < 28; ++i) {
+          char *data = new char[bytes]();
+          views_.add_view(i, bytes, data);
+        }
       }
     }
   }
@@ -257,8 +259,13 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child,
-                                      double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
+    double scale = views_.scale();
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kSourcePrimary}};
+    
+
+    /*
     // The function is called on the expansion of the child box and \p s_size is
     // the child box's size.
     double h = s_size / 2;
@@ -267,10 +274,9 @@ public:
     double py = center.y() + (from_child % 4 <= 1 ? h : -h);
     double pz = center.z() + (from_child < 4 ? h : -h);
 
-    double scale = views_.scale();
     expansion_t *retval{new
         expansion_t{Point{px, py, pz}, scale * 2, kSourcePrimary}};
-
+    */
     int p = builtin_yukawa_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis

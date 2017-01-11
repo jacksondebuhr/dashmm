@@ -282,8 +282,8 @@ public:
     return std::unique_ptr<expansion_t>{retval}; 
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child, 
-                                      double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
+    /*
     // The function is called on the expansion of the child box and \p s_size is
     // the child box's size. 
     double h = s_size / 2; 
@@ -340,6 +340,8 @@ public:
 
     delete [] W2; 
     return std::unique_ptr<expansion_t>{retval};
+    */
+    return std::unique_ptr<expansion_t>{nullptr};
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_indx, double s_size, 
