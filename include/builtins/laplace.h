@@ -261,6 +261,7 @@ class Laplace {
 
   std::unique_ptr<expansion_t> M_to_M(int from_child,
                                       double s_size) const {
+#if 0
     // The function is called on the expansion of the child box and
     // \p s_size is the child box's size.
     double h = s_size / 2;
@@ -272,6 +273,12 @@ class Laplace {
 
     expansion_t *retval{new expansion_t{Point{px, py, pz},
           scale, kSourcePrimary}};
+#else 
+    // the input s_size is not needed. 
+    // The return value does not need to have center and scale setup
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kSourcePrimary}}; 
+#endif 
 
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();

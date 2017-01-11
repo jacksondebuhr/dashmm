@@ -633,6 +633,7 @@ class ExpansionLCO {
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
+#if 0
     double s_size = shared::geo().size_from_level(head->index.level());
     int from_child = head->index.which_child();
 
@@ -642,6 +643,15 @@ class ExpansionLCO {
 
     expansionlco_t destination{target};
     destination.contribute(std::move(translated));
+#else 
+    int from_child = head->index.which_child(); 
+    expansion_t lexp{views}; 
+    auto translated = lexp.M_to_M(from_child, 0.0); 
+    lexp.release();  // Question: why release? (clears the views)
+
+    expansionlco_t destination{target}; 
+    destination.contribute(std::move(translated)); 
+#endif
     EVENT_TRACE_DASHMM_MTOM_END();
   }
 
