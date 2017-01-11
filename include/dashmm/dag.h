@@ -143,6 +143,11 @@ class DAG {
   // NOTE: source leaves, source nodes, target nodes, target leaves, overall
   std::vector<double> average_out_degree() const;
 
+  std::pair<int, int> min_max_out_degree_S() const;
+  std::pair<int, int> min_max_in_degree_T() const;
+  std::pair<int, int> min_max_out_degree_SI() const;
+  std::pair<int, int> min_max_in_degree_TI() const;
+
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
   std::vector<DAGNode *> target_nodes;

@@ -298,6 +298,16 @@ class Evaluator {
     // BEGIN DISTRIBUTE
     hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
+if (hpx_get_my_rank() == 0) {
+  auto sout = dag->min_max_out_degree_S();
+  auto tin = dag->min_max_in_degree_T();
+  auto siout = dag->min_max_out_degree_SI();
+  auto tiin = dag->min_max_in_degree_TI();
+  fprintf(stdout, "S: out: %d %d\n", sout.first, sout.second);
+  fprintf(stdout, "SI: out: %d %d\n", siout.first, sout.second);
+  fprintf(stdout, "TI: in: %d %d\n", tiin.first, tiin.second);
+  fprintf(stdout, "T: in: %d %d\n", tin.first, tin.second);
+}
     parms->distro.compute_distribution(*dag);
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
