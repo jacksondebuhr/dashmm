@@ -474,25 +474,25 @@ std::vector<double> DAG::average_out_degree() const {
   size_t s_total{0};
   size_t s_count = source_leaves.size();
   for (size_t i = 0; i < s_count; ++i) {
-    s_total += source_leaves[i].out_edges.size();
+    s_total += source_leaves[i]->out_edges.size();
   }
 
   size_t sn_total{0};
   size_t sn_count = source_nodes.size();
   for (size_t i = 0; i < sn_count; ++i) {
-    sn_total += source_nodes[i].out_edges.size();
+    sn_total += source_nodes[i]->out_edges.size();
   }
 
   size_t t_total{0};
   size_t t_count = target_leaves.size();
   for (size_t i = 0; i < t_count; ++i) {
-    t_total += target_leaves[i].out_edges.size();
+    t_total += target_leaves[i]->out_edges.size();
   }
 
   size_t tn_total{0};
   size_t tn_count = target_nodes.size();
   for (size_t i = 0; i < tn_count; ++i) {
-    tn_total += target_nodes[i].out_edges.size();
+    tn_total += target_nodes[i]->out_edges.size();
   }
 
   double s_od_mean = (double)s_total / s_count;
@@ -529,7 +529,7 @@ std::pair<int, int> DAG::min_max_out_degree_S() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_leaves.size(); ++i) {
-    size_t val = source_leaves[i]->out_edges.size();
+    int val = source_leaves[i]->out_edges.size();
     if (val < min) min = val;
     if (val > max) max = val;
   }
@@ -541,7 +541,7 @@ std::pair<int, int> DAG::min_max_in_degree_T() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < target_leaves.size(); ++i) {
-    size_t val = target_leaves[i]->in_edges.size();
+    int val = target_leaves[i]->in_edges.size();
     if (val < min) min = val;
     if (val > max) max = val;
   }
@@ -554,13 +554,13 @@ std::pair<int, int> DAG::min_max_out_degree_SI() const {
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_nodes.size(); ++i) {
     // determine if we are M, and skip
-    auto item = std::find(source_nodes[i]->in_edges.begin(), 
-                          source_nodes[i]->in_edges.end(),
-                          [](const DAGEdge &a)->bool {
-                            return a.op == Operation::MtoI;
-                          });
+    auto item = std::find_if(source_nodes[i]->in_edges.begin(), 
+                            source_nodes[i]->in_edges.end(),
+                            [](const DAGEdge &a)->bool {
+                              return a.op == Operation::MtoI;
+                            });
     if (item != source_nodes[i]->in_edges.end()) {
-      size_t val = source_nodes[i]->out_edges.size();
+      int val = source_nodes[i]->out_edges.size();
       if (val < min) min = val;
       if (val > max) max = val;
     }
@@ -573,13 +573,13 @@ std::pair<int, int> DAG::min_max_in_degree_TI() const {
   int min{std::numeric_limits<int>::max()};
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < target_nodes.size(); ++i) {
-    auto item = std::find(target_nodes[i]->out_edges.begin(),
-                          target_nodes[i]->out_edges.end(),
-                          [](const DAGEdge &a)->bool {
-                            return a.op == Operation::ItoL;
-                          });
+    auto item = std::find_if(target_nodes[i]->out_edges.begin(),
+                            target_nodes[i]->out_edges.end(),
+                            [](const DAGEdge &a)->bool {
+                              return a.op == Operation::ItoL;
+                            });
     if (item != target_nodes[i]->out_edges.end()) {
-      size_t val = target_nodes[i]->in_edges.size();
+      int val = target_nodes[i]->in_edges.size();
       if (val < min) min = val;
       if (val > max) max = val;
     }
