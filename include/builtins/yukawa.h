@@ -324,8 +324,7 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 

@@ -335,19 +335,13 @@ class Laplace {
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
     int t2s_x = s_index.x() - t_index.x();
     int t2s_y = s_index.y() - t_index.y();
     int t2s_z = s_index.z() - t_index.z();
-    Point center = views_.center();
-    double scale = views_.scale();
-    double tx = center.x() - t2s_x * s_size;
-    double ty = center.y() - t2s_y * s_size;
-    double tz = center.z() - t2s_z * s_size;
 
-    expansion_t *retval{new expansion_t{Point{tx, ty, tz}, scale,
-                                        kTargetPrimary}};
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kTargetPrimary}};
     int p = builtin_laplace_table_->p();
 
     // Shifting distance
@@ -373,9 +367,9 @@ class Laplace {
 
     if (proj < 1e-14) {
       if (t2s_z > 0) {
-        retval->M_to_L_zp(M, powers_rho, W1);
+        M_to_L_zp(M, powers_rho, W1);
       } else {
-        retval->M_to_L_zm(M, powers_rho, W1);
+        M_to_L_zm(M, powers_rho, W1);
       }
     } else {
       // azimuthal angle
