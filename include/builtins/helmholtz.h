@@ -536,7 +536,7 @@ public:
     }
   }
 
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+  std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale(); 
     expansion_t *retval{new expansion_t{views_.center(), 
           scale, kSourceIntermediate}}; 

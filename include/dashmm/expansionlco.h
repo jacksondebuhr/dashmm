@@ -714,7 +714,7 @@ class ExpansionLCO {
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOI_BEGIN();
     expansion_t lexp{views};
-    auto translated = lexp.M_to_I(head->index);
+    auto translated = lexp.M_to_I(); 
     lexp.release();
 
     expansionlco_t lco{target};
