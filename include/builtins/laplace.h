@@ -728,8 +728,7 @@ class Laplace {
     return std::unique_ptr<expansion_t>(retval);
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     // t_index is the index of the parent node on the target side
 
     // Compute index offsets between the current source node and the 1st child
@@ -737,12 +736,6 @@ class Laplace {
     int dx = s_index.x() - t_index.x() * 2;
     int dy = s_index.y() - t_index.y() * 2;
     int dz = s_index.z() - t_index.z() * 2;
-
-    // Compute center of the parent node
-    Point center = views_.center();
-    double px = center.x() + (dx + 0.5) * s_size;
-    double py = center.y() + (dy + 0.5) * s_size;
-    double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
     int nexp = builtin_laplace_table_->nexp();
@@ -760,7 +753,8 @@ class Laplace {
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
     double scale = views_.scale() / 2;
-    ViewSet views{kTargetIntermediate, Point{px, py, pz}, scale};
+    //ViewSet views{kTargetIntermediate, Point{px, py, pz}, scale};
+    ViewSet views{kTargetIntermediate, Point{0.0, 0.0, 0.0}, 0.0}; 
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.

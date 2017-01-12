@@ -731,10 +731,9 @@ class ExpansionLCO {
   static void i_to_i_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_ITOI_BEGIN();
-    double s_size = shared::geo().size_from_level(head->index.level());
 
     expansion_t lexp{views};
-    auto translated = lexp.I_to_I(head->index, s_size, tidx);
+    auto translated = lexp.I_to_I(head->index, tidx);
     lexp.release();
 
     expansionlco_t lco{target};
