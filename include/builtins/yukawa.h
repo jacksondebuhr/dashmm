@@ -72,9 +72,8 @@ public:
   using target_t = Target;
   using expansion_t = Yukawa<Source, Target>;
 
-  Yukawa(Point center, double scale, ExpansionRole role)
+  Yukawa(ExpansionRole role, Point center = Point{}, double scale = 1.0)
     : views_{ViewSet{role, center, scale}} {
-
     // View size for each spherical harmonic expansion
     int p = builtin_yukawa_table_->p();
     int nsh = (p + 1) * (p + 2) / 2;
@@ -134,9 +133,6 @@ public:
 
   int view_count() const { return views_.count(); }
 
-  // This is likely to be removed from the interface
-  void get_views(ViewSet &view) const {}
-
   ViewSet get_all_views() const {return views_;}
 
   ExpansionRole role() const {return views_.role();}
@@ -155,7 +151,7 @@ public:
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, scale, kSourcePrimary}};
+    expansion_t *retval{new expansion_t{kSourcePrimary, center, scale}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -209,7 +205,7 @@ public:
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, scale, kTargetPrimary}};
+    expansion_t *retval{new expansion_t{kTargetPrimary, center, scale}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -261,8 +257,8 @@ public:
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kSourcePrimary}};
+    expansion_t *retval{new expansion_t{kSourcePrimary, 
+           Point{0.0, 0.0, 0.0}, 0.0}};
     
 
     /*
@@ -330,8 +326,8 @@ public:
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary
+    , Point{0.0, 0.0, 0.0}, 0.0}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -443,7 +439,6 @@ public:
     double *bessel = new double[p + 1];
     dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    //double scale = views_.scale();
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, views_.center());
@@ -510,8 +505,8 @@ public:
 
   std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{views_.center(),
-          scale, kSourceIntermediate}};
+    expansion_t *retval{new expansion_t{kSourceIntermediate,  
+    views_.center(),scale}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -727,8 +722,9 @@ public:
       (t_index.x() % 2);
 
     double scale = views_.scale() / 2;
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary
+      , Point{0.0, 0.0, 0.0}, 
+          0.0}}; 
                                                                 
     int nexp = builtin_yukawa_table_->nexp(scale);
 

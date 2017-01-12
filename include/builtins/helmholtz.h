@@ -60,7 +60,7 @@ public:
   using target_t = Target; 
   using expansion_t = Helmholtz<Source, Target>; 
 
-  Helmholtz(Point center, double scale, ExpansionRole role) 
+  Helmholtz(ExpansionRole role, Point center, double scale) 
     : views_{ViewSet{role, center, scale}} {
     
     // View size for each spherical harmonic expansion
@@ -175,7 +175,7 @@ public:
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
                                       Source *last) const {
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{center, scale, kSourcePrimary}}; 
+    expansion_t *retval{new expansion_t{kSourcePrimary, center, scale}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
@@ -229,7 +229,7 @@ public:
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
                                       Source *last) const {
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{center, scale, kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary, center, scale}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
@@ -362,8 +362,8 @@ public:
           scale / 2, kTargetPrimary}};
     */
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary, Point{0.0, 0.0, 0.0}, 
+          0.0}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -538,8 +538,8 @@ public:
 
   std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{views_.center(), 
-          scale, kSourceIntermediate}}; 
+    expansion_t *retval{new expansion_t{kSourceIntermediate, views_.center(), 
+          scale}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     // Addresses of the views, in the order of x-, y-, and z-directions

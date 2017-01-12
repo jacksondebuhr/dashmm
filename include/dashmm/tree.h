@@ -2517,8 +2517,8 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kSourcePrimary}
+        new expansion_t{kSourcePrimary, n_center, 
+            expansion_t::compute_scale(node->idx)}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -2530,8 +2530,8 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kSourceIntermediate}
+        new expansion_t{kSourceIntermediate, n_center, 
+            expansion_t::compute_scale(node->idx)}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
@@ -2589,8 +2589,8 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kTargetPrimary}
+        new expansion_t{kTargetPrimary, n_center, 
+            expansion_t::compute_scale(node->idx)}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -2602,8 +2602,8 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kTargetIntermediate}
+        new expansion_t{kTargetIntermediate, n_center, 
+            expansion_t::compute_scale(node->idx)}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),

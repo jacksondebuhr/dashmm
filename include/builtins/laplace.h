@@ -73,9 +73,8 @@ class Laplace {
   using target_t = Target;
   using expansion_t = Laplace<Source, Target>;
 
-  Laplace(Point center, double scale, ExpansionRole role)
+  Laplace(ExpansionRole role, Point center = Point{}, double scale = 1.0) 
     : views_{ViewSet{role, center, scale}} {
-
     // View size for each spherical harmonic expansion
     int p = builtin_laplace_table_->p();
     int nsh = (p + 1) * (p + 2) / 2;
@@ -133,8 +132,6 @@ class Laplace {
 
   int view_count() const { return views_.count(); }
 
-  void get_views(ViewSet &view) const {}
-
   ViewSet get_all_views() const {return views_;}
 
   ExpansionRole role() const {return views_.role();}
@@ -153,7 +150,7 @@ class Laplace {
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, 1.0, kSourcePrimary}};
+    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_laplace_table_->p();
     const double *sqf = builtin_laplace_table_->sqf();
@@ -207,7 +204,7 @@ class Laplace {
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, 1.0, kTargetPrimary}};
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_laplace_table_->p();
     const double *sqf = builtin_laplace_table_->sqf();
@@ -260,8 +257,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kSourcePrimary}}; 
+    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
 
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
@@ -336,12 +332,11 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+
     int t2s_x = s_index.x() - t_index.x();
     int t2s_y = s_index.y() - t_index.y();
     int t2s_z = s_index.z() - t_index.z();
-
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}};
     int p = builtin_laplace_table_->p();
 
     // Shifting distance
@@ -394,8 +389,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
 
@@ -602,9 +596,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_I() const {
-    double scale = views_.scale();
-    expansion_t *retval{new expansion_t{views_.center(), scale,
-                                        kSourceIntermediate}};
+    expansion_t *retval{new expansion_t{kSourceIntermediate}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -752,9 +744,7 @@ class Laplace {
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    double scale = views_.scale() / 2;
-    //ViewSet views{kTargetIntermediate, Point{px, py, pz}, scale};
-    ViewSet views{kTargetIntermediate, Point{0.0, 0.0, 0.0}, 0.0}; 
+    ViewSet views{kTargetIntermediate}; 
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -805,13 +795,12 @@ class Laplace {
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
     // t_index and t_size is the index and size of the child
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() * 2;
-
-    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
-          0.0, kTargetPrimary}}; 
 
     int nexp = builtin_laplace_table_->nexp();
 
