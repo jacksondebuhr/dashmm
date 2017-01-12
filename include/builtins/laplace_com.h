@@ -80,7 +80,7 @@ class LaplaceCOM {
   using target_t = Target;
   using expansion_t = LaplaceCOM<Source, Target>;
 
-  LaplaceCOM(ExpansionRole role, Point center, double scale) {
+  LaplaceCOM(ExpansionRole role, double scale = 1.0, Point center = Point{}) {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -170,8 +170,7 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
-    expansion_t *temp = new expansion_t(kSourcePrimary, Point{0.0, 0.0, 0.0}, 1.0
-                                        );
+    expansion_t *temp = new expansion_t{kSourcePrimary};
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
     temp->calc_Q(first, last);
@@ -185,7 +184,7 @@ class LaplaceCOM {
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     assert(valid(ViewSet{}));
-    expansion_t *temp = new expansion_t{kSourcePrimary, Point{0.0, 0.0, 0.0}, 1.0};
+    expansion_t *temp = new expansion_t{kSourcePrimary}; 
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
     temp->set_Q(data_->Q);

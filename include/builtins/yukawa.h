@@ -72,7 +72,7 @@ public:
   using target_t = Target;
   using expansion_t = Yukawa<Source, Target>;
 
-  Yukawa(ExpansionRole role, Point center = Point{}, double scale = 1.0)
+  Yukawa(ExpansionRole role, double scale = 1.0, Point center = Point{})
     : views_{ViewSet{role, center, scale}} {
     // View size for each spherical harmonic expansion
     int p = builtin_yukawa_table_->p();
@@ -151,7 +151,7 @@ public:
   std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourcePrimary, center, scale}};
+    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -205,7 +205,7 @@ public:
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
                                       Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kTargetPrimary, center, scale}};
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -257,22 +257,7 @@ public:
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourcePrimary, 
-           Point{0.0, 0.0, 0.0}, 0.0}};
-    
-
-    /*
-    // The function is called on the expansion of the child box and \p s_size is
-    // the child box's size.
-    double h = s_size / 2;
-    Point center = views_.center();
-    double px = center.x() + (from_child % 2 == 0 ? h : -h);
-    double py = center.y() + (from_child % 4 <= 1 ? h : -h);
-    double pz = center.z() + (from_child < 4 ? h : -h);
-
-    expansion_t *retval{new
-        expansion_t{Point{px, py, pz}, scale * 2, kSourcePrimary}};
-    */
+    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
     int p = builtin_yukawa_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
@@ -326,8 +311,7 @@ public:
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kTargetPrimary
-    , Point{0.0, 0.0, 0.0}, 0.0}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -505,8 +489,7 @@ public:
 
   std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourceIntermediate,  
-    views_.center(),scale}};
+    expansion_t *retval{new expansion_t{kSourceIntermediate, scale}};  
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -664,7 +647,7 @@ public:
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{kTargetIntermediate, Point{0.0, 0.0, 0.0}, 0.0}; 
+    ViewSet views{kTargetIntermediate}; 
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -717,15 +700,13 @@ public:
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+
     // t_index and t_size is the index and size of the child
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() / 2;
-    expansion_t *retval{new expansion_t{kTargetPrimary
-      , Point{0.0, 0.0, 0.0}, 
-          0.0}}; 
-                                                                
     int nexp = builtin_yukawa_table_->nexp(scale);
 
     dcomplex_t *E[28]{nullptr};

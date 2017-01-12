@@ -73,7 +73,7 @@ class Laplace {
   using target_t = Target;
   using expansion_t = Laplace<Source, Target>;
 
-  Laplace(ExpansionRole role, Point center = Point{}, double scale = 1.0) 
+  Laplace(ExpansionRole role, double scale = 1.0, Point center = Point{}) 
     : views_{ViewSet{role, center, scale}} {
     // View size for each spherical harmonic expansion
     int p = builtin_laplace_table_->p();
