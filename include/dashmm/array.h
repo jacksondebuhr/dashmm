@@ -417,6 +417,10 @@ class Array {
     T *retval{nullptr};
     hpx_run(&array_collect_action, &retval, &data_);
 
+    if (hpx_get_my_rank()) {
+      retval = nullptr;
+    }
+
     // We have to specify a deleter here because internally HPX does not know
     // the type T, so it allocates as an array of char.
     return std::unique_ptr<T[], void(*)(T *)>(retval, [](T *ptr) {
