@@ -146,12 +146,11 @@ class Laplace {
     dcomplex_t *data = reinterpret_cast<dcomplex_t *>(views_.view_data(view));
     return data[i];
   }
-
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
-                                      Source *last) const {
+  
+  void S_to_M(Source *first, Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    Point center = views_.center(); 
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_laplace_table_->p();
     const double *sqf = builtin_laplace_table_->sqf();
 
@@ -197,8 +196,6 @@ class Laplace {
     delete [] legendre;
     delete [] powers_r;
     delete [] powers_ephi;
-
-    return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,

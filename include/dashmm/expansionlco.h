@@ -173,25 +173,30 @@ class ExpansionLCO {
 
   /// Set this expansion with the multipole expansion of the given sources
   ///
-  /// This will set the expansion with the multipole expansion computed for
-  /// the given @p sources, and with the given @p center. Note that this is
-  /// an asynchronous operation. The contribution will be scheduled, but will
-  /// not necessarily be complete when this function returns.
+  /// This will set the expansion with the multipole expansion computed for the
+  /// given @p sources. As this M only expects 1 input, the implementation here
+  /// directly operates on the memory reserved for the expansion data inside
+  /// this object. The set operation performed simply decrements the internal
+  /// counter of the LCO. 
   ///
-  /// The expansion resulting from the provided sources is added to the
-  /// expansion represented by this object.
-  ///
-  /// \param center - the center of the computed expansion
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  /// \param idx - the index of the node for which this is an expansion
   void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOM_BEGIN();
-    double scale = expansion_t::compute_scale(idx);
-    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
-    expansion_t local{views};
-    auto multi = local.S_to_M(center, sources, &sources[n_src]);
-    contribute(std::move(multi));
+
+    void *lva{nullptr}; 
+    assert(hpx_gas_try_pin(data_, &lva)); 
+    Header *head = static_cast<Header *>(hpx_lco_user_get_user_data(lva)); 
+    ReadBuffer here{head->data, head->expansion_size}; 
+    ViewSet views{}; 
+    views.interpret(here); 
+    expansion_t local{views}; 
+    local.S_to_M(sources, &sources[n_src]); 
+    local.release(); 
+    hpx_gas_unpin(data_); 
+    int code = SetOpCodes::kStoM; 
+    hpx_lco_set_lsync(data_, sizeof(int), &code, HPX_NULL); 
+
     EVENT_TRACE_DASHMM_STOM_END();
   }
 
@@ -345,6 +350,7 @@ class ExpansionLCO {
   /// Operation codes for the LCOs set operation
   enum SetOpCodes {
     kContribute,
+    kStoM, 
     kOutEdges
   };
 
@@ -392,29 +398,31 @@ class ExpansionLCO {
     assert(lhs->yet_to_arrive >= 0);
 
     switch (*code) {
-      case SetOpCodes::kContribute:
-        {
-          EVENT_TRACE_DASHMM_ELCO_BEGIN();
-          ViewSet views{};
-          views.interpret(input);
-          expansion_t incoming{views};
-
-          ReadBuffer here{lhs->data, lhs->expansion_size};
-          ViewSet here_views{};
-          here_views.interpret(here);
-          expansion_t expand{here_views};
-
-          // add the one to the other
-          expand.add_expansion(&incoming);
-
-          // release the data, because these objects do not actually own it
-          expand.release();
-          incoming.release();
-          EVENT_TRACE_DASHMM_ELCO_END();
-        }
-        break;
-      case SetOpCodes::kOutEdges:
-        break;
+    case SetOpCodes::kContribute:
+      {
+        EVENT_TRACE_DASHMM_ELCO_BEGIN();
+        ViewSet views{};
+        views.interpret(input);
+        expansion_t incoming{views};
+        
+        ReadBuffer here{lhs->data, lhs->expansion_size};
+        ViewSet here_views{};
+        here_views.interpret(here);
+        expansion_t expand{here_views};
+        
+        // add the one to the other
+        expand.add_expansion(&incoming);
+        
+        // release the data, because these objects do not actually own it
+        expand.release();
+        incoming.release();
+        EVENT_TRACE_DASHMM_ELCO_END();
+      }
+      break;
+    case SetOpCodes::kStoM: 
+      break;
+    case SetOpCodes::kOutEdges:
+      break;
     }
   }
 
