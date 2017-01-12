@@ -181,7 +181,7 @@ class ExpansionLCO {
   ///
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+  void S_to_M(Source *sources, size_t n_src) {
     EVENT_TRACE_DASHMM_STOM_BEGIN();
 
     void *lva{nullptr}; 
