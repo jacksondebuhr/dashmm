@@ -197,8 +197,7 @@ class LaplaceCOM {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child,
-                                      double t_size) const {
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 

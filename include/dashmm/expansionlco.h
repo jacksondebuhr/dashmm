@@ -673,10 +673,9 @@ class ExpansionLCO {
                               hpx_addr_t target, Index tidx) {
     EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
-    double t_size = shared::geo().size_from_level(tidx.level());
 
     expansion_t lexp{views};
-    auto translated = lexp.L_to_L(to_child, t_size);
+    auto translated = lexp.L_to_L(to_child); 
     lexp.release();
 
     expansionlco_t total{target};

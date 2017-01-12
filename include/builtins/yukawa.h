@@ -328,18 +328,10 @@ public:
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
-    // The function is called on the parent box and \p t_size is its child's
-    // size.
-    Point center = views_.center();
-    double h = t_size / 2;
-    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = center.z() + (to_child < 4 ? -h : h);
-
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz},
-          scale / 2, kTargetPrimary}};
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kTargetPrimary}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};

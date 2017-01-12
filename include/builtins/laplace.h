@@ -393,18 +393,9 @@ class Laplace {
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
-    // The function is called on the parent box and t_size is its child size
-    Point center = views_.center();
-    double h = t_size / 2;
-    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = center.z() + (to_child < 4 ? -h : h);
-    double scale = views_.scale() * 2;
-
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale,
-                                        kTargetPrimary}};
-
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kTargetPrimary}}; 
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
 
