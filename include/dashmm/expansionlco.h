@@ -218,10 +218,10 @@ class ExpansionLCO {
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOL_BEGIN();
     double scale = expansion_t::compute_scale(idx);
-    ViewSet views{kNoRoleNeeded, Point{0.0, 0.0, 0.0}, scale};
-    expansion_t local{views};
-    auto multi = local.S_to_L(center, sources, &sources[n_src]);
-    contribute(std::move(multi));
+    ViewSet views{kNoRoleNeeded, center, scale}; 
+    expansion_t local{views}; 
+    auto multi = local.S_to_L(sources, &sources[n_src]); 
+    contribute(std::move(multi)); 
     EVENT_TRACE_DASHMM_STOL_END();
   }
 

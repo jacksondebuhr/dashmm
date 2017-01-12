@@ -199,9 +199,9 @@ public:
     delete [] bessel;
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale();
+    Point center = views_.center(); 
     expansion_t *retval{new expansion_t{kTargetPrimary}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();

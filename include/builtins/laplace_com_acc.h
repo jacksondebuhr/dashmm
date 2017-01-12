@@ -174,8 +174,7 @@ class LaplaceCOMAcc {
     calc_Q(first, last);
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
