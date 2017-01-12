@@ -803,21 +803,15 @@ class Laplace {
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
     // t_index and t_size is the index and size of the child
-    // Compute child's center
-    double h = t_size / 2;
-    Point center = views_.center();
-    double cx = center.x() + (t_index.x() % 2 == 0 ? -h : h);
-    double cy = center.y() + (t_index.y() % 2 == 0 ? -h : h);
-    double cz = center.z() + (t_index.z() % 2 == 0 ? -h : h);
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() * 2;
 
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz}, scale,
-                                        kTargetPrimary}};
+    expansion_t *retval{new expansion_t{Point{0.0, 0.0, 0.0}, 
+          0.0, kTargetPrimary}}; 
 
     int nexp = builtin_laplace_table_->nexp();
 

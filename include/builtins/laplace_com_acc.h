@@ -281,7 +281,7 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 

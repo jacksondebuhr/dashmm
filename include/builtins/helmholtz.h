@@ -799,7 +799,8 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    /*
     // t_index and t_size are the index_and size of the child
     // Compute child's center 
     double h = t_size / 2; 
@@ -1098,6 +1099,8 @@ public:
 
     delete [] S;
     return std::unique_ptr<expansion_t>(retval);
+    */
+    return std::unique_ptr<expansion_t>(nullptr); 
   }    
 
   void add_expansion(const expansion_t *temp1) {
