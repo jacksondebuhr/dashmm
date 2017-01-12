@@ -415,7 +415,7 @@ class Array {
     assert(valid());
 
     T *retval{nullptr};
-    hpx_run_spmd(&array_collect_action, &retval, &data_);
+    hpx_run(&array_collect_action, &retval, &data_);
 
     // We have to specify a deleter here because internally HPX does not know
     // the type T, so it allocates as an array of char.
