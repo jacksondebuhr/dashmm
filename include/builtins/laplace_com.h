@@ -80,7 +80,7 @@ class LaplaceCOM {
   using target_t = Target;
   using expansion_t = LaplaceCOM<Source, Target>;
 
-  LaplaceCOM(Point center, double scale, ExpansionRole role) {
+  LaplaceCOM(ExpansionRole role, double scale = 1.0, Point center = Point{}) {
     bytes_ = sizeof(LaplaceCOMData);
     data_ = reinterpret_cast<LaplaceCOMData *>(new char [bytes_]);
     assert(valid(ViewSet{}));
@@ -168,39 +168,30 @@ class LaplaceCOM {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
-                                      Source *last) const {
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
-                                        kSourcePrimary);
-    temp->calc_mtot(first, last);
-    temp->calc_xcom(first, last);
-    temp->calc_Q(first, last);
-    return std::unique_ptr<expansion_t>{temp};
+  void S_to_M(Source *first, Source *last) const {
+    calc_mtot(first, last);
+    calc_xcom(first, last);
+    calc_Q(first, last);
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child,
-                                      double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     assert(valid(ViewSet{}));
-    expansion_t *temp = new expansion_t(Point{0.0, 0.0, 0.0}, 1.0,
-                                        kSourcePrimary);
+    expansion_t *temp = new expansion_t{kSourcePrimary}; 
     temp->set_mtot(data_->mtot);
     temp->set_xcom(data_->xcom);
     temp->set_Q(data_->Q);
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child,
-                                      double t_size) const {
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
@@ -250,16 +241,15 @@ class LaplaceCOM {
     }
   }
 
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+  std::unique_ptr<expansion_t> M_to_I() const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 

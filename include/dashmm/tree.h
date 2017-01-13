@@ -2517,8 +2517,8 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kSourcePrimary}
+        new expansion_t{kSourcePrimary, 
+            expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -2530,8 +2530,8 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kSourceIntermediate}
+        new expansion_t{kSourceIntermediate, 
+            expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
@@ -2589,8 +2589,8 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kTargetPrimary}
+        new expansion_t{kTargetPrimary,  
+            expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
                             node->dag.normal()->out_edges.size(),
@@ -2602,8 +2602,8 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{n_center, expansion_t::compute_scale(node->idx),
-                        kTargetIntermediate}
+        new expansion_t{kTargetIntermediate, 
+            expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
                                 node->dag.interm()->out_edges.size(),
@@ -2845,8 +2845,7 @@ class DualTree {
         case Operation::StoM:
           {
             expansionlco_t expand{edge[i].target};
-            Point center = domain.center_from_index(edge[i].idx);
-            expand.S_to_M(center, sources, n_src, edge[i].idx);
+            expand.S_to_M(sources, n_src); 
           }
           break;
         case Operation::StoL:

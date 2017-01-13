@@ -60,7 +60,7 @@ public:
   using target_t = Target; 
   using expansion_t = Helmholtz<Source, Target>; 
 
-  Helmholtz(Point center, double scale, ExpansionRole role) 
+  Helmholtz(ExpansionRole role, double scale, Point center) 
     : views_{ViewSet{role, center, scale}} {
     
     // View size for each spherical harmonic expansion
@@ -154,9 +154,6 @@ public:
 
   int view_count() const { return views_.count(); }
   
-  // This is likely to be removed from the interface
-  void get_views(ViewSet &view) const {}
-
   ViewSet get_all_views() const {return views_;}
 
   ExpansionRole role() const {return views_.role();}
@@ -172,11 +169,11 @@ public:
     return data[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first, 
-                                      Source *last) const {
+  void S_to_M(Source *first, Source *last) const {
+    /*
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{center, scale, kSourcePrimary}}; 
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}}; 
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
     double omega = builtin_helmholtz_table_->omega(); 
@@ -224,12 +221,13 @@ public:
     delete [] bessel; 
     
     return std::unique_ptr<expansion_t>{retval}; 
+    */
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first, 
-                                      Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{center, scale, kTargetPrimary}}; 
+    Point center = views_.center(); 
+    expansion_t *retval{new expansion_t{kTargetPrimary, scale, center}}; 
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
@@ -282,8 +280,8 @@ public:
     return std::unique_ptr<expansion_t>{retval}; 
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child, 
-                                      double s_size) const {
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
+    /*
     // The function is called on the expansion of the child box and \p s_size is
     // the child box's size. 
     double h = s_size / 2; 
@@ -340,14 +338,16 @@ public:
 
     delete [] W2; 
     return std::unique_ptr<expansion_t>{retval};
+    */
+    return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> M_to_L(Index s_indx, double s_size, 
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_indx, Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr}; 
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
+    /*
     // The function is called on the parent box and \p t_size is its child's
     // size. 
     Point center = views_.center(); 
@@ -356,9 +356,12 @@ public:
     double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
     double cz = center.z() + (to_child < 4 ? -h : h);
 
-    double scale = views_.scale();
     expansion_t *retval{new expansion_t{Point{cx, cy, cz},
           scale / 2, kTargetPrimary}};
+    */
+    double scale = views_.scale();
+    expansion_t *retval{new expansion_t{kTargetPrimary, 0.0, 
+          Point{0.0, 0.0, 0.0}}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -531,10 +534,11 @@ public:
     }
   }
 
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+  std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{views_.center(), 
-          scale, kSourceIntermediate}}; 
+    expansion_t *retval{new expansion_t{kSourceIntermediate, 
+          scale, views_.center(), 
+          }}; 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
 
     // Addresses of the views, in the order of x-, y-, and z-directions
@@ -683,8 +687,7 @@ public:
     return std::unique_ptr<expansion_t>(retval); 
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size, 
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     // t_index is the index of the parent node on the target side 
 
     // Compute index offsets between the current source node and the 1st child
@@ -694,10 +697,10 @@ public:
     int dz = s_index.z() - t_index.z() * 2;
 
     // Compute center of the parent node
-    Point center = views_.center();
-    double px = center.x() + (dx + 0.5) * s_size;
-    double py = center.y() + (dy + 0.5) * s_size;
-    double pz = center.z() + (dz + 0.5) * s_size;
+    //Point center = views_.center();
+    //double px = center.x() + (dx + 0.5) * s_size;
+    //double py = center.y() + (dy + 0.5) * s_size;
+    //double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
     double scale = views_.scale();
@@ -722,7 +725,7 @@ public:
     dcomplex_t *Evan_mz = 
       reinterpret_cast<dcomplex_t *>(views_.view_data(8)); 
 
-    ViewSet views{kTargetIntermediate, Point{px, py, pz}, 2 * scale}; 
+    ViewSet views{kTargetIntermediate, Point{0.0, 0.0, 0.0}, 0.0}; 
 
     // Each S will generate from 1 to 3 views (evan + prop) on the target
     // side. For propagating wave, the terms are doubled as conjugacy is lost
@@ -795,7 +798,8 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    /*
     // t_index and t_size are the index_and size of the child
     // Compute child's center 
     double h = t_size / 2; 
@@ -1094,6 +1098,8 @@ public:
 
     delete [] S;
     return std::unique_ptr<expansion_t>(retval);
+    */
+    return std::unique_ptr<expansion_t>(nullptr); 
   }    
 
   void add_expansion(const expansion_t *temp1) {

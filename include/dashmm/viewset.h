@@ -77,7 +77,7 @@ class ViewSet {
   /// \param role - the role of the represented views
   /// \param center - the center point of the expansion
   /// \param scale - the scale of the expansion
-  ViewSet(ExpansionRole role, const Point &center, double scale)
+  ViewSet(ExpansionRole role, const Point &center = Point{}, double scale = 1.0)
     : views_{}, role_{role}, center_{center}, scale_{scale} { }
 
   /// Clear the ViewSet
