@@ -70,8 +70,9 @@ int main(int argc, char **argv) {
             minns / 1.0e6, maxns / 1.0e6);
 
     // Get a window of events from 1s to 2s
-    //auto window = runtrace.window(minns, maxns);
+    auto window = runtrace.window(minns, maxns);
     //output_window(window, runtrace.min_ns());
+
 
     //auto coverage = coverage_of_segment_type(window, 1,
     //                                         minns, maxns);
@@ -102,14 +103,20 @@ int main(int argc, char **argv) {
     }
     */
 
+
     std::vector<int> segs{};
     for (int seg = traceutils::segment::kDASHMMStoT;
          seg <= traceutils::segment::kDASHMMItoL; ++seg) {
-      segs.push_back(seg);
+      //segs.push_back(seg);
+      fprintf(stdout, "Segment type %d: %lg\n", seg,
+              average_segment_time(window, seg, minns, maxns));
     }
 
-    traceutils::Utilization util{runtrace};
-    util("test.txt", minns, maxns, 100, segs);
+    //traceutils::Utilization util{runtrace};
+    //util("test.txt", minns, maxns, 100, segs);
+
+
+    // collect the segments
 
 
   } catch (std::runtime_error &err) {

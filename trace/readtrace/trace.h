@@ -61,6 +61,10 @@ cover_t coverage_of_segment_type(const window_t &window, int type,
                                  uint64_t start, uint64_t end);
 
 
+double average_segment_time(const window_t &window, int type,
+                            uint64_t start, uint64_t end);
+
+
 } // traceutils
 
 

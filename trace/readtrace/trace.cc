@@ -165,6 +165,40 @@ namespace {
     return ((double)cover) / total;
   }
 
+  std::pair<double, int> average_segment_time_worker(
+        const range_t &range, int type, uint64_t start, uint64_t end) {
+    if (range.second - range.first == 0) {
+      return std::make_pair((double)0.0, (int)0);
+    }
+
+    uint64_t cover{0};
+    int64_t previous_start = start;
+    int64_t previous_end = start - 1;
+    uint64_t type_count{0};
+    for (auto i = range.first; i != range.second; ++i) {
+      if ((*i)->segment_type() == type) {
+        ++type_count;
+        if ((*i)->start()) {
+          // make sure the segments are alternating start/stop
+          previous_start = (*i)->stamp();
+          assert(previous_end < previous_start);
+        } else {
+          // make sure if we are not a start we are an end
+          assert((*i)->end());
+          // make sure the segments are alternating start and end
+          previous_end = (*i)->stamp();
+          assert(previous_end >= previous_start);
+          cover += previous_end - previous_start;
+        }
+      }
+    }
+    // Deal with a start but no end here
+    if (type_count && (previous_end < previous_start)) {
+      cover += end - previous_start;
+    }
+    return std::make_pair(1.0e-6 * cover, type_count);
+  }
+
   std::map<int, double> span_coverage(const span_t &span, int type,
                                       uint64_t start, uint64_t end) {
     std::map<int, double> retval{};
@@ -172,6 +206,19 @@ namespace {
       retval[i->first] = range_coverage(i->second, type, start, end);
     }
     return retval;
+  }
+
+  std::pair<double, int> average_segment_time_locality(
+          const span_t &span, int type, uint64_t start, uint64_t end) {
+    // return the total segment time here, and the number of segments
+    double ttotal{0.0};
+    double nseg{0};
+    for (auto i = span.begin(); i != span.end(); ++i) {
+      auto result = average_segment_time_worker(i->second, type, start, end);
+      ttotal += result.first;
+      nseg += result.second;
+    }
+    return std::make_pair(ttotal, nseg);
   }
 } // anonymous
 
@@ -181,6 +228,23 @@ cover_t coverage_of_segment_type(const window_t &window, int type,
   cover_t retval{};
   for (auto i = window.begin(); i != window.end(); ++i) {
     retval[i->first] = span_coverage(i->second, type, start, end);
+  }
+  return retval;
+}
+
+
+double average_segment_time(const window_t &window, int type,
+                            uint64_t start, uint64_t end) {
+  double retval{0.0};
+  int nseg{0};
+  for (auto i = window.begin(); i != window.end(); ++i) {
+    auto result = average_segment_time_locality(i->second, type, start, end);
+    nseg += result.second;
+    retval += result.first;
+  }
+  // Get the average
+  if (nseg) {
+    retval /= nseg;
   }
   return retval;
 }
