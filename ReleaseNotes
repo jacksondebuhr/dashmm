@@ -1,0 +1,17 @@
+A log of changes in the release.
+
+1.1.0
+
+* Array methods now return the same return values on all ranks.
+* Memory use improvements in ExpansionLCO
+* Improvements to Array implementation
+* Added tracing events to DASHMM - must be enabled during build, and the
+  installed HPX must be modified to accept the new events.
+
+
+(Things to do to get the release ready)
+- Clean up code
+- Change License
+- Remove some extra collection methods in DAG
+- Remove the detailed timing stuff in evaluate
+- Doublecheck the documentation in source, and in the file
