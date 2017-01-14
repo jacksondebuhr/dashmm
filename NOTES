@@ -112,48 +112,7 @@ TODO: Should we explicitly enforce the singleton nature of Evaluator?
 This that definitely would break the API
 ========================================
 
-
-TODO: Make the way that Expansions manage their data not suck as much as it
-      does now. Really. There is a strange complicated dance happening with
-      all of this, and it will be easy for a user to muck it up.
-      -----> NOTE: this will mean breaking changes, and a definite bump to
-                   2.0.0.
-      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
-                   first grant likely.
-TODO: Make S->* static members of Expansion.
-TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
-      and so on. Extending this, should we do the same thing for other
-      subsystems?
-TODO: Array collect really ought to return a smart pointer, right?
-      (DONE in dev-v2)
-TODO: The operators do not really need their centers. So the interface has this
-      pointless member. Remove them all.
-TODO: We will need a better explicit dag representation - it uses a huge
-      amount of memory.
-TODO: Perhaps we want to parameterize the nodes with some user data? So
-      the user can use the tree for other things as well.
-  * It would be nice if we were to decouple some of the use of the tree and the
-  construction of the tree. The ultimate goal would be to perhaps allow the user
-  to supply their tree to us, like if they had a better method to make it, or
-  if their code already needs to make a tree for some reason. Then DASHMM could
-  just do the DAG and so on. This would also allow us to try other constructions
-  more easily. We basically would be able to hot swap implementations. Also,
-  this might make it simpler to make a tree that can update adiabadically.
-TODO: Should we use exceptions in the main interface to return errors? This is
-  probably cleaner. the catch is that I would need to work out what happens
-  when I emit an exception in an HPX action.
-
-
-
-
-
-
-OPEN QUESTIONS and TODO
-TODO: What is it about HPX-5 that is absolutely needed by DASHMM? Would
-      something more specific be better? Can we introduce some abstraction to
-      insulate ourselves from the HPX-5 risk?
-
-
+DO NOT TRACK THESE HERE. INSTEAD PUT THEM INTO THIS SAME FILE IN dev-v2
 
 
 
