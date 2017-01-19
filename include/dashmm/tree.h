@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -815,8 +804,6 @@ class Tree {
     int n_nodes = compressed_tree[1];
     int type = compressed_tree[2];
 
-    // NOTE: This is a miserable solution to this problem. See if there is
-    // something better for this.
     if (type == 0) {
       Node<Source> *grid = local_tree->unif_grid_source();
 
@@ -1510,8 +1497,6 @@ class DualTree {
     collect_DAG_nodes_from_T_node(target_tree_->root_, retval->target_leaves,
                                   retval->target_nodes);
 
-    // TODO: Note that these are non-binding requests, but this is the most
-    // clear we can write this.
     retval->source_leaves.shrink_to_fit();
     retval->source_nodes.shrink_to_fit();
     retval->target_nodes.shrink_to_fit();
@@ -2262,10 +2247,6 @@ class DualTree {
   /// that will not have any particles under them. In this case, the links to
   /// these nodes from higher levels should be culled to avoid sending Methods
   /// into pointless work, and potentially scheduling pointless work.
-  ///
-  /// TODO: At the moment, this is done in serial. It might be useful to
-  /// get some parallelism here. Probably the easiest is to do this work
-  /// as its own task.
   void prune_topnodes() {
     // Go over uniform level and remove link to any no particle nodes
     int *s_counts = unif_count_src();

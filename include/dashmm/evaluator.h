@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -232,8 +221,6 @@ class Evaluator {
   ///
   /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
-    // BEGIN TREE CREATION
-    //hpx_time_t creation_begin = hpx_time_now();
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
                            parms->targets);
@@ -241,17 +228,7 @@ class Evaluator {
         dualtree_t::partition(global_tree, parms->sources, parms->targets);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
-    //hpx_time_t creation_end = hpx_time_now();
-    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    //fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
-    // END TREE CREATION
 
-    //auto local_tree = global_tree.here();
-    //fprintf(stdout, "UnifGridDistrib:");
-    //for (int i = 0; i < hpx_get_num_ranks(); ++i) {
-    //  fprintf(stdout, " %d", local_tree->last(i) - local_tree->first(i) + 1);
-    //}
-    //fprintf(stdout, "\n");
 
     // Save tree global address in message
     parms->rwaddr = global_tree.data();
@@ -295,18 +272,13 @@ class Evaluator {
     tree->set_method(parms->method);
 
     // Get ready to evaluate
-    // BEGIN DISTRIBUTE
     hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
                                                 distribute_end);
-    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-    //        distribute_deltat);
-    // END DISTRIBUTE
 
-    // BEGIN ALLOCATE
     hpx_time_t allocate_begin = hpx_time_now();
     tree->create_expansions_from_DAG(parms->rwaddr);
 
@@ -317,11 +289,7 @@ class Evaluator {
     hpx_lco_wait(parms->middone);
     hpx_time_t allocate_end = hpx_time_now();
     double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
-    // END ALLOCATE
 
-
-    // BEGIN EVALUATE
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_begin();
     // This is repeated, because the previous call is an atomic operation with
@@ -339,16 +307,10 @@ class Evaluator {
     hpx_lco_wait(heredone);
     hpx_time_t evaluate_end = hpx_time_now();
     double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
-    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_end();
 #endif
-    // END EVALUATE
-
-    fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
-            hpx_get_my_rank(),
-            distribute_deltat, allocate_deltat, evaluate_deltat);
 
     // Delete some local stuff
     hpx_lco_delete_sync(heredone);
