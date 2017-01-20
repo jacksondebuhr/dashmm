@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -36,6 +25,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arrayref.h"
+#include "dashmm/traceevents.h"
 #include "dashmm/viewset.h"
 
 
@@ -94,8 +84,6 @@ class TargetLCO {
   /// \param n_inputs - the number of inputs to the LCO
   /// \param targets - ArrayRef indicating the global memory that the LCO is
   ///                  representing
-  /// \param where - global address which should be local to the allocated
-  ///                LCO
   TargetLCO(size_t n_inputs, const targetref_t &targets) {
     Data init{static_cast<int>(n_inputs), targets};
     lco_ = hpx_lco_user_new(sizeof(init), init_, operation_,
@@ -222,69 +210,54 @@ class TargetLCO {
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
 
-    if (lhs->targets.data() == HPX_NULL) {
+    if (lhs->targets.data() == nullptr) {
       return;
     }
 
     if (*code == kStoT) {
       // The input contains the sources
+      EVENT_TRACE_DASHMM_STOT_BEGIN();
       StoT *input = static_cast<StoT *>(rhs);
 
       if (input->count) {
-        // The LCO data contains the reference to the targets, which must be
-        // pinned.
-        target_t *targets{nullptr};
-        // NOTE: This should succeed because we place the LCO at the same
-        // locality as the actual target data.
-        assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+        target_t *targets{lhs->targets.data()};
 
         expansion_t expand(ViewSet{});
         expand.S_to_T(input->sources, &input->sources[input->count],
                        targets, &targets[lhs->targets.n()]);
 
-        hpx_gas_unpin(lhs->targets.data());
       }
+      EVENT_TRACE_DASHMM_STOT_END();
     } else if (*code == kMtoT) {
+      EVENT_TRACE_DASHMM_MTOT_BEGIN();
       readbuf.interpret<MtoT>();
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      target_t *targets{lhs->targets.data()};
 
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
       expand.M_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
-
-      hpx_gas_unpin(lhs->targets.data());
+      EVENT_TRACE_DASHMM_MTOT_END();
     } else if (*code == kLtoT) {
+      EVENT_TRACE_DASHMM_LTOT_BEGIN();
       readbuf.interpret<LtoT>();
 
-      // The LCO data contains the reference to the targets, which must be
-      // pinned.
-      target_t *targets{nullptr};
-      // NOTE: This should succeed because we place the LCO at the same locality
-      // as the actual target data.
-      assert(hpx_gas_try_pin(lhs->targets.data(), (void **)&targets));
+      target_t *targets{lhs->targets.data()};
 
       ViewSet views{};
       views.interpret(readbuf);
       expansion_t expand(views);
       expand.L_to_T(targets, &targets[lhs->targets.n()]);
       expand.release();
-
-      hpx_gas_unpin(lhs->targets.data());
+      EVENT_TRACE_DASHMM_LTOT_END();
     } else {
       assert(0 && "Incorrect code to TargetLCO");
     }
   }
 
-  /// The LCO is set if it has been finalized, and all scheduled operations
-  /// have taken place.
+  /// The LCO is set if all scheduled operations have taken place.
   static bool predicate_handler(Data *i, size_t bytes) {
     return (i->yet_to_arrive == 0);
   }

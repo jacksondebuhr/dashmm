@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -34,7 +23,6 @@
 #include <map>
 #include <memory>
 #include <string>
-
 #include "dashmm/dashmm.h"
 
 // The type used for source data. This meets all the requiremenets of the
@@ -104,7 +92,7 @@ void print_usage(char *progname) {
           "number of digits of accuracy for fmm (3)\n"
           "--verify=[yes/no]           "
           "perform an accuracy test comparing to direct summation (yes)\n"
-          "--kernel=[laplace/yukawa]   "
+          "--kernel=[laplace/yukawa/helmholtz]   "
           "particle interaction type (laplace)\n"
           , progname);
 }
@@ -226,6 +214,17 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     } else if (retval.accuracy != 3 && retval.accuracy != 6) {
       fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
               " for yukawa kernel using fmm97\n");
+      return -1;
+    }
+  }
+
+  if (retval.kernel == "helmholtz") {
+    if (retval.method != "fmm97") {
+      fprintf(stderr, "Usage ERROR: helmholtz kernel must use fmm97\n");
+      return -1;
+    } else if (retval.accuracy != 3 && retval.accuracy != 6) {
+      fprintf(stderr, "Usage ERROR: only 3-/6-digit accuracy supported"
+              " for helmholtz kernel using fmm97\n");
       return -1;
     }
   }

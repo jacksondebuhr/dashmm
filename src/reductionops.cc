@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -86,7 +75,7 @@ HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_ident_op, int_max_ident_handler,
 void int_max_op_handler(int *lhs, const int *rhs, size_t bytes) {
   size_t count = bytes / sizeof(int);
   for (size_t i = 0; i < count; ++i) {
-    lhs[i] = std::max(lhs[i], rhs[i] + 1);
+    lhs[i] = std::max(lhs[i], rhs[i]);
   }
 }
 HPX_ACTION(HPX_FUNCTION, HPX_ATTR_NONE, int_max_op, int_max_op_handler,

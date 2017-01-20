@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -43,8 +32,10 @@
 #include <cstdio>
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <string>
+#include <utility>
 
 #include "dashmm/index.h"
 
@@ -361,6 +352,8 @@ struct CSVEdge {
   Operation op;
   Index t_idx;
   int t_loc;
+  DAGNode *source;
+  DAGNode *target;
 };
 
 
@@ -369,7 +362,8 @@ void add_out_edges_from_node(DAGNode *node, std::vector<CSVEdge> &edges) {
     edges.emplace_back(CSVEdge{node->idx, node->locality,
                                node->out_edges[i].op,
                                node->out_edges[i].target->idx,
-                               node->out_edges[i].target->locality});
+                               node->out_edges[i].target->locality,
+                               node, node->out_edges[i].target});
   }
 }
 
@@ -401,11 +395,12 @@ void print_edges_to_file(std::vector<CSVEdge> &edges, std::string fname) {
 
   for (size_t i = 0; i < edges.size(); ++i) {
     std::string opstr = edge_code_to_print(edges[i].op);
-    fprintf(ofd, "%d %d %d %d - %d - %s - %d %d %d %d - %d\n",
+    fprintf(ofd, "%d %d %d %d - %d - %s - %d %d %d %d - %d - %p %p\n",
             edges[i].s_idx.x(), edges[i].s_idx.y(), edges[i].s_idx.z(),
             edges[i].s_idx.level(), edges[i].s_loc, opstr.c_str(),
             edges[i].t_idx.x(), edges[i].t_idx.y(), edges[i].t_idx.z(),
-            edges[i].t_idx.level(), edges[i].t_loc);
+            edges[i].t_idx.level(), edges[i].t_loc,
+            edges[i].source, edges[i].target);
   }
 
   fclose(ofd);

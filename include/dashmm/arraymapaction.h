@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -113,7 +102,7 @@ class ArrayMapAction {
                           HPX_ACTION_T, HPX_POINTER, HPX_ADDR);
       HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_DEFAULT, spawn_, spawn_handler,
                           HPX_SIZE_T, HPX_SIZE_T, HPX_SIZE_T,
-                          HPX_ADDR, HPX_ACTION_T, HPX_POINTER, HPX_ADDR);
+                          HPX_ADDR, HPX_ACTION_T, HPX_POINTER, HPX_POINTER);
       registered_ = 1;
     }
 
@@ -142,7 +131,7 @@ class ArrayMapAction {
                                      sizeof(ArrayMetaData));
     ArrayMetaData *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
-    hpx_addr_t data = local->data;
+    char *data = local->data;
     size_t total_count = local->local_count;
     hpx_gas_unpin(global);
 
@@ -205,13 +194,10 @@ class ArrayMapAction {
   /// \returns - HPX_SUCCESS
   static int spawn_handler(size_t count, size_t total_count,
                            size_t chunk_size, hpx_addr_t alldone,
-                           hpx_action_t leaf, const E *env, hpx_addr_t data) {
+                           hpx_action_t leaf, const E *env, char *data) {
     if (count <= chunk_size) {
       map_function_t lfunc = (map_function_t)hpx_action_get_handler(leaf);
-      T *local{nullptr};
-      assert(hpx_gas_try_pin(data, (void **)&local));
-      lfunc(local, count, env);
-      hpx_gas_unpin(data);
+      lfunc((T *)data, count, env);
       hpx_lco_set_lsync(alldone, 0, nullptr, HPX_NULL);
     } else {
       size_t num_chunks = count / chunk_size;
@@ -222,8 +208,7 @@ class ArrayMapAction {
       size_t num_left = num_chunks / 2;
       size_t count_left = num_left * chunk_size;
       size_t count_right = count - count_left;
-      hpx_addr_t data_right = hpx_addr_add(data, sizeof(T) * count_left,
-                                           sizeof(T) * total_count);
+      char *data_right = data + sizeof(T) * count_left;
 
       hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_left, &total_count,
                &chunk_size, &alldone, &leaf, &env, &data);

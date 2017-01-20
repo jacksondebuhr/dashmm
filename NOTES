@@ -1,34 +1,41 @@
 THIS BRANCH TODO
 
 
-TODO: Update tutorial
-TODO: Update User Expansion documentation; in particular ViewSet needs to be
-      explained.
-TODO: Make the way that Expansions manage their data not suck as much as it
-      does now. Really. There is a strange complicated dance happening with
-      all of this, and it will be easy for a user to muck it up.
-      -----> NOTE: this will mean breaking changes, and a definite bump to
-                   2.0.0.
-      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
-                   first grant likely.
-TODO: Make S->* static members of Expansion.
+==========================================
+Things that likely would not break the API
+==========================================
+
+TODO: We should transform the out edge spawn into actions for each now that
+      we know how to do that cheaply.
+TODO: The remote stuff should be a future. That way a no-copy parallel spawn
+      is possible. It has to 'live' somewhere.
+
+TODO: Decide if the current solution for the DAG vector capacity problem is
+      good enough, or if we should instead work toward collecting the tree
+      sizes.
+
+TODO: This is likely the big limiter in the short term on problem size. We
+      need to improve the memory use of the explicit DAG. If there were a way
+      to perhaps clean that up before we really begin the execution that would
+      be awesome, or to start to delete it when it begins. But there is a good
+      deal of waste and repetition there. The fact of the explicit DAG is nice,
+      but it needs to be made more efficient.
+
+TODO: Think about if there are places that RDMA could improve the performance.
+      That might have us putting more into the GAS.
+
+TODO: be more clear about when an expansion needs to own data and when not.
 TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
       like an inelegant solution, and perhaps one that relies on the
       inclusion order. Check into this.
 TODO: targetlco.h: contribute_*_to_T; IN each case there is likely some extra
       copying going on. See if there is a way to reduce that. Perhaps via the
       parcel interface.
-TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
-      and so on. Extending this, should we do the same thing for other
-      subsystems?
 TODO: From tree.h line 2240
     // TODO: This is an inelegant solution to the problem of getting the
     // local segments unpinned. src_data and trg_data will unpin the segment
     // when the scope we introduce here is closed. Perhaps add unpin(), but
     // that detracts from the RAII nature of the current ArrayData object.
-TODO: Array collect really ought to return a smart pointer, right?
-
-
 TODO: Think about the following issue
   The out edge spawn action will have to be ready to either do the current thing,
   or send an action to the remote locality that will first look up the address
@@ -51,15 +58,9 @@ TODO: Another thing might be to send this to the tree and not the LCO. Then the
       tree can eventually build up a complete list over the iterations.
       Again, there is a termination problem with this, but it is a different
       perspective.
-
-
-
-TODO: be more clear about when an expansion needs to own data and when not.
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
-
-
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
           Basically, leave it better than you found it.
@@ -80,99 +81,54 @@ TODO: Decide if we should also test Hilbert ordering on the top level distrib
 TODO: Further, should we allow for a non-space-filling curve distribution.
       This might be a way to make a non-contiguous chunk on the SFC a better
       overall distribution.
-
-
-
-Overall Plan to 1.0
- * Documentation clean up throughout
-    - advanced user guide; including how to define methods
+TODO: Documentation clean up throughout
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
-
-
- * We will need a better explicit dag representation - it uses a huge amount of
-      memory.
- * Split Evaluate into pieces and expose more interface to users
+TODO: Split Evaluate into pieces and expose more interface to users
     - NOTE: This is not a vital thing to accomplish for 1.0.0
     - Enable repeat use of a DAG
     - Potentially provide objects representing the tree and so on to the user
       and some utility routines to use the resulting objects
- * Finish interface
+TODO: Finish interface
     - NOTE: this is not a vital thing to accomplish for 1.0.0
     - Make it so that an advanced user could call all the needed stuff directly
       from an HPX thread.
     - As a corollary to that, add assertions to routines that have
       inside / outside HPX restrictions
- * As there is time, work on performance
-    - Time various parts of the code
-
-
-Future feature TODO pulled from the source
- * Have a mechanism to build an array up from parts on each rank. The overall
-   organizational thing might be collective, but each rank then replaces with
-   an ArrayRef. This would then need ArrayRef to have an allocation form.
-   Then, a new resum() or something method would need to bind the whole thing
-   together. No use yet, but could be nice.
- * Array::allocate() ::get() and ::put() all can now return different codes on
-   different ranks.
- * The expansion concept does not allow for access of the kernel parameters.
+TODO: The expansion concept does not allow for access of the kernel parameters.
    They end up in the table, and cannot be accessed later. Not sure if this is
    a problem, but it could be.
 TODO: Another idea from Bo: Store the edges in one place and then just index
       into that. Cuts down on the representation by quite a bit.
 TODO: Probably don't save the actual expansion data in the LCO. AGAS is not
       being used, so why protect against it being used in the future.
-
-
-OPEN QUESTIONS and TODO
-TODO: What is it about HPX-5 that is absolutely needed by DASHMM? Would
-      something more specific be better? Can we introduce some abstraction to
-      insulate ourselves from the HPX-5 risk?
-TODO: Make the Array type work from inside HPX-5 threads also
-        (We have no use case for this just yet. Delay)
-        (Also, think about adding the two kinds of sorting to the Array.
-         at the moment, there is not really any use case in mind, other than
-         wouldn't it be nice. So we can delay this until we need it.)
+TODO: FORTRAN skeleten Expansion. Somehow link to a user's existing FORTRAN
+      operations.
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
         (This is not a bad idea, but it can wait, as long as the docs warn
          users.)
-TODO: Perhaps we want to parameterize the nodes with some user data? So
-      the user can use the tree for other things as well.
-        (Cool idea; no use case. Delay)
+
+========================================
+This that definitely would break the API
+========================================
+
+DO NOT TRACK THESE HERE. INSTEAD PUT THEM INTO THIS SAME FILE IN dev-v2
 
 
 
 
-Some notes about issues or future features
-
-* We will need to improve the error handling in this thing quite a bit.
-Basically any way that the user-facing methods can go wrong should return
-sensible error where possible instead of just being assertions that fail.
-
-* It would be nice if we were to decouple some of the use of the tree and the
-construction of the tree. The ultimate goal would be to perhaps allow the user
-to supply their tree to us, like if they had a better method to make it, or
-if their code already needs to make a tree for some reason. Then DASHMM could
-just do the DAG and so on. This would also allow us to try other constructions
-more easily. We basically would be able to hot swap implementations. Also,
-this might make it simpler to make a tree that can update adiabadically.
-
-* FORTRAN skeleten Expansion. Somehow link to a user's existing FORTRAN
-operations.
 
 
 
-Interface Ideas
 
+
+FUTURE BUILT-INs
  * We should also in the near term get a base nearest neighbor search. This will
    be essential for SPH and Phil's MFV methods.
    This would be useful in much wider contexts, however.
  * Do LaplaceCOM with softened force (ala GADGET)
  * Do one for Ewald technique for periodic BCs
  * Do one for Short range forces
-
-Some more methods
-
  * Can we do something more like GADGET's BH method?
     (This is more tricky. The acceptability of an expansion is dependent on the
      particle data of the targets. This would make the node-wide analysis
@@ -180,3 +136,13 @@ Some more methods
  * Is there some room for performance improvement in BH where we might use
    single particles for the decision? Is this just a matter of using a smaller
    threshold? Will that pay any dividends?
+
+
+
+IDEAS TO TRY
+  * If we get the tree decoupled from the execution, could we perhaps use
+    GADGET or AREPO or GIZMO or whatever to build the tree, and then just sub
+    in our execution? That would be a pretty damn good comparison to make.
+    It would mean that design of our decoupling would need to be such that
+    we could do this. But that would be a really cool comparison to make.
+    Really cool.

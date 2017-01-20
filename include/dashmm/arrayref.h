@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -39,97 +28,12 @@
 namespace dashmm {
 
 
-/// This class represents a pinned copy of a reference to an Array
-///
-/// An Array object represents data that lives in the global address space.
-/// An ArrayRef object represents a portion of that array. An ArrayData
-/// represents a locally accessible portion of the Array data.
-///
-/// This object is similar in some ways to a smart pointer, but instead of
-/// managing the lifetime of the allocation, this will manage the lifetime of
-/// an HPX-5 pin operation. To access the underlying data, one uses the
-/// value() member.
-template <typename Record>
-class ArrayData {
- public:
-  /// Default constructor
-  ArrayData() : data_{HPX_NULL}, local_{nullptr} { }
-
-  /// Construct from a global address
-  explicit ArrayData(hpx_addr_t data) : data_{data}, local_{nullptr} {
-    if (data_ != HPX_NULL) {
-      assert(hpx_gas_try_pin(data_, (void **)&local_));
-    }
-  }
-
-  /// Copy construction
-  ArrayData(const ArrayData<Record> &other) {
-    data_ = other.data_;
-    if (data_ != HPX_NULL) {
-      assert(hpx_gas_try_pin(data_, (void **)&local_));
-    }
-  }
-
-  /// Move construction
-  ArrayData(ArrayData<Record> &&other) {
-    data_ = other.data_;
-    local_ = other.local_;
-    other.local_ = nullptr;
-    other.data_ = HPX_NULL;
-  }
-
-  /// The destructor unpins the memory
-  ~ArrayData() {
-    if (data_ != HPX_NULL) {
-      hpx_gas_unpin(data_);
-    }
-  }
-
-  /// Copy assignment
-  ArrayData<Record> &operator=(const ArrayData<Record> &other) {
-    if (data_ != HPX_NULL) {
-      hpx_gas_unpin(data_);
-      local_ = nullptr;
-    }
-
-    data_ = other.data_;
-    assert(hpx_gas_try_pin(data_, (void **)&local_));
-
-    return *this;
-  }
-
-  /// Move assignment
-  ArrayData<Record> &operator=(ArrayData<Record> &&other) {
-    if (data_ != HPX_NULL) {
-      hpx_gas_unpin(data_);
-      local_ = nullptr;
-    }
-
-    data_ = other.data_;
-    local_ = other.local_;
-
-    other.data_ = HPX_NULL;
-    other.local_ = nullptr;
-
-    return *this;
-  }
-
-  /// Return the local address
-  Record *value() const {return local_;}
-
- private:
-  hpx_addr_t data_;
-  Record *local_;
-};
-
-
 /// Reference to a set of records in a dashmm::Array object
 ///
-/// This is a reference object, meaning that it refers to the Record data in
-/// the GAS, but does not contain those data. As such, one can pass this
+/// This is a reference object, meaning that it refers to the Record data
+/// but does not contain those data. As such, one can pass this
 /// class by value without worry. Also, because this is a reference, this
-/// object cannot be used to destroy the memory in the global address space to
-/// which it refers.
+/// object should not be used to destroy the memory to which it refers.
 ///
 /// NOTE: This object is only intended to be used from an HPX-5 thread. Only
 /// slice() actually bears this restriction, but the remaining routines are of
@@ -143,14 +47,13 @@ class ArrayRef {
   using arrayref_t = ArrayRef<Record>;
 
   /// Default constructor.
-  ArrayRef() : data_{HPX_NULL}, n_{0}, n_tot_{0} { }
+  ArrayRef() : data_{nullptr}, n_{0} { }
 
   /// Construct from a specific address and counts.
-  ArrayRef(hpx_addr_t data, size_t n, size_t n_tot)
-      : data_{data}, n_{n}, n_tot_{n_tot} { }
+  ArrayRef(Record *data, size_t n) : data_{data}, n_{n} { }
 
   /// Returns if the reference is valid
-  bool valid() const {return data_ != HPX_NULL;}
+  bool valid() const {return data_ != nullptr;}
 
   /// Get a reference to a slice of the current reference
   ///
@@ -165,37 +68,26 @@ class ArrayRef {
   /// \returns - the resulting ArrayRef; may be invalid.
   arrayref_t slice(size_t offset, size_t n) const {
     if (offset > n_) {
-      return arrayref_t{HPX_NULL, 0, 0};
+      return arrayref_t{nullptr, 0};
     }
     if (offset + n > n_) {
-      return arrayref_t{HPX_NULL, 0, 0};
+      return arrayref_t{nullptr, 0};
     }
-    hpx_addr_t addr = hpx_addr_add(data_, sizeof(Record) * offset,
-                                   sizeof(Record) * n_tot_);
-    return arrayref_t{addr, n, n_tot_};
+    Record *addr = data_ + offset;
+    return arrayref_t{addr, n};
   }
 
   /// Returns the number of Source records referred to.
   size_t n() const {return n_;}
 
-  /// Returns the total number of Source records in the underlying allocation.
-  size_t n_tot() const {return n_tot_;}
-
   /// Returns the global address of the referred to data.
-  hpx_addr_t data() const {return data_;}
-
-  /// Return a local reference
-  ArrayData<Record> pin() const {
-    return ArrayData<Record>(data_);
-  }
+  Record *data() const {return data_;}
 
  private:
   /// Address of the first Record referred to by this object
-  hpx_addr_t data_;
+  Record *data_;
   /// Number of Records referred to by this object
   size_t n_;
-  /// Total number of Records in the underlying GAS allocation
-  size_t n_tot_;
 };
 
 

@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -33,11 +22,12 @@
 
 #include <cmath>
 #include <cassert>
+#include "dashmm/types.h"
 
 
 namespace dashmm {
 
-
+/// Offset of coefficient (*)_n^m, where 0 <= m <= n
 inline int midx(const int n, const int m) {
   return n * (n + 1) / 2 + m;
 }
@@ -54,16 +44,22 @@ inline double pow_m1(const int m) {
   return (m % 2 ? -1.0 : 1.0);
 }
 
+/// Compute Legendre polynomial P_n^m(x), where |x| <= 1, 0 <= m <= n
 void legendre_Plm(int n, double x, double *P);
 
+/// Compute scaled Legendre polynomial scale^n P_n^m(x) where |x| > 1
 void legendre_Plm_gt1_scaled(int nb, double x, double scale, double *P);
 
+/// Gamma function
 double Gamma(double x);
 
+/// Modified cylindrical Bessel function of the first kind
 int bessel_In(int nb, double alpha, double x, int ize, double *B);
 
+/// Modified spherical Bessel function of the first kind
 void bessel_in_scaled(int nb, double x, double scale, double *B);
 
+/// Modified spherical Bessel function of the second kind
 void bessel_kn_scaled(int nb, double x, double scale, double *B);
 
 

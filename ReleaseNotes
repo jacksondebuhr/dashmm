@@ -1,0 +1,36 @@
+A log of changes in the release.
+
+1.1.0
+
+* Array methods now return the same return values on all ranks.
+* Memory use improvements in ExpansionLCO
+* Improvements to Array implementation
+* Added tracing events to DASHMM - must be enabled during build, and the
+  installed HPX must be modified to accept the new events.
+
+
+(Things to do to get the release ready)
+DONE - Clean up code
+DONE - Change License
+DONE - Remove some extra collection methods in DAG
+DONE - Remove the detailed timing stuff in evaluate
+- Doublecheck the documentation in source, and in the file
+DONE - Remove Helmholtz stuff
+DONE - Remove Helmholtz in demo/basic
+DONE - Remove pointless special functions (list from Bo)
+DONE - Update copyright dates and top comment in every file
+
+
+
+// =============================================================================
+//  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
+//
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
+//  All rights reserved.
+//
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
+//
+//  This software was created at the Indiana University Center for Research in
+//  Extreme Scale Technologies (CREST).
+// =============================================================================
