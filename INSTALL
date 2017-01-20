@@ -8,7 +8,7 @@ it in applications.
 
 Prerequisites:
 
-DASHMM v. 1.0.0 depends on one external library: HPX-5. The current
+DASHMM v. 1.1.0 depends on one external library: HPX-5. The current
 version of DASHMM depends on version 4.0.0 of HPX-5 or later, which
 may be found at \url{https://hpx.crest.iu.edu/}. Please see the
 official HPX-5 documentation for instructions on how to build, install
