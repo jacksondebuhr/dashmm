@@ -23,7 +23,8 @@ cp INSTALL $BASENAME/
 cp Makefile $BASENAME/
 cp README $BASENAME/
 cp LICENSE $BASENAME/
-cp doc/DASHMMUserGuide.pdf $BASENAME/
+mkdir $BASENAME/doc
+cp doc/DASHMMUserGuide.pdf $BASENAME/doc/
 cp -r demo/ $BASENAME/
 cp -r include/ $BASENAME/
 cp -r src/ $BASENAME/
