@@ -272,14 +272,9 @@ class Evaluator {
     tree->set_method(parms->method);
 
     // Get ready to evaluate
-    hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
-    hpx_time_t distribute_end = hpx_time_now();
-    double distribute_deltat = hpx_time_diff_us(distribute_begin,
-                                                distribute_end);
 
-    hpx_time_t allocate_begin = hpx_time_now();
     tree->create_expansions_from_DAG(parms->rwaddr);
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -287,8 +282,6 @@ class Evaluator {
     // get their work going when they come to it and then they return.
     hpx_lco_and_set(parms->middone, HPX_NULL);
     hpx_lco_wait(parms->middone);
-    hpx_time_t allocate_end = hpx_time_now();
-    double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_begin();
@@ -300,13 +293,10 @@ class Evaluator {
     EVENT_TRACE_DASHMM_ZEROREF();
 #endif
 
-    hpx_time_t evaluate_begin = hpx_time_now();
     tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation(global_tree);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
     hpx_lco_wait(heredone);
-    hpx_time_t evaluate_end = hpx_time_now();
-    double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_end();
