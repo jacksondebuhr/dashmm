@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -70,10 +59,10 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{}; 
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{}; 
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{};
 
 // This type collects the input arguments to the program.
 struct InputArguments {
@@ -511,11 +500,11 @@ void perform_evaluation_test(InputArguments args) {
   } else if (args.kernel == std::string{"helmholtz"}) {
     if (args.method == std::string{"fmm97"}) {
       dashmm::FMM97<SourceData, TargetData, dashmm::Helmholtz> method{};
-      std::vector<double> kernelparms(1, 0.1); 
+      std::vector<double> kernelparms(1, 0.1);
 
-      t0 = getticks(); 
-      err = helmholtz_fmm97.evaluate(source_handle, target_handle, 
-                                     args.refinement_limit, method, 
+      t0 = getticks();
+      err = helmholtz_fmm97.evaluate(source_handle, target_handle,
+                                     args.refinement_limit, method,
                                      args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
       tf = getticks();

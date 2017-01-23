@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -25,14 +14,14 @@
 #ifndef __DASHMM_HELMHOLTZ_TABLE_H__
 #define __DASHMM_HELMHOLTZ_TABLE_H__
 
-/// \file 
-/// \brief Declaration of precomputed table for Helmholtz 
+/// \file
+/// \brief Declaration of precomputed table for Helmholtz
 
 #include <cmath>
 #include <complex>
-#include <map> 
+#include <map>
 #include <memory>
-#include <vector> 
+#include <vector>
 #include "dashmm/types.h"
 #include "builtins/special_function.h"
 #include "builtins/builtin_table.h"
@@ -41,9 +30,9 @@ namespace dashmm {
 
 class HelmholtzTable {
 public:
-  HelmholtzTable(int n_digits, double size, double omega); 
-  ~HelmholtzTable(); 
-  static const int maxlev; 
+  HelmholtzTable(int n_digits, double size, double omega);
+  ~HelmholtzTable();
+  static const int maxlev;
   int p() const {return p_;}
   int s_e() const {return s_e_;}
   int s_p() const {return s_p_;}
@@ -53,14 +42,14 @@ public:
   const double *dmat_plus(double v) const {return dmat_plus_->at(v);}
   const double *dmat_minus(double v) const {return dmat_minus_->at(v);}
   const double *m2m(double scale) const {
-    int offset = level(scale) - 3; 
-    assert(offset >= 0); 
+    int offset = level(scale) - 3;
+    assert(offset >= 0);
     return &m2m_[(p_ + 1) * (p_ + 1) * (p_ + 2) / 2 * offset];
   }
   const double *l2l(double scale) const {
-    int offset = level(scale) - 2; 
-    assert(offset >= 0 && offset <= maxlev - 3); 
-    return &l2l_[(p_ + 1) * (p_ + 1) * (p_ + 2) / 2 * offset]; 
+    int offset = level(scale) - 2;
+    assert(offset >= 0 && offset <= maxlev - 3);
+    return &l2l_[(p_ + 1) * (p_ + 1) * (p_ + 2) / 2 * offset];
   }
   const double *x_e() const {return x_e_;}
   const double *w_e() const {return w_e_;}
@@ -68,7 +57,7 @@ public:
     return &m_e_[s_e_ * level(scale)];
   }
   const int *sm_e(double scale) const {
-    return &sm_e_[(s_e_ + 1) * level(scale)]; 
+    return &sm_e_[(s_e_ + 1) * level(scale)];
   }
   int n_e(double scale) const {return n_e_[level(scale)];}
   const int *f_e() const {return f_e_;}
@@ -94,7 +83,7 @@ public:
     return &m_p_[s_p_ * level(scale)];
   }
   const int *sm_p(double scale) const {
-    return &sm_p_[(s_p_ + 1) * level(scale)]; 
+    return &sm_p_[(s_p_ + 1) * level(scale)];
   }
   int n_p(double scale) const {return n_p_[level(scale)];}
   const int *f_p() const {return f_p_;}
@@ -115,55 +104,55 @@ public:
   }
   double size(double scale) const {return size_ * scale / scale_;}
 
-private: 
-  int p_; 
+private:
+  int p_;
   int s_e_;
-  int s_p_; 
-  double omega_; 
-  double size_; 
-  double scale_; 
-  double *sqf_; 
-  builtin_map_t *dmat_plus_; 
-  builtin_map_t *dmat_minus_; 
-  double *m2m_; 
-  double *l2l_; 
-  double *x_e_; 
-  double *w_e_; 
-  int *m_e_; 
-  int *sm_e_; 
-  int *n_e_; 
-  int *f_e_; 
-  int *smf_e_; 
-  dcomplex_t **ealphaj_e_; 
-  dcomplex_t **xs_e_; 
-  dcomplex_t **ys_e_; 
-  double **zs_e_; 
-  double *x_p_; 
-  double *w_p_; 
-  int *m_p_; 
-  int *sm_p_; 
-  int *n_p_; 
-  int *f_p_; 
-  int *smf_p_; 
-  dcomplex_t **ealphaj_p_; 
-  dcomplex_t **xs_p_; 
-  dcomplex_t **ys_p_; 
-  dcomplex_t **zs_p_; 
+  int s_p_;
+  double omega_;
+  double size_;
+  double scale_;
+  double *sqf_;
+  builtin_map_t *dmat_plus_;
+  builtin_map_t *dmat_minus_;
+  double *m2m_;
+  double *l2l_;
+  double *x_e_;
+  double *w_e_;
+  int *m_e_;
+  int *sm_e_;
+  int *n_e_;
+  int *f_e_;
+  int *smf_e_;
+  dcomplex_t **ealphaj_e_;
+  dcomplex_t **xs_e_;
+  dcomplex_t **ys_e_;
+  double **zs_e_;
+  double *x_p_;
+  double *w_p_;
+  int *m_p_;
+  int *sm_p_;
+  int *n_p_;
+  int *f_p_;
+  int *smf_p_;
+  dcomplex_t **ealphaj_p_;
+  dcomplex_t **xs_p_;
+  dcomplex_t **ys_p_;
+  dcomplex_t **zs_p_;
 
   int level(double scale) const {return log2(scale_ / scale);}
-  void gaussq(int N); 
-  int imtql2(int N, double *d, double *e, double *z); 
-  void generate_sqf(); 
-  void generate_scaled_wigner_dmat(); 
-  void generate_scaled_dmat_of_beta(double beta, double *dp, double *dm); 
-  void generate_m2m(); 
-  void generate_l2l(); 
-}; 
+  void gaussq(int N);
+  int imtql2(int N, double *d, double *e, double *z);
+  void generate_sqf();
+  void generate_scaled_wigner_dmat();
+  void generate_scaled_dmat_of_beta(double beta, double *dp, double *dm);
+  void generate_m2m();
+  void generate_l2l();
+};
 
 
-extern std::unique_ptr<HelmholtzTable> builtin_helmholtz_table_; 
+extern std::unique_ptr<HelmholtzTable> builtin_helmholtz_table_;
 
-void update_helmholtz_table(int n_digits, double size, double omega); 
+void update_helmholtz_table(int n_digits, double size, double omega);
 }; // namespace dashmm
 
 #endif

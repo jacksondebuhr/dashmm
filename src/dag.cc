@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -499,7 +488,7 @@ std::vector<double> DAG::average_out_degree() const {
   double sn_od_mean = (double)sn_total / sn_count;
   double tn_od_mean = (double)tn_total / tn_count;
   double t_od_mean = (double)t_total / t_count;
-  double od_mean = (double)(s_total + sn_total + tn_total + t_total) / 
+  double od_mean = (double)(s_total + sn_total + tn_total + t_total) /
                       (s_count + sn_count + tn_count + t_count);
 
 }
@@ -554,7 +543,7 @@ std::pair<int, int> DAG::min_max_out_degree_SI() const {
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_nodes.size(); ++i) {
     // determine if we are M, and skip
-    auto item = std::find_if(source_nodes[i]->in_edges.begin(), 
+    auto item = std::find_if(source_nodes[i]->in_edges.begin(),
                             source_nodes[i]->in_edges.end(),
                             [](const DAGEdge &a)->bool {
                               return a.op == Operation::MtoI;

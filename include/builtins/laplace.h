@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -73,7 +62,7 @@ class Laplace {
   using target_t = Target;
   using expansion_t = Laplace<Source, Target>;
 
-  Laplace(ExpansionRole role, double scale = 1.0, Point center = Point{}) 
+  Laplace(ExpansionRole role, double scale = 1.0, Point center = Point{})
     : views_{ViewSet{role, center, scale}} {
     // View size for each spherical harmonic expansion
     int p = builtin_laplace_table_->p();
@@ -146,10 +135,10 @@ class Laplace {
     dcomplex_t *data = reinterpret_cast<dcomplex_t *>(views_.view_data(view));
     return data[i];
   }
-  
+
   void S_to_M(Source *first, Source *last) const {
     double scale = views_.scale();
-    Point center = views_.center(); 
+    Point center = views_.center();
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_laplace_table_->p();
     const double *sqf = builtin_laplace_table_->sqf();
@@ -200,8 +189,8 @@ class Laplace {
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale();
-    Point center = views_.center(); 
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    Point center = views_.center();
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_laplace_table_->p();
     const double *sqf = builtin_laplace_table_->sqf();
@@ -254,7 +243,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
-    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
+    expansion_t *retval{new expansion_t{kSourcePrimary}};
 
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
@@ -329,7 +318,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     int t2s_x = s_index.x() - t_index.x();
     int t2s_y = s_index.y() - t_index.y();
@@ -386,7 +375,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
 
@@ -593,7 +582,7 @@ class Laplace {
   }
 
   std::unique_ptr<expansion_t> M_to_I() const {
-    expansion_t *retval{new expansion_t{kSourceIntermediate}}; 
+    expansion_t *retval{new expansion_t{kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -741,7 +730,7 @@ class Laplace {
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{kTargetIntermediate}; 
+    ViewSet views{kTargetIntermediate};
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -792,7 +781,7 @@ class Laplace {
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
     // t_index and t_size is the index and size of the child
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);

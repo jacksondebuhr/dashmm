@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -177,25 +166,25 @@ class ExpansionLCO {
   /// given @p sources. As this M only expects 1 input, the implementation here
   /// directly operates on the memory reserved for the expansion data inside
   /// this object. The set operation performed simply decrements the internal
-  /// counter of the LCO. 
+  /// counter of the LCO.
   ///
   /// \param sources - the source data
   /// \param n_src - the number of sources
   void S_to_M(Source *sources, size_t n_src) {
     EVENT_TRACE_DASHMM_STOM_BEGIN();
 
-    void *lva{nullptr}; 
-    assert(hpx_gas_try_pin(data_, &lva)); 
-    Header *head = static_cast<Header *>(hpx_lco_user_get_user_data(lva)); 
-    ReadBuffer here{head->data, head->expansion_size}; 
-    ViewSet views{}; 
-    views.interpret(here); 
-    expansion_t local{views}; 
-    local.S_to_M(sources, &sources[n_src]); 
-    local.release(); 
-    hpx_gas_unpin(data_); 
-    int code = SetOpCodes::kStoM; 
-    hpx_lco_set_lsync(data_, sizeof(int), &code, HPX_NULL); 
+    void *lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lva));
+    Header *head = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
+    ReadBuffer here{head->data, head->expansion_size};
+    ViewSet views{};
+    views.interpret(here);
+    expansion_t local{views};
+    local.S_to_M(sources, &sources[n_src]);
+    local.release();
+    hpx_gas_unpin(data_);
+    int code = SetOpCodes::kStoM;
+    hpx_lco_set_lsync(data_, sizeof(int), &code, HPX_NULL);
 
     EVENT_TRACE_DASHMM_STOM_END();
   }
@@ -218,10 +207,10 @@ class ExpansionLCO {
   void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOL_BEGIN();
     double scale = expansion_t::compute_scale(idx);
-    ViewSet views{kNoRoleNeeded, center, scale}; 
-    expansion_t local{views}; 
-    auto multi = local.S_to_L(sources, &sources[n_src]); 
-    contribute(std::move(multi)); 
+    ViewSet views{kNoRoleNeeded, center, scale};
+    expansion_t local{views};
+    auto multi = local.S_to_L(sources, &sources[n_src]);
+    contribute(std::move(multi));
     EVENT_TRACE_DASHMM_STOL_END();
   }
 
@@ -350,7 +339,7 @@ class ExpansionLCO {
   /// Operation codes for the LCOs set operation
   enum SetOpCodes {
     kContribute,
-    kStoM, 
+    kStoM,
     kOutEdges
   };
 
@@ -404,22 +393,22 @@ class ExpansionLCO {
         ViewSet views{};
         views.interpret(input);
         expansion_t incoming{views};
-        
+
         ReadBuffer here{lhs->data, lhs->expansion_size};
         ViewSet here_views{};
         here_views.interpret(here);
         expansion_t expand{here_views};
-        
+
         // add the one to the other
         expand.add_expansion(&incoming);
-        
+
         // release the data, because these objects do not actually own it
         expand.release();
         incoming.release();
         EVENT_TRACE_DASHMM_ELCO_END();
       }
       break;
-    case SetOpCodes::kStoM: 
+    case SetOpCodes::kStoM:
       break;
     case SetOpCodes::kOutEdges:
       break;
@@ -641,13 +630,13 @@ class ExpansionLCO {
   static void m_to_m_out_edge(Header *head, const ViewSet &views,
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
-    int from_child = head->index.which_child(); 
-    expansion_t lexp{views}; 
-    auto translated = lexp.M_to_M(from_child); 
+    int from_child = head->index.which_child();
+    expansion_t lexp{views};
+    auto translated = lexp.M_to_M(from_child);
     lexp.release();  // Question: why release? (clears the views)
 
-    expansionlco_t destination{target}; 
-    destination.contribute(std::move(translated)); 
+    expansionlco_t destination{target};
+    destination.contribute(std::move(translated));
     EVENT_TRACE_DASHMM_MTOM_END();
   }
 
@@ -683,7 +672,7 @@ class ExpansionLCO {
     int to_child = tidx.which_child();
 
     expansion_t lexp{views};
-    auto translated = lexp.L_to_L(to_child); 
+    auto translated = lexp.L_to_L(to_child);
     lexp.release();
 
     expansionlco_t total{target};
@@ -722,7 +711,7 @@ class ExpansionLCO {
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOI_BEGIN();
     expansion_t lexp{views};
-    auto translated = lexp.M_to_I(); 
+    auto translated = lexp.M_to_I();
     lexp.release();
 
     expansionlco_t lco{target};
@@ -760,7 +749,7 @@ class ExpansionLCO {
     EVENT_TRACE_DASHMM_ITOL_BEGIN();
 
     expansion_t lexp{views};
-    auto translated = lexp.I_to_L(tidx); 
+    auto translated = lexp.I_to_L(tidx);
     lexp.release();
 
     expansionlco_t lco{target};
