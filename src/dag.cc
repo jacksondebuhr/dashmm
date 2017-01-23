@@ -359,9 +359,9 @@ struct CSVEdge {
 
 void add_out_edges_from_node(DAGNode *node, std::vector<CSVEdge> &edges) {
   for (size_t i = 0; i < node->out_edges.size(); ++i) {
-    edges.emplace_back(CSVEdge{node->idx, node->locality,
+    edges.emplace_back(CSVEdge{node->index(), node->locality,
                                node->out_edges[i].op,
-                               node->out_edges[i].target->idx,
+                               node->out_edges[i].target->index(),
                                node->out_edges[i].target->locality,
                                node, node->out_edges[i].target});
   }
@@ -425,6 +425,11 @@ bool csvedge_comp(CSVEdge a, CSVEdge b) {
 
 
 } // unnamed namespace
+
+
+inline Index DAGNode::index() const {
+  return parent->index();
+}
 
 
 void DAG::toJSON(std::string fname) {

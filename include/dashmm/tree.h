@@ -2741,7 +2741,7 @@ class DualTree {
         for (auto loop = begin; loop != curr; ++loop) {
           edgerecords[i].op = loop->op;
           edgerecords[i].target = loop->target->global_addx;
-          edgerecords[i].idx = loop->target->idx;
+          edgerecords[i].idx = loop->target->index();
           ++i;
         }
 

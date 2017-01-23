@@ -280,7 +280,7 @@ class ExpansionLCO {
       for (int i = 0; i < n_out; ++i) {
         records[i].op = edges[i].op;
         records[i].target = edges[i].target->global_addx;
-        records[i].tidx = edges[i].target->idx;
+        records[i].tidx = edges[i].target->index();
         records[i].locality = edges[i].target->locality;
       }
     }

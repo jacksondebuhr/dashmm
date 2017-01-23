@@ -48,20 +48,14 @@ struct DAGEdge {
 };
 
 
+class DAGInfo;
+
+
 /// Node in the explicit representation of the DAG
 struct DAGNode {
-  std::vector<DAGEdge> out_edges;   /// these are out edges
-  std::vector<DAGEdge> in_edges;    /// these are in edges
-  Index idx;                        /// index of the containing node
-
-  int locality;                  /// the locality where this will be placed
-  hpx_addr_t global_addx;        /// global address of object serving this node
-                                 /// or a source ref
-  int color;
-
-  DAGNode(Index i)
-    : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-      color{0} {}
+  DAGNode(/*Index i*/const DAGInfo *p)
+    : out_edges{}, in_edges{}, /*idx{i},*/ locality{-1}, global_addx{HPX_NULL},
+      color{0}, parent{p} { }
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
@@ -72,6 +66,19 @@ struct DAGNode {
   void add_in_edge(DAGNode *start, Operation op, int weight) {
     in_edges.push_back(DAGEdge{start, this, op, weight});
   }
+
+  Index index() const;
+
+  std::vector<DAGEdge> out_edges;   /// these are out edges
+  std::vector<DAGEdge> in_edges;    /// these are in edges
+
+  int locality;                  /// the locality where this will be placed
+  hpx_addr_t global_addx;        /// global address of object serving this node
+                                 /// or a source ref
+  int color;
+
+private:
+  const DAGInfo *parent;
 };
 
 
@@ -206,7 +213,7 @@ class DAGInfo {
     bool retval = false;
     lock();
     if (normal_ == nullptr) {
-      normal_ = new DAGNode{idx_};
+      normal_ = new DAGNode{this};
       retval = true;
     }
     unlock();
@@ -223,7 +230,7 @@ class DAGInfo {
     bool retval = false;
     lock();
     if (interm_ == nullptr) {
-      interm_ = new DAGNode{idx_};
+      interm_ = new DAGNode{this};
       retval = true;
     }
     unlock();
@@ -237,7 +244,7 @@ class DAGInfo {
   /// targets in the target tree.
   void add_parts() {
     assert(parts_ == nullptr);
-    parts_ = new DAGNode{idx_};
+    parts_ = new DAGNode{this};
     assert(parts_ != nullptr);
   }
 
