@@ -54,7 +54,7 @@ class DAGInfo;
 /// Node in the explicit representation of the DAG
 struct DAGNode {
   DAGNode(/*Index i*/const DAGInfo *p)
-    : out_edges{}, in_edges{}, /*idx{i},*/ locality{-1}, global_addx{HPX_NULL},
+    : out_edges{}, in_edges{}, locality{-1}, global_addx{HPX_NULL},
       color{0}, parent{p} { }
 
   /// Utility routine to add an edge to the DAG
