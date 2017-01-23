@@ -52,10 +52,11 @@ class DAGInfo;
 
 
 /// Node in the explicit representation of the DAG
-struct DAGNode {
+class DAGNode {
+ public:
   DAGNode(/*Index i*/const DAGInfo *p)
     : out_edges{}, in_edges{}, locality{-1}, global_addx{HPX_NULL},
-      color{0}, parent{p} { }
+      color{0}, parent_{p} { }
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
@@ -67,7 +68,17 @@ struct DAGNode {
     in_edges.push_back(DAGEdge{start, this, op, weight});
   }
 
+  /// Return the index of the related tree node
   Index index() const;
+
+  /// Is this node a source or target node
+  bool is_parts() const;
+
+  /// Is this node a multipole or local node
+  bool is_normal() const;
+
+  /// Is this node an intermediate node
+  bool is_interm() const;
 
   std::vector<DAGEdge> out_edges;   /// these are out edges
   std::vector<DAGEdge> in_edges;    /// these are in edges
@@ -77,8 +88,8 @@ struct DAGNode {
                                  /// or a source ref
   int color;
 
-private:
-  const DAGInfo *parent;
+ private:
+  const DAGInfo *parent_;
 };
 
 

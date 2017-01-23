@@ -21,6 +21,7 @@
 
 
 #include <queue>
+#include <vector>
 
 #include "dashmm/dag.h"
 
@@ -42,9 +43,14 @@ class BHDistro {
   static void assign_for_target(DAGInfo &dag, int locality) { }
 
  private:
-  std::queue<DAGNode *> collect_readies(DAG &dag);
-  void compute_locality(DAGNode *node);
-  void mark_upstream_nodes(DAGNode *node, std::queue<DAGNode *> &master);
+  static void assign_colors_and_sort(DAG &dag);
+  static bool color_comparison(const DAGNode *a, const DAGNode *b);
+  static void assign_localities(std::vector<DAGNode *> &nodes);
+  static void compute_locality(DAGNode *node);
+
+  //std::queue<DAGNode *> collect_readies(DAG &dag);
+  //void compute_locality(DAGNode *node);
+  //void mark_upstream_nodes(DAGNode *node, std::queue<DAGNode *> &master);
   bool distribution_complete(DAG &dag);
 };
 

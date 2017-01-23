@@ -427,8 +427,20 @@ bool csvedge_comp(CSVEdge a, CSVEdge b) {
 } // unnamed namespace
 
 
-inline Index DAGNode::index() const {
-  return parent->index();
+Index DAGNode::index() const {
+  return parent_->index();
+}
+
+bool DAGNode::is_parts() const {
+  return parent_->parts() == this;
+}
+
+bool DAGNode::is_normal() const {
+  return parent_->normal() == this;
+}
+
+bool DAGNode::is_interm() const {
+  return parent_->interm() == this;
 }
 
 
