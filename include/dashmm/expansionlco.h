@@ -687,7 +687,7 @@ class ExpansionLCO {
   static void m_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
-    targetlco_t destination{target, 0};
+    targetlco_t destination{target};
     destination.contribute_M_to_T(head->expansion_size, head->data);
   }
 
@@ -698,7 +698,7 @@ class ExpansionLCO {
   static void l_to_t_out_edge(Header *head, hpx_addr_t target) {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
-    targetlco_t destination{target, 0};
+    targetlco_t destination{target};
     destination.contribute_L_to_T(head->expansion_size, head->data);
   }
 

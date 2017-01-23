@@ -71,10 +71,10 @@ class TargetLCO {
   using targetref_t = ArrayRef<Target>;
 
   /// Construct a default object
-  TargetLCO() : lco_{HPX_NULL}, n_targs_{0} { }
+  TargetLCO() : lco_{HPX_NULL} { }
 
   /// Construct from an existing LCO
-  TargetLCO(hpx_addr_t data, size_t n_targs) : lco_{data}, n_targs_{n_targs} { }
+  TargetLCO(hpx_addr_t data) : lco_{data} { }
 
   /// Construct an LCO from input TargetRef
   ///
@@ -89,7 +89,6 @@ class TargetLCO {
     lco_ = hpx_lco_user_new(sizeof(init), init_, operation_,
                             predicate_, &init, sizeof(init));
     assert(lco_ != HPX_NULL);
-    n_targs_ = targets.n();
   }
 
   /// Destroy the LCO
@@ -97,15 +96,11 @@ class TargetLCO {
     if (lco_ != HPX_NULL) {
       hpx_lco_delete_sync(lco_);
       lco_ = HPX_NULL;
-      n_targs_ = 0;
     }
   }
 
   /// The global address of the referred to object
   hpx_addr_t lco() const {return lco_;}
-
-  /// The number of targets in the referred object
-  size_t n() const {return n_targs_;}
 
   /// Contribute a S->T operation to the referred targets
   ///
@@ -264,8 +259,6 @@ class TargetLCO {
 
   /// The global address of the LCO
   hpx_addr_t lco_;
-  /// The number of targets represented by the LCO.
-  size_t n_targs_;
 
   /// HPX function for LCO initialization
   static hpx_action_t init_;

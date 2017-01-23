@@ -56,13 +56,12 @@ struct DAGNode {
 
   int locality;                  /// the locality where this will be placed
   hpx_addr_t global_addx;        /// global address of object serving this node
-  size_t n_parts;                /// number of points stored in a target lco
                                  /// or a source ref
   int color;
 
   DAGNode(Index i)
     : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-      n_parts{0}, color{0} {}
+      color{0} {}
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
@@ -127,15 +126,6 @@ class DAG {
 
   /// Count edges in the full DAG
   size_t edge_count() const;
-
-  /// Return the average out degree of each class of node and the overall
-  // NOTE: source leaves, source nodes, target nodes, target leaves, overall
-  std::vector<double> average_out_degree() const;
-
-  std::pair<int, int> min_max_out_degree_S() const;
-  std::pair<int, int> min_max_in_degree_T() const;
-  std::pair<int, int> min_max_out_degree_SI() const;
-  std::pair<int, int> min_max_in_degree_TI() const;
 
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
@@ -308,11 +298,10 @@ class DAGInfo {
   ///
   /// \param targs - the target LCO represented by this object's
   ///                particle DAG node.
-  void set_targetlco(const hpx_addr_t addx, const int num) {
+  void set_targetlco(const hpx_addr_t addx) {
     assert(parts_ != nullptr);
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
-      parts_->n_parts = num;
     }
   }
 

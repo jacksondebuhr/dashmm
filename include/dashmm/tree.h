@@ -1714,7 +1714,6 @@ class DualTree {
   struct DAGInstigationRecord {
     Operation op;
     hpx_addr_t target;
-    size_t n_parts;
     Index idx;
   };
 
@@ -2610,7 +2609,7 @@ class DualTree {
     if (node->dag.has_parts()) {
       if (node->dag.parts()->locality == myrank) {
         targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts};
-        node->dag.set_targetlco(tlco.lco(), tlco.n());
+        node->dag.set_targetlco(tlco.lco());
       }
 
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
@@ -2742,7 +2741,6 @@ class DualTree {
         for (auto loop = begin; loop != curr; ++loop) {
           edgerecords[i].op = loop->op;
           edgerecords[i].target = loop->target->global_addx;
-          edgerecords[i].n_parts = loop->target->n_parts;
           edgerecords[i].idx = loop->target->idx;
           ++i;
         }
@@ -2856,7 +2854,8 @@ class DualTree {
             // S_to_T on expansion LCOs do not need any of the
             // expansionlco_t's state, so we create a default object.
             expansionlco_t expand{HPX_NULL};
-            targetlco_t targets{edge[i].target, edge[i].n_parts};
+            // HERE
+            targetlco_t targets{edge[i].target};
             expand.S_to_T(sources, n_src, targets);
           }
           break;
@@ -3092,7 +3091,7 @@ class DualTree {
         if (type) {
           // NOTE: destroy() does not care about the second argument to the
           // constructor, so we put in some junk
-          auto temp = targetlco_t{nodes[i]->global_addx, 0};
+          auto temp = targetlco_t{nodes[i]->global_addx};
           temp.destroy();
         } else {
           auto temp = expansionlco_t{nodes[i]->global_addx};
