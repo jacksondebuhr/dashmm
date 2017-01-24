@@ -15,6 +15,7 @@ Summary of changes to implementation:
 * No longer keep the shared DomainGeometry object (PLANNED)
 * Removed computation of height for DistributionPolicy
 * FMM97Distro rearranged somewhat.
+* BHDistro does some work during DAG discovery.
 
 
 Bug Fixes:
