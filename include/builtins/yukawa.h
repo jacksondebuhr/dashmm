@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -150,7 +139,7 @@ public:
 
   void S_to_M(Source *first, Source *last) const {
     double scale = views_.scale();
-    Point center = views_.center(); 
+    Point center = views_.center();
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -201,8 +190,8 @@ public:
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale();
-    Point center = views_.center(); 
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    Point center = views_.center();
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -254,7 +243,7 @@ public:
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourcePrimary}}; 
+    expansion_t *retval{new expansion_t{kSourcePrimary}};
     int p = builtin_yukawa_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
@@ -308,7 +297,7 @@ public:
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -486,7 +475,7 @@ public:
 
   std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kSourceIntermediate, scale}};  
+    expansion_t *retval{new expansion_t{kSourceIntermediate, scale}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -644,7 +633,7 @@ public:
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{kTargetIntermediate}; 
+    ViewSet views{kTargetIntermediate};
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -697,7 +686,7 @@ public:
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     // t_index and t_size is the index and size of the child
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +

@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -29,50 +18,46 @@
 
 #include "builtins/bhdistro.h"
 
-#include <vector>
+#include <algorithm>
 
 
 namespace dashmm {
 
 
 void BHDistro::compute_distribution(DAG &dag) {
-  std::queue<DAGNode *> nodes = collect_readies(dag);
-
-  while (!nodes.empty()) {
-    DAGNode *curr = nodes.front();
-    compute_locality(curr);
-    mark_upstream_nodes(curr, nodes);
-    nodes.pop();
-  }
+  assign_colors_and_sort(dag);
+  assign_localities(dag.target_nodes);
+  assign_localities(dag.source_nodes);
 }
 
 
-// Collect all nodes of the DAG which have no out edges. These are either
-// sources, which already have a locality, or are nodes that do not matter
-// much, in which case a random assignment is okay.
-std::queue<DAGNode *> BHDistro::collect_readies(DAG &dag) {
-  std::queue<DAGNode *> retval{};
-
+void BHDistro::assign_colors_and_sort(DAG &dag) {
   for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
-    if (dag.source_nodes[i]->out_edges.size() == 0) {
-      retval.push(dag.source_nodes[i]);
-    }
+    DAGNode *node = dag.source_nodes[i];
+    node->color = -2 * node->index().level() + (node->is_interm() ? 1 : 0);
   }
-
   for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
-    if (dag.target_nodes[i]->out_edges.size() == 0) {
-      retval.push(dag.target_nodes[i]);
-    }
+    DAGNode *node = dag.target_nodes[i];
+    node->color = 2 * (node->index().level() + 1)
+                  - (node->is_interm() ? 1 : 0);
   }
-
-  for (size_t i = 0; i < dag.target_leaves.size(); ++i) {
-    assert(dag.target_leaves[i]->out_edges.size() == 0);
-    retval.push(dag.target_leaves[i]);
-  }
-
-  return retval;
+  std::sort(dag.source_nodes.begin(), dag.source_nodes.end(),
+            color_comparison);
+  std::sort(dag.target_nodes.begin(), dag.target_nodes.end(),
+            color_comparison);
 }
 
+
+bool BHDistro::color_comparison(const DAGNode *a, const DAGNode *b) {
+  return a->color > b->color;
+}
+
+void BHDistro::assign_localities(std::vector<DAGNode *> &nodes) {
+  // Upon entry, the nodes are sorted highest to lowest color
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    compute_locality(nodes[i]);
+  }
+}
 
 void BHDistro::compute_locality(DAGNode *node) {
   // It already has a locality
@@ -88,7 +73,7 @@ void BHDistro::compute_locality(DAGNode *node) {
 
   // The typical case; count up weights to each locality
   int n_ranks = hpx_get_num_ranks();
-  std::vector<int> bins(n_ranks, 0);
+  std::vector<int> bins(n_ranks, 0);    // Is there a better choice here?
   for (size_t i = 0; i < node->out_edges.size(); ++i) {
     int loc = node->out_edges[i].target->locality;
     assert(loc >= 0 && loc < n_ranks);
@@ -108,21 +93,6 @@ void BHDistro::compute_locality(DAGNode *node) {
   // Set this node to have locality that matches the bulk of outgoing work
   node->locality = maxidx;
 }
-
-
-void BHDistro::mark_upstream_nodes(DAGNode *node,
-                                   std::queue<DAGNode *> &master) {
-  assert(node->locality >= 0);  // Need to be sure that the locality is set.
-
-  for (size_t i = 0; i < node->in_edges.size(); ++i) {
-    node->in_edges[i].source->color += 1;
-    if ((size_t)node->in_edges[i].source->color
-            == node->in_edges[i].source->out_edges.size()) {
-      master.push(node->in_edges[i].source);
-    }
-  }
-}
-
 
 bool BHDistro::distribution_complete(DAG &dag) {
   for (size_t i = 0; i < dag.source_leaves.size(); ++i) {

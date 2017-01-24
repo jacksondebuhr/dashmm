@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -44,6 +33,7 @@ namespace dashmm {
 
 
 struct DAGNode;
+class DAGInfo;
 
 
 /// Edge in the explicit representation of the DAG
@@ -60,20 +50,11 @@ struct DAGEdge {
 
 
 /// Node in the explicit representation of the DAG
-struct DAGNode {
-  std::vector<DAGEdge> out_edges;   /// these are out edges
-  std::vector<DAGEdge> in_edges;    /// these are in edges
-  Index idx;                        /// index of the containing node
-
-  int locality;                  /// the locality where this will be placed
-  hpx_addr_t global_addx;        /// global address of object serving this node
-  size_t n_parts;                /// number of points stored in a target lco
-                                 /// or a source ref
-  int color;
-
-  DAGNode(Index i)
-    : out_edges{}, in_edges{}, idx{i}, locality{-1}, global_addx{HPX_NULL},
-      n_parts{0}, color{0} {}
+class DAGNode {
+ public:
+  DAGNode(/*Index i*/const DAGInfo *p)
+    : out_edges{}, in_edges{}, locality{-1}, global_addx{HPX_NULL},
+      color{0}, parent_{p} { }
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
@@ -84,6 +65,29 @@ struct DAGNode {
   void add_in_edge(DAGNode *start, Operation op, int weight) {
     in_edges.push_back(DAGEdge{start, this, op, weight});
   }
+
+  /// Return the index of the related tree node
+  Index index() const;
+
+  /// Is this node a source or target node
+  bool is_parts() const;
+
+  /// Is this node a multipole or local node
+  bool is_normal() const;
+
+  /// Is this node an intermediate node
+  bool is_interm() const;
+
+  std::vector<DAGEdge> out_edges;   /// these are out edges
+  std::vector<DAGEdge> in_edges;    /// these are in edges
+
+  int locality;                  /// the locality where this will be placed
+  hpx_addr_t global_addx;        /// global address of object serving this node
+                                 /// or a source ref
+  int color;
+
+ private:
+  const DAGInfo *parent_;
 };
 
 
@@ -138,15 +142,6 @@ class DAG {
 
   /// Count edges in the full DAG
   size_t edge_count() const;
-
-  /// Return the average out degree of each class of node and the overall
-  // NOTE: source leaves, source nodes, target nodes, target leaves, overall
-  std::vector<double> average_out_degree() const;
-
-  std::pair<int, int> min_max_out_degree_S() const;
-  std::pair<int, int> min_max_in_degree_T() const;
-  std::pair<int, int> min_max_out_degree_SI() const;
-  std::pair<int, int> min_max_in_degree_TI() const;
 
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
@@ -227,7 +222,7 @@ class DAGInfo {
     bool retval = false;
     lock();
     if (normal_ == nullptr) {
-      normal_ = new DAGNode{idx_};
+      normal_ = new DAGNode{this};
       retval = true;
     }
     unlock();
@@ -244,7 +239,7 @@ class DAGInfo {
     bool retval = false;
     lock();
     if (interm_ == nullptr) {
-      interm_ = new DAGNode{idx_};
+      interm_ = new DAGNode{this};
       retval = true;
     }
     unlock();
@@ -258,7 +253,7 @@ class DAGInfo {
   /// targets in the target tree.
   void add_parts() {
     assert(parts_ == nullptr);
-    parts_ = new DAGNode{idx_};
+    parts_ = new DAGNode{this};
     assert(parts_ != nullptr);
   }
 
@@ -319,11 +314,10 @@ class DAGInfo {
   ///
   /// \param targs - the target LCO represented by this object's
   ///                particle DAG node.
-  void set_targetlco(const hpx_addr_t addx, const int num) {
+  void set_targetlco(const hpx_addr_t addx) {
     assert(parts_ != nullptr);
     if (parts_ != nullptr) {
       parts_->global_addx = addx;
-      parts_->n_parts = num;
     }
   }
 

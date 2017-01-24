@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -1725,7 +1714,6 @@ class DualTree {
   struct DAGInstigationRecord {
     Operation op;
     hpx_addr_t target;
-    size_t n_parts;
     Index idx;
   };
 
@@ -2517,7 +2505,7 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{kSourcePrimary, 
+        new expansion_t{kSourcePrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
@@ -2530,7 +2518,7 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{kSourceIntermediate, 
+        new expansion_t{kSourceIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
@@ -2589,7 +2577,7 @@ class DualTree {
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
       std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{kTargetPrimary,  
+        new expansion_t{kTargetPrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t expand(node->dag.normal()->in_edges.size(),
@@ -2602,7 +2590,7 @@ class DualTree {
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
       std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{kTargetIntermediate, 
+        new expansion_t{kTargetIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
       expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
@@ -2621,7 +2609,7 @@ class DualTree {
     if (node->dag.has_parts()) {
       if (node->dag.parts()->locality == myrank) {
         targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts};
-        node->dag.set_targetlco(tlco.lco(), tlco.n());
+        node->dag.set_targetlco(tlco.lco());
       }
 
       hpx_lco_set(done, 0, nullptr, HPX_NULL, HPX_NULL);
@@ -2753,8 +2741,7 @@ class DualTree {
         for (auto loop = begin; loop != curr; ++loop) {
           edgerecords[i].op = loop->op;
           edgerecords[i].target = loop->target->global_addx;
-          edgerecords[i].n_parts = loop->target->n_parts;
-          edgerecords[i].idx = loop->target->idx;
+          edgerecords[i].idx = loop->target->index();
           ++i;
         }
 
@@ -2845,7 +2832,7 @@ class DualTree {
         case Operation::StoM:
           {
             expansionlco_t expand{edge[i].target};
-            expand.S_to_M(sources, n_src); 
+            expand.S_to_M(sources, n_src);
           }
           break;
         case Operation::StoL:
@@ -2867,7 +2854,8 @@ class DualTree {
             // S_to_T on expansion LCOs do not need any of the
             // expansionlco_t's state, so we create a default object.
             expansionlco_t expand{HPX_NULL};
-            targetlco_t targets{edge[i].target, edge[i].n_parts};
+            // HERE
+            targetlco_t targets{edge[i].target};
             expand.S_to_T(sources, n_src, targets);
           }
           break;
@@ -3103,7 +3091,7 @@ class DualTree {
         if (type) {
           // NOTE: destroy() does not care about the second argument to the
           // constructor, so we put in some junk
-          auto temp = targetlco_t{nodes[i]->global_addx, 0};
+          auto temp = targetlco_t{nodes[i]->global_addx};
           temp.destroy();
         } else {
           auto temp = expansionlco_t{nodes[i]->global_addx};

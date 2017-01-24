@@ -1,0 +1,11 @@
+Summary of changes to interface:
+* Array::collect now returns a smart pointer
+* S_to_M operation in Expansion concept has a new interface (INCOMPLETE)
+    -- This needs to be updated in the concept and in the documentation
+    -- Further, JD is still not too happy with this change.
+* Other simplifications to the Expansion concept (INCOMPLETE)
+    -- Bo will need to update this item with all the changes, one for each
+
+
+Summary of changes to implementation:
+* No longer keep the shared DomainGeometry object (PLANNED)

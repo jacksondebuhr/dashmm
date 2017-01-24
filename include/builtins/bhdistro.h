@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -32,6 +21,7 @@
 
 
 #include <queue>
+#include <vector>
 
 #include "dashmm/dag.h"
 
@@ -53,9 +43,10 @@ class BHDistro {
   static void assign_for_target(DAGInfo &dag, int locality) { }
 
  private:
-  std::queue<DAGNode *> collect_readies(DAG &dag);
-  void compute_locality(DAGNode *node);
-  void mark_upstream_nodes(DAGNode *node, std::queue<DAGNode *> &master);
+  static void assign_colors_and_sort(DAG &dag);
+  static bool color_comparison(const DAGNode *a, const DAGNode *b);
+  static void assign_localities(std::vector<DAGNode *> &nodes);
+  static void compute_locality(DAGNode *node);
   bool distribution_complete(DAG &dag);
 };
 

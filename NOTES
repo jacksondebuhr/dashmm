@@ -121,15 +121,21 @@ TODO: Make the way that Expansions manage their data not suck as much as it
       -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
                    first grant likely.
 TODO: Make S->* static members of Expansion.
+        In a complication, there S->M is now not in the pattern of the rest of
+        the operators. Not sure what to do about this.
 TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
       and so on. Extending this, should we do the same thing for other
       subsystems?
-TODO: Array collect really ought to return a smart pointer, right?
-      (DONE in dev-v2)
-TODO: The operators do not really need their centers. So the interface has this
-      pointless member. Remove them all.
+        This would be okay, but what would DAG turn into? dag::DAG? That's
+        pretty goofy...
 TODO: We will need a better explicit dag representation - it uses a huge
       amount of memory.
+        This is started. We have removed some waste. If we can get the
+        FMM97Distro to not use in_edges, we can eliminate a huge amount of
+        memory in this.
+TODO: Work out if there is a better way to apply the distribution. We shall
+      need to have some way to parallelize it, or have some way to overlap that
+      work with other work.
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
   * It would be nice if we were to decouple some of the use of the tree and the
@@ -142,19 +148,6 @@ TODO: Perhaps we want to parameterize the nodes with some user data? So
 TODO: Should we use exceptions in the main interface to return errors? This is
   probably cleaner. the catch is that I would need to work out what happens
   when I emit an exception in an HPX action.
-
-
-
-
-
-
-OPEN QUESTIONS and TODO
-TODO: What is it about HPX-5 that is absolutely needed by DASHMM? Would
-      something more specific be better? Can we introduce some abstraction to
-      insulate ourselves from the HPX-5 risk?
-
-
-
 
 
 

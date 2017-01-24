@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -370,9 +359,9 @@ struct CSVEdge {
 
 void add_out_edges_from_node(DAGNode *node, std::vector<CSVEdge> &edges) {
   for (size_t i = 0; i < node->out_edges.size(); ++i) {
-    edges.emplace_back(CSVEdge{node->idx, node->locality,
+    edges.emplace_back(CSVEdge{node->index(), node->locality,
                                node->out_edges[i].op,
-                               node->out_edges[i].target->idx,
+                               node->out_edges[i].target->index(),
                                node->out_edges[i].target->locality,
                                node, node->out_edges[i].target});
   }
@@ -438,6 +427,23 @@ bool csvedge_comp(CSVEdge a, CSVEdge b) {
 } // unnamed namespace
 
 
+Index DAGNode::index() const {
+  return parent_->index();
+}
+
+bool DAGNode::is_parts() const {
+  return parent_->parts() == this;
+}
+
+bool DAGNode::is_normal() const {
+  return parent_->normal() == this;
+}
+
+bool DAGNode::is_interm() const {
+  return parent_->interm() == this;
+}
+
+
 void DAG::toJSON(std::string fname) {
   // Create a mapping from DAGNode * to index
   auto dagnode_to_index = create_dagnode_to_index(*this);
@@ -470,41 +476,6 @@ size_t DAG::node_count() const {
 }
 
 
-std::vector<double> DAG::average_out_degree() const {
-  size_t s_total{0};
-  size_t s_count = source_leaves.size();
-  for (size_t i = 0; i < s_count; ++i) {
-    s_total += source_leaves[i]->out_edges.size();
-  }
-
-  size_t sn_total{0};
-  size_t sn_count = source_nodes.size();
-  for (size_t i = 0; i < sn_count; ++i) {
-    sn_total += source_nodes[i]->out_edges.size();
-  }
-
-  size_t t_total{0};
-  size_t t_count = target_leaves.size();
-  for (size_t i = 0; i < t_count; ++i) {
-    t_total += target_leaves[i]->out_edges.size();
-  }
-
-  size_t tn_total{0};
-  size_t tn_count = target_nodes.size();
-  for (size_t i = 0; i < tn_count; ++i) {
-    tn_total += target_nodes[i]->out_edges.size();
-  }
-
-  double s_od_mean = (double)s_total / s_count;
-  double sn_od_mean = (double)sn_total / sn_count;
-  double tn_od_mean = (double)tn_total / tn_count;
-  double t_od_mean = (double)t_total / t_count;
-  double od_mean = (double)(s_total + sn_total + tn_total + t_total) / 
-                      (s_count + sn_count + tn_count + t_count);
-
-}
-
-
 size_t DAG::edge_count() const {
   size_t retval{0};
 
@@ -522,69 +493,6 @@ size_t DAG::edge_count() const {
   }
 
   return retval;
-}
-
-
-std::pair<int, int> DAG::min_max_out_degree_S() const {
-  int min{std::numeric_limits<int>::max()};
-  int max{std::numeric_limits<int>::min()};
-  for (size_t i = 0; i < source_leaves.size(); ++i) {
-    int val = source_leaves[i]->out_edges.size();
-    if (val < min) min = val;
-    if (val > max) max = val;
-  }
-  return std::make_pair(min, max);
-}
-
-
-std::pair<int, int> DAG::min_max_in_degree_T() const {
-  int min{std::numeric_limits<int>::max()};
-  int max{std::numeric_limits<int>::min()};
-  for (size_t i = 0; i < target_leaves.size(); ++i) {
-    int val = target_leaves[i]->in_edges.size();
-    if (val < min) min = val;
-    if (val > max) max = val;
-  }
-  return std::make_pair(min, max);
-}
-
-
-std::pair<int, int> DAG::min_max_out_degree_SI() const {
-  int min{std::numeric_limits<int>::max()};
-  int max{std::numeric_limits<int>::min()};
-  for (size_t i = 0; i < source_nodes.size(); ++i) {
-    // determine if we are M, and skip
-    auto item = std::find_if(source_nodes[i]->in_edges.begin(), 
-                            source_nodes[i]->in_edges.end(),
-                            [](const DAGEdge &a)->bool {
-                              return a.op == Operation::MtoI;
-                            });
-    if (item != source_nodes[i]->in_edges.end()) {
-      int val = source_nodes[i]->out_edges.size();
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-  }
-  return std::make_pair(min, max);
-}
-
-
-std::pair<int, int> DAG::min_max_in_degree_TI() const {
-  int min{std::numeric_limits<int>::max()};
-  int max{std::numeric_limits<int>::min()};
-  for (size_t i = 0; i < target_nodes.size(); ++i) {
-    auto item = std::find_if(target_nodes[i]->out_edges.begin(),
-                            target_nodes[i]->out_edges.end(),
-                            [](const DAGEdge &a)->bool {
-                              return a.op == Operation::ItoL;
-                            });
-    if (item != target_nodes[i]->out_edges.end()) {
-      int val = target_nodes[i]->in_edges.size();
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-  }
-  return std::make_pair(min, max);
 }
 
 
