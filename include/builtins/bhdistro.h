@@ -39,11 +39,11 @@ class BHDistro {
   BHDistro() { }
 
   void compute_distribution(DAG &dag);
-  static void assign_for_source(DAGInfo &dag, int locality) { }
-  static void assign_for_target(DAGInfo &dag, int locality) { }
+  static void assign_for_source(DAGInfo &dag, int locality);
+  static void assign_for_target(DAGInfo &dag, int locality);
 
  private:
-  static void assign_colors_and_sort(DAG &dag);
+  static void sort(DAG &dag);
   static bool color_comparison(const DAGNode *a, const DAGNode *b);
   static void assign_localities(std::vector<DAGNode *> &nodes);
   static void compute_locality(DAGNode *node);

@@ -25,22 +25,39 @@ namespace dashmm {
 
 
 void BHDistro::compute_distribution(DAG &dag) {
-  assign_colors_and_sort(dag);
+  sort(dag);
   assign_localities(dag.target_nodes);
   assign_localities(dag.source_nodes);
 }
 
 
-void BHDistro::assign_colors_and_sort(DAG &dag) {
-  for (size_t i = 0; i < dag.source_nodes.size(); ++i) {
-    DAGNode *node = dag.source_nodes[i];
-    node->color = -2 * node->index().level() + (node->is_interm() ? 1 : 0);
+void BHDistro::assign_for_source(DAGInfo &dag, int locality) {
+  DAGNode *normal = dag.normal();
+  if (normal != nullptr) {
+    normal->color = -2 * normal->index().level();
   }
-  for (size_t i = 0; i < dag.target_nodes.size(); ++i) {
-    DAGNode *node = dag.target_nodes[i];
-    node->color = 2 * (node->index().level() + 1)
-                  - (node->is_interm() ? 1 : 0);
+
+  DAGNode *interm = dag.interm();
+  if (interm != nullptr) {
+    interm->color = -2 * interm->index().level() + 1;
   }
+}
+
+
+void BHDistro::assign_for_target(DAGInfo &dag, int locality) {
+  DAGNode *normal = dag.normal();
+  if (normal != nullptr) {
+    normal->color = 2 * (normal->index().level() + 1);
+  }
+
+  DAGNode *interm = dag.interm();
+  if (interm != nullptr) {
+    interm->color = 2 * (interm->index().level() + 1) - 1;
+  }
+}
+
+
+void BHDistro::sort(DAG &dag) {
   std::sort(dag.source_nodes.begin(), dag.source_nodes.end(),
             color_comparison);
   std::sort(dag.target_nodes.begin(), dag.target_nodes.end(),
