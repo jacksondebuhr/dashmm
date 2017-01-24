@@ -5,7 +5,17 @@ Summary of changes to interface:
     -- Further, JD is still not too happy with this change.
 * Other simplifications to the Expansion concept (INCOMPLETE)
     -- Bo will need to update this item with all the changes, one for each
+* Streamline DAG objects (INCOMPLETE)
+    -- Jackson needs to record these, and also changes to other things that
+       resulted.
+* Removed height paramter to assign_for_sources member of DistributionPolicy.
 
 
 Summary of changes to implementation:
 * No longer keep the shared DomainGeometry object (PLANNED)
+* Removed computation of height for DistributionPolicy
+* FMM97Distro rearranged somewhat.
+
+
+Bug Fixes:
+* Incorrect computation of height passed into distribution policy

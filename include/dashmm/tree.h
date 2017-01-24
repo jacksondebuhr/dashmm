@@ -2891,10 +2891,13 @@ class DualTree {
 
     int height;
     hpx_lco_get(cdone, sizeof(int), &height);
-    hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
     hpx_lco_delete_sync(cdone);
 
-    method_t::distropolicy_t::assign_for_source(node->dag, loc, height);
+    method_t::distropolicy_t::assign_for_source(node->dag, loc);
+
+    height += 2;
+    hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
+
     return HPX_SUCCESS;
   }
 
@@ -2920,7 +2923,7 @@ class DualTree {
       node->dag.set_parts_locality(dag_rank);
       node->dag.set_normal_locality(dag_rank);
 
-      method_t::distropolicy_t::assign_for_source(node->dag, dag_rank, 0);
+      method_t::distropolicy_t::assign_for_source(node->dag, dag_rank);
 
       int height = 0;
       hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
@@ -2940,7 +2943,6 @@ class DualTree {
 
     // Once the children are done, call aggregate here, continuing a set to
     // done once that has happened.
-    assert(cdone != HPX_NULL);
     hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, HPX_NULL,
                   &tree, &node, &cdone, &done);
 
