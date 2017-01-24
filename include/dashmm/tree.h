@@ -2508,7 +2508,7 @@ class DualTree {
         new expansion_t{kSourcePrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+      expansionlco_t expand(node->dag.normal()->in_count(),
                             node->dag.normal()->out_edges.size(),
                             node->idx, std::move(input_expand),
                             rwtree);
@@ -2521,7 +2521,7 @@ class DualTree {
         new expansion_t{kSourceIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
                                 node->dag.interm()->out_edges.size(),
                                 node->idx,
                                 std::move(interm_expand),
@@ -2580,7 +2580,7 @@ class DualTree {
         new expansion_t{kTargetPrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+      expansionlco_t expand(node->dag.normal()->in_count(),
                             node->dag.normal()->out_edges.size(),
                             node->idx, std::move(input_expand),
                             rwtree);
@@ -2593,7 +2593,7 @@ class DualTree {
         new expansion_t{kTargetIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
                                 node->dag.interm()->out_edges.size(),
                                 node->idx,
                                 std::move(interm_expand),
@@ -2608,7 +2608,7 @@ class DualTree {
     // Here is where we make the target lco if needed
     if (node->dag.has_parts()) {
       if (node->dag.parts()->locality == myrank) {
-        targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts};
+        targetlco_t tlco{node->dag.parts()->in_count(), node->parts};
         node->dag.set_targetlco(tlco.lco());
       }
 
