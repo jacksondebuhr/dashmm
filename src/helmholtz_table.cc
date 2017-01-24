@@ -179,7 +179,7 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
         double t2 = sqrt(t1 * t1 + wd * wd); 
         int index = j; 
         int max_mk = m0e[j]; 
-        for (int k = j + 1; j < s_e_; ++k) {
+        for (int k = j + 1; k < s_e_; ++k) {
           if (x_e_[k] >= t2) {
             index = k;
             break;

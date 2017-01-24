@@ -34,6 +34,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <iostream>
 
 #include "dashmm/index.h"
 #include "builtins/helmholtz_table.h"
@@ -60,9 +61,9 @@ public:
   using target_t = Target; 
   using expansion_t = Helmholtz<Source, Target>; 
 
-  Helmholtz(ExpansionRole role, double scale, Point center) 
+  Helmholtz(ExpansionRole role, double scale = 1.0, Point center = Point{}) 
     : views_{ViewSet{role, center, scale}} {
-    
+      
     // View size for each spherical harmonic expansion
     int p = builtin_helmholtz_table_->p(); 
     int n_e = builtin_helmholtz_table_->n_e(scale); 
@@ -170,9 +171,8 @@ public:
   }
 
   void S_to_M(Source *first, Source *last) const {
-    /*
     double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}}; 
+    Point center = views_.center(); 
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_helmholtz_table_->p(); 
     const double *sqf = builtin_helmholtz_table_->sqf(); 
@@ -219,9 +219,6 @@ public:
     delete [] legendre;
     delete [] powers_ephi;
     delete [] bessel; 
-    
-    return std::unique_ptr<expansion_t>{retval}; 
-    */
   }
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
@@ -281,18 +278,8 @@ public:
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
-    /*
-    // The function is called on the expansion of the child box and \p s_size is
-    // the child box's size. 
-    double h = s_size / 2; 
-    Point center = views_.center(); 
-    double px = center.x() + (from_child % 2 == 0 ? h : -h); 
-    double py = center.y() + (from_child % 4 <= 1 ? h : -h); 
-    double pz = center.z() + (from_child < 4 ? h : -h); 
-
     double scale = views_.scale(); 
-    expansion_t *retval{new 
-        expansion_t{Point{px, py, pz}, scale * 2, kSourcePrimary}}; 
+    expansion_t *retval{new expansion_t{kSourcePrimary}};  
     int p = builtin_helmholtz_table_->p(); 
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis 
@@ -337,9 +324,8 @@ public:
     rotate_sph_z(W2, -alpha, W1, false); 
 
     delete [] W2; 
-    return std::unique_ptr<expansion_t>{retval};
-    */
-    return std::unique_ptr<expansion_t>{nullptr};
+    std::cout << "mm\n"; 
+    return std::unique_ptr<expansion_t>{retval};    
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_indx, Index t_index) const {
@@ -411,8 +397,8 @@ public:
   }
 
   void M_to_T(Target *first, Target *last) const {
-    int p = builtin_helmholtz_table_->p(); 
     double scale = views_.scale(); 
+    int p = builtin_helmholtz_table_->p(); 
     double omega = builtin_helmholtz_table_->omega(); 
     double *legendre = new double[(p + 1) * (p + 2) / 2]; 
     dcomplex_t *bessel = new dcomplex_t[p + 1]; 
