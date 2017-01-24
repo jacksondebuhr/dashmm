@@ -18,4 +18,3 @@ Summary of changes to implementation:
 
 
 Bug Fixes:
-* Incorrect computation of height passed into distribution policy
