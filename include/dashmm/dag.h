@@ -33,6 +33,7 @@ namespace dashmm {
 
 
 struct DAGNode;
+class DAGInfo;
 
 
 /// Edge in the explicit representation of the DAG
@@ -46,9 +47,6 @@ struct DAGEdge {
   DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
     : source{start}, target{end}, op{inop}, weight{w} {}
 };
-
-
-class DAGInfo;
 
 
 /// Node in the explicit representation of the DAG
