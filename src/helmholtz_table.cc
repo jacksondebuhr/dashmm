@@ -164,11 +164,11 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
 
     if (wd > 1e-4) {
       for (int j = 0; j < s_e_; ++j) {
-        double t1 = x_e_[j];
-        double t2 = sqrt(t1 * t1 + wd * wd);
-        int index = j;
-        int max_mk = m0e[j];
-        for (int k = j + 1; j < s_e_; ++k) {
+        double t1 = x_e_[j]; 
+        double t2 = sqrt(t1 * t1 + wd * wd); 
+        int index = j; 
+        int max_mk = m0e[j]; 
+        for (int k = j + 1; k < s_e_; ++k) {
           if (x_e_[k] >= t2) {
             index = k;
             break;
