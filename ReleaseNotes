@@ -9,6 +9,7 @@ Summary of changes to interface:
     -- Jackson needs to record these, and also changes to other things that
        resulted.
 * Removed height paramter to assign_for_sources member of DistributionPolicy.
+* removed unofficial members of DAG object
 
 
 Summary of changes to implementation:

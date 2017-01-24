@@ -38,14 +38,13 @@ class DAGInfo;
 
 /// Edge in the explicit representation of the DAG
 struct DAGEdge {
-  DAGNode *source;          /// Source node of the edge
   DAGNode *target;          /// Target node of the edge
   Operation op;             /// Operation to perform along edge
   int weight;               /// estimate of communication cost if it occurs
 
-  DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop}, weight{0} {}
-  DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
-    : source{start}, target{end}, op{inop}, weight{w} {}
+  DAGEdge() : target{nullptr}, op{Operation::Nop}, weight{0} {}
+  DAGEdge(DAGNode *end, Operation inop, int w)
+    : target{end}, op{inop}, weight{w} {}
 };
 
 
@@ -58,7 +57,7 @@ class DAGNode {
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
-    out_edges.push_back(DAGEdge{this, end, op, weight});
+    out_edges.push_back(DAGEdge{/*this,*/ end, op, weight});
   }
 
   /// Utility routine to track a new input edge
@@ -114,20 +113,6 @@ class DAGNode {
 class DAG {
  public:
   DAG() : source_leaves{}, source_nodes{}, target_nodes{}, target_leaves{} { }
-
-  /// Print the DAG out in JSON format.
-  ///
-  /// This will open a file with the given name, and write out the DAG
-  /// information to that file is JSON format. See the implementation for
-  /// details about what is included.
-  ///
-  /// NOTE: This is an experimental interface
-  void toJSON(std::string fname);
-
-  /// Print the DAG out in a simpler text format.
-  ///
-  /// NOTE: This is an experimental interface
-  void toEdgeCSV(std::string fname);
 
   /// Comparison routine that will used to sort edges by locality
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
