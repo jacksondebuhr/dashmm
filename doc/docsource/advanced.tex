@@ -452,12 +452,6 @@ distribution policy to aid in the decision about data placement around the
 system. The full definition of \texttt{DAGEdge} is as follows:
 
 \begin{lstlisting}
-DAGNode *DAGEdge::source
-\end{lstlisting}
-
-\noindent Source node of the edge.
-
-\begin{lstlisting}
 DAGNode *DAGEdge::target
 \end{lstlisting}
 
@@ -489,18 +483,6 @@ std::vector<DAGEdge> DAGNode::out_edges
 \noindent The edges of the DAG that start at this node.
 
 \begin{lstlisting}
-std::vector<DAGEdge> DAGNode::in_edges
-\end{lstlisting}
-
-\noindent The edges of the DAG that end at this node.
-
-\begin{lstlisting}
-Index DAGNode::idx
-\end{lstlisting}
-
-\noindent The index of the tree node to which this DAG node is associated.
-
-\begin{lstlisting}
 int DAGNode::locality
 \end{lstlisting}
 
@@ -522,6 +504,37 @@ DAGNode::DAGNode(Index i)
 \noindent Construct a DAG node. This will set the index to the given value,
 give the locality a value of \texttt{-1}, and default construct the remaining
 members of the node.
+
+\begin{lstlisting}
+bool DAGNode::in_count() const
+\end{lstlisting}
+
+\noindent Returns the number of incoming edges to this node.
+
+\begin{lstlisting}
+Index DAGNode::index()
+\end{lstlisting}
+
+\noindent Returns the index of the tree node to which this DAG node is
+associated.
+
+\begin{lstlisting}
+bool DAGNode::is_parts() const
+\end{lstlisting}
+
+\noindent Indicates if this node represents sources or targets.
+
+\begin{lstlisting}
+bool DAGNode::is_normal() const
+\end{lstlisting}
+
+\noindent Indicates if this node represents a multipole or local expansion.
+
+\begin{lstlisting}
+bool DAGNode::is_interm() const
+\end{lstlisting}
+
+\noindent Inidicates if this node represents an intermediate expansion.
 
 
 \subsection{\texttt{DAG}}

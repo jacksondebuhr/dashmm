@@ -128,14 +128,11 @@ TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
       subsystems?
         This would be okay, but what would DAG turn into? dag::DAG? That's
         pretty goofy...
-TODO: We will need a better explicit dag representation - it uses a huge
-      amount of memory.
-        This is started. We have removed some waste. If we can get the
-        FMM97Distro to not use in_edges, we can eliminate a huge amount of
-        memory in this.
 TODO: Work out if there is a better way to apply the distribution. We shall
       need to have some way to parallelize it, or have some way to overlap that
       work with other work.
+        Perhaps have a second pass with the same sort of tree parallel thing
+        like when the DAG is discovered.
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
   * It would be nice if we were to decouple some of the use of the tree and the
