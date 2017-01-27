@@ -38,33 +38,35 @@ class DAGInfo;
 
 /// Edge in the explicit representation of the DAG
 struct DAGEdge {
-  DAGNode *source;          /// Source node of the edge
   DAGNode *target;          /// Target node of the edge
   Operation op;             /// Operation to perform along edge
   int weight;               /// estimate of communication cost if it occurs
 
-  DAGEdge() : source{nullptr}, target{nullptr}, op{Operation::Nop}, weight{0} {}
-  DAGEdge(DAGNode *start, DAGNode *end, Operation inop, int w)
-    : source{start}, target{end}, op{inop}, weight{w} {}
+  DAGEdge() : target{nullptr}, op{Operation::Nop}, weight{0} {}
+  DAGEdge(DAGNode *end, Operation inop, int w)
+    : target{end}, op{inop}, weight{w} {}
 };
 
 
 /// Node in the explicit representation of the DAG
 class DAGNode {
  public:
-  DAGNode(/*Index i*/const DAGInfo *p)
-    : out_edges{}, in_edges{}, locality{-1}, global_addx{HPX_NULL},
-      color{0}, parent_{p} { }
+  DAGNode(const DAGInfo *p)
+    : out_edges{}, locality{-1}, color{0},
+      global_addx{HPX_NULL}, parent_{p}, in_count_{0} { }
 
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
-    out_edges.push_back(DAGEdge{this, end, op, weight});
+    out_edges.push_back(DAGEdge{/*this,*/ end, op, weight});
   }
 
-  /// Utility routine to add an edge to the DAG
-  void add_in_edge(DAGNode *start, Operation op, int weight) {
-    in_edges.push_back(DAGEdge{start, this, op, weight});
+  /// Utility routine to track a new input edge
+  void add_in_edge() {
+    ++in_count_;
   }
+
+  /// Return how many input edges we need
+  size_t in_count() const {return in_count_;}
 
   /// Return the index of the related tree node
   Index index() const;
@@ -79,15 +81,15 @@ class DAGNode {
   bool is_interm() const;
 
   std::vector<DAGEdge> out_edges;   /// these are out edges
-  std::vector<DAGEdge> in_edges;    /// these are in edges
 
   int locality;                  /// the locality where this will be placed
+  int color;
   hpx_addr_t global_addx;        /// global address of object serving this node
                                  /// or a source ref
-  int color;
 
  private:
   const DAGInfo *parent_;
+  size_t in_count_;
 };
 
 
@@ -112,20 +114,6 @@ class DAG {
  public:
   DAG() : source_leaves{}, source_nodes{}, target_nodes{}, target_leaves{} { }
 
-  /// Print the DAG out in JSON format.
-  ///
-  /// This will open a file with the given name, and write out the DAG
-  /// information to that file is JSON format. See the implementation for
-  /// details about what is included.
-  ///
-  /// NOTE: This is an experimental interface
-  void toJSON(std::string fname);
-
-  /// Print the DAG out in a simpler text format.
-  ///
-  /// NOTE: This is an experimental interface
-  void toEdgeCSV(std::string fname);
-
   /// Comparison routine that will used to sort edges by locality
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
     return (a.target->locality < b.target->locality);
@@ -136,12 +124,6 @@ class DAG {
     return op == Operation::MtoT || op == Operation::LtoT
                                  || op == Operation::StoT;
   }
-
-  /// Count nodes in the full DAG
-  size_t node_count() const;
-
-  /// Count edges in the full DAG
-  size_t edge_count() const;
 
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
@@ -534,7 +516,7 @@ class DAGInfo {
                          DAGInfo *dest_info, DAGNode *dest,
                          Operation op, int weight) {
     dest_info->lock();
-    dest->add_in_edge(source, op, weight);
+    dest->add_in_edge();
     dest_info->unlock();
 
     src_info->lock();

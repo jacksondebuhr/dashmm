@@ -30,8 +30,12 @@ class FMM97Distro {
  public:
   FMM97Distro() { }
   void compute_distribution(DAG &dag);
-  static void assign_for_source(DAGInfo &dag, int locality, int height);
+  static void assign_for_source(DAGInfo &dag, int locality);
   static void assign_for_target(DAGInfo &dag, int locality);
+
+ private:
+  static bool color_comparison(const DAGNode *a, const DAGNode *b);
+  static void compute_locality(DAGNode *node);
 };
 
 

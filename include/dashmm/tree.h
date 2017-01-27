@@ -1454,7 +1454,7 @@ class DualTree {
   /// \returns - the resulting DAG.
   DAG *create_DAG() {
     // Do work on the source tree
-    hpx_addr_t sdone = hpx_lco_future_new(sizeof(int));
+    hpx_addr_t sdone = hpx_lco_and_new(1);
     assert(sdone != HPX_NULL);
 
     dualtree_t *thetree = this;
@@ -2508,7 +2508,7 @@ class DualTree {
         new expansion_t{kSourcePrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+      expansionlco_t expand(node->dag.normal()->in_count(),
                             node->dag.normal()->out_edges.size(),
                             node->idx, std::move(input_expand),
                             rwtree);
@@ -2521,7 +2521,7 @@ class DualTree {
         new expansion_t{kSourceIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
                                 node->dag.interm()->out_edges.size(),
                                 node->idx,
                                 std::move(interm_expand),
@@ -2580,7 +2580,7 @@ class DualTree {
         new expansion_t{kTargetPrimary,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t expand(node->dag.normal()->in_edges.size(),
+      expansionlco_t expand(node->dag.normal()->in_count(),
                             node->dag.normal()->out_edges.size(),
                             node->idx, std::move(input_expand),
                             rwtree);
@@ -2593,7 +2593,7 @@ class DualTree {
         new expansion_t{kTargetIntermediate,
             expansion_t::compute_scale(node->idx), n_center}
       };
-      expansionlco_t intexp_lco(node->dag.interm()->in_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
                                 node->dag.interm()->out_edges.size(),
                                 node->idx,
                                 std::move(interm_expand),
@@ -2608,7 +2608,7 @@ class DualTree {
     // Here is where we make the target lco if needed
     if (node->dag.has_parts()) {
       if (node->dag.parts()->locality == myrank) {
-        targetlco_t tlco{node->dag.parts()->in_edges.size(), node->parts};
+        targetlco_t tlco{node->dag.parts()->in_count(), node->parts};
         node->dag.set_targetlco(tlco.lco());
       }
 
@@ -2873,13 +2873,11 @@ class DualTree {
   ///
   /// \param tree - the DualTree
   /// \param node - the node of the source tree
-  /// \param cdone - the completion detection LCO that is deleted by this action
   /// \param done - the completion LCO that is set by this action
   ///
   /// \returns - HPX_SUCCESS
   static int source_apply_method_child_done_handler(dualtree_t *tree,
                                                     sourcenode_t *node,
-                                                    hpx_addr_t cdone,
                                                     hpx_addr_t done) {
     tree->method_.aggregate(node, &tree->domain_);
     int loc{0};
@@ -2889,12 +2887,10 @@ class DualTree {
       loc = tree->rank_of_unif_grid(dag_idx);
     }
 
-    int height;
-    hpx_lco_get(cdone, sizeof(int), &height);
-    hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
-    hpx_lco_delete_sync(cdone);
+    method_t::distropolicy_t::assign_for_source(node->dag, loc);
 
-    method_t::distropolicy_t::assign_for_source(node->dag, loc, height);
+    hpx_lco_and_set(done, HPX_NULL);
+
     return HPX_SUCCESS;
   }
 
@@ -2920,16 +2916,14 @@ class DualTree {
       node->dag.set_parts_locality(dag_rank);
       node->dag.set_normal_locality(dag_rank);
 
-      method_t::distropolicy_t::assign_for_source(node->dag, dag_rank, 0);
+      method_t::distropolicy_t::assign_for_source(node->dag, dag_rank);
 
-      int height = 0;
-      hpx_lco_set(done, sizeof(int), &height, HPX_NULL, HPX_NULL);
+      hpx_lco_and_set(done, HPX_NULL);
 
       return HPX_SUCCESS;
     }
 
-    hpx_addr_t cdone = hpx_lco_reduce_new(n_children, sizeof(int),
-                                          int_max_ident_op, int_max_op);
+    hpx_addr_t cdone = hpx_lco_and_new(n_children);
     assert(cdone != HPX_NULL);
 
     for (int i = 0; i < 8; ++i) {
@@ -2938,11 +2932,12 @@ class DualTree {
                &tree, &node->child[i], &cdone);
     }
 
-    // Once the children are done, call aggregate here, continuing a set to
-    // done once that has happened.
-    assert(cdone != HPX_NULL);
-    hpx_call_when(cdone, HPX_HERE, source_apply_method_child_done_, HPX_NULL,
-                  &tree, &node, &cdone, &done);
+    // Once the children are done, call aggregate here, deleting cdone as
+    // the continuation.
+    hpx_call_when_with_continuation(cdone,
+                                    HPX_HERE, source_apply_method_child_done_,
+                                    cdone, hpx_lco_delete_action,
+                                    &tree, &node, &done);
 
     return HPX_SUCCESS;
   }
