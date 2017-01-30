@@ -5,10 +5,11 @@ THIS BRANCH TODO
 Things that likely would not break the API
 ==========================================
 
-TODO: We should transform the out edge spawn into actions for each now that
-      we know how to do that cheaply.
-TODO: The remote stuff should be a future. That way a no-copy parallel spawn
-      is possible. It has to 'live' somewhere.
+TODO: Set up code for the inclusion of priorities.
+TODO: Change work instigation to be a par-for (or equivalent) over the
+      DAG nodes.
+TODO: The remote stuff should be an RDMA into a preallocated buffer. At least,
+      this would allow a no-copy spawn of the remote edges.
 
 TODO: Decide if the current solution for the DAG vector capacity problem is
       good enough, or if we should instead work toward collecting the tree
@@ -67,13 +68,6 @@ TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
         - One place this is annoying is in the 'other_member' member of dag
           nodes. At the moment, we use the larger size there, and case to
           integers for the accuracy.
-TODO: Improve the way that we optionally put out the DAG information. Perhaps
-      this would be another version of evaluate, but which takes an additional
-      template parameter serving the DAG output. This would then force the
-      factorization of evaluate even higher.
-        Or perhaps once there is a mechanism to get the DAG for a given
-        evaluation, we can just go ahead and return that the user, and they
-        can call whatever methods they want on it.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
 TODO: Decide if we should also test Hilbert ordering on the top level distrib
