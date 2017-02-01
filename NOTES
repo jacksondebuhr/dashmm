@@ -6,23 +6,6 @@ Things that likely would not break the API
 ==========================================
 
 TODO: Set up code for the inclusion of priorities.
-TODO: Change work instigation to be a par-for (or equivalent) over the
-      DAG nodes.
-        I am not sure we can use the built-in par-for here. If we did, the
-        resulting actions would not have the correct priority. I think we
-        should give them appropriate priorities. So that is likely a very high
-        priority, if not the highest. That way, all the work gets started,
-        even at the expense of making progress elsewhere. The runtime cannot
-        pick a good schedule without adequate information.
-
-        But if we do not prioritize the spawn, we shall end up with a case
-        where the rest of the spawn can be buried under the other work.
-        Much better to have it all ready to start.
-
-        So we basically need to collect the spawns into a loop. And then we
-        can go ahead and bundle them into groups. The catch is that there will
-        be some that are not to be launched. So should we then sort the
-        nodes locally, and then spawn? (really just partition them).
 TODO: Decide if there is a better solution to the access to tree node problem
       that has cropped up for DAGInfo.
 TODO: The remote stuff should be an RDMA into a preallocated buffer. At least,
