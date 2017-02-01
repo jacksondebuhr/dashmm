@@ -80,6 +80,11 @@ class DAGNode {
   /// Is this node an intermediate node
   bool is_interm() const;
 
+  /// Get the associated tree node for this DAGNode
+  ///
+  /// WARNING: Use with caution.
+  void *tree_node() const;
+
   std::vector<DAGEdge> out_edges;   /// these are out edges
 
   int locality;                  /// the locality where this will be placed
@@ -152,8 +157,9 @@ class DAG {
 class DAGInfo {
  public:
   /// Construct the DAGInfo
-  DAGInfo()
-      : idx_{0, 0, 0, 0}, normal_{nullptr}, interm_{nullptr}, parts_{nullptr} {
+  DAGInfo(void *treenode)
+      : idx_{0, 0, 0, 0}, normal_{nullptr}, interm_{nullptr}, parts_{nullptr},
+        tree_node_{treenode} {
     lock_ = hpx_lco_sema_new(1);
     assert(lock_ != HPX_NULL);
   }
@@ -161,10 +167,9 @@ class DAGInfo {
   /// Construct the DAGInfo
   ///
   /// This cannot be used outside of an HPX-5 thread.
-  DAGInfo(Index idx) : idx_{idx} {
-    normal_ = nullptr;
-    interm_ = nullptr;
-    parts_ = nullptr;
+  DAGInfo(void *treenode, Index idx)
+      : idx_{idx}, normal_{nullptr}, interm_{nullptr}, parts_{nullptr},
+        tree_node_{treenode} {
     lock_ = hpx_lco_sema_new(1);
     assert(lock_ != HPX_NULL);
   }
@@ -194,6 +199,11 @@ class DAGInfo {
 
   /// Set the index of the DAGInfo object
   void set_index(const Index &index) {idx_ = index;}
+
+  /// Return pointer to tree node owning this DAGInfo object
+  ///
+  /// WARNING: Use with caution.
+  void *tree_node() const {return tree_node_;}
 
   /// Add the normal node
   ///
@@ -540,6 +550,7 @@ class DAGInfo {
   DAGNode *normal_;
   DAGNode *interm_;
   DAGNode *parts_;   // source or target
+  void *tree_node_;
 };
 
 

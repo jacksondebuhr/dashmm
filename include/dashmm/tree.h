@@ -78,7 +78,7 @@ class Node {
   using arrayref_t = ArrayRef<Record>;
 
   /// The default constructor allocates nothing, and sets all to zero.
-  Node() : idx{}, parts{}, parent{nullptr}, first_{0} {
+  Node() : idx{}, parts{}, parent{nullptr}, dag{this}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -107,7 +107,7 @@ class Node {
   /// \param parts - the particles inside the volume represented by this node
   /// \param parent - the parent of this node
   Node(Index index, arrayref_t parts, node_t *parent)
-      : idx{index}, parts{parts}, parent{parent}, dag{index}, first_{0} {
+      : idx{index}, parts{parts}, parent{parent}, dag{this, index}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -1595,6 +1595,14 @@ class DualTree {
     hpx_addr_t rwaddr = global_tree.data();
     hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
              &rwaddr, &source_tree_->root_);
+
+    // BRANCH
+    // Change this to take in the DAG
+    // Leave it as a member of tree for now, even though that makes no sense
+    //   we will fix that soon
+    // All this will do is partition the source nodes by locality
+    // then divide them up into chunks and spawn the chunks with the highest
+    // possible priority
   }
 
   /// Destroys the LCOs associated with the DAG
@@ -2670,6 +2678,13 @@ class DualTree {
   ///
   /// \returns - HPX_SUCCESS
   static int instigate_dag_eval_handler(hpx_addr_t rwtree, sourcenode_t *node) {
+    // BRANCH
+    // This will then take in two DAGNode* acting as iterators that will give
+    //   the range to spawn over. This is in addition to the rwtree address,
+    //   which is needed.
+    // This will then call out to a function, or maybe inline do the work
+    //   of the spawn.
+
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
 
