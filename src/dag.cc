@@ -49,5 +49,9 @@ bool DAGNode::is_interm() const {
   return parent_->interm() == this;
 }
 
+void *DAGNode::tree_node() const {
+  return parent_->tree_node();
+}
+
 
 } // dashmm

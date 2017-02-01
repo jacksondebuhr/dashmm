@@ -323,7 +323,7 @@ class Evaluator {
 
     hpx_time_t evaluate_begin = hpx_time_now();
     tree->setup_edge_lists(dag);
-    tree->start_DAG_evaluation(global_tree);
+    tree->start_DAG_evaluation(global_tree, dag);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
     hpx_lco_wait(heredone);
     hpx_time_t evaluate_end = hpx_time_now();

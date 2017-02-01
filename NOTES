@@ -23,6 +23,8 @@ TODO: Change work instigation to be a par-for (or equivalent) over the
         can go ahead and bundle them into groups. The catch is that there will
         be some that are not to be launched. So should we then sort the
         nodes locally, and then spawn? (really just partition them).
+TODO: Decide if there is a better solution to the access to tree node problem
+      that has cropped up for DAGInfo.
 TODO: The remote stuff should be an RDMA into a preallocated buffer. At least,
       this would allow a no-copy spawn of the remote edges.
 

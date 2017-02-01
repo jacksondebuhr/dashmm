@@ -232,7 +232,7 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::instigate_dag_eval_,
                         dualtree_t::instigate_dag_eval_handler,
-                        HPX_ADDR, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         dualtree_t::instigate_dag_eval_remote_,
                         dualtree_t::instigate_dag_eval_remote_handler,

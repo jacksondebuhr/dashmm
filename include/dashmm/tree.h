@@ -78,7 +78,7 @@ class Node {
   using arrayref_t = ArrayRef<Record>;
 
   /// The default constructor allocates nothing, and sets all to zero.
-  Node() : idx{}, parts{}, parent{nullptr}, first_{0} {
+  Node() : idx{}, parts{}, parent{nullptr}, dag{this}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -107,7 +107,7 @@ class Node {
   /// \param parts - the particles inside the volume represented by this node
   /// \param parent - the parent of this node
   Node(Index index, arrayref_t parts, node_t *parent)
-      : idx{index}, parts{parts}, parent{parent}, dag{index}, first_{0} {
+      : idx{index}, parts{parts}, parent{parent}, dag{this, index}, first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -1591,10 +1591,45 @@ class DualTree {
   /// of the full evaluation implicitly waits on this operation.
   ///
   /// \param global_tree - the Dual Tree
-  void start_DAG_evaluation(RankWise<dualtree_t> &global_tree) {
+  void start_DAG_evaluation(RankWise<dualtree_t> &global_tree, DAG *dag) {
     hpx_addr_t rwaddr = global_tree.data();
-    hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
-             &rwaddr, &source_tree_->root_);
+
+    // Sort by locality
+    int rank = hpx_get_my_rank();
+    auto partition_point = std::partition(
+      dag->source_leaves.begin(), dag->source_leaves.end(),
+      [rank](const DAGNode *a) -> bool {
+        return a->locality == rank;
+      });
+    size_t count = partition_point - dag->source_leaves.begin();
+
+    // Find chunk size
+    int n_workers = hpx_get_num_threads();
+    size_t delta = count / n_workers;
+    if (!delta) {
+      // If there are so few to spawn as to make delta < 1, then just do one
+      // chunk. This should be rare.
+      delta = count;
+    }
+
+    // Spawn chunks
+    DAGNode **data = dag->source_leaves.data();
+    size_t parc_size = sizeof(hpx_addr_t) + 2 * sizeof(DAGNode *);
+    for (size_t start = 0; start < count; start += delta) {
+      size_t end = start + delta;
+      if (end > count) {
+        end = count;
+      }
+      DAGNode **first = &data[start];
+      DAGNode **last = &data[end];
+
+      hpx_parcel_t *parc = hpx_parcel_acquire(nullptr, parc_size);
+      hpx_parcel_set_target(parc, HPX_HERE);
+      hpx_parcel_set_action(parc, instigate_dag_eval_);
+      hpx_parcel_set_args(parc, &rwaddr, &first, &last);
+      // PRIORITY - set parcel priority to maximum
+      hpx_parcel_send_sync(parc);
+    }
   }
 
   /// Destroys the LCOs associated with the DAG
@@ -2666,32 +2701,18 @@ class DualTree {
   /// out edges.
   ///
   /// \param rwtree - the global address of the DualTree
-  /// \param node - the node being worked on for this action
+  /// \param first - the first DAGNode in consideration
+  /// \param last - the last DAGNode in consideration
   ///
   /// \returns - HPX_SUCCESS
-  static int instigate_dag_eval_handler(hpx_addr_t rwtree, sourcenode_t *node) {
+  static int instigate_dag_eval_handler(hpx_addr_t rwtree, DAGNode **first,
+                                        DAGNode **last) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
 
-    DAGNode *parts{nullptr};
-
-    int n_children{node->n_children()};
-    if (n_children > 0) {
-      for (int i = 0; i < 8; ++i) {
-        if (node->child[i] != nullptr) {
-          hpx_call(HPX_HERE, instigate_dag_eval_, HPX_NULL,
-                  &rwtree, &node->child[i]);
-        }
-      }
-    } else {
-      // At a leaf, we do actual work
-      parts = node->dag.parts();
-      if (parts != nullptr && parts->locality != hpx_get_my_rank()) {
-        parts = nullptr;
-      }
-    }
-
-    if (parts) {
+    for (DAGNode **iter = first; iter != last; ++iter) {
+      DAGNode *parts = *iter;
+      sourcenode_t *node = static_cast<sourcenode_t *>(parts->tree_node());
       sourceref_t sources = node->parts;
 
       // We first sort the out edges by locality
@@ -2755,6 +2776,11 @@ class DualTree {
           hpx_parcel_t *parc = hpx_parcel_acquire(scratch, parcel_size);
           hpx_parcel_set_action(parc, instigate_dag_eval_remote_);
           hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
+          // PRIORITY - set the priority for this parcel. What would it be?
+          //  The remotes are all S->T here. We know that because the DAGNode
+          //  in question is a leaf, and DASHMM fixes the related M to be the
+          //  same locality. So the remotes cannot be the S->M and so they have
+          //  no particular priority.
 
           hpx_parcel_send_sync(parc);
         }
