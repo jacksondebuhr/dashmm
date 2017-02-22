@@ -153,6 +153,9 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
     } else if (omega <= 10) {
       C1 = 22;
       C2 = 12;
+    } else {
+      fprintf(stderr, "Exceeds low-frequency regime\n"); 
+      exit(-1); 
     }
 
     int *m_e = &m_e_[s_e_ * lev];
