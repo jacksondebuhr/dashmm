@@ -515,7 +515,7 @@ public:
     const int *f = builtin_yukawa_table_->f();
 
     // Get number of trapezoid points
-    const int *m = builtin_yukawa_table_->m(scale);
+    const int *mk = builtin_yukawa_table_->m(scale);
     const int *smf = builtin_yukawa_table_->smf(scale);
 
     // Get e^{i * m * alpha_j}
@@ -582,7 +582,7 @@ public:
         }
 
         // Compute W(k, j)
-        for (int j = 1; j <= m[k] / 2; ++j) {
+        for (int j = 1; j <= mk[k] / 2; ++j) {
           dcomplex_t up{z1[0] + z2[0]};
           dcomplex_t dn{z1[0] - z2[0]};
           dcomplex_t power_I{0.0, 1.0};
@@ -979,7 +979,7 @@ private:
     double scale = views_.scale() / 2;;
     int p = builtin_yukawa_table_->p();
     int s = builtin_yukawa_table_->s();
-    const int *m = builtin_yukawa_table_->m(scale);
+    const int *M = builtin_yukawa_table_->m(scale);
     const int *sm = builtin_yukawa_table_->sm(scale);
     const int *smf = builtin_yukawa_table_->smf(scale);
     const int *f = builtin_yukawa_table_->f();
@@ -996,7 +996,7 @@ private:
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
 
     for (int k = 0; k < s; ++k) {
-      int mk2 = m[k] / 2;
+      int mk2 = M[k] / 2;
 
       // Compute sum_{j=1}^m(k) W(k, j) e^{-i * m * alpha_j}
       dcomplex_t *z = new dcomplex_t[f[k] + 1];
@@ -1030,7 +1030,7 @@ private:
 
       legendre_Plm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre);
 
-      double factor = w[k] / m[k];
+      double factor = w[k] / M[k];
       for (int n = 0; n <= p; ++n) {
         int mmax = (n <= f[k] ? n : f[k]);
         for (int m = 0; m <= mmax; ++m) {
