@@ -312,7 +312,6 @@ public:
     rotate_sph_z(W2, -alpha, W1, false);
 
     delete [] W2; 
-    std::cout << "mm\n"; 
     return std::unique_ptr<expansion_t>{retval};    
   }
 

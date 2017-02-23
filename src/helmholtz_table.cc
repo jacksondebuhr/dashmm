@@ -733,7 +733,7 @@ void HelmholtzTable::generate_m2m() {
           for (int k = m; k <= bound; ++k) {
             temp += pow(-0.5, n + k) * pow(sigma, np - n) *
               (2 * n + 1) * factorial[n - m] * factorial[np + m] *
-              factorial[2 * k] / factorial[k + m] / factorial[k] *
+              factorial[2 * k] / factorial[k + m] / factorial[k] /
               factorial[k - m] / factorial[n - k] / factorial[np - k] *
               bessel[np + n - k] * pow(omega_ * rho, np + n - 2 * k);
           }
