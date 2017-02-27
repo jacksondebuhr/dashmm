@@ -2,7 +2,7 @@ Creating the DAG from the tree and the Method
   Source_apply_method(dual tree, source root, sync);
   sync.wait();
   vector V = {source root};
-  Target_apply_method(target root, V, sync); 
+  Target_apply_method(target root, V, sync);
   sync.wait();
 
   Source_apply_method(DualTree T, SourceNode *node, LCO done) {
@@ -31,7 +31,7 @@ Creating the DAG from the tree and the Method
   }
 
   Source_apply_method_child_done(DualTree T, SourceNode *node, LCO done) {
-    DAGNode M, I;
+    DAGNode N, I;
     (N, I) = Method::aggregate(node, T.domain);
     Method::distropolicy_t::assign_for_source(N, I);
     done.set();
@@ -40,7 +40,7 @@ Creating the DAG from the tree and the Method
 
   Target_apply_method(DualTree T, TargetNode *node, vector<SourceNode *> V,
                       bool same_s_and_t, LCO done) {
-    bool refine = (node->level < T.unif_level) 
+    bool refine = (node->level < T.unif_level)
                     || Method::refine(same_s_and_t, node, V);
 
     DagNode I, L, targ;
@@ -71,13 +71,17 @@ Creating the DAG from the tree and the Method
 
   //// Operations on the various things that these need
   DualTree: DomainGeometry domain()
-            int uniform_level()
+            int uniform_level() <---- this is a specific implementation detail
+        This basically becomes the metadata collection. It could potentially
+        by something under DASHMM control. The sort of metadata we need would
+        be pretty regular: the two roots, the overall domain, and routines to
+        map an index into locality for the data distribution.
   SourceNode: int n_children()
               SourceNode *child(i)
               Index index()
               int level()
               int locality(unif_level, node_index) - so a mapping from index of
-                node and something about the tree to locallity. Should this 
+                node and something about the tree to locallity. Should this
                 instead be part of DualTree?
   TargetNode: int n_children()
               TargetNode *child(i)
@@ -93,7 +97,7 @@ Creating the DAG from the tree and the Method
 
   So if we are making these routines to work with whatever user supplied type,
   we just need the above methods. So these would all be implemented as template
-  functions, and the user would need to provide instances of them for their 
+  functions, and the user would need to provide instances of them for their
   tree types. Perhaps we could get away with making the DualTree a DASHMM
   type that stores their sort of Nodes for the roots, and then the relevant
   DASHMM information.
