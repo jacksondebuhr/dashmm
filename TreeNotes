@@ -1,0 +1,110 @@
+Creating the DAG from the tree and the Method
+  Source_apply_method(dual tree, source root, sync);
+  sync.wait();
+  vector V = {source root};
+  Target_apply_method(target root, V, sync); 
+  sync.wait();
+
+  Source_apply_method(DualTree T, SourceNode *node, LCO done) {
+    if (node->n_children() == 0) {
+      DAGNode P, N, I;
+      (P, N, I) = Method::generate(node, T.domain);
+      P.locality = node->locality
+      N.locality = node->locality
+      Method::distropolicy_t::assign_for_source(P, N, I, node->locality);
+      done.set();
+      return;
+    }
+
+    LCO cdone = new LCO::And(node->n_children)
+    for (SourceNode *child in node->children) {
+      Source_apply_method(T, child, cdone)
+    }
+
+    when (cdone) {
+      Source_apply_method_child_done(T, node, done)
+    } then {
+      delete cdone
+    }
+
+    return;
+  }
+
+  Source_apply_method_child_done(DualTree T, SourceNode *node, LCO done) {
+    DAGNode M, I;
+    (N, I) = Method::aggregate(node, T.domain);
+    Method::distropolicy_t::assign_for_source(N, I);
+    done.set();
+    return;
+  }
+
+  Target_apply_method(DualTree T, TargetNode *node, vector<SourceNode *> V,
+                      bool same_s_and_t, LCO done) {
+    bool refine = (node->level < T.unif_level) 
+                    || Method::refine(same_s_and_t, node, V);
+
+    DagNode I, L, targ;
+    L = Method::inherit(node, T.domain, !refine);
+    (L, targ) = Method::process(node, V, !refine, T.domain);
+
+    if (refine) {
+      targ.locality = node->locality;
+      L.locality = node->locality;
+      done.set();
+    } else {
+      LCO cdone = new LCO::And(node->n_children());
+      for (TargetNode child in node->children()) {
+        vector<SourceNode *> V_c = V;
+        Target_apply_method(T, child, V_c, same_s_and_t, cdone);
+      }
+
+      Method::distropolicy_t::assign_for_target(I, L, targ, node->locality)
+
+      when (cdone) {
+        delete cdone;
+      }
+    }
+
+    delete V;
+    return;
+  }
+
+  //// Operations on the various things that these need
+  DualTree: DomainGeometry domain()
+            int uniform_level()
+  SourceNode: int n_children()
+              SourceNode *child(i)
+              Index index()
+              int level()
+              int locality(unif_level, node_index) - so a mapping from index of
+                node and something about the tree to locallity. Should this 
+                instead be part of DualTree?
+  TargetNode: int n_children()
+              TargetNode *child(i)
+              Index index()
+              int level()
+              int locality(unif_level, node_index) - again, make this part of
+                something else? It makes the most sense encapsulated here.
+                But then we are always passing in tree metadata to it.
+  Somewhere: A mapping from SourceNode -> (P, N, I) dag nodes
+             A mapping from TargetNode -> (P, N, I) dag nodes
+
+  ////// Discussion
+
+  So if we are making these routines to work with whatever user supplied type,
+  we just need the above methods. So these would all be implemented as template
+  functions, and the user would need to provide instances of them for their 
+  tree types. Perhaps we could get away with making the DualTree a DASHMM
+  type that stores their sort of Nodes for the roots, and then the relevant
+  DASHMM information.
+
+
+Computing the distribution of the DAG
+
+Creating Expansions from DAG
+
+Setup edge lists
+
+Start DAG evaluation
+
+Setup Termination detection
