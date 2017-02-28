@@ -288,6 +288,9 @@ class Evaluator {
     hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
+    //if (hpx_get_my_rank() == 0) {
+    //  dag->printedges(hpx_get_num_ranks());
+    //}
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
                                                 distribute_end);
