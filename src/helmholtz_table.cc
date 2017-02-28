@@ -358,7 +358,7 @@ void HelmholtzTable::gaussq(int N) {
 
   // Scale to approximate \int_0^{\pi / 2} f(x) dx
   for (int i = 0; i < N; ++i) {
-    x_p_[i] = (x_p_[i] + 1) / 4 / M_PI;
+    x_p_[i] = (x_p_[i] + 1) / 4 * M_PI;
     w_p_[i] = w_p_[i] * sin(x_p_[i]) * M_PI / 4;
   }
 
