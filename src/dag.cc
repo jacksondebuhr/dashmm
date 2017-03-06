@@ -13,24 +13,79 @@
 
 
 /// \file
-/// \brief Implementation of JSON format DAG output
-///
-/// The intent of this file it to make an easily digestible form of the
-/// DAG information for use in visualization tools. This implements JSON
-/// formatted data, as it is human readable (if boring) and because there
-/// are quality JSON readers in a wide array of languages and frameworks.
-///
-/// NOTE: This is not as robust as other portions of DASHMM, and should be
-/// considered to be experimental. The default mode of operation of DASHMM
-/// will not even call into these routines, and must be manually enabled
-/// by modifying the source code of the library. Please note the intentional
-/// vagueness.
+/// \brief Implement DAG objects
 
 
 #include "dashmm/dag.h"
 
+#include <cstdio>
+
+#include <vector>
+
 
 namespace dashmm {
+
+namespace {
+  using edge_table_t = std::vector<std::vector<std::vector<int>>>;
+
+  int optoint(Operation op) {
+    switch(op) {
+      case Operation::Nop:
+        return 0;
+        break;
+      case Operation::StoM:
+        return 1;
+        break;
+      case Operation::StoL:
+        return 2;
+        break;
+      case Operation::MtoM:
+        return 3;
+        break;
+      case Operation::MtoL:
+        return 4;
+        break;
+      case Operation::LtoL:
+        return 5;
+        break;
+      case Operation::MtoT:
+        return 6;
+        break;
+      case Operation::LtoT:
+        return 7;
+        break;
+      case Operation::StoT:
+        return 8;
+        break;
+      case Operation::MtoI:
+        return 9;
+        break;
+      case Operation::ItoI:
+        return 10;
+        break;
+      case Operation::ItoL:
+        return 11;
+        break;
+    }
+    return 0;
+  }
+
+  edge_table_t zero_table(int n) {
+    edge_table_t edges(
+        12, std::vector<std::vector<int>>(
+            n, std::vector<int>(n, 0)));
+    return edges;
+  }
+
+  void collect_edges(edge_table_t &edges, const std::vector<DAGNode *> &nodes) {
+    for (size_t i = 0; i < nodes.size(); ++i) {
+      for (size_t j = 0; j < nodes[i]->out_edges.size(); ++j) {
+        DAGEdge &e = nodes[i]->out_edges[j];
+        edges[optoint(e.op)][nodes[i]->locality][e.target->locality] += 1;
+      }
+    }
+  }
+}
 
 
 Index DAGNode::index() const {
@@ -53,5 +108,27 @@ void *DAGNode::tree_node() const {
   return parent_->tree_node();
 }
 
+void DAG::printedges(int n) {
+  edge_table_t edges = zero_table(n);
+  collect_edges(edges, source_leaves);
+  collect_edges(edges, source_nodes);
+  collect_edges(edges, target_nodes);
+
+  FILE *ofd = fopen("dag.txt", "w");
+  for (int i = 0; i < 12; ++i) {
+    fprintf(ofd, "Table for operation %d:\n", i);
+    fprintf(ofd, "------------------------------\n");
+    for (int j = 0; j < n; ++j) {
+      for (int k = 0; k < n; ++k) {
+        fprintf(ofd, "%d -> %d : %d\n", j, k, edges[i][j][k]);
+      }
+    }
+    fprintf(ofd, "\n");
+  }
+  fclose(ofd);
+}
+
 
 } // dashmm
+
+

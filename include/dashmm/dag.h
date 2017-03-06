@@ -130,6 +130,8 @@ class DAG {
                                  || op == Operation::StoT;
   }
 
+  void printedges(int n);
+
   std::vector<DAGNode *> source_leaves;
   std::vector<DAGNode *> source_nodes;
   std::vector<DAGNode *> target_nodes;
