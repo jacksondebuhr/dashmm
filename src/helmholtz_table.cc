@@ -197,14 +197,13 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
     }
     n_e_[lev] = sm_e[s_e_];
 
-    // These are the numbers for the source side and needs to be doubled when
-    // applied on the target side.
-    sm_p[0] = 0;
-    smf_p[0] = 0;
+    sm_p[0] = 0; 
+    smf_p[0] = 0; 
     for (int j = 1; j <= s_p_; ++j) {
-      sm_p[j] = sm_p[j - 1] + m_p[j - 1] / 2;
-      smf_p[j] = smf_p[j - 1] + m_p[j - 1] * f_p_[j - 1] / 2;
+      sm_p[j] = sm_p[j - 1] + m_p[j - 1]; 
+      smf_p[j] = smf_p[j - 1] + m_p[j - 1] * f_p_[j - 1]; 
     }
+
     n_p_[lev] = sm_p[s_p_];
   }
 
@@ -229,16 +228,13 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
     int *m_p = &m_p_[s_p_ * lev];
     ealphaj_p_[lev] = new dcomplex_t[smf_p[s_p_]];
 
-    offset = 0;
-    // This computes enough coefficients for the source side. On the target
-    // side, j goes to m_p[k]. For j2 = j1 + m_p[k] / 2, e(m, k, j2) differs
-    // from e(m, j, j1) by (-1)^m.
+    offset = 0; 
     for (int k = 0; k < s_p_; ++k) {
-      double alpha_k = 2 * M_PI / m_p[k];
-      for (int j = 1; j <= m_p[k] / 2; ++j) {
-        double alpha_kj = alpha_k * j;
+      double alpha_k = 2 * M_PI / m_p[k]; 
+      for (int j = 1; j <= m_p[k]; ++j) {
+        double alpha_kj = alpha_k * j; 
         for (int m = 1; m <= f_p_[k]; ++m) {
-          ealphaj_p_[lev][offset++] =
+          ealphaj_p_[lev][offset++] = 
             dcomplex_t{cos(m * alpha_kj), sin(m * alpha_kj)};
         }
       }
@@ -295,18 +291,9 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
     offset = 0;
     for (int k = 0; k < s_p_; ++k) {
       double alpha_k = 2 * M_PI / m_p[k];
-
-      // On the source side, only half of the propagating wave coefficients are
-      // saved due to conjugacy. The conjugacy is lost after shifting. This
-      // means, we need to use cos(alapha_{k, j}) where j >= m_p[k] / 2.
-      // Notice that if j2 = j1 + m_p[k] / 2,
-      // cos(alpha_{k, j2}) = cos(alpha_{k, j1} + pi) = -cos(alpha_{k, j1})
-      // For this reason, we only save the coefficients for (k, j) where
-      // j <= m_p[k] / 2, and apply conjugacy of the coefficient when processing
-      // the terms where j > m_p[k] / 2.
-      for (int j = 1; j <= m_p[k] / 2; ++j) {
-        double alpha_kj = j * alpha_k;
-        double arg = wd * sin(x_p_[k]) * cos(alpha_kj);
+      for (int j = 1; j <= m_p[k]; ++j) {
+        double alpha_kj = j * alpha_k; 
+        double arg = wd * sin(x_p_[k]) * cos(alpha_kj); 
         for (int d = -3; d <= 3; ++d) {
           xs_p_[lev][offset++] = dcomplex_t{cos(arg * d), sin(arg * d)};
         }
@@ -317,9 +304,9 @@ HelmholtzTable::HelmholtzTable(int n_digits, double size, double omega) {
     offset = 0;
     for (int k = 0; k < s_p_; ++k) {
       double alpha_k = 2 * M_PI / m_p[k];
-      for (int j = 1; j <= m_p[k] / 2; ++j) {
-        double alpha_kj = j * alpha_k;
-        double arg = wd * sin(x_p_[k]) * sin(alpha_kj);
+      for (int j = 1; j <= m_p[k]; ++j) {
+        double alpha_kj = j * alpha_k; 
+        double arg = wd * sin(x_p_[k]) * sin(alpha_kj); 
         for (int d = -3; d <= 3; ++d) {
           ys_p_[lev][offset++] = dcomplex_t{cos(arg * d), sin(arg * d)};
         }

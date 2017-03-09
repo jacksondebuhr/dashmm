@@ -66,22 +66,18 @@ public:
       char *data = new char[bytes]();
       views_.add_view(0, bytes, data);
     } else if (role == kSourceIntermediate) {
-      // On the source side, propagating waves along positive and negative
-      // directions of a given axis are conjugate of each other. As a result,
-      // only the one along the positive direction is saved.
-      size_t bytes_p = sizeof(dcomplex_t) * n_p;
-      size_t bytes_e = sizeof(dcomplex_t) * n_e;
-
-      // On the source side, one have
-      // (1) Prop(k, j) = conj(Prop(k, j + m_p(k) / 2)
-      // (2) Evan(k, j) = conj(Evan(k, j + m_e(k) / 2)
-      // Only half of the coefficients are saved for this reason.
+      // On the source side, propagating waves along the positive and negative
+      // direction of a given axis are conjugate of each other. As a result,
+      // only the one along the positive direction is saved
+      size_t bytes_p = sizeof(dcomplex_t) * n_p; 
+      size_t bytes_e = sizeof(dcomplex_t) * n_e; 
+      
       for (int i = 0; i < 3; ++i) {
-        int j = 3 * i;
+        int j = 3 * i; 
 
-        // Propagating wave
-        char *data1 = new char[bytes_p]();
-        views_.add_view(j, bytes_p, data1);
+        // Propagating wave 
+        char *data1 = new char[bytes_p](); 
+        views_.add_view(j, bytes_p, data1); 
 
         // Evanescent wave positive axis
         char *data2 = new char[bytes_e]();
@@ -92,10 +88,7 @@ public:
         views_.add_view(j + 2, bytes_e, data3);
       }
     } else if (role == kTargetIntermediate) {
-      // On the target side, propgating wave loses symmetry, and one needs to
-      // store Prop(k, j) for 1 <= j <= m_p(k). Evanescent wave still maintains
-      // the symmetry, so only half of the Evan(k, j) are saved.
-      size_t bytes_p = sizeof(dcomplex_t) * n_p * 2;
+      size_t bytes_p = sizeof(dcomplex_t) * n_p;
       size_t bytes_e = sizeof(dcomplex_t) * n_e;
 
       for (int i = 0; i < 28; ++i) {
@@ -590,8 +583,8 @@ public:
           }
         }
 
-        // Compute Prop(k, j) for 1 <= j <= m_p[k] / 2
-        for (int j = 1; j <= m_p[k] / 2; ++j) {
+        // Compute Prop(k, j) for 1 <= j <= m_p[k]
+        for (int j = 1; j <= m_p[k]; ++j) {
           dcomplex_t temp = z0;
           for (int m = 1; m <= f_p[k]; ++m) {
             int idx = smf_p[k] + (j - 1) * f_p[k] + m - 1;
@@ -669,12 +662,6 @@ public:
     int dy = s_index.y() - t_index.y() * 2;
     int dz = s_index.z() - t_index.z() * 2;
 
-    // Compute center of the parent node
-    //Point center = views_.center();
-    //double px = center.x() + (dx + 0.5) * s_size;
-    //double py = center.y() + (dy + 0.5) * s_size;
-    //double pz = center.z() + (dz + 0.5) * s_size;
-
     // Exponential expansions on the source side
     double scale = views_.scale();
 
@@ -698,13 +685,9 @@ public:
     dcomplex_t *Evan_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(8));
 
-    ViewSet views{kTargetIntermediate, Point{0.0, 0.0, 0.0}, 0.0};
-
-    // Each S will generate from 1 to 3 views (evan + prop) on the target
-    // side. For propagating wave, the terms are doubled as conjugacy is lost
-    // after shifting
+    ViewSet views{kTargetIntermediate}; 
     int n_e = builtin_helmholtz_table_->n_e(scale);
-    int n_p = builtin_helmholtz_table_->n_p(scale) * 2;
+    int n_p = builtin_helmholtz_table_->n_p(scale);
     size_t bytes_e = n_e * sizeof(dcomplex_t);
     size_t bytes_p = n_p * sizeof(dcomplex_t);
 
@@ -733,22 +716,22 @@ public:
       }
 
       if (tag <= 1) {
-        e2e_p(T[j], Prop_z, dx, dy, 0, scale, true, false);
+        e2e_p(T[j], Prop_z, dx, dy, 0, scale, true);
         e2e_e(T[j + 1], Evan_mz, dx, dy, 0, scale);
       } else if (tag <= 5) {
-        e2e_p(T[j], Prop_y, dx, dy, 0, scale, true, false);
+        e2e_p(T[j], Prop_y, dx, dy, 0, scale, true);
         e2e_e(T[j + 1], Evan_my, dz, dx, 0, scale);
       } else if (tag <= 13) {
-        e2e_p(T[j], Prop_x, -dz, dy, 0, scale, true, false);
+        e2e_p(T[j], Prop_x, -dz, dy, 0, scale, true);
         e2e_e(T[j + 1], Evan_mx, -dz, dy, 0, scale);
       } else if (tag <= 15) {
-        e2e_p(T[j], Prop_z, -dx, -dy, 0, scale, false, false);
+        e2e_p(T[j], Prop_z, -dx, -dy, 0, scale, false);
         e2e_e(T[j + 1], Evan_pz, -dx, -dy, 0, scale);
       } else if (tag <= 19) {
-        e2e_p(T[j], Prop_y, -dz, -dx, 0, scale, false, false);
+        e2e_p(T[j], Prop_y, -dz, -dx, 0, scale, false);
         e2e_e(T[j + 1], Evan_py, -dz, -dx, 0, scale);
       } else {
-        e2e_p(T[j], Prop_x, dz, -dy, 0, scale, false, false);
+        e2e_p(T[j], Prop_x, dz, -dy, 0, scale, false);
         e2e_e(T[j + 1], Evan_px, dz, -dy, 0, scale);
       }
 
@@ -772,20 +755,11 @@ public:
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
-    /*
-    // t_index and t_size are the index_and size of the child
-    // Compute child's center
-    double h = t_size / 2;
-    Point center = views_.center();
-    double cx = center.x() + (t_index.x() % 2 == 0 ? -h : h);
-    double cy = center.y() + (t_index.y() % 2 == 0 ? -h : h);
-    double cz = center.z() + (t_index.z() % 2 == 0 ? -h : h);
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() / 2;
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz},
-                                        scale, kTargetPrimary}};
     dcomplex_t *Evan[28]{nullptr};
     dcomplex_t *Prop[28]{nullptr};
     for (int i = 0; i < 28; ++i) {
@@ -796,7 +770,7 @@ public:
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
 
     int n_e = builtin_helmholtz_table_->n_e(scale);
-    int n_p = builtin_helmholtz_table_->n_p(scale) * 2;
+    int n_p = builtin_helmholtz_table_->n_p(scale); 
     dcomplex_t *S = new dcomplex_t[(n_e + n_p) * 6]();
     dcomplex_t *sProp_mz = S;
     dcomplex_t *sProp_pz = sProp_mz + n_p;
@@ -828,20 +802,20 @@ public:
       e2e_e(sEvan_mx, Evan[e1], 0, 0, 2, scale);
       e2e_e(sEvan_px, Evan[wall], 0, 0, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_mz, Prop[u1234], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], 0, 0, 3, scale, false);
+      e2e_p(sProp_mz, Prop[u1234], 0, 0, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 0, 0, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_my, Prop[n1256], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_my, Prop[n12], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], 0, 0, 3, scale, false);
+      e2e_p(sProp_my, Prop[n1256], 0, 0, 2, scale, false);
+      e2e_p(sProp_my, Prop[n12], 0, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 0, 0, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_mx, Prop[e1357], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e13], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e1], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 0, 0, 3, scale, false);
+      e2e_p(sProp_mx, Prop[e1357], 0, 0, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e13], 0, 0, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e1], 0, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], 0, 0, 2, scale, false);
       break;
     case 1:
       e2e_e(sEvan_mz, Evan[uall], -1, 0, 3, scale);
@@ -859,20 +833,20 @@ public:
       e2e_e(sEvan_px, Evan[w24], 0, 0, 2, scale);
       e2e_e(sEvan_px, Evan[w2], 0, 0, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], -1, 0, 3, scale, false, true);
-      e2e_p(sProp_mz, Prop[u1234], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 1, 0, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], -1, 0, 3, scale, false);
+      e2e_p(sProp_mz, Prop[u1234], -1, 0, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 1, 0, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], 0, -1, 3, scale, false, true);
-      e2e_p(sProp_my, Prop[n1256], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_my, Prop[n12], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], 0, -1, 3, scale, false);
+      e2e_p(sProp_my, Prop[n1256], 0, -1, 2, scale, false);
+      e2e_p(sProp_my, Prop[n12], 0, -1, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 0, 1, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_px, Prop[w2468], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w24], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w2], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 0, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], 0, 0, 3, scale, false);
+      e2e_p(sProp_px, Prop[w2468], 0, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[w24], 0, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[w2], 0, 0, 2, scale, false);
       break;
     case 2:
       e2e_e(sEvan_mz, Evan[uall], 0, -1, 3, scale);
@@ -890,20 +864,20 @@ public:
       e2e_e(sEvan_mx, Evan[e3], 0, -1, 2, scale);
       e2e_e(sEvan_px, Evan[wall], 0, 1, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], 0, -1, 3, scale, false, true);
-      e2e_p(sProp_mz, Prop[u1234], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], 0, -1, 3, scale, false);
+      e2e_p(sProp_mz, Prop[u1234], 0, -1, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 0, 1, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_py, Prop[s3478], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[s34], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], 0, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 0, 0, 3, scale, false);
+      e2e_p(sProp_py, Prop[s3478], 0, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[s34], 0, 0, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 0, -1, 3, scale, false, true);
-      e2e_p(sProp_mx, Prop[e1357], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e13], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e3], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 0, -1, 3, scale, false);
+      e2e_p(sProp_mx, Prop[e1357], 0, -1, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e13], 0, -1, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e3], 0, -1, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], 0, 1, 2, scale, false);
       break;
     case 3:
       e2e_e(sEvan_mz, Evan[uall], -1, -1, 3, scale);
@@ -921,20 +895,20 @@ public:
       e2e_e(sEvan_px, Evan[w24], 0, 1, 2, scale);
       e2e_e(sEvan_px, Evan[w4], 0, 1, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], -1, -1, 3, scale, false, true);
-      e2e_p(sProp_mz, Prop[u1234], -1, -1, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 1, 1, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], -1, -1, 3, scale, false);
+      e2e_p(sProp_mz, Prop[u1234], -1, -1, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 1, 1, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 0, 1, 3, scale, false, true);
-      e2e_p(sProp_py, Prop[s3478], 0, 1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[s34], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], 0, -1, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 0, 1, 3, scale, false);
+      e2e_p(sProp_py, Prop[s3478], 0, 1, 2, scale, false);
+      e2e_p(sProp_py, Prop[s34], 0, 1, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], 0, 1, 3, scale, false, true);
-      e2e_p(sProp_px, Prop[w2468], 0, 1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w24], 0, 1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w4], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 0, -1, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], 0, 1, 3, scale, false);
+      e2e_p(sProp_px, Prop[w2468], 0, 1, 2, scale, false);
+      e2e_p(sProp_px, Prop[w24], 0, 1, 2, scale, false);
+      e2e_p(sProp_px, Prop[w4], 0, 1, 2, scale, false);
       break;
     case 4:
       e2e_e(sEvan_mz, Evan[uall], 0, 0, 2, scale);
@@ -952,20 +926,20 @@ public:
       e2e_e(sEvan_mx, Evan[e5], 1, 0, 2, scale);
       e2e_e(sEvan_px, Evan[wall], -1, 0, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], 0, 0, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 0, 0, 3, scale, false, true);
-      e2e_p(sProp_pz, Prop[d5678], 0, 0, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], 0, 0, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 0, 0, 3, scale, false);
+      e2e_p(sProp_pz, Prop[d5678], 0, 0, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], -1, 0, 3, scale, false, true);
-      e2e_p(sProp_my, Prop[n1256], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_my, Prop[n56], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 1, 0, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], -1, 0, 3, scale, false);
+      e2e_p(sProp_my, Prop[n1256], -1, 0, 2, scale, false);
+      e2e_p(sProp_my, Prop[n56], -1, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 1, 0, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 1, 0, 3, scale, false, true);
-      e2e_p(sProp_mx, Prop[e1357], 1, 0, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e57], 1, 0, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e5], 1, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], -1, 0, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 1, 0, 3, scale, false);
+      e2e_p(sProp_mx, Prop[e1357], 1, 0, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e57], 1, 0, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e5], 1, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], -1, 0, 2, scale, false);
       break;
     case 5:
       e2e_e(sEvan_mz, Evan[uall], -1, 0, 2, scale);
@@ -983,20 +957,20 @@ public:
       e2e_e(sEvan_px, Evan[w68], -1, 0, 2, scale);
       e2e_e(sEvan_px, Evan[w6], -1, 0, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 1, 0, 3, scale, false, true);
-      e2e_p(sProp_pz, Prop[d5678], 1, 0, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], -1, 0, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 1, 0, 3, scale, false);
+      e2e_p(sProp_pz, Prop[d5678], 1, 0, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], -1, -1, 3, scale, false, true);
-      e2e_p(sProp_my, Prop[n1256], -1, -1, 2, scale, false, true);
-      e2e_p(sProp_my, Prop[n56], -1, -1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 1, 1, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], -1, -1, 3, scale, false);
+      e2e_p(sProp_my, Prop[n1256], -1, -1, 2, scale, false);
+      e2e_p(sProp_my, Prop[n56], -1, -1, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 1, 1, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 1, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], -1, 0, 3, scale, false, true);
-      e2e_p(sProp_px, Prop[w2468], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w68], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w6], -1, 0, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 1, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], -1, 0, 3, scale, false);
+      e2e_p(sProp_px, Prop[w2468], -1, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[w68], -1, 0, 2, scale, false);
+      e2e_p(sProp_px, Prop[w6], -1, 0, 2, scale, false);
       break;
     case 6:
       e2e_e(sEvan_mz, Evan[uall], 0, -1, 2, scale);
@@ -1014,20 +988,20 @@ public:
       e2e_e(sEvan_mx, Evan[e7], 1, -1, 2, scale);
       e2e_e(sEvan_px, Evan[wall], -1, 1, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], 0, -1, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 0, 1, 3, scale, false, true);
-      e2e_p(sProp_pz, Prop[d5678], 0, 1, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], 0, -1, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 0, 1, 3, scale, false);
+      e2e_p(sProp_pz, Prop[d5678], 0, 1, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], -1, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 1, 0, 3, scale, false, true);
-      e2e_p(sProp_py, Prop[s3478], 1, 0, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[s78], 1, 0, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], -1, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 1, 0, 3, scale, false);
+      e2e_p(sProp_py, Prop[s3478], 1, 0, 2, scale, false);
+      e2e_p(sProp_py, Prop[s78], 1, 0, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 1, -1, 3, scale, false, true);
-      e2e_p(sProp_mx, Prop[e1357], 1, -1, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e57], 1, -1, 2, scale, false, true);
-      e2e_p(sProp_mx, Prop[e7], 1, -1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], -1, 1, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 1, -1, 3, scale, false);
+      e2e_p(sProp_mx, Prop[e1357], 1, -1, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e57], 1, -1, 2, scale, false);
+      e2e_p(sProp_mx, Prop[e7], 1, -1, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], -1, 1, 2, scale, false);
       break;
     case 7:
       e2e_e(sEvan_mz, Evan[uall], -1, -1, 2, scale);
@@ -1045,20 +1019,20 @@ public:
       e2e_e(sEvan_px, Evan[w68], -1, 1, 2, scale);
       e2e_e(sEvan_px, Evan[w8], -1, 1, 2, scale);
 
-      e2e_p(sProp_mz, Prop[uall], -1, -1, 2, scale, false, true);
-      e2e_p(sProp_pz, Prop[dall], 1, 1, 3, scale, false, true);
-      e2e_p(sProp_pz, Prop[d5678], 1, 1, 2, scale, false, true);
+      e2e_p(sProp_mz, Prop[uall], -1, -1, 2, scale, false);
+      e2e_p(sProp_pz, Prop[dall], 1, 1, 3, scale, false);
+      e2e_p(sProp_pz, Prop[d5678], 1, 1, 2, scale, false);
 
-      e2e_p(sProp_my, Prop[nall], -1, -1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[sall], 1, 1, 3, scale, false, true);
-      e2e_p(sProp_py, Prop[s3478], 1, 1, 2, scale, false, true);
-      e2e_p(sProp_py, Prop[s78], 1, 1, 2, scale, false, true);
+      e2e_p(sProp_my, Prop[nall], -1, -1, 2, scale, false);
+      e2e_p(sProp_py, Prop[sall], 1, 1, 3, scale, false);
+      e2e_p(sProp_py, Prop[s3478], 1, 1, 2, scale, false);
+      e2e_p(sProp_py, Prop[s78], 1, 1, 2, scale, false);
 
-      e2e_p(sProp_mx, Prop[eall], 1, -1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[wall], -1, 1, 3, scale, false, true);
-      e2e_p(sProp_px, Prop[w2468], -1, 1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w68], -1, 1, 2, scale, false, true);
-      e2e_p(sProp_px, Prop[w8], -1, 1, 2, scale, false, true);
+      e2e_p(sProp_mx, Prop[eall], 1, -1, 2, scale, false);
+      e2e_p(sProp_px, Prop[wall], -1, 1, 3, scale, false);
+      e2e_p(sProp_px, Prop[w2468], -1, 1, 2, scale, false);
+      e2e_p(sProp_px, Prop[w68], -1, 1, 2, scale, false);
+      e2e_p(sProp_px, Prop[w8], -1, 1, 2, scale, false);
       break;
     }
 
@@ -1071,8 +1045,6 @@ public:
 
     delete [] S;
     return std::unique_ptr<expansion_t>(retval);
-    */
-    return std::unique_ptr<expansion_t>(nullptr);
   }
 
   void add_expansion(const expansion_t *temp1) {
@@ -1212,58 +1184,32 @@ private:
   }
 
   void e2e_p(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z,
-             double scale, bool conjugate, bool target) const {
+             double scale, bool conjugate) const {
     const dcomplex_t *xs = builtin_helmholtz_table_->xs_p(scale);
     const dcomplex_t *ys = builtin_helmholtz_table_->ys_p(scale);
     const dcomplex_t *zs = builtin_helmholtz_table_->zs_p(scale);
-    const int *m = builtin_helmholtz_table_->m_e(scale);
-    const int *sm = builtin_helmholtz_table_->sm_e(scale);
-    int s = builtin_helmholtz_table_->s_e();
+    const int *m = builtin_helmholtz_table_->m_p(scale);
+    const int *sm = builtin_helmholtz_table_->sm_p(scale);
+    int s = builtin_helmholtz_table_->s_p();
 
-    // There are two cases handled by this function.
-    // (1) Shifting propagating wave from source side to target side
-    // (2) Shifting propagating wave from target side to target side
-    // For case 1, the input is saved for W(k, j), 1 <= j <= m[k] / 2
-    // and the output is saved for 1 <= j <= m[k]
-    // For case 2, both input and output are saved for 1 <= j <= m[k]
-
-    if (target) {
+    if (conjugate) {
       for (int k = 0; k < s; ++k) {
         int curr = sm[k];
         dcomplex_t factor_z = zs[7 * k + 3 + z];
-        int mk2 = m[k] / 2;
-        for (int j = 0; j < m[k] / 2; ++j) {
+        for (int j = 0; j < m[k]; ++j) {
           int offset = (curr + j) * 7 + 3;
-          dcomplex_t factor_xy = xs[offset + x] * ys[offset + y];
-          M[2 * curr + j] += W[2 * curr + j] * factor_z * factor_xy;
-          M[2 * curr + j + mk2] +=
-            W[2 * curr + j + mk2] * factor_z * conj(factor_xy);
+          dcomplex_t factor_xy = xs[offset + x] * ys[offset+y];
+          M[curr + j] += conj(W[curr + j]) * factor_z * factor_xy;
         }
       }
     } else {
-      if (conjugate) {
-        for (int k = 0; k < s; ++k) {
-          int curr = sm[k];
-          dcomplex_t factor_z = zs[7 * k + 3 + z];
-          int mk2 = m[k] / 2;
-          for (int j = 0; j < m[k] / 2; ++j) {
-            int offset = (curr + j) * 7 + 3;
-            dcomplex_t factor_xy = xs[offset + x] * ys[offset+y];
-            M[2 * curr + j] += conj(W[curr + j]) * factor_z * factor_xy;
-            M[2 * curr + j + mk2] += W[curr + j] * factor_z * conj(factor_xy);
-          }
-        }
-      } else {
-        for (int k = 0; k < s; ++k) {
-          int curr = sm[k];
-          dcomplex_t factor_z = zs[7 * k + 3 + z];
-          int mk2 = m[k] / 2;
-          for (int j = 0; j < m[k] / 2; ++j) {
-            int offset = (curr + j) * 7 + 3;
-            dcomplex_t factor_xy = xs[offset + x] * ys[offset + y];
-            M[2 * curr + j] += W[curr + j] * factor_z * factor_xy;
-            M[2 * curr + j + mk2] += conj(W[curr + j] * factor_xy) * factor_z;
-          }
+      for (int k = 0; k < s; ++k) {
+        int curr = sm[k];
+        dcomplex_t factor_z = zs[7 * k + 3 + z];
+        for (int j = 0; j < m[k]; ++j) {
+          int offset = (curr + j) * 7 + 3;
+          dcomplex_t factor_xy = xs[offset + x] * ys[offset + y];
+          M[curr + j] += W[curr + j] * factor_z * factor_xy;
         }
       }
     }
@@ -1278,11 +1224,12 @@ private:
     const int *sm = builtin_helmholtz_table_->sm_e(scale);
     int s = builtin_helmholtz_table_->s_e();
 
+    int offset = 0; 
     for (int k = 0; k < s; ++k) {
       double factor_z = zs[4 * k + z];
       for (int j = 0; j < m[k] / 2; ++j) {
-        int offset = (sm[k] + j) * 7 + 3;
-        dcomplex_t factor_xy = xs[offset + x] * ys[offset + y];
+        int idx = (sm[k] + j) * 7 + 3; 
+        dcomplex_t factor_xy = xs[idx + x] * ys[idx + y];
         M[offset] += W[offset] * factor_z * factor_xy;
         offset++;
       }
@@ -1319,8 +1266,8 @@ private:
     const double *w_p = builtin_helmholtz_table_->w_p();
 
     dcomplex_t *contrib = nullptr;
-    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 1)];
-    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 1)];
+    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 1)]();
+    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 1)]();
 
     // Convert evanescent wave into local expansion
     for (int k = 0; k < s_e; ++k) {
@@ -1331,12 +1278,12 @@ private:
       // Evan(k, j) and Evan(k, j + mk2) are conjugate of each other
 
       // Computes sum_{j=1}^{m_evan(k)} Evan(k, j) e^{-i * m * alpha_j}
-      dcomplex_t *z = new dcomplex_t[f_e[k] + 1]();
+      dcomplex_t *z = new dcomplex_t[f_e[k] * 2 + 1]();
 
       // m = 0
       for (int j = 1; j <= mk2; ++j) {
         int idx = sm_e[k] + j - 1;
-        z[0] += 2 * real(Evan[idx]);
+        z[f_e[k]] += 2 * real(Evan[idx]);
       }
 
       // m = 1, ..., f_evan[k], where m is odd
@@ -1344,7 +1291,10 @@ private:
         for (int j = 1; j <= mk2; ++j) {
           int widx = sm_e[k] + j - 1;
           int aidx = smf_e[k] + (j - 1) * f_e[k] + m - 1;
-          z[m] += conj(ealphaj_e[aidx]) * 2.0 * imag(Evan[widx]);
+          z[f_e[k] + m] += 
+            (Evan[widx] - conj(Evan[widx])) * conj(ealphaj_e[aidx]); 
+          z[f_e[k] - m] += 
+            (Evan[widx] - conj(Evan[widx])) * ealphaj_e[aidx]; 
         }
       }
 
@@ -1353,99 +1303,98 @@ private:
         for (int j = 1; j <= mk2; ++j) {
           int widx = sm_e[k] + j - 1;
           int aidx = smf_e[k] + (j - 1) * f_e[k] + m - 1;
-          z[m] += conj(ealphaj_e[aidx]) * 2.0 * real(Evan[widx]);
+          z[f_e[k] + m] += 
+            (Evan[widx] + conj(Evan[widx])) * conj(ealphaj_e[aidx]); 
+          z[f_e[k] - m] += 
+            (Evan[widx] + conj(Evan[widx])) * ealphaj_e[aidx]; 
         }
       }
 
       legendre_Plm_evan_scaled(p, x_e[k] / wd, scale, legendre_e);
 
-      double factor1 = 2 * w_e[k] / wd / m_e[k];
+      dcomplex_t factor1{0.0, -w_e[k] / wd / m_e[k]}; 
       for (int n = 0; n <= p; ++n) {
-        int mmax = (n <= f_e[k] ? n : f_e[k]);
+        int mmax = (n <= f_e[k] ? n : f_e[k]); 
 
-        // Process L_n^0
-        W1[lidx(n, 0)] += z[0] * legendre_e[midx(n, 0)] *
-          factor1 * dcomplex_t{0.0, -1.0};
+        // L_n^0 
+        W1[lidx(n, 0)] += z[f_e[k]] * legendre_e[midx(n, 0)] * factor1; 
 
-        dcomplex_t factor2{0.0, factor1};
-        for (int m = 1; m <= mmax; m += 2) {
-          dcomplex_t temp1 = legendre_e[midx(n, m)] * factor2;
-          dcomplex_t temp2 = legendre_e[midx(n, m + 1)] * factor2;
-          // L_n^m where m is odd
-          W1[lidx(n, m)] += z[m] * temp1;
-          // L_n^(-m) where m is odd
-          W1[lidx(n, -m)] += conj(z[m]) * temp1;
-          // L_n^m where m is even
-          W1[lidx(n, m + 1)] += z[m + 1] * temp2;
-          // L_n^(-m) where m is even
-          W1[lidx(n, -m - 1)] += conj(z[m + 1]) * temp2;
-          factor2 *= -1;
+        for (int m = 1; m <= mmax; m += 4) {
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] * 
+            dcomplex_t{0.0, 1.0}; 
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
+        }
+
+        for (int m = 2; m <= mmax; m += 4) {
+          dcomplex_t temp = -factor1 * legendre_e[midx(n, m)]; 
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
+        } 
+
+        for (int m = 3; m <= mmax; m += 4) {
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] * 
+            dcomplex_t{0.0, -1.0}; 
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
+        } 
+
+        for (int m = 4; m <= mmax; m += 4) {
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)]; 
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
         }
       }
+      
       delete [] z;
     }
 
-    // Convert propagating wave
     for (int k = 0; k < s_p; ++k) {
-      // Note: Prop(k, j) needs to be scaled by w_p[k] / m_p[k]
-      int curr = 2 * sm_p[k] - 1;
-      int mk2 = m_p[k] / 2;
-
-      // Computes sum_{j = 1}^{m_p[k]} Prop(k, j) e^{-i * m * alpha_j}
-      dcomplex_t *z = new dcomplex_t[f_p[k] + 1]();
-
-      // m = 0
+      // Computes sum_{j=1}^{m_p[k]} Prop(k,j) e^{-i * m * alpha_j} 
+      dcomplex_t *z = new dcomplex_t[f_p[k] * 2 + 1](); 
+      
+      // m = 0; 
       for (int j = 1; j <= m_p[k]; ++j) {
-        z[0] += Prop[curr + j];
+        int idx = sm_p[k] + j - 1; 
+        z[f_p[k]] += Prop[idx]; 
       }
 
-      // If j2 = j1 + m_p[k] / 2, then
-      // e^{-i * m * alpha_j2} = e^{-i * m * alpha_j1} * (-1)^m
 
-      // m = 1, ..., f_p[k], where m is odd
-      for (int m = 1; m <= f_p[k]; m += 2) {
-        for (int j = 1; j <= mk2; ++j) {
-          int aidx = smf_p[k] + (j - 1) * f_p[k] + m - 1;
-          z[m] +=
-            conj(ealphaj_p[aidx]) * (Prop[curr + j] - Prop[curr + j + mk2]);
+      // m = 1, ..., f_p[k]
+      for (int m = 1; m <= f_p[k]; m++) {
+        for (int j = 1; j <= m_p[k]; ++j) {
+          int widx = sm_p[k] + j - 1; 
+          int aidx = smf_p[k] + (j - 1) * f_p[k] + m - 1; 
+          z[f_p[k] + m] += conj(ealphaj_p[aidx]) * Prop[widx]; 
+          z[f_p[k] - m] += ealphaj_p[aidx] * Prop[widx]; 
         }
       }
 
-      // m = 2, ..., f_p[k], where m is even
-      for (int m = 2; m <= f_p[k]; m += 2) {
-        for (int j = 1; j <= mk2; ++j) {
-          int aidx = smf_p[k] + (j - 1) * f_p[k] + m - 1;
-          z[m] +=
-            conj(ealphaj_p[aidx]) * (Prop[curr + j] + Prop[curr + j + mk2]);
-        }
-      }
+      legendre_Plm_prop_scaled(p, cos(x_p[k]), scale, legendre_p); 
 
-      legendre_Plm_prop_scaled(p, cos(x_p[k]), scale, legendre_p);
-
-      double factor1 = w_p[k] / m_p[k];
+      double factor1 = w_p[k] / m_p[k]; 
 
       for (int n = 0; n <= p; ++n) {
-        int mmax = (n <= f_p[k] ? n : f_p[k]);
+        int mmax = (n <= f_p[k] ? n : f_p[k]); 
 
-        // Process L_n^0
-        W1[lidx(n, 0)] += z[0] * legendre_p[midx(n, 0)] * factor1;
-
+        // Process L_n^0 
+        W1[lidx(n, 0)] += z[f_p[k]] * legendre_p[midx(n, 0)] * factor1; 
+        
         for (int m = 1; m <= mmax; ++m) {
-          // L_n^m
-          W1[lidx(n, m)] += z[m] * legendre_p[midx(n, m)] * factor1;
-          // L_n^(-m)
-          W1[lidx(n, -m)] += conj(z[m]) * legendre_p[midx(n, m)] * factor1;
+          // L_n^m 
+          W1[lidx(n, m)] += z[f_p[k] + m] * legendre_p[midx(n, m)] * factor1; 
+          // L_n^{-m}
+          W1[lidx(n, -m)] += z[f_p[k] - m] * legendre_p[midx(n, m)] * factor1; 
         }
       }
-
-      delete [] z;
+      delete [] z; 
     }
 
     // Scale the local expansion by
     // (2 * n + 1) * (n - |m|)! / (n + |m|)! (-1)^n
     int offset = 0;
+    double power_m1 = 1;
     for (int n = 0; n <= p; ++n) {
-      double power_m1 = 1;
       for (int m = -n; m <= n; ++m) {
         W1[offset++] *= sqf[midx(n, fabs(m))] * power_m1;
       }
