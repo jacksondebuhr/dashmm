@@ -243,10 +243,20 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     fprintf(stdout, "method: %s \nthreshold: %d\nkernel: %s\n\n",
             retval.method.c_str(), retval.refinement_limit,
             retval.kernel.c_str());
-  } else {
-    // Only have rank 0 create data
-    retval.source_count = 0;
-    retval.target_count = 0;
+  }
+
+  // Dole out sources and targets equally
+  int sshare = retval.source_count / dashmm::get_num_ranks();
+  int sbonus = retval.source_count % dashmm::get_num_ranks();
+  retval.source_count = sshare;
+  if (dashmm::get_my_rank() < sbonus) {
+    ++retval.source_count;
+  }
+  int tshare = retval.target_count / dashmm::get_num_ranks();
+  int tbonus = retval.target_count % dashmm::get_num_ranks();
+  retval.target_count = tshare;
+  if (dashmm::get_my_rank() < tbonus) {
+    ++retval.target_count;
   }
 
   return 0;
@@ -366,26 +376,27 @@ dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
 // Set the target data
 void set_targets(TargetData *targets, int target_count,
                  std::string target_type) {
+  int offset = target_count * dashmm::get_my_rank();
   if (target_type == std::string{"cube"}) {
     //Cube
     for (int i = 0; i < target_count; ++i) {
       targets[i].position = pick_cube_position();
       targets[i].phi = 0.0;
-      targets[i].index = i;
+      targets[i].index = i + offset;
     }
   } else if (target_type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < target_count; ++i) {
       targets[i].position = pick_sphere_position();
       targets[i].phi = 0.0;
-      targets[i].index = i;
+      targets[i].index = i + offset;
     }
   } else {
     //Plummer
     for (int i = 0; i < target_count; ++i) {
       targets[i].position = pick_plummer_position();
       targets[i].phi = 0.0;
-      targets[i].index = i;
+      targets[i].index = i + offset;
     }
   }
 }
@@ -446,7 +457,7 @@ void compare_results(TargetData *targets, int target_count,
 
 // The main driver routine that performes the test of evaluate()
 void perform_evaluation_test(InputArguments args) {
-  srand(123456);
+  srand(123456 + dashmm::get_my_rank());
 
   dashmm::Array<SourceData> source_handle = prepare_sources(args);
   dashmm::Array<TargetData> target_handle = prepare_targets(args);
@@ -569,11 +580,11 @@ void perform_evaluation_test(InputArguments args) {
                                    args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
     } else if (args.kernel == "helmholtz") {
-      dashmm::Direct<SourceData, TargetData, dashmm::Helmholtz> direct{}; 
-      std::vector<double> kernelparms(1, 0.1); 
-      err = helmholtz_direct.evaluate(source_handle, test_handle, 
-                                      args.refinement_limit, direct, 
-                                      args.accuracy, kernelparms); 
+      dashmm::Direct<SourceData, TargetData, dashmm::Helmholtz> direct{};
+      std::vector<double> kernelparms(1, 0.1);
+      err = helmholtz_direct.evaluate(source_handle, test_handle,
+                                      args.refinement_limit, direct,
+                                      args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
     }
 
