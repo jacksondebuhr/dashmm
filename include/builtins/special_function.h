@@ -41,6 +41,10 @@ inline int didx(const int n, const int mp, const int m) {
   return n * (n + 1) * (4 * n - 1) / 6 + mp * (2 * n + 1) + n + m;
 }
 
+inline int hidx(const int n, const int mp, const int m) {
+  return n * (2 * n - 1) * (2 * n + 1) / 3 + (mp + n) * (2 * n + 1) + n + m;
+}
+
 inline int sidx(int n, int m, int np, int p) {
   return midx(n, m) * (p + 1) + np;
 }

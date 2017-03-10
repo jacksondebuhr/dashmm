@@ -313,21 +313,10 @@ public:
   }
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
-    /*
     // The function is called on the parent box and \p t_size is its child's
     // size.
-    Point center = views_.center();
-    double h = t_size / 2;
-    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = center.z() + (to_child < 4 ? -h : h);
-
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz},
-          scale / 2, kTargetPrimary}};
-    */
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kTargetPrimary, 0.0,
-          Point{0.0, 0.0, 0.0}}};
+    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -518,7 +507,7 @@ public:
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(7))};
     dcomplex_t *EvanM[3] = {
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(2)),
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(4)),
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(5)),
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(8))};
 
     int p = builtin_helmholtz_table_->p();
@@ -1133,50 +1122,56 @@ private:
 
     if (is_local) {
       for (int n = 0; n <= p; ++n) {
-        for (int mp = -n; mp <= -1; mp++) {
-          // Get L_n^0
-          const dcomplex_t *Ln = &M[lidx(n, 0)];
-          // Apply d(n, mp, m) = d(n, -m, -mp)
-          for (int m = -n; m <= -1; ++m)
-            MR[curr] += Ln[m] * d[didx(n, -m, -mp)];
-          // Apply d(n, mp, m) = (-1)^(m - mp) d(n, m, mp)
-          // and the input M needs to be scaled (-1)^m
-          for (int m = 0; m <= n; ++m)
-            MR[curr] += Ln[m] * d[didx(n, m, mp)] * pow(-1, mp);
-          curr++;
+        for (int mp = -n; mp <= -1; ++mp) {
+          MR[curr] = 0; 
+          
+          // Get L_n^0 
+          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
+          // Get d_n^{mp, 0} 
+          const double *coeff = &d[hidx(n, mp, 0)]; 
+
+          MR[curr] = Ln[0] * coeff[0]; 
+          double power_m = -1; 
+          for (int m = 1; m <= n; ++m) {
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
+            power_m = -power_m; 
+          }
+          curr++; 
         }
 
-        int power_mp = 1;
+        double power_mp = 1; 
         for (int mp = 0; mp <= n; ++mp) {
-          // Get d_n^{mp, 0}
-          const double *coeff = &d[didx(n, mp, 0)];
-          // Get L_n^0
-          const dcomplex_t *Ln = &M[lidx(n, 0)];
-          MR[curr] = Ln[0] * coeff[0];
-          double power_m = -1;
+          MR[curr] = 0; 
+          
+          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
+          const double *coeff = &d[hidx(n, mp, 0)]; 
+
+          MR[curr] += Ln[0] * coeff[0]; 
+          double power_m = -1; 
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]);
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
             power_m = -power_m;
           }
-          MR[curr++] *= power_mp;
-          power_mp = -power_mp;
+
+          MR[curr++] *= power_mp; 
+          power_mp = -power_mp; 
         }
       }
     } else {
       for (int n = 0; n <= p; ++n) {
-        int power_mp = 1;
+        double power_mp = 1; 
         for (int mp = 0; mp <= n; ++mp) {
-          // Get d_n^{mp, 0}
-          const double *coeff = &d[didx(n, mp, 0)];
-          // Get M_n^0
-          const dcomplex_t *Mn = &M[midx(n, 0)];
+          const double *coeff = &d[hidx(n, mp, 0)]; 
+          const dcomplex_t *Mn = &M[midx(n, 0)]; 
+
           MR[curr] = Mn[0] * coeff[0];
-          double power_m = -1;
+          double power_m = -1; 
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]);
+            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]); 
             power_m = -power_m;
           }
-          MR[curr++] *= power_mp;
+
+          MR[curr++] *= power_mp; 
           power_mp = -power_mp;
         }
       }
