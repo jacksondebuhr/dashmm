@@ -518,7 +518,7 @@ public:
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(7))};
     dcomplex_t *EvanM[3] = {
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(2)),
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(4)),
+      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(5)),
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(8))};
 
     int p = builtin_helmholtz_table_->p();
