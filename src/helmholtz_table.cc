@@ -546,7 +546,8 @@ void HelmholtzTable::generate_scaled_wigner_dmat() {
   dmat_plus_ = new builtin_map_t;
   dmat_minus_ = new builtin_map_t;
   double cbeta[3] = {sqrt(3) / 3, -sqrt(3) / 3, 0};
-  int nd = (p_ + 1) * (4 * p_ * p_ + 11 * p_ + 6) / 6;
+  //int nd = (p_ + 1) * (4 * p_ * p_ + 11 * p_ + 6) / 6;
+  int nd = (p_ + 1) * (2 * p_ + 1) * (2 * p_ + 3) / 3; 
   for (int i = 0; i < 3; ++i) {
     double beta = acos(cbeta[i]);
     double *dp_data = new double[nd];
@@ -569,20 +570,21 @@ void HelmholtzTable::generate_scaled_dmat_of_beta(double beta, double *dp,
   dm[0] = 1;
 
   // Set d_1^{0, m}
-  dp[1] = -sbeta / sqrt(2); // d_1^{0, -1}
-  dp[2] = cbeta; // d_1^{0, 0}
-  dp[3] = sbeta / sqrt(2); // d_1^{0, 1}
-  dm[1] = -dp[1];
-  dm[2] = dp[2];
-  dm[3] = -dp[3];
+  dp[hidx(1, 0, -1)] = -sbeta / sqrt(2); // d_1^{0, -1}
+  dp[hidx(1, 0, 0)] = cbeta; // d_1^{0, 0}
+  dp[hidx(1, 0, 1)] = sbeta / sqrt(2); // d_1^{0, 1}
+  dm[hidx(1, 0, -1)] = -dp[hidx(1, 0, -1)];
+  dm[hidx(1, 0, 0)] = dp[hidx(1, 0, 0)];
+  dm[hidx(1, 0, 1)] = -dp[hidx(1, 0, 1)];
 
   // Set d_1^{1, m}
-  dp[4] = s2beta2; // d_1^{1, -1}
-  dp[5] = -sbeta / sqrt(2); // d_1^{1, 0}
-  dp[6] = c2beta2; // d_1^{1, 1}
-  dm[4] = dp[4];
-  dm[5] = -dp[5];
-  dm[6] = dp[6];
+  dp[hidx(1, 1, -1)] = s2beta2; // d_1^{1, -1}
+  dp[hidx(1, 1, 0)] = -sbeta / sqrt(2); // d_1^{1, 0}
+  dp[hidx(1, 1, 1)] = c2beta2; // d_1^{1, 1}
+  dm[hidx(1, 1, -1)] = dp[hidx(1, 1, -1)];
+  dm[hidx(1, 1, 0)] = -dp[hidx(1, 1, 0)];
+  dm[hidx(1, 1, 1)] = dp[hidx(1, 1, 1)];
+
 
   // Compute d_n^{0, m} for 2 <= n <= P
   for (int n = 2; n <= p_; ++n) {
@@ -591,9 +593,10 @@ void HelmholtzTable::generate_scaled_dmat_of_beta(double beta, double *dp,
     // Get address of d_n^{0, 0} for angle beta, saved in dpc
     // Get address of d_{n - 1}^{0, 0} for angle beta, saved in dpp
     // Get address of d_n^{0, 0} for angle -beta, saved in dmc
-    dpc = &dp[didx(n, 0, 0)];
-    dpp = &dp[didx(n - 1, 0, 0)];
-    dmc = &dm[didx(n, 0, 0)];
+    dpc = &dp[hidx(n, 0, 0)];
+    dpp = &dp[hidx(n - 1, 0, 0)];
+    dmc = &dm[hidx(n, 0, 0)];
+
 
     // Compute d_n^{0, -n}
     m = -n;
@@ -630,9 +633,10 @@ void HelmholtzTable::generate_scaled_dmat_of_beta(double beta, double *dp,
       // Get address of d_n^{mp, 0} for angle beta, saved in dpc
       // Get address of d_{n - 1}^{mp - 1, 0} for angle beta, saved in dpp
       // Get address of d_n^{mp, 0} for angle -beta, saved in dmc
-      dpc = &dp[didx(n, mp, 0)];
-      dpp = &dp[didx(n - 1, mp - 1, 0)];
-      dmc = &dm[didx(n, mp, 0)];
+
+      dpc = &dp[hidx(n, mp, 0)];
+      dpp = &dp[hidx(n - 1, mp - 1, 0)];
+      dmc = &dm[hidx(n, mp, 0)];
 
       double factor = 1.0 / sqrt((n + mp) * (n + mp - 1));
 
@@ -668,6 +672,21 @@ void HelmholtzTable::generate_scaled_dmat_of_beta(double beta, double *dp,
     }
   }
 
+  // Fill d_n^{mp, m} for negative mp values 
+  for (int n = 1; n <= p_; ++n) {
+    for (int mp = -n; mp <= -1; ++mp) {
+      for (int m = -n; m <= -1; ++m) {
+        dp[hidx(n, mp, m)] = dp[hidx(n, -m, -mp)]; 
+        dm[hidx(n, mp, m)] = dm[hidx(n, -m, -mp)]; 
+      } 
+
+      for (int m = 0; m <= n; ++m) {
+        dp[hidx(n, mp, m)] = pow(-1, m - mp) * dp[hidx(n, m, mp)]; 
+        dm[hidx(n, mp, m)] = pow(-1, m - mp) * dm[hidx(n, m, mp)]; 
+      }
+    }
+  }
+
   // Scale
   double factorial[2 * p_ + 1];
   factorial[0] = 1.0;
@@ -675,14 +694,14 @@ void HelmholtzTable::generate_scaled_dmat_of_beta(double beta, double *dp,
     factorial[i] = factorial[i - 1] * i;
   }
 
-  int offset = 0;
+  int offset = 0; 
   for (int n = 0; n <= p_; ++n) {
-    for (int mp = 0; mp <= n; ++mp) {
+    for (int mp = -n; mp <= n; ++mp) {
       for (int m = -n; m <= n; ++m) {
-        double scale = sqrt(factorial[n - mp] * factorial[n + abs(m)] /
-                            factorial[n + mp] / factorial[n - abs(m)]);
-        dp[offset] *= scale;
-        dm[offset] *= scale;
+        double scale = sqrt(factorial[n - abs(mp)] * factorial[n + abs(m)] / 
+                            factorial[n + abs(mp)] / factorial[n - abs(m)]); 
+        dp[offset] *= scale; 
+        dm[offset] *= scale; 
         offset++;
       }
     }
