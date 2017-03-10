@@ -222,7 +222,7 @@ class Evaluator {
   /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     // BEGIN TREE CREATION
-    //hpx_time_t creation_begin = hpx_time_now();
+    hpx_time_t creation_begin = hpx_time_now();
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
                            parms->targets);
@@ -230,9 +230,9 @@ class Evaluator {
         dualtree_t::partition(global_tree, parms->sources, parms->targets);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
-    //hpx_time_t creation_end = hpx_time_now();
-    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    //fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
+    hpx_time_t creation_end = hpx_time_now();
+    double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
+    fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
     // END TREE CREATION
 
     //auto local_tree = global_tree.here();

@@ -25,7 +25,7 @@ SourceApplyMethod(Evaluator *meta, SourceNode *node, LCO done) {
   int n_children = interface::tree::n_children(node)
   if (n_children == 0) {
     // Leaves generate
-    DAGNode *P, N, I;
+    DAGNode *P, *N, *I;
     (P, N, I) = Evaluator::method_t::generate(node, meta->domain());
     int local = interface::tree::locality(node);
     P->locality = local;
@@ -54,7 +54,7 @@ SourceApplyMethod(Evaluator *meta, SourceNode *node, LCO done) {
 }
 
 SourceApplyMethodChildDone(DualTree *meta, SourceNode *node, LCO done) {
-  DAGNode *N, I;
+  DAGNode *N, *I;
   (N, I) = Evaluator::method_t::aggregate(node, meta->domain());
   Evaluator::method_t::distropolicy_t::assign_for_source(
         nullptr, N, I, interface::tree::locality(node));
