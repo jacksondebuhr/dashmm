@@ -40,7 +40,7 @@ private:
   FileHeader head_;
   FileSourceData *sources_;
   FileTargetData *targets_;
-}
+};
 
 
 

@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 
     fileone.Write(argv[4]);
 
-  } catch (const std::ios_base_failure &e) {
+  } catch (const std::ios_base::failure &e) {
     fprintf(stderr, "Bad news:\n%s\n", e.what());
   } catch (const std::runtime_error &e) {
     fprintf(stderr, "Watch out!\n%s\n", e.what());

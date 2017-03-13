@@ -1,6 +1,10 @@
 #ifndef __DASHMM_TEST_COMMON_COMMON_H__
 #define __DASHMM_TEST_COMMON_COMMON_H__
 
+
+#include "dashmm/dashmm.h"
+
+
 struct FileHeader {
   int n_sources;
   int n_targets;

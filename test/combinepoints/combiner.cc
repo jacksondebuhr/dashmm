@@ -25,10 +25,10 @@ Combiner::Combiner(std::string fname)
     throw std::ios_base::failure(message);
   }
 
-  if (head_->n_sources) {
-    sources_ = new FileSourceData[head_->n_sources];
-    if (head_->n_sources
-        != fread(sources_, sizeof(FileSourceData), head_->n_sources, ofd)) {
+  if (head_.n_sources) {
+    sources_ = new FileSourceData[head_.n_sources];
+    if ((unsigned int)head_.n_sources
+        != fread(sources_, sizeof(FileSourceData), head_.n_sources, ofd)) {
       delete [] sources_;
       sources_ = nullptr;
       fclose(ofd);
@@ -38,10 +38,10 @@ Combiner::Combiner(std::string fname)
     }
   }
 
-  if (head_->n_targets) {
-    targets_ = new FileTargetData[head_->n_targets];
-    if (head->n_targets
-        != fread(targets_, sizeof(FileTargetData), head_->n_targets, ofd)) {
+  if (head_.n_targets) {
+    targets_ = new FileTargetData[head_.n_targets];
+    if ((unsigned int)head_.n_targets
+        != fread(targets_, sizeof(FileTargetData), head_.n_targets, ofd)) {
       delete [] sources_;
       sources_ = nullptr;
       delete [] targets_;
@@ -140,23 +140,23 @@ void Combiner::Write(std::string fname) {
     throw std::ios_base::failure(message);
   }
 
-  if (1 != fwrite(head_, sizeof(head_), 1, ofd)) {
+  if (1 != fwrite(&head_, sizeof(head_), 1, ofd)) {
     fclose(ofd);
     std::string message{"Error writing header to file: "};
     message.append(fname_);
     throw std::ios_base::failure(message);
   }
 
-  if (head_->n_sources
-        != fwrite(sources_, sizeof(FileSourceData), head_->n_sources, ofd)) {
+  if ((unsigned int)head_.n_sources
+        != fwrite(sources_, sizeof(FileSourceData), head_.n_sources, ofd)) {
     fclose(ofd);
     std::string message{"Error writing sources to file: "};
     message.append(fname_);
     throw std::ios_base::failure(message);
   }
 
-  if (head_->n_targets
-        != fwrite(targets_, sizeof(FileTargetData), head_->n_targets, ofd)) {
+  if ((unsigned int)head_.n_targets
+        != fwrite(targets_, sizeof(FileTargetData), head_.n_targets, ofd)) {
     fclose(ofd);
     std::string message{"Error writing targets to file: "};
     message.append(fname_);
