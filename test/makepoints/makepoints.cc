@@ -26,6 +26,8 @@
 #include <string>
 #include "dashmm/dashmm.h"
 
+#include "../common/common.h"
+
 
 constexpr int kNSources = 10000;
 constexpr int kNTargets = 10000;
@@ -33,37 +35,11 @@ constexpr int kRefinementLimit = 40;
 constexpr double kYukawaParam = 0.1;
 constexpr double kHelmholtzParam = 0.1;
 
-struct SourceData {
-  dashmm::Point position;
-  double charge;
-  int index;
-};
+using SourceData = FileSourceData;
 
 struct TargetData {
   dashmm::Point position;
   std::complex<double> phi;
-  int index;
-};
-
-// TODO eventually this should be exported to another header file so that
-// anyone needing to read the file can get at this information.
-struct FileHeader {
-  int n_sources;
-  int n_targets;
-  int refinement_limit;
-  double yukawa_param;
-  double helmholtz_param;
-  bool has_laplace;
-  bool has_yukawa;
-  bool has_helmholtz;
-};
-
-struct FileTargetData {
-  dashmm::Point position;
-  std::complex<double> phi;
-  std::complex<double> phi_laplace;
-  std::complex<double> phi_yukawa;
-  std::complex<double> phi_helmholtz;
   int index;
 };
 
@@ -289,11 +265,11 @@ void save_to_file(dashmm::Array<SourceData> source_handle,
     kNSources,
     kNTargets,
     kRefinementLimit,
+    false,
+    false,
+    false,
     kYukawaParam,
-    kHelmholtzParam,
-    false,
-    false,
-    false
+    kHelmholtzParam
   };
   std::function<void(const TargetData *, FileTargetData *)> saver{};
   if (kernel == std::string{"laplace"}) {
