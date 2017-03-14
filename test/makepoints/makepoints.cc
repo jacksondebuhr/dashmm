@@ -24,7 +24,11 @@
 #include <map>
 #include <memory>
 #include <string>
-#include "dashmm/dashmm.h"
+
+#include "builtins/laplace.h"
+#include "builtins/yukawa.h"
+#include "builtins/helmholtz.h"
+#include "dashmm/types.h"
 
 #include "../common/common.h"
 
@@ -42,19 +46,6 @@ struct TargetData {
   std::complex<double> phi;
   int index;
 };
-
-// Here we create the evaluator objects that we shall need in this demo.
-// These must be instantiated before the call to dashmm::init so that they
-// might register the relevant actions with the runtime system.
-//
-// It is more typical to have only one or possibly two evaluators. The
-// proliferation here is because this demo program allows for many use-cases.
-dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::Laplace, dashmm::Direct> laplace_direct{};
-dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
-dashmm::Evaluator<SourceData, TargetData,
-                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{};
 
 // This type collects the input arguments to the program.
 struct InputArguments {
@@ -172,23 +163,11 @@ void set_sources(SourceData *sources, int source_count,
   }
 }
 
-// Prepare the source data. This means both allocate the dashmm::Array,
-// as well as creating the source data, and putting the source data into the
-// global address space.
-dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
-  SourceData *sources{nullptr};
-  sources = new SourceData[kNSources];
+// Prepare the source data.
+SourceData *prepare_sources(InputArguments &args) {
+  SourceData *sources = new SourceData[kNSources];
   set_sources(sources, kNSources, args.type);
-
-  dashmm::Array<SourceData> retval{};
-  int err = retval.allocate(kNSources);
-  assert(err == dashmm::kSuccess);
-  err = retval.put(0, kNSources, sources);
-  assert(err == dashmm::kSuccess);
-
-  delete [] sources;
-
-  return retval;
+  return sources;
 }
 
 // Set the target data
@@ -211,45 +190,25 @@ void set_targets(TargetData *targets, int target_count,
   }
 }
 
-// Prepare the target data. This means both allocate the dashmm::Array,
-// as well as creating the target data, and putting the target data into the
-// global address space.
-dashmm::Array<TargetData> prepare_targets(InputArguments &args) {
-  TargetData *targets{nullptr};
-  targets = new TargetData[kNTargets];
+// Prepare the target data.
+TargetData *prepare_targets(InputArguments &args) {
+  TargetData *targets = new TargetData[kNTargets];
   set_targets(targets, kNTargets, args.type);
-
-  dashmm::Array<TargetData> retval{};
-  int err = retval.allocate(kNTargets);
-  assert(err == dashmm::kSuccess);
-  err = retval.put(0, kNTargets, targets);
-  assert(err == dashmm::kSuccess);
-
-  if (kNTargets) {
-    delete [] targets;
-  }
-
-  return retval;
+  return targets;
 }
 
 
 // Save the results to file
-void save_to_file(dashmm::Array<SourceData> source_handle,
-                  dashmm::Array<TargetData> target_handle,
+void save_to_file(SourceData *sources,
+                  TargetData *targets,
                   const std::string &kernel,
                   const std::string &shape) {
-  // Collect the data
-  auto sources = source_handle.collect();
-  auto targets = target_handle.collect();
-
   // Sort by the index
-  SourceData *slocal = sources.get();
-  std::sort(slocal, &slocal[kNSources],
+  std::sort(sources, &sources[kNSources],
             [](const SourceData &a, const SourceData &b) -> bool {
               return a.index < b.index;
             });
-  TargetData *tlocal = targets.get();
-  std::sort(tlocal, &tlocal[kNTargets],
+  std::sort(targets, &targets[kNTargets],
             [](const TargetData &a, const TargetData &b) -> bool {
               return a.index < b.index;
             });
@@ -297,7 +256,7 @@ void save_to_file(dashmm::Array<SourceData> source_handle,
   assert(1 == fwrite(&head, sizeof(head), 1, ofd));
 
   // write the sources
-  assert(kNSources == fwrite(slocal, sizeof(SourceData), kNSources, ofd));
+  assert(kNSources == fwrite(sources, sizeof(SourceData), kNSources, ofd));
 
   // write the targets
   for (int i = 0; i < kNSources; ++i) {
@@ -310,65 +269,63 @@ void save_to_file(dashmm::Array<SourceData> source_handle,
   fclose(ofd);
 }
 
+// Set up kernel tables
+void prepare_expansions(bool is_cube_data) {
+  double domain_size = is_cube_data ? 1.0 : 2.0;
+  dashmm::Laplace<SourceData, TargetData>::update_table(
+      3, domain_size, std::vector<double>{});
 
-// The main driver routine that performes the test of evaluate()
-void perform_evaluation_test(InputArguments args) {
+  std::vector<double> yukawaparms(1, kYukawaParam);
+  dashmm::Yukawa<SourceData, TargetData>::update_table(
+      3, domain_size, yukawaparms);
+
+  std::vector<double> helmparms(1, kHelmholtzParam);
+  dashmm::Helmholtz<SourceData, TargetData>::update_table(
+      3, domain_size, helmparms);
+}
+
+
+void compute_potential(InputArguments args) {
   srand(123456);
 
-  dashmm::Array<SourceData> source_handle = prepare_sources(args);
-  dashmm::Array<TargetData> target_handle = prepare_targets(args);
+  SourceData *sources = prepare_sources(args);
+  TargetData *targets = prepare_targets(args);
 
   //Perform the evaluation
-  int err{0};
   if (args.kernel == std::string{"laplace"}) {
-    dashmm::Direct<SourceData, TargetData, dashmm::Laplace> direct{};
-    err = laplace_direct.evaluate(source_handle, target_handle,
-                                  kRefinementLimit, direct, 3,
-                                  std::vector<double>{});
-    assert(err == dashmm::kSuccess);
+    dashmm::Laplace<SourceData, TargetData>
+                expansion{dashmm::ExpansionRole::kNoRoleNeeded};
+    expansion.S_to_T(sources, &sources[kNSources],
+                     targets, &targets[kNTargets]);
   } else if (args.kernel == std::string{"yukawa"}) {
-    dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{};
-    std::vector<double> kernelparms(1, kYukawaParam);
-    err = yukawa_direct.evaluate(source_handle, target_handle,
-                                 kRefinementLimit, direct, 3, kernelparms);
-    assert(err == dashmm::kSuccess);
+    dashmm::Yukawa<SourceData, TargetData>
+                expansion{dashmm::ExpansionRole::kNoRoleNeeded};
+    expansion.S_to_T(sources, &sources[kNSources],
+                     targets, &targets[kNTargets]);
   } else if (args.kernel == std::string{"helmholtz"}) {
-    dashmm::Direct<SourceData, TargetData, dashmm::Helmholtz> direct{};
-    std::vector<double> kernelparms(1, kHelmholtzParam);
-    err = helmholtz_direct.evaluate(source_handle, target_handle,
-                                    kRefinementLimit, direct, 3, kernelparms);
-    assert(err == dashmm::kSuccess);
+    dashmm::Helmholtz<SourceData, TargetData>
+                expansion{dashmm::ExpansionRole::kNoRoleNeeded};
+    expansion.S_to_T(sources, &sources[kNSources],
+                     targets, &targets[kNTargets]);
   }
 
   // Now save the data to file
-  save_to_file(source_handle, target_handle, args.kernel, args.type);
+  save_to_file(sources, targets, args.kernel, args.type);
 
   //free up resources
-  err = source_handle.destroy();
-  assert(err == dashmm::kSuccess);
-  err = target_handle.destroy();
-  assert(err == dashmm::kSuccess);
+  delete [] sources;
+  delete [] targets;
 }
 
 // Program entrypoint
 int main(int argc, char **argv) {
-  auto err = dashmm::init(&argc, &argv);
-  assert(err == dashmm::kSuccess);
-
-  if (dashmm::get_num_ranks() > 1) {
-    fprintf(stderr, "ERROR: Only designed for one rank.");
-    return -1;
-  }
-
   InputArguments inputargs;
   int usage_error = read_arguments(argc, argv, inputargs);
 
   if (!usage_error) {
-    perform_evaluation_test(inputargs);
+    prepare_expansions(inputargs.type == "cube");
+    compute_potential(inputargs);
   }
-
-  err = dashmm::finalize();
-  assert(err == dashmm::kSuccess);
 
   return 0;
 }

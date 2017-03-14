@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
   }
 
   fprintf(stdout,
-          "Files: '%s', '%s' and '%s' successfully combined into '%s'\n",
-          argv[1], argv[2], argv[3], argv[4]);
+      "Files:\n\t'%s'\n\t'%s'\n\t'%s'\nsuccessfully combined into\n\t'%s'\n",
+      argv[1], argv[2], argv[3], argv[4]);
 
   return 0;
 }
