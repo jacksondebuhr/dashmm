@@ -96,7 +96,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   };
 
   int long_index = 0;
-  while ((opt = getopt_long(argc, argv, "m:s:w:t:g:l:v:a:k:h",
+  while ((opt = getopt_long(argc, argv, "m:w:l:a:k:h",
                             long_options, &long_index)) != -1) {
     std::string verifyarg{};
     switch (opt) {
@@ -302,6 +302,17 @@ void perform_evaluation_test(InputArguments args) {
   Source *sources{nullptr};
   Target *targets{nullptr};
   FileHeader header = read_input_data(args.datafile, &sources, &targets);
+
+  if ((args.kernel == "laplace" && !header.has_laplace)
+      || (args.kernel == "yukawa" && !header.has_yukawa)
+      || (args.kernel == "helmholtz" && !header.has_helmholtz)) {
+    delete [] sources;
+    delete [] targets;
+    fprintf(stderr,
+            "Input file does not have data for the requested kernel.\n");
+    return;
+  }
+
   dashmm::Array<Source> source_handle = prepare_sources(header.n_sources,
                                                         sources);
   dashmm::Array<Target> target_handle = prepare_targets(header.n_targets,

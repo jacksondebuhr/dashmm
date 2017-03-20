@@ -33,8 +33,8 @@
 #include "../common/common.h"
 
 
-constexpr int kNSources = 1000000;
-constexpr int kNTargets = 1000000;
+constexpr int kNSources = 10000;
+constexpr int kNTargets = 10000;
 constexpr int kRefinementLimit = 40;
 constexpr double kYukawaParam = 0.1;
 constexpr double kHelmholtzParam = 0.1;
@@ -51,14 +51,17 @@ struct TargetData {
 struct InputArguments {
   std::string type;
   std::string kernel;
+  bool single;
 };
 
 // Print usage information.
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
           "Options available: [possible/values] (default value)\n"
-          "--kernel=[laplace/yukawa/helmholtz]  method to use (fmm)\n"
+          "--kernel=[laplace/yukawa/helmholtz]  kernel to use (laplace)\n"
           "--data=[cube/sphere]                 distribution type (cube)\n"
+          "--singlesign=[yes/no]\n"
+          "                     use only a single sign of charge (no)\n"
           , progname);
 }
 
@@ -68,17 +71,19 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   //Set defaults
   retval.type = std::string{"cube"};
   retval.kernel = std::string{"laplace"};
+  retval.single = false;
 
   int opt = 0;
   static struct option long_options[] = {
     {"data", required_argument, 0, 'w'},
     {"kernel", required_argument, 0, 'k'},
+    {"singlesign", required_argument, 0, 's'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
 
   int long_index = 0;
-  while ((opt = getopt_long(argc, argv, "w:k:h",
+  while ((opt = getopt_long(argc, argv, "w:k:s:h",
                             long_options, &long_index)) != -1) {
     std::string verifyarg{};
     switch (opt) {
@@ -87,6 +92,16 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
       break;
     case 'k':
       retval.kernel = optarg;
+      break;
+    case 's':
+      {
+        std::string value = optarg;
+        if (value == "yes") {
+          retval.single = true;
+        } else {
+          retval.single = false;
+        }
+      }
       break;
     case 'h':
       print_usage(argv[0]);
@@ -136,9 +151,9 @@ dashmm::Point pick_sphere_position() {
 }
 
 // Pick a random charge vale
-double pick_charge() {
+double pick_charge(bool single) {
   double retval = (double)rand() / RAND_MAX + 1.0;
-  if (rand() % 2) {
+  if (!single && rand() % 2) {
     retval *= -1.0;
   }
   return retval;
@@ -146,18 +161,18 @@ double pick_charge() {
 
 // Set the source data
 void set_sources(SourceData *sources, int source_count,
-                 std::string type) {
+                 std::string type, bool single) {
   if (type == std::string{"cube"}) {
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_cube_position();
-      sources[i].charge = pick_charge();
+      sources[i].charge = pick_charge(single);
       sources[i].index = i;
     }
   } else if (type == std::string{"sphere"}) {
     //Sphere
     for (int i = 0; i < source_count; ++i) {
       sources[i].position = pick_sphere_position();
-      sources[i].charge = pick_charge();
+      sources[i].charge = pick_charge(single);
       sources[i].index = i;
     }
   }
@@ -166,7 +181,7 @@ void set_sources(SourceData *sources, int source_count,
 // Prepare the source data.
 SourceData *prepare_sources(InputArguments &args) {
   SourceData *sources = new SourceData[kNSources];
-  set_sources(sources, kNSources, args.type);
+  set_sources(sources, kNSources, args.type, args.single);
   return sources;
 }
 
@@ -202,7 +217,8 @@ TargetData *prepare_targets(InputArguments &args) {
 void save_to_file(SourceData *sources,
                   TargetData *targets,
                   const std::string &kernel,
-                  const std::string &shape) {
+                  const std::string &shape,
+                  bool single) {
   // Sort by the index
   std::sort(sources, &sources[kNSources],
             [](const SourceData &a, const SourceData &b) -> bool {
@@ -215,7 +231,11 @@ void save_to_file(SourceData *sources,
 
   // Open the file
   char fname[300];
-  sprintf(fname, "prepared.%s.%s.dat", kernel.c_str(), shape.c_str());
+  if (single) {
+    sprintf(fname, "prepared.%s.%s.single.dat", kernel.c_str(), shape.c_str());
+  } else {
+    sprintf(fname, "prepared.%s.%s.dat", kernel.c_str(), shape.c_str());
+  }
   FILE *ofd = fopen(fname, "wb");
   assert(ofd != nullptr);
 
@@ -310,7 +330,7 @@ void compute_potential(InputArguments args) {
   }
 
   // Now save the data to file
-  save_to_file(sources, targets, args.kernel, args.type);
+  save_to_file(sources, targets, args.kernel, args.type, args.single);
 
   //free up resources
   delete [] sources;
