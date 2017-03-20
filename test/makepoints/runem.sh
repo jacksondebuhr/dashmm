@@ -13,6 +13,3 @@ make clean
 make
 ./combine ../makepoints/prepared.laplace.cube.dat ../makepoints/prepared.yukawa.cube.dat ../makepoints/prepared.helmholtz.cube.dat prepared.all.cube.dat
 ./combine ../makepoints/prepared.laplace.sphere.dat ../makepoints/prepared.yukawa.sphere.dat ../makepoints/prepared.helmholtz.sphere.dat prepared.all.sphere.dat
-
-cd ../makepoints
-rm *.dat

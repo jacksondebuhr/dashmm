@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
       Combiner filethree{argv[3]};
 
       fileone.Combine(filetwo);
-      filetwo.Combine(filethree);
+      fileone.Combine(filethree);
     }
 
     fileone.Write(argv[4]);
