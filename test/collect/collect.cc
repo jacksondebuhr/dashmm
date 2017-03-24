@@ -57,21 +57,23 @@ struct InputArguments {
   std::string method;
   std::string kernel;
   int accuracy;
+  std::string outfile;
 };
 
 // Print usage information.
 void print_usage(char *progname) {
   fprintf(stdout, "Usage: %s [OPTIONS]\n\n"
-          "Options available: [possible/values] (default value)\n"
-          "--method=[fmm/fmm97/bh]     method to use (fmm)\n"
-          "--data=[filename]\n         source/target datafile\n"
-          "--threshold=num             "
-          "source and target tree partition refinement limit (40)\n"
-          "--accuracy=num              "
-          "number of digits of accuracy for fmm (3)\n"
-          "--kernel=[laplace/yukawa/helmholtz]   "
-          "particle interaction type (laplace)\n"
-          , progname);
+    "Options available: [possible/values] (default value)\n"
+    "--method=[fmm/fmm97/bh]     method to use (fmm)\n"
+    "--data=[filename]\n         source/target datafile\n"
+    "--threshold=num             "
+    "source and target tree partition refinement limit (40)\n"
+    "--accuracy=num              "
+    "number of digits of accuracy for fmm (3)\n"
+    "--kernel=[laplace/yukawa/helmholtz]   "
+    "particle interaction type (laplace)\n"
+    "--outfile=[filename]        output point data into given file as text\n"
+    , progname);
 }
 
 // Parse the command line arguments, overiding any defaults at the request of
@@ -83,6 +85,7 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
   retval.method = std::string{"fmm97"};
   retval.kernel = std::string{"laplace"};
   retval.accuracy = 3;
+  retval.outfile = "";
 
   int opt = 0;
   static struct option long_options[] = {
@@ -91,12 +94,13 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
     {"threshold", required_argument, 0, 'l'},
     {"accuracy", required_argument, 0, 'a'},
     {"kernel", required_argument, 0, 'k'},
+    {"outfile", required_argument, 0, 'o'},
     {"help", no_argument, 0, 'h'},
     {0, 0, 0, 0}
   };
 
   int long_index = 0;
-  while ((opt = getopt_long(argc, argv, "m:w:l:a:k:h",
+  while ((opt = getopt_long(argc, argv, "m:w:l:a:k:o:h",
                             long_options, &long_index)) != -1) {
     std::string verifyarg{};
     switch (opt) {
@@ -114,6 +118,9 @@ int read_arguments(int argc, char **argv, InputArguments &retval) {
       break;
     case 'k':
       retval.kernel = optarg;
+      break;
+    case 'o':
+      retval.outfile = optarg;
       break;
     case 'h':
       print_usage(argv[0]);
@@ -239,12 +246,13 @@ dashmm::Array<Target> prepare_targets(int n_targets, Target *targets) {
 
 
 void compare_results(Target *targets, int target_count,
-                     const std::string &kernel) {
+                     const std::string &kernel, const std::string &outfile) {
   if (dashmm::get_my_rank()) return;
 
   std::function<double(const Target &)> normit{nullptr};
   std::function<double(const Target &)> denom{nullptr};
   std::function<double(const Target &)> maxrelerr{nullptr};
+  std::function<std::complex<double>(const Target &)> whichvalue{nullptr};
   if (kernel == "laplace") {
     normit = [](const Target &a) -> double {
       return std::norm(a.phi - a.phi_laplace);
@@ -254,6 +262,9 @@ void compare_results(Target *targets, int target_count,
     };
     maxrelerr = [](const Target &a) -> double {
       return fabs((a.phi.real() - a.phi_laplace.real()) / a.phi_laplace.real());
+    };
+    whichvalue = [](const Target &a) -> std::complex<double> {
+      return a.phi_laplace;
     };
   } else if (kernel == "yukawa") {
     normit = [](const Target &a) -> double {
@@ -265,6 +276,9 @@ void compare_results(Target *targets, int target_count,
     maxrelerr = [](const Target &a) -> double {
       return fabs((a.phi.real() - a.phi_yukawa.real()) / a.phi_yukawa.real());
     };
+    whichvalue = [](const Target &a) -> std::complex<double> {
+      return a.phi_yukawa;
+    };
   } else { //must be helmholtz
     normit = [](const Target &a) -> double {
       return std::norm(a.phi - a.phi_helmholtz);
@@ -273,8 +287,11 @@ void compare_results(Target *targets, int target_count,
       return std::norm(a.phi_helmholtz);
     };
     maxrelerr = [](const Target &a) -> double {
-      return fabs((a.phi.real() - a.phi_helmholtz.real())
-                        / a.phi_helmholtz.real());
+      return sqrt(std::norm(a.phi - a.phi_helmholtz)
+                        / std::norm(a.phi_helmholtz));
+    };
+    whichvalue = [](const Target &a) -> std::complex<double> {
+      return a.phi_helmholtz;
     };
   }
 
@@ -292,6 +309,20 @@ void compare_results(Target *targets, int target_count,
   }
   fprintf(stdout, "Error for %d test points: %4.3e (max %4.3e)\n",
                   target_count, sqrt(numerator / denominator), maxrel);
+
+  if (outfile != "") {
+    FILE *ofd = fopen(outfile.c_str(), "w");
+    assert(ofd);
+    for (int i = 0; i < target_count; ++i) {
+      auto exact = whichvalue(targets[i]);
+      fprintf(ofd, "%d %g %g %g %g %g %g %g\n", targets[i].index,
+              targets[i].phi.real(), targets[i].phi.imag(),
+              exact.real(), exact.imag(),
+              targets[i].position.x(), targets[i].position.y(),
+              targets[i].position.z());
+    }
+    fclose(ofd);
+  }
 }
 
 // The main driver routine that performes the test of evaluate()
@@ -386,7 +417,7 @@ void perform_evaluation_test(InputArguments args) {
   auto results = target_handle.collect();
 
   // run comparison
-  compare_results(results.get(), header.n_targets, args.kernel);
+  compare_results(results.get(), header.n_targets, args.kernel, args.outfile);
 
   //free up resources
   err = source_handle.destroy();

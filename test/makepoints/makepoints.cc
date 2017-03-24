@@ -33,8 +33,8 @@
 #include "../common/common.h"
 
 
-constexpr int kNSources = 10000;
-constexpr int kNTargets = 10000;
+constexpr int kNSources = 1000000;
+constexpr int kNTargets = 1000000;
 constexpr int kRefinementLimit = 40;
 constexpr double kYukawaParam = 0.1;
 constexpr double kHelmholtzParam = 0.1;

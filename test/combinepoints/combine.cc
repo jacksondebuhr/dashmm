@@ -19,10 +19,10 @@ int main(int argc, char **argv) {
     Combiner fileone{argv[1]};
 
     { // We scope these to remove their resources as soon as possible
-      Combiner filetwo{argv[2]};
+      //Combiner filetwo{argv[2]};
       Combiner filethree{argv[3]};
 
-      fileone.Combine(filetwo);
+      //fileone.Combine(filetwo);
       fileone.Combine(filethree);
     }
 

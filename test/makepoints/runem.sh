@@ -8,6 +8,9 @@ make
 ./makepoints --kernel=yukawa --data=sphere
 ./makepoints --kernel=helmholtz --data=sphere
 
+./makepoints --kernel=laplace --data=cube --singlesign=yes
+./makepoints --kernel=laplace --data=sphere --singlesign=yes
+
 cd ../combinepoints
 make clean
 make
