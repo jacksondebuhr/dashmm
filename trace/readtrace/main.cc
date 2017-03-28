@@ -9,6 +9,7 @@
 #include "locality.h"
 #include "plotter.h"
 #include "segmentids.h"
+#include "sqlite3out.h"
 #include "traceevent.h"
 #include "tracefile.h"
 #include "trace.h"
@@ -69,47 +70,9 @@ int main(int argc, char **argv) {
     fprintf(stdout, "Time window: [%lg %lg] (ms)\n",
             minns / 1.0e6, maxns / 1.0e6);
 
-    // Get a window of events from 1s to 2s
-    //auto window = runtrace.window(minns, maxns);
-    //output_window(window, runtrace.min_ns());
-
-    //auto coverage = coverage_of_segment_type(window, 1,
-    //                                         minns, maxns);
-
-    //for (auto i = coverage.begin(); i != coverage.end(); ++i) {
-    //  for (auto j = i->second.begin(); j != i->second.end(); ++j) {
-    //    fprintf(stdout, "coverage of (%d,%d): %lg\n", i->first, j->first,
-    //            (coverage[i->first])[j->first]);
-    //  }
-    //}
-
-    /*
-    for (int segment = traceutils::segment::kNetworkProgress;
-         segment <= traceutils::segment::kDASHMMItoL; ++segment) {
-      traceutils::Plotter maker{runtrace};
-      auto dt = maxns - minns;
-      std::string segtype = traceutils::segment::name(segment);
-
-      maker(1000, 512, 0, minns, maxns, segtype + "full.png", segment, 0);
-      maker(1000, 512, 0, minns, minns + dt * 0.25, segtype + "first.png",
-            segment, 0);
-      maker(1000, 512, 0, minns + dt * 0.25, minns + dt * 0.5,
-            segtype + "second.png", segment, 0);
-      maker(1000, 512, 0, minns + dt * 0.5, minns + dt * 0.75,
-            segtype + "third.png", segment, 0);
-      maker(1000, 512, 0, minns + dt * 0.75, maxns,
-            segtype + "fourth.png", segment, 0);
-    }
-    */
-
-    std::vector<int> segs{};
-    for (int seg = traceutils::segment::kDASHMMStoT;
-         seg <= traceutils::segment::kDASHMMItoL; ++seg) {
-      segs.push_back(seg);
-    }
-
-    traceutils::Utilization util{runtrace};
-    util("test.txt", minns, maxns, 100, segs);
+    // now go ahead and put it out as an SQLite database
+    traceutils::SQLiteWriter out{"firsttry.db", runtrace};
+    out.write();
 
 
   } catch (std::runtime_error &err) {
@@ -119,13 +82,6 @@ int main(int argc, char **argv) {
   } catch (...) {
     fprintf(stderr, "Who knows...\n");
   }
-
-
-  // Testing out the thing somewhat
-  //pngwriter testimage{100, 100, 1.0, "checker.png"};
-  //testimage.setcompressionlevel(0);
-  //testimage.filledsquare(10, 10, 50, 50, 1.0, 0.0, 0.0);
-  //testimage.close();
 
   return 0;
 }

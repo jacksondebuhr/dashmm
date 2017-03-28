@@ -20,6 +20,7 @@ class Trace {
 
   int localities() const {return locs_.size();}
   int max_locality() const {return locs_.rbegin()->first;}
+  bool has_locality(int l) const {return locs_.find(l) != locs_.end();}
 
   int num_workers(int loc) const;
   int max_worker(int loc) const;
