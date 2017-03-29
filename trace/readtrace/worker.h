@@ -53,6 +53,14 @@ class Worker {
   // Get the zeroref if present; returns -1 is not present
   uint64_t get_zeroref() const;
 
+  // Do something with all of the events
+  template <typename Callable>
+  void apply(Callable action) const {
+    for (size_t i = 0; i < events_.size(); ++i) {
+      action(events_[i].get());
+    }
+  }
+
   void reset_zero(uint64_t zero);
 
  private:

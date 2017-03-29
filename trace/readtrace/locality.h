@@ -50,6 +50,14 @@ class Locality {
   uint64_t max_ns() const;
   uint64_t min_ns() const;
 
+  // Do something with all the events
+  template <typename Callable>
+  void apply(Callable action) const {
+    for (auto i = workers_.begin(); i != workers_.end(); ++i) {
+      i->second.apply(action);
+    }
+  }
+
   // Grab a span
   span_t span(uint64_t start, uint64_t end) const;
 

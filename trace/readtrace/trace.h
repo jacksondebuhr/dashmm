@@ -49,6 +49,14 @@ class Trace {
   // Get a window of events
   window_t window(uint64_t start, uint64_t end) const;
 
+  // apply something to all events
+  template <typename Callable>
+  void apply(Callable action) const {
+    for (auto i = locs_.begin(); i != locs_.end(); ++i) {
+      i->second.apply(action);
+    }
+  }
+
  private:
   bool locked_;
   std::map<int, Locality> locs_;

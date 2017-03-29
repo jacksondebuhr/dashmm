@@ -71,7 +71,7 @@ class Event {
   virtual std::unique_ptr<Event> read_from_file(FILE *fd) const = 0;
 
  private:
-  // All events have a timestam
+  // All events have a timestamp
   uint64_t stamp_;
 };
 
