@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -38,7 +27,7 @@
 
 namespace dashmm {
 
-/// Offset of coefficient (*)_n^m, where 0 <= m <= n 
+/// Offset of coefficient (*)_n^m, where 0 <= m <= n
 inline int midx(const int n, const int m) {
   return n * (n + 1) / 2 + m;
 }
@@ -50,6 +39,10 @@ inline int lidx(const int n, const int m) {
 
 inline int didx(const int n, const int mp, const int m) {
   return n * (n + 1) * (4 * n - 1) / 6 + mp * (2 * n + 1) + n + m;
+}
+
+inline int hidx(const int n, const int mp, const int m) {
+  return n * (2 * n - 1) * (2 * n + 1) / 3 + (mp + n) * (2 * n + 1) + n + m;
 }
 
 inline int sidx(int n, int m, int np, int p) {
@@ -66,36 +59,36 @@ void legendre_Plm(int n, double x, double *P);
 /// Compute scaled Legendre polynomial scale^n P_n^m(x) where |x| > 1
 void legendre_Plm_gt1_scaled(int nb, double x, double scale, double *P);
 
-/// Compute scaled Legendre polynomial scale^n R_n^{|m|}(x), where 
-/// R_n^{|m|}(x) i^{n+|m|} = P_n^{|m|}(ix) 
-void legendre_Plm_evan_scaled(int nb, double x, double scale, double *P); 
+/// Compute scaled Legendre polynomial scale^n R_n^{|m|}(x), where
+/// R_n^{|m|}(x) i^{n+|m|} = P_n^{|m|}(ix)
+void legendre_Plm_evan_scaled(int nb, double x, double scale, double *P);
 
-/// Compute scaled Legendre polynomial (-i * scale)^n P_n^m(x) 
-void legendre_Plm_prop_scaled(int nb, double x, double scale, dcomplex_t *P); 
+/// Compute scaled Legendre polynomial (-i * scale)^n P_n^m(x)
+void legendre_Plm_prop_scaled(int nb, double x, double scale, dcomplex_t *P);
 
-/// Gamma function 
+/// Gamma function
 double Gamma(double x);
 
-/// Cylindrical Bessel function of the first kind 
-int bessel_Jn(int nb, double alpha, double x, double *B); 
+/// Cylindrical Bessel function of the first kind
+int bessel_Jn(int nb, double alpha, double x, double *B);
 
-/// Cylindrical Bessel function of the second kind 
-int bessel_Yn(int nb, double alpha, double x, double *B); 
+/// Cylindrical Bessel function of the second kind
+int bessel_Yn(int nb, double alpha, double x, double *B);
 
-/// Modified cylindrical Bessel function of the first kind 
+/// Modified cylindrical Bessel function of the first kind
 int bessel_In(int nb, double alpha, double x, int ize, double *B);
 
-/// Spherical Bessel function of the first kind 
-void bessel_jn_scaled(int nb, double x, double scale, double *B); 
+/// Spherical Bessel function of the first kind
+void bessel_jn_scaled(int nb, double x, double scale, double *B);
 
-/// Modified spherical Bessel function of the first kind 
+/// Modified spherical Bessel function of the first kind
 void bessel_in_scaled(int nb, double x, double scale, double *B);
 
-/// Modified spherical Bessel function of the second kind 
+/// Modified spherical Bessel function of the second kind
 void bessel_kn_scaled(int nb, double x, double scale, double *B);
 
-/// Spherical Hankel function of the first kind 
-void bessel_hn_scaled(int nb, double x, double scale, dcomplex_t *B); 
+/// Spherical Hankel function of the first kind
+void bessel_hn_scaled(int nb, double x, double scale, dcomplex_t *B);
 
 
 } // namespace dashmm

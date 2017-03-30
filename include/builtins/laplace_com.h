@@ -212,7 +212,8 @@ class LaplaceCOM {
       double sum = 0;
       double diff[3] {pos.x() - data_->xcom[0], pos.y() - data_->xcom[1],
              pos.z() - data_->xcom[2]};
-      double diff2mag{diff[0] * diff[0] + diff[1] * diff[1] + diff[2] * diff[2]};
+      double diff2mag{diff[0] * diff[0] + diff[1] * diff[1]
+                      + diff[2] * diff[2]};
       double diffmag{sqrt(diff2mag)};
       double quaddenom{-1.0 / (2.0 * diff2mag * diff2mag * diffmag)};
 
