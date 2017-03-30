@@ -444,11 +444,12 @@ void compare_results(TargetData *targets, int target_count,
     auto j = offsets.find(exacts[i].index);
     assert(j != offsets.end());
     int idx = j->second;
-    double relerr = fabs(targets[idx].phi.real() - exacts[i].phi.real());
-    numerator += relerr * relerr;
-    denominator += exacts[i].phi.real() * exacts[i].phi.real();
-    if (relerr / exacts[i].phi.real() > maxrel) {
-      maxrel = relerr / exacts[i].phi.real();
+    double relerr = std::norm(targets[idx].phi - exacts[i].phi);
+    numerator += relerr;
+    double exnorm = std::norm(exacts[i].phi);
+    denominator += exnorm;
+    if (sqrt(relerr / exnorm) > maxrel) {
+      maxrel = sqrt(relerr / exnorm);
     }
   }
   fprintf(stdout, "Error for %d test points: %4.3e (max %4.3e)\n",
