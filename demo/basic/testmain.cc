@@ -580,6 +580,13 @@ void perform_evaluation_test(InputArguments args) {
                                    args.refinement_limit, direct,
                                    args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
+    } else if (args.kernel == "helmholtz") {
+      dashmm::Direct<SourceData, TargetData, dashmm::Helmholtz> direct{};
+      std::vector<double> kernelparms(1, 0.1);
+      err = helmholtz_direct.evaluate(source_handle, test_handle,
+                                      args.refinement_limit, direct,
+                                      args.accuracy, kernelparms);
+      assert(err == dashmm::kSuccess);
     }
 
     // Retrieve the test results
