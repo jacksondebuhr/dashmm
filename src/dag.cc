@@ -470,6 +470,7 @@ size_t DAG::node_count() const {
 }
 
 
+/*
 std::vector<double> DAG::average_out_degree() const {
   size_t s_total{0};
   size_t s_count = source_leaves.size();
@@ -499,10 +500,11 @@ std::vector<double> DAG::average_out_degree() const {
   double sn_od_mean = (double)sn_total / sn_count;
   double tn_od_mean = (double)tn_total / tn_count;
   double t_od_mean = (double)t_total / t_count;
-  double od_mean = (double)(s_total + sn_total + tn_total + t_total) / 
+  double od_mean = (double)(s_total + sn_total + tn_total + t_total) /
                       (s_count + sn_count + tn_count + t_count);
 
 }
+*/
 
 
 size_t DAG::edge_count() const {
@@ -554,7 +556,7 @@ std::pair<int, int> DAG::min_max_out_degree_SI() const {
   int max{std::numeric_limits<int>::min()};
   for (size_t i = 0; i < source_nodes.size(); ++i) {
     // determine if we are M, and skip
-    auto item = std::find_if(source_nodes[i]->in_edges.begin(), 
+    auto item = std::find_if(source_nodes[i]->in_edges.begin(),
                             source_nodes[i]->in_edges.end(),
                             [](const DAGEdge &a)->bool {
                               return a.op == Operation::MtoI;
