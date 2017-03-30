@@ -9,8 +9,14 @@
 namespace traceutils {
 
 
+int Worker::counter_ = 0;
+
+
 Worker::Worker(File &stream)
-    : id_{stream.worker()}, loc_{stream.locality()}, events_{},
+    : id_{stream.worker()},
+      loc_{stream.locality()},
+      gid_{counter_++},
+      events_{},
       locked_{false} {
   std::vector<std::unique_ptr<Event>> trial{};
   do {

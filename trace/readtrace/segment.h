@@ -97,6 +97,13 @@ class SegmentCollator {
     return true;
   }
 
+  // add segments from one to the other
+  void combine(SegmentCollator &other) {
+    for (size_t i = 0; i < other.full_.size(); ++i) {
+      this->full_.push_back(std::move(other.full_[i]));
+    }
+  }
+
   size_t SegmentCount() const {return full_.size();}
   const Segment *GetSegment(size_t index) const {return full_[index].get();}
 

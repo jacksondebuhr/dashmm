@@ -24,7 +24,7 @@ class Worker {
  public:
   Worker(File &stream);
   Worker(int id = -1, int loc = -1) noexcept
-      : id_{id}, loc_{loc}, events_{}, locked_{false} { }
+      : id_{id}, loc_{loc}, gid_{counter_++}, events_{}, locked_{false} { }
   Worker(Worker &&other) = default;
 
   // Make sure we get the default move
@@ -33,6 +33,7 @@ class Worker {
   // Simple queries
   int id() const {return id_;}
   int locality() const {return loc_;}
+  int gid() const {return gid_;}
   size_t num_events() const {return events_.size();}
 
   // This could throw an exception std::runtime_error if the File object
@@ -65,9 +66,11 @@ class Worker {
 
  private:
   int id_;  // Which worker is this (numbered per locality)
-  int loc_; // Which locality for which this was a worker
+  int loc_; // Locality for which this was a worker
+  int gid_;
   std::vector<std::unique_ptr<Event>> events_;
   bool locked_;
+  static int counter_;
 };
 
 

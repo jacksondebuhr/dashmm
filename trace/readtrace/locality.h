@@ -58,6 +58,14 @@ class Locality {
     }
   }
 
+  // So something with all workers
+  template <typename Callable>
+  void apply_to_workers(Callable action) const {
+    for (auto i = workers_.begin(); i != workers_.end(); ++i) {
+      action(i->second);
+    }
+  }
+
   // Grab a span
   span_t span(uint64_t start, uint64_t end) const;
 

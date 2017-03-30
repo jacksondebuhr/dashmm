@@ -165,19 +165,11 @@ void SQLiteWriter::WorkerTable() {
         "INSERT INTO Worker (id, wid, loc) VALUES (?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
-    Counter worker_id{};
-
-    auto lmap = trace_.worker_map();
-    for (auto i = lmap.begin(); i != lmap.end(); ++i) {
-      auto wmap = i->second;
-      for (auto j = wmap.begin(); j != wmap.end(); ++j) {
-        addit.Bind(1, (sqlite3_int64)worker_id.next());
-        addit.Bind(2, (sqlite3_int64)j->first);
-        addit.Bind(3, (sqlite3_int64)i->first);
-        while (addit.Step()) { }
-        addit.Reset();
-      }
-    }
+    trace_.apply_to_workers([&addit](const Worker &w) {
+      addit.Bind(1, (sqlite3_int64)w.gid());
+      addit.Bind(2, (sqlite3_int64)w.id());
+      addit.Bind(3, (sqlite3_int64)w.locality());
+    });
   }
   fprintf(stdout, "DONE\n"); fflush(stdout);
 }
@@ -314,9 +306,13 @@ SegmentCollator SQLiteWriter::EventTable(
       "CREATE TABLE Event ("
       " id INTEGER,"
       " tid INTEGER,"
+      " lid INTEGER,"
+      " wid INTEGER,"
       " timens INTEGER,"
-      " PRIMARY KEY(id),"
-      " FOREIGN KEY (tid) REFERENCES Eventtype(id));"};
+      " PRIMARY KEY (id),"
+      " FOREIGN KEY (tid) REFERENCES Eventtype (id),"
+      " FOREIGN KEY (lid) REFERENCES Locality (id),"
+      " FOREIGN KEY (wid) REFERENCES Worker (id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
@@ -324,7 +320,7 @@ SegmentCollator SQLiteWriter::EventTable(
   SegmentCollator segments{};
   { // INSERT
     std::string addrow{
-      "INSERT INTO Event (id, tid, timens) VALUES (?, ?, ?);"};
+      "INSERT INTO Event (id, tid, lid, wid, timens) VALUES (?, ?, ?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     std::string transtart{"BEGIN TRANSACTION;"};
@@ -335,14 +331,23 @@ SegmentCollator SQLiteWriter::EventTable(
 
     Counter genid{};
     int tcounter{0};
-    trace_.apply([&addit, &genid, &evttyp, &tstart, &tend, &tcounter,
-                  &segments] (const Event *evt) {
+
+    trace_.apply_to_workers([&genid, &tcounter, &evttyp, &tstart, &tend,
+                             &segments, &addit] (const Worker &w) {
+      // wrap up an apply on the events
+      int gid = w.gid();
+      int loc = w.locality();
+
+      // apply on events
+      SegmentCollator workseg{};
+      w.apply([&genid, &tcounter, &evttyp, &tstart, &tend,
+               &workseg, &gid, &loc, &addit] (const Event *evt) {
         if (tcounter == 0) {
           while (tstart.Step()) { }
           tstart.Reset(false);
         }
 
-        if (!segments.collate(evt, genid.curr())) {
+        if (!workseg.collate(evt, genid.curr())) {
           fprintf(stderr, "Event id %lu - Event type '%s'\n", genid.curr(),
                   evt->event_type().c_str());
           throw std::runtime_error("Something with segments.");
@@ -350,7 +355,9 @@ SegmentCollator SQLiteWriter::EventTable(
 
         addit.Bind(1, (sqlite3_int64)genid.next());
         addit.Bind(2, (sqlite3_int64)evttyp.find(evt->event_type())->second);
-        addit.Bind(3, (sqlite3_int64)evt->stamp());
+        addit.Bind(3, (sqlite3_int64)loc);
+        addit.Bind(4, (sqlite3_int64)gid);
+        addit.Bind(5, (sqlite3_int64)evt->stamp());
         while (addit.Step()) { }
         addit.Reset();
 
@@ -359,8 +366,10 @@ SegmentCollator SQLiteWriter::EventTable(
           tend.Reset();
           tcounter = 0;
         }
-      }
-    );
+      });
+
+      segments.combine(workseg);
+    });
 
     if (tcounter > 0 && tcounter < 100000) {
       while (tend.Step()) { }

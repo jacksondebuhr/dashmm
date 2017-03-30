@@ -57,6 +57,14 @@ class Trace {
     }
   }
 
+  // apply to each worker
+  template <typename Callable>
+  void apply_to_workers(Callable action) const {
+    for (auto i = locs_.begin(); i != locs_.end(); ++i) {
+      i->second.apply_to_workers(action);
+    }
+  }
+
  private:
   bool locked_;
   std::map<int, Locality> locs_;
