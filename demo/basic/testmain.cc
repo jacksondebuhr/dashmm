@@ -70,10 +70,10 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::Direct> yukawa_direct{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Yukawa, dashmm::FMM97> yukawa_fmm97{};
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{}; 
-dashmm::Evaluator<SourceData, TargetData, 
-                  dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{}; 
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{};
+dashmm::Evaluator<SourceData, TargetData,
+                  dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{};
 
 // This type collects the input arguments to the program.
 struct InputArguments {
@@ -444,11 +444,12 @@ void compare_results(TargetData *targets, int target_count,
     auto j = offsets.find(exacts[i].index);
     assert(j != offsets.end());
     int idx = j->second;
-    double relerr = fabs(targets[idx].phi.real() - exacts[i].phi.real());
-    numerator += relerr * relerr;
-    denominator += exacts[i].phi.real() * exacts[i].phi.real();
-    if (relerr / exacts[i].phi.real() > maxrel) {
-      maxrel = relerr / exacts[i].phi.real();
+    double relerr = std::norm(targets[idx].phi - exacts[i].phi);
+    numerator += relerr;
+    double exnorm = std::norm(exacts[i].phi);
+    denominator += exnorm;
+    if (sqrt(relerr / exnorm) > maxrel) {
+      maxrel = sqrt(relerr / exnorm);
     }
   }
   fprintf(stdout, "Error for %d test points: %4.3e (max %4.3e)\n",
@@ -511,11 +512,11 @@ void perform_evaluation_test(InputArguments args) {
   } else if (args.kernel == std::string{"helmholtz"}) {
     if (args.method == std::string{"fmm97"}) {
       dashmm::FMM97<SourceData, TargetData, dashmm::Helmholtz> method{};
-      std::vector<double> kernelparms(1, 0.1); 
+      std::vector<double> kernelparms(1, 0.1);
 
-      t0 = getticks(); 
-      err = helmholtz_fmm97.evaluate(source_handle, target_handle, 
-                                     args.refinement_limit, method, 
+      t0 = getticks();
+      err = helmholtz_fmm97.evaluate(source_handle, target_handle,
+                                     args.refinement_limit, method,
                                      args.accuracy, kernelparms);
       assert(err == dashmm::kSuccess);
       tf = getticks();
