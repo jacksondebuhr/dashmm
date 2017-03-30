@@ -265,8 +265,15 @@ public:
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child, double s_size) const {
+    double h = s_size / 2;
+    Point center = views_.center();
+    double px = center.x() + (from_child % 2 == 0 ? h : -h);
+    double py = center.y() + (from_child % 4 <= 1 ? h : -h);
+    double pz = center.z() + (from_child < 4 ? h : -h);
+
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{}, 1.0, kSourcePrimary}};
+    expansion_t *retval{
+        new expansion_t{Point{px, py, pz}, scale * 2, kSourcePrimary}};
     int p = builtin_helmholtz_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
@@ -322,8 +329,15 @@ public:
   std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
     // The function is called on the parent box and \p t_size is its child's
     // size.
+    Point center = views_.center();
+    double h = t_size / 2;
+    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
+    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
+    double cz = center.z() + (to_child < 4 ? -h : h);
+
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{}, 1.0, kTargetPrimary}};
+    expansion_t *retval{
+        new expansion_t{Point{cx, cy, cz}, scale / 2, kTargetPrimary}};
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -498,7 +512,8 @@ public:
 
   std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{}, scale, kSourceIntermediate}};
+    expansion_t *retval{new expansion_t{views_.center(),
+                        scale, kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views, in the order of x-, y-, and z-directions
@@ -657,6 +672,12 @@ public:
     int dy = s_index.y() - t_index.y() * 2;
     int dz = s_index.z() - t_index.z() * 2;
 
+    // Compute center of the parent node
+    Point center = views_.center();
+    double px = center.x() + (dx + 0.5) * s_size;
+    double py = center.y() + (dy + 0.5) * s_size;
+    double pz = center.z() + (dz + 0.5) * s_size;
+
     // Exponential expansions on the source side
     double scale = views_.scale();
 
@@ -680,7 +701,7 @@ public:
     dcomplex_t *Evan_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(8));
 
-    ViewSet views{kTargetIntermediate, Point{}, 1.0};
+    ViewSet views{kTargetIntermediate, Point{px, py, pz}, 2 * scale};
     int n_e = builtin_helmholtz_table_->n_e(scale);
     int n_p = builtin_helmholtz_table_->n_p(scale);
     size_t bytes_e = n_e * sizeof(dcomplex_t);
@@ -750,11 +771,19 @@ public:
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
-    expansion_t *retval{new expansion_t{Point{}, 1.0, kTargetPrimary}};
+    // t_index and t_size are the index_and size of the child
+    // Compute child's center
+    double h = t_size / 2;
+    Point center = views_.center();
+    double cx = center.x() + (t_index.x() % 2 == 0 ? -h : h);
+    double cy = center.y() + (t_index.y() % 2 == 0 ? -h : h);
+    double cz = center.z() + (t_index.z() % 2 == 0 ? -h : h);
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() / 2;
+    expansion_t *retval{
+        new expansion_t{Point{cx, cy, cz}, scale, kTargetPrimary}};
     dcomplex_t *Evan[28]{nullptr};
     dcomplex_t *Prop[28]{nullptr};
     for (int i = 0; i < 28; ++i) {
