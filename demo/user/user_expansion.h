@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -164,11 +153,14 @@ class User {
     return data_ != nullptr;
   }
 
+  // This gives the number of views in this object.
   int view_count() const {
     if (data_) return 1;
     return 0;
   }
 
+  // Given a set of views to collect from this object, this will modify the
+  // given ViewSet object to contain also references to the view data.
   void get_views(dashmm::ViewSet &view) const {
     assert(view.count() < 2);
     if (view.count() > 0) {
@@ -178,6 +170,7 @@ class User {
     view.set_role(role_);
   }
 
+  // This returns all the views of this object.
   dashmm::ViewSet get_all_views() const {
     dashmm::ViewSet retval{};
     retval.add_view(0);
@@ -185,6 +178,9 @@ class User {
     return retval;
   }
 
+  // This gives the role of the expansion. The possible values are
+  // kSourcePrimary, kSourceIntermediate, kTargetPrimary, kTargetIntermediate
+  // and kNoRoleNeeded.
   dashmm::ExpansionRole role() const {return role_;}
 
   // This gives the point around which this Expansion is defined.
@@ -352,6 +348,7 @@ class User {
   // This stores the size (in bytes) of data_.
   size_t bytes_;
 
+  // The role of the expansion
   dashmm::ExpansionRole role_;
 };
 

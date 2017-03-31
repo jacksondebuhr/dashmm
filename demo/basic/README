@@ -28,7 +28,7 @@ of default arguments. The behavior of the demo can be controlled by a set of
 command line arguments.
 
 Options available: [possible/values] (default value)
-  --method=[fmm/bh]            method to use (fmm)
+  --method=[fmm/fmm97/b        method to use (fmm97)
   --nsources=num               number of source points to generate (10000)
   --sourcedata=[cube/sphere/plummer]
                                source distribution type (cube)
@@ -40,6 +40,8 @@ Options available: [possible/values] (default value)
   --accuracy=num               number of digits of accuracy for fmm (3)
   --verify=[yes/no]            perform an accuracy test comparing to direct
                                  summation (yes)
+  --kernel=[laplace/yukawa/helmholtz]
+                               particle interaction type (laplace)
 
 After running, the code will output some summary information.
 

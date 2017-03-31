@@ -1,22 +1,11 @@
 // =============================================================================
-//  This file is part of:
 //  Dynamic Adaptive System for Hierarchical Multipole Methods (DASHMM)
 //
-//  Copyright (c) 2015-2016, Trustees of Indiana University,
+//  Copyright (c) 2015-2017, Trustees of Indiana University,
 //  All rights reserved.
 //
-//  DASHMM is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  DASHMM is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with DASHMM. If not, see <http://www.gnu.org/licenses/>.
+//  This software may be modified and distributed under the terms of the BSD
+//  license. See the LICENSE file for details.
 //
 //  This software was created at the Indiana University Center for Research in
 //  Extreme Scale Technologies (CREST).
@@ -233,7 +222,9 @@ class Evaluator {
   /// \returns - HPX_SUCCESS
   static int evaluate_handler(EvaluateParams *parms, size_t total_size) {
     // BEGIN TREE CREATION
-    //hpx_time_t creation_begin = hpx_time_now();
+#ifdef DASHMMEXTRATIMING
+    hpx_time_t creation_begin = hpx_time_now();
+#endif
     RankWise<dualtree_t> global_tree =
         dualtree_t::create(parms->refinement_limit, parms->sources,
                            parms->targets);
@@ -241,17 +232,12 @@ class Evaluator {
         dualtree_t::partition(global_tree, parms->sources, parms->targets);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
-    //hpx_time_t creation_end = hpx_time_now();
-    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    //fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
+#ifdef DASHMMEXTRATIMING
+    hpx_time_t creation_end = hpx_time_now();
+    double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
+    fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
+#endif
     // END TREE CREATION
-
-    //auto local_tree = global_tree.here();
-    //fprintf(stdout, "UnifGridDistrib:");
-    //for (int i = 0; i < hpx_get_num_ranks(); ++i) {
-    //  fprintf(stdout, " %d", local_tree->last(i) - local_tree->first(i) + 1);
-    //}
-    //fprintf(stdout, "\n");
 
     // Save tree global address in message
     parms->rwaddr = global_tree.data();
@@ -296,18 +282,22 @@ class Evaluator {
 
     // Get ready to evaluate
     // BEGIN DISTRIBUTE
+#ifdef DASHMMEXTRATIMING
     hpx_time_t distribute_begin = hpx_time_now();
+#endif
     DAG *dag = tree->create_DAG();
     parms->distro.compute_distribution(*dag);
+#ifdef DASHMMEXTRATIMING
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
                                                 distribute_end);
-    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-    //        distribute_deltat);
+#endif
     // END DISTRIBUTE
 
     // BEGIN ALLOCATE
+#ifdef DASHMMEXTRATIMING
     hpx_time_t allocate_begin = hpx_time_now();
+#endif
     tree->create_expansions_from_DAG(parms->rwaddr);
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -315,9 +305,10 @@ class Evaluator {
     // get their work going when they come to it and then they return.
     hpx_lco_and_set(parms->middone, HPX_NULL);
     hpx_lco_wait(parms->middone);
+#ifdef DASHMMEXTRATIMING
     hpx_time_t allocate_end = hpx_time_now();
     double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
+#endif
     // END ALLOCATE
 
 
@@ -332,23 +323,28 @@ class Evaluator {
     EVENT_TRACE_DASHMM_ZEROREF();
 #endif
 
+#ifdef DASHMMEXTRATIMING
     hpx_time_t evaluate_begin = hpx_time_now();
+#endif
     tree->setup_edge_lists(dag);
     tree->start_DAG_evaluation(global_tree);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
     hpx_lco_wait(heredone);
+#ifdef DASHMMEXTRATIMING
     hpx_time_t evaluate_end = hpx_time_now();
     double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
-    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
+#endif
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_end();
 #endif
     // END EVALUATE
 
+#ifdef DASHMMEXTRATIMING
     fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
             hpx_get_my_rank(),
             distribute_deltat, allocate_deltat, evaluate_deltat);
+#endif
 
     // Delete some local stuff
     hpx_lco_delete_sync(heredone);
