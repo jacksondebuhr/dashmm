@@ -108,7 +108,7 @@ for every node of the source tree.
 
 The \texttt{MtoL} operation is used to translate summaries of a set of sources
 into a summary that applies to a volume in the target tree. This is the
-operation that distinguishes FMM from BH; the creation of the local expansions
+operation that distinguishes FMM from BH: the creation of the local expansions
 allows for efficient evaluation of large parts of the source distribution.
 
 The \texttt{LtoL} operation is used to translate a local expansion that applies
@@ -157,7 +157,7 @@ kernel. In the most direct sense, the kernel can be seen in the implemented
 \texttt{StoT} operation.
 
 Some kernels will have parameters that control the exact shape of the potential.
-In particular, the built-in Yukawa kernel is scaling variant, and so the
+For example, the built-in Yukawa kernel is scaling variant, and so the
 scale must be provided to DASHMM. These kernel parameters also impact the
 expansions that are employed in Expansion. Further, often there is some one-time
 precomputation that can occur that produces values that are used in the various

@@ -54,7 +54,7 @@ struct SourceData {
   Point position;
   double charge;
 };
-\end{lstlisting}3
+\end{lstlisting}
 
 \noindent Beyond these required members, anything might be added to a Source
 type. This allows the user to associate application specific data to
@@ -563,8 +563,6 @@ This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index range
 is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 
-{\bf NOTE: Are we going to deprecate this?}
-
 \begin{lstlisting}
 ReturnCode Array<T>::put(size_t first, size_t last, T *in)
 \end{lstlisting}
@@ -585,8 +583,6 @@ subsequent changes in the local data will not be reflected in the array object.
 This method will return one of the following: \texttt{kRuntimeError} if there
 is an error with the runtime; \texttt{kDomainError} if the provided index
 range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
-
-{\bf NOTE: Are we going to deprecate this?}
 
 \begin{lstlisting}
 T *Array<T>::collect()
@@ -722,7 +718,7 @@ The \texttt{Direct} method is primarily intended for use as a comparison for
 computing
 the exact result for a given set of sources. There is some parallelism
 implemented for this method, so the execution time is reduced somewhat.
-However, for realistic problem sizes, this method should be avoided.
+However, for realistic problem sizes, this method should not be used.
 
 The only operation that is used by the \texttt{Direct} method is
 \texttt{StoT}, so any Expansion implementing that operator can be used with the
@@ -831,6 +827,28 @@ The \texttt{Yukawa} expansion is a spherical harmonic expansion of the Yukawa
 potential. This potential is scaling variant, so a single kernel parameter
 must be provided to \texttt{evaluate()}. Calls to evaluate must also supply an
 accuracy parameter that gives the number of digits of accuracy required.
+
+Though this expansion is in principle compatible with every method included
+with DASHMM, it is designed for the \texttt{FMM97} method.
+
+This expansion imposes the following restrictions on the source type: a
+member of type \texttt{Point} with the name \texttt{position} must be provided;
+a member of
+type \texttt{double} with the name \texttt{charge} must be provided.
+
+This expansion imposes the following restrictions on the target type: a
+member of type \texttt{Point} with the name \texttt{position} must be provided;
+a member of type \texttt{dcomplex\_t} with the name \texttt{potential}
+ must be provided.
+
+\subsection{\texttt{Helmholtz}}
+
+The \texttt{Helmholtz} expansion expands the Helmholtz potential in the low
+frequency regime using spherical harmonic and spherical Bessel functions.
+This potential is scaling variant and also oscillatory, and a single kernel
+parameter must be provided to \texttt{evaluate()}. Calls to evaluate must
+also supply an accuracy parameter that gives the number of digits of
+accuracy required.
 
 Though this expansion is in principle compatible with every method included
 with DASHMM, it is designed for the \texttt{FMM97} method.

@@ -6,7 +6,7 @@ gives a brief sketch of the demo programs included with DASHMM.
 
 \section{Prerequisites}
 
-DASHMM v.\ 1.0.0 depends on one external library: HPX-5. The current
+DASHMM v.\ \version depends on one external library: HPX-5. The current
 version of DASHMM depends on version 4.0.0 of HPX-5 or later, which
 may be found at \url{https://hpx.crest.iu.edu/}. Please see the
 official HPX-5 documentation for instructions on how to build, install
@@ -50,6 +50,17 @@ contained in the header files. This means that much of the compilation
 of the DASHMM code will occur when the user code is compiled. This can
 increase the compilation time of user code, but the added flexibility
 of DASHMM is worth the minor increase in compilation time.
+
+There are two compile time options for DASHMM, both of which are intended
+primarily for the library's developers. During compilation, one can define
+{\tt DASHMMINSTRUMENTATION} to compile the library to use HPX-5's built-in
+instrumentation to trace DASHMM events. It should be noted that successful
+traces require modifications of HPX-5. For those interested, please contact
+the developers. One may also define {\tt DASHMMEXTRATIMING} to have the
+evaluation produce extra timing output. Again, this is targeted at the
+developers, so no attempt will be made to explain the output. Because
+DASHMM is templated, these options would need to be define when builind the
+user program as well, as much of the library is not compiled until that point.
 
 \section{Linking against DASHMM}
 
