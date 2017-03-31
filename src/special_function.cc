@@ -601,7 +601,7 @@ int bessel_Jn(int nb, double alpha, double x, double *B) {
 }
 
 int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
-  int I, K, NA, NCALC;
+  int I, NA, NCALC;
   double ALFA, AYE, B, C, COSMU, D, DEN, DDIV, DIV, DMU, D1, D2,
     E, EN, ENU, EN1, EVEN, EX, F, G, GAMMA, H, ODD, P, PA, PA1,
     Q, QA, QA1, Q0, R, S, SINMU, TERM, TWOBYX, XNA, X2, YA, YA1;
@@ -750,6 +750,8 @@ int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
     G = -Q / S;
     Q = G;
     EN -= 1.0;
+
+    EN1 = 0.0;
     while (EN > 0.0) {
       R = EN1 * (2.0 - P) - 2.0;
       S = B + EN1 * Q;
@@ -792,40 +794,66 @@ int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
     DDIV = 8.0 * EX;
     DMU = ALPHA;
     DEN = sqrt(EX);
-    for (K = 1; K <= 2; ++K) {
-      P = COSMU;
-      COSMU = SINMU;
-      SINMU = -P;
-      D1 = (2.0 * DMU - 1.0) * (2.0 * DMU + 1.0);
-      D2 = 0.0;
-      DIV = DDIV;
-      P = 0.0;
-      Q = 0.0;
-      Q0 = D1 / DIV;
-      TERM = Q0;
-      for (I = 2; I <= 20; ++I) {
-        D2 = D2 + 8.0;
-        D1 = D1 - D2;
-        DIV = DIV + DDIV;
-        TERM = -TERM * D1 / DIV;
-        P = P + TERM;
-        D2 = D2 + 8.0;
-        D1 = D1 - D2;
+
+    // Explicitly do k = 1
+    P = COSMU;
+    COSMU = SINMU;
+    SINMU = -P;
+    D1 = (2.0 * DMU - 1.0) * (2.0 * DMU + 1.0);
+    D2 = 0.0;
+    DIV = DDIV;
+    P = 0.0;
+    Q = 0.0;
+    Q0 = D1 / DIV;
+    TERM = Q0;
+    for (I = 2; I <= 20; ++I) {
+      D2 = D2 + 8.0;
+      D1 = D1 - D2;
+      DIV = DIV + DDIV;
+      TERM = -TERM * D1 / DIV;
+      P = P + TERM;
+      D2 = D2 + 8.0;
+      D1 = D1 - D2;
         DIV = DIV + DDIV;
         TERM = TERM * D1 / DIV;
         Q = Q + TERM;
         if (fabs(TERM) <= EPS)
           break;
-      }
-      P = P + 1.0;
-      Q = Q + Q0;
-      if (K == 1) {
-        YA = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
-      } else {
-        YA1 = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
-      }
-      DMU = DMU + 1.0;
     }
+    P = P + 1.0;
+    Q = Q + Q0;
+    YA = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
+    DMU = DMU + 1.0;
+
+    // Explicitly do k = 2
+    P = COSMU;
+    COSMU = SINMU;
+    SINMU = -P;
+    D1 = (2.0 * DMU - 1.0) * (2.0 * DMU + 1.0);
+    D2 = 0.0;
+    DIV = DDIV;
+    P = 0.0;
+    Q = 0.0;
+    Q0 = D1 / DIV;
+    TERM = Q0;
+    for (I = 2; I <= 20; ++I) {
+      D2 = D2 + 8.0;
+      D1 = D1 - D2;
+      DIV = DIV + DDIV;
+      TERM = -TERM * D1 / DIV;
+      P = P + TERM;
+      D2 = D2 + 8.0;
+      D1 = D1 - D2;
+      DIV = DIV + DDIV;
+      TERM = TERM * D1 / DIV;
+      Q = Q + TERM;
+      if (fabs(TERM) <= EPS)
+        break;
+    }
+    P = P + 1.0;
+    Q = Q + Q0;
+    YA1 = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
+    DMU = DMU + 1.0;
   }
 
   if (NA == 1) {
