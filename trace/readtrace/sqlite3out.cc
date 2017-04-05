@@ -149,10 +149,10 @@ void SQLiteWriter::WorkerTable() {
     std::string creation{
       "CREATE TABLE Worker ("
       " id INTEGER, "
-      " wid INTEGER, "
-      " loc INTEGER, "
+      " WorkerId INTEGER, "
+      " Locality INTEGER, "
       " PRIMARY KEY(id),"
-      " FOREIGN KEY (loc) REFERENCES Locality(id));"};
+      " FOREIGN KEY (Locality) REFERENCES Locality(id));"};
     SQLiteStatement makeit{db_, creation};
     bool more = false;
     do {
@@ -162,7 +162,7 @@ void SQLiteWriter::WorkerTable() {
 
   { // INSERT
     std::string addrow{
-        "INSERT INTO Worker (id, wid, loc) VALUES (?, ?, ?);"};
+        "INSERT INTO Worker (id, WorkerId, Locality) VALUES (?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     trace_.apply_to_workers([&addit](const Worker &w) {
@@ -189,13 +189,13 @@ void SQLiteWriter::SegmenttypeTable() {
     std::string creation{
       "CREATE TABLE Segmenttype ("
       " id INTEGER PRIMARY KEY,"
-      " name TEXT);"};
+      " Name TEXT);"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
 
   { // INSERT
-    std::string addrow{"INSERT INTO Segmenttype (id, name) VALUES (?, ?);"};
+    std::string addrow{"INSERT INTO Segmenttype (id, Name) VALUES (?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     for (auto i = segtyp.begin(); i != segtyp.end(); ++i) {
@@ -224,7 +224,7 @@ std::map<std::string, int> SQLiteWriter::EventclassTable() {
     std::string creation{
       "CREATE TABLE Eventclass ("
       "  id INTEGER,"
-      "  class TEXT,"
+      "  Name TEXT,"
       "  PRIMARY KEY(id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
@@ -232,7 +232,7 @@ std::map<std::string, int> SQLiteWriter::EventclassTable() {
 
   { // INSERT
     std::string addrow{
-      "INSERT INTO Eventclass (id, class) VALUES (?, ?);"};
+      "INSERT INTO Eventclass (id, Name) VALUES (?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     for (auto i = evtcls.begin(); i != evtcls.end(); ++i) {
@@ -263,12 +263,12 @@ std::map<std::string, int> SQLiteWriter::EventtypeTable(
     std::string creation{
       "CREATE TABLE Eventtype ("
       " id INTEGER,"
-      " cid INTEGER,"
-      " name TEXT,"
-      " sid INTEGER,"
+      " ClassId INTEGER,"
+      " Name TEXT,"
+      " SegmentId INTEGER,"
       " PRIMARY KEY(id),"
-      " FOREIGN KEY (sid) REFERENCES Segmenttype(id),"
-      " FOREIGN KEY (cid) REFERENCES Eventclass(id));"};
+      " FOREIGN KEY (SegmentId) REFERENCES Segmenttype(id),"
+      " FOREIGN KEY (ClassId) REFERENCES Eventclass(id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
@@ -276,7 +276,8 @@ std::map<std::string, int> SQLiteWriter::EventtypeTable(
   std::map<std::string, int> retval{};
   { // INSERT
     std::string addrow{
-      "INSERT INTO Eventtype (id, cid, name, sid) VALUES (?, ?, ?, ?);"};
+      "INSERT INTO Eventtype (id, ClassId, Name, SegmentId)"
+      "  VALUES (?, ?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     Counter eid{};
@@ -305,14 +306,14 @@ SegmentCollator SQLiteWriter::EventTable(
     std::string creation{
       "CREATE TABLE Event ("
       " id INTEGER,"
-      " tid INTEGER,"
-      " lid INTEGER,"
-      " wid INTEGER,"
-      " timens INTEGER,"
+      " TypeId INTEGER,"
+      " Locality INTEGER,"
+      " WorkerId INTEGER,"
+      " TimeNs INTEGER,"
       " PRIMARY KEY (id),"
-      " FOREIGN KEY (tid) REFERENCES Eventtype (id),"
-      " FOREIGN KEY (lid) REFERENCES Locality (id),"
-      " FOREIGN KEY (wid) REFERENCES Worker (id));"};
+      " FOREIGN KEY (TypeId) REFERENCES Eventtype (id),"
+      " FOREIGN KEY (Locality) REFERENCES Locality (id),"
+      " FOREIGN KEY (WorkerId) REFERENCES Worker (id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
@@ -320,7 +321,8 @@ SegmentCollator SQLiteWriter::EventTable(
   SegmentCollator segments{};
   { // INSERT
     std::string addrow{
-      "INSERT INTO Event (id, tid, lid, wid, timens) VALUES (?, ?, ?, ?, ?);"};
+      "INSERT INTO Event (id, TypeId, Locality, WorkerId, TimeNs)"
+      "  VALUES (?, ?, ?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     std::string transtart{"BEGIN TRANSACTION;"};
@@ -388,19 +390,20 @@ void SQLiteWriter::SegmentTable(const SegmentCollator &segs) {
     std::string creation{
       "CREATE TABLE Segment ("
       " id INTEGER,"
-      " sid INTEGER,"
-      " start INTEGER,"
-      " end INTEGER,"
+      " SegmentId INTEGER,"
+      " StartEvent INTEGER,"
+      " EndEvent INTEGER,"
       " PRIMARY KEY(id),"
-      " FOREIGN KEY (start) REFERENCES Event(id),"
-      " FOREIGN KEY (end) REFERENCES Event(id));"};
+      " FOREIGN KEY (StartEvent) REFERENCES Event(id),"
+      " FOREIGN KEY (EndEvent) REFERENCES Event(id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
 
   { // INSERT
     std::string addrow{
-      "INSERT INTO Segment (id, sid, start, end) VALUES (?, ?, ?, ?);"};
+      "INSERT INTO Segment (id, SegmentId, StartEvent, EndEvent)"
+      "  VALUES (?, ?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     std::string transtart{"BEGIN TRANSACTION;"};

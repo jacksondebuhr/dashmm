@@ -1,0 +1,90 @@
+This file explains the structure of the database that the utility can
+create.
+
+The tables are as follows:
+
+
+Locality:
+
+id INTEGER PRIMARY KEY
+  The locality id. This is just the rank of the locality as from
+  hpx_get_my_rank()
+
+
+Worker:
+
+id INTEGER PRIMARY KEY
+  A unique id for the worker. Workers are labeles as they are encountered.
+
+WorkerId INTEGER
+  The 'rank' of the worker on its locality. If the run used 6 threads per
+  locality (--hpx-threads=6) then this would be in the range [0, 5].
+
+Locality INTEGER FOREIGN KEY REFERENCES Locality.id
+  The locality this was a worker for.
+
+
+Segmenttype:
+
+id INTEGER PRIMARY KEY
+  A unique id for the segment type.
+
+Name TEXT
+  The name of the segment type. Used to give meaning to the id
+
+
+Eventclass:
+
+id INTEGER PRIMARY KEY
+  A unique identifier for the event class
+
+Name TEXT
+  The name of the event class. Used to give meaning to the id
+
+
+Eventtype:
+
+id INTEGER PRIMARY KEY
+  A unique id for event types.
+
+ClassId INTEGER FOREIGN KEY REFERENCES Eventclass.id
+  Which event class is this an event for.
+
+Name TEXT
+  The name of the event type. Makes it more meaningful.
+
+SegmentId INTEGER FOREIGN KEY REFERENCES Segmenttype.id
+  Which segment is this event a part of.
+
+
+Event:
+
+id INTEGER PRIMARY KEY
+  A unique identifier for the event
+
+TypeId INTEGER FOREIGN KEY REFERENCES Eventtype.id
+  The type of this event.
+
+Locality INTEGER FOREIGN KEY REFERENCES Locality.id
+  The locality that performed this event.
+
+WorkerId INTEGER FOREIGN KEY REFERENCES Worker.id
+  The worker that recorded the event.
+
+TimeNs INTEGER
+  The time in ns of the event.
+
+
+Segment:
+
+id INTEGER PRIMARY KEY
+  A unique identifier for the segment
+
+SegmentId INTEGER
+  The segment type of this segment
+
+StartEvent INTEGER FOREIGN KEY REFERENCES Event.id
+  The id of the initial event in this segment
+
+EndEvent INTEGER FOREIGN KEY REFERENCES Event.id
+  The id of the final event in this segment
