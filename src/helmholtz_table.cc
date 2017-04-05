@@ -493,7 +493,7 @@ int HelmholtzTable::imtql2(int N, double *D, double *E, double *Z) {
 
       D[L - 1] -= P;
       E[L - 1] = G;
-      E[M] = 0.0;
+      E[M - 1] = 0.0;
     }
   }
 
