@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
             minns / 1.0e6, maxns / 1.0e6);
 
     // now go ahead and put it out as an SQLite database
-    traceutils::SQLiteWriter out{"firsttry.db", runtrace};
+    traceutils::SQLiteWriter out{"trace.db", runtrace};
     out.write();
 
 

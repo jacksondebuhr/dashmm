@@ -7,6 +7,7 @@
 
 #include <sqlite3.h>
 
+#include "segment.h"
 #include "trace.h"
 
 
@@ -58,10 +59,11 @@ private:
   void LocalityTable();
   void WorkerTable();
   void SegmenttypeTable();
-  void EventclassTable();
-  void EventtypeTable();
-  void EventTable();
-  void SegmentTable();
+  std::map<std::string, int> EventclassTable();
+  std::map<std::string, int> EventtypeTable(
+                                      const std::map<std::string, int> &cls);
+  SegmentCollator EventTable(const std::map<std::string, int> &evttyp);
+  void SegmentTable(const SegmentCollator &segs);
 
   std::string file_name_;
   sqlite3 *db_;
