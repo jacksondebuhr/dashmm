@@ -759,6 +759,11 @@ void HelmholtzTable::generate_l2l() {
   double *factorial = new double[2 * p_ + 1];
   double *bessel = new double[2 * p_ + 1];
 
+  factorial[0] = 1.0; 
+  for (int i = 1; i <= 2 * p_; ++i) {
+    factorial[i] = factorial[i - 1] * i;
+  }
+
   for (int lev = 2; lev <= maxlev - 1; ++lev) {
     // Compute shift distance rho
     double rho = sqrt(3) / 4 * size_ / pow(2, lev);
