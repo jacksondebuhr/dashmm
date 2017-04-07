@@ -493,7 +493,7 @@ int HelmholtzTable::imtql2(int N, double *D, double *E, double *Z) {
 
       D[L - 1] -= P;
       E[L - 1] = G;
-      E[M] = 0.0;
+      E[M - 1] = 0.0;
     }
   }
 
@@ -758,6 +758,11 @@ void HelmholtzTable::generate_l2l() {
   l2l_ = new double[(p_ + 1) * (p_ + 1) * (p_ + 2) / 2 * (maxlev - 2)];
   double *factorial = new double[2 * p_ + 1];
   double *bessel = new double[2 * p_ + 1];
+
+  factorial[0] = 1.0; 
+  for (int i = 1; i <= 2 * p_; ++i) {
+    factorial[i] = factorial[i - 1] * i;
+  }
 
   for (int lev = 2; lev <= maxlev - 1; ++lev) {
     // Compute shift distance rho

@@ -750,8 +750,23 @@ int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
     G = -Q / S;
     Q = G;
     EN -= 1.0;
-
-    EN1 = 0.0;
+    
+    // Initializing EN1 to 0.0 to remove some warning, without affecting the
+    // code behavior from its original Fortran implementation. 
+    // 
+    // In the Fortran code, if the previous while loop is not entered, EN1 is
+    // not initialized when first entering the following while loop. That means
+    // R and S are computed from uninitilized values, and subsequently D, P, Q,
+    // F, and G are junk. Notice that the line EN -= 1.0 inside the following
+    // while loop corresponds to the goto line immediately before the while
+    // loop. A closer look of the Fortran code suggests that the first time the
+    // following while loop is entered, the only meaningful thing it does is to
+    // initilize EN1 with EN. Then EN will be decremented to enter the while
+    // loop again, from then on, EN1 keeps the value of EN and 1. 
+    // 
+    // Setting EN1 to 0.0 will remove the warning on R and S. Then later EN1 is
+    // initialized with the desired value. 
+    EN1 = 0.0; 
     while (EN > 0.0) {
       R = EN1 * (2.0 - P) - 2.0;
       S = B + EN1 * Q;
@@ -794,6 +809,44 @@ int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
     DDIV = 8.0 * EX;
     DMU = ALPHA;
     DEN = sqrt(EX);
+    // The following is the original implementation, initializing YA 
+    // when K is 1 is always executed, but somehow the compiler generates an
+    // warning that YA might be used uninitialized. 
+    // 
+    // for (K = 1; K <= 2; ++K) {
+    //   P = COSMU;
+    //   COSMU = SINMU;
+    //   SINMU = -P;
+    //   D1 = (2.0 * DMU - 1.0) * (2.0 * DMU + 1.0);
+    //   D2 = 0.0;
+    //   DIV = DDIV;
+    //   P = 0.0;
+    //   Q = 0.0;
+    //   Q0 = D1 / DIV;
+    //   TERM = Q0;
+    //   for (I = 2; I <= 20; ++I) {
+    //     D2 = D2 + 8.0;
+    //     D1 = D1 - D2;
+    //     DIV = DIV + DDIV;
+    //     TERM = -TERM * D1 / DIV;
+    //     P = P + TERM;
+    //     D2 = D2 + 8.0;
+    //     D1 = D1 - D2;
+    //     DIV = DIV + DDIV;
+    //     TERM = TERM * D1 / DIV;
+    //     Q = Q + TERM;
+    //     if (fabs(TERM) <= EPS)
+    //       break;
+    //   }
+    //   P = P + 1.0;
+    //   Q = Q + Q0;
+    //   if (K == 1) {
+    //     YA = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
+    //   } else {
+    //     YA1 = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
+    //   }
+    //   DMU = DMU + 1.0;
+    // }
 
     // Explicitly do k = 1
     P = COSMU;
@@ -824,8 +877,8 @@ int bessel_Yn(int NB, double ALPHA, double X, double *BY) {
     Q = Q + Q0;
     YA = SQ2BPI * (P * COSMU - Q * SINMU) / DEN;
     DMU = DMU + 1.0;
-
-    // Explicitly do k = 2
+ 
+    // Explicitly do k = 2 
     P = COSMU;
     COSMU = SINMU;
     SINMU = -P;

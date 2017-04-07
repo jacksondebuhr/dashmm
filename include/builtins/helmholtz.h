@@ -340,7 +340,7 @@ public:
         new expansion_t{Point{cx, cy, cz}, scale / 2, kTargetPrimary}};
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
-    const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
+    const int tab_alpha[8] = {5, 7, 3, 1, 5, 7, 3, 1}; 
 
     // Get rotation angle
     double alpha = tab_alpha[to_child] * M_PI_4;
@@ -349,11 +349,11 @@ public:
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (to_child < 4 ?
-                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3)) :
-                        builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3)));
     const double *d2 = (to_child < 4 ?
-                        builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3)) :
-                        builtin_helmholtz_table_->dmat_minus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_minus(-1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3)));
 
     // Get precomputed coefficients for shifting along z-axis
     const double *coeff = builtin_helmholtz_table_->l2l(scale);
@@ -1158,55 +1158,55 @@ private:
     if (is_local) {
       for (int n = 0; n <= p; ++n) {
         for (int mp = -n; mp <= -1; ++mp) {
-          MR[curr] = 0;
+          MR[curr] = 0; 
+          
+          // Get L_n^0 
+          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
+          // Get d_n^{mp, 0} 
+          const double *coeff = &d[hidx(n, mp, 0)]; 
 
-          // Get L_n^0
-          const dcomplex_t *Ln = &M[lidx(n, 0)];
-          // Get d_n^{mp, 0}
-          const double *coeff = &d[hidx(n, mp, 0)];
-
-          MR[curr] = Ln[0] * coeff[0];
-          double power_m = -1;
+          MR[curr] = Ln[0] * coeff[0]; 
+          double power_m = -1; 
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]);
-            power_m = -power_m;
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
+            power_m = -power_m; 
           }
-          curr++;
+          curr++; 
         }
 
-        double power_mp = 1;
+        double power_mp = 1; 
         for (int mp = 0; mp <= n; ++mp) {
-          MR[curr] = 0;
+          MR[curr] = 0; 
+          
+          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
+          const double *coeff = &d[hidx(n, mp, 0)]; 
 
-          const dcomplex_t *Ln = &M[lidx(n, 0)];
-          const double *coeff = &d[hidx(n, mp, 0)];
-
-          MR[curr] += Ln[0] * coeff[0];
-          double power_m = -1;
+          MR[curr] += Ln[0] * coeff[0]; 
+          double power_m = -1; 
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]);
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
             power_m = -power_m;
           }
 
-          MR[curr++] *= power_mp;
-          power_mp = -power_mp;
+          MR[curr++] *= power_mp; 
+          power_mp = -power_mp; 
         }
       }
     } else {
       for (int n = 0; n <= p; ++n) {
-        double power_mp = 1;
+        double power_mp = 1; 
         for (int mp = 0; mp <= n; ++mp) {
-          const double *coeff = &d[hidx(n, mp, 0)];
-          const dcomplex_t *Mn = &M[midx(n, 0)];
+          const double *coeff = &d[hidx(n, mp, 0)]; 
+          const dcomplex_t *Mn = &M[midx(n, 0)]; 
 
           MR[curr] = Mn[0] * coeff[0];
-          double power_m = -1;
+          double power_m = -1; 
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]);
+            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]); 
             power_m = -power_m;
           }
 
-          MR[curr++] *= power_mp;
+          MR[curr++] *= power_mp; 
           power_mp = -power_mp;
         }
       }
