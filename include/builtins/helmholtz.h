@@ -319,7 +319,7 @@ public:
     expansion_t *retval{new expansion_t{kTargetPrimary}}; 
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
-    const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
+    const int tab_alpha[8] = {5, 7, 3, 1, 5, 7, 3, 1}; 
 
     // Get rotation angle
     double alpha = tab_alpha[to_child] * M_PI_4;
@@ -328,11 +328,11 @@ public:
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
     const double *d1 = (to_child < 4 ?
-                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3)) :
-                        builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3)));
     const double *d2 = (to_child < 4 ?
-                        builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3)) :
-                        builtin_helmholtz_table_->dmat_minus(-1.0 / sqrt(3)));
+                        builtin_helmholtz_table_->dmat_minus(-1.0 / sqrt(3)) :
+                        builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3)));
 
     // Get precomputed coefficients for shifting along z-axis
     const double *coeff = builtin_helmholtz_table_->l2l(scale);
