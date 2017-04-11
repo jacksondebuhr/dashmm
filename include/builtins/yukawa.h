@@ -61,31 +61,32 @@ public:
   using target_t = Target;
   using expansion_t = Yukawa<Source, Target>;
 
-  Yukawa(Point center, double scale, ExpansionRole role)
+  Yukawa(ExpansionRole role, double scale = 1.0, Point center = Point{})
     : views_{ViewSet{role, center, scale}} {
-
     // View size for each spherical harmonic expansion
     int p = builtin_yukawa_table_->p();
     int nsh = (p + 1) * (p + 2) / 2;
-
-    // View size for each exponential expansion at the current scale level
-    int nexp = builtin_yukawa_table_->nexp(scale);
 
     if (role == kSourcePrimary || role == kTargetPrimary) {
       size_t bytes = sizeof(dcomplex_t) * nsh;
       char *data = new char[bytes]();
       views_.add_view(0, bytes, data);
-    } else if (role == kSourceIntermediate) {
-      size_t bytes = sizeof(dcomplex_t) * nexp;
-      for (int i = 0; i < 6; ++i) {
-        char *data = new char[bytes]();
-        views_.add_view(i, bytes, data);
-      }
-    } else if (role == kTargetIntermediate) {
-      size_t bytes = sizeof(dcomplex_t) * nexp;
-      for (int i = 0; i < 28; ++i) {
-        char *data = new char[bytes]();
-        views_.add_view(i, bytes, data);
+    } else {
+      // View size for each exponential expansion at the current scale level
+      int nexp = builtin_yukawa_table_->nexp(scale);
+
+      if (role == kSourceIntermediate) {
+        size_t bytes = sizeof(dcomplex_t) * nexp;
+        for (int i = 0; i < 6; ++i) {
+          char *data = new char[bytes]();
+          views_.add_view(i, bytes, data);
+        }
+      } else { // role == kTargetIntermediate
+        size_t bytes = sizeof(dcomplex_t) * nexp;
+        for (int i = 0; i < 28; ++i) {
+          char *data = new char[bytes]();
+          views_.add_view(i, bytes, data);
+        }
       }
     }
   }
@@ -121,9 +122,6 @@ public:
 
   int view_count() const { return views_.count(); }
 
-  // This is likely to be removed from the interface
-  void get_views(ViewSet &view) const {}
-
   ViewSet get_all_views() const {return views_;}
 
   ExpansionRole role() const {return views_.role();}
@@ -139,11 +137,10 @@ public:
     return data[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Point center, Source *first,
-                                      Source *last) const {
+  void S_to_M(Source *first, Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, scale, kSourcePrimary}};
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    Point center = views_.center();
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
     double lambda = builtin_yukawa_table_->lambda();
@@ -189,14 +186,12 @@ public:
     delete [] legendre;
     delete [] powers_ephi;
     delete [] bessel;
-
-    return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Point center, Source *first,
-                                      Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{center, scale, kTargetPrimary}};
+    Point center = views_.center();
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
@@ -246,20 +241,9 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> M_to_M(int from_child,
-                                      double s_size) const {
-    // The function is called on the expansion of the child box and \p s_size is
-    // the child box's size.
-    double h = s_size / 2;
-    Point center = views_.center();
-    double px = center.x() + (from_child % 2 == 0 ? h : -h);
-    double py = center.y() + (from_child % 4 <= 1 ? h : -h);
-    double pz = center.z() + (from_child < 4 ? h : -h);
-
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new
-        expansion_t{Point{px, py, pz}, scale * 2, kSourcePrimary}};
-
+    expansion_t *retval{new expansion_t{kSourcePrimary}};
     int p = builtin_yukawa_table_->p();
 
     // Get precomputed Wigner d-matrix for rotation about the y-axis
@@ -307,23 +291,13 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
-  std::unique_ptr<expansion_t> L_to_L(int to_child, double t_size) const {
-    // The function is called on the parent box and \p t_size is its child's
-    // size.
-    Point center = views_.center();
-    double h = t_size / 2;
-    double cx = center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = center.z() + (to_child < 4 ? -h : h);
-
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz},
-          scale / 2, kTargetPrimary}};
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
     const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
@@ -435,7 +409,6 @@ public:
     double *bessel = new double[p + 1];
     dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    //double scale = views_.scale();
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, views_.center());
@@ -500,10 +473,9 @@ public:
     }
   }
 
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const {
+  std::unique_ptr<expansion_t> M_to_I() const {
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{views_.center(),
-          scale, kSourceIntermediate}};
+    expansion_t *retval{new expansion_t{kSourceIntermediate, scale}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     // Addresses of the views
@@ -543,7 +515,7 @@ public:
     const int *f = builtin_yukawa_table_->f();
 
     // Get number of trapezoid points
-    const int *m = builtin_yukawa_table_->m(scale);
+    const int *mk = builtin_yukawa_table_->m(scale);
     const int *smf = builtin_yukawa_table_->smf(scale);
 
     // Get e^{i * m * alpha_j}
@@ -610,7 +582,7 @@ public:
         }
 
         // Compute W(k, j)
-        for (int j = 1; j <= m[k] / 2; ++j) {
+        for (int j = 1; j <= mk[k] / 2; ++j) {
           dcomplex_t up{z1[0] + z2[0]};
           dcomplex_t dn{z1[0] - z2[0]};
           dcomplex_t power_I{0.0, 1.0};
@@ -636,8 +608,7 @@ public:
     return std::unique_ptr<expansion_t>(retval);
   }
 
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
-                                      Index t_index) const {
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     // t_index is the index of the parent node on the target side
 
     // Compute index offsets between the current source node and the 1st child
@@ -645,12 +616,6 @@ public:
     int dx = s_index.x() - t_index.x() * 2;
     int dy = s_index.y() - t_index.y() * 2;
     int dz = s_index.z() - t_index.z() * 2;
-
-    // Compute center of the parent node
-    Point center = views_.center();
-    double px = center.x() + (dx + 0.5) * s_size;
-    double py = center.y() + (dy + 0.5) * s_size;
-    double pz = center.z() + (dz + 0.5) * s_size;
 
     // Exponential expansions on the source side
     double scale = views_.scale();
@@ -668,7 +633,7 @@ public:
     const dcomplex_t *S_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(5));
 
-    ViewSet views{kTargetIntermediate, Point{px, py, pz}, 2 * scale};
+    ViewSet views{kTargetIntermediate};
 
     // Each S is going to generate between 1 and 3 views of the exponential
     // expansions on the target side.
@@ -720,21 +685,14 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
+
     // t_index and t_size is the index and size of the child
-    // Compute child's center
-    double h = t_size / 2;
-    Point center = views_.center();
-    double cx = center.x() + (t_index.x() % 2 == 0 ? -h : h);
-    double cy = center.y() + (t_index.y() % 2 == 0 ? -h : h);
-    double cz = center.z() + (t_index.z() % 2 == 0 ? -h : h);
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
     double scale = views_.scale() / 2;
-    expansion_t *retval{new expansion_t{Point{cx, cy, cz},
-                                        scale, kTargetPrimary}};
-
     int nexp = builtin_yukawa_table_->nexp(scale);
 
     dcomplex_t *E[28]{nullptr};
@@ -1021,7 +979,7 @@ private:
     double scale = views_.scale() / 2;;
     int p = builtin_yukawa_table_->p();
     int s = builtin_yukawa_table_->s();
-    const int *m = builtin_yukawa_table_->m(scale);
+    const int *M = builtin_yukawa_table_->m(scale);
     const int *sm = builtin_yukawa_table_->sm(scale);
     const int *smf = builtin_yukawa_table_->smf(scale);
     const int *f = builtin_yukawa_table_->f();
@@ -1038,7 +996,7 @@ private:
     dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
 
     for (int k = 0; k < s; ++k) {
-      int mk2 = m[k] / 2;
+      int mk2 = M[k] / 2;
 
       // Compute sum_{j=1}^m(k) W(k, j) e^{-i * m * alpha_j}
       dcomplex_t *z = new dcomplex_t[f[k] + 1];
@@ -1072,7 +1030,7 @@ private:
 
       legendre_Plm_gt1_scaled(p, 1 + x[k] / ld, scale, legendre);
 
-      double factor = w[k] / m[k];
+      double factor = w[k] / M[k];
       for (int n = 0; n <= p; ++n) {
         int mmax = (n <= f[k] ? n : f[k]);
         for (int m = 0; m <= mmax; ++m) {
