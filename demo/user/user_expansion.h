@@ -86,7 +86,8 @@ class User {
   //
   // DASHMM expects that the data provided by release() will have been allocated
   // using new char [].
-  User(dashmm::Point center, double scale, dashmm::ExpansionRole role) {
+  User(dashmm::ExpansionRole role, double scale = 1.0,
+       dashmm::Point center = dashmm::Point{}) {
     // If there was more complication to UserData, this next line would need to
     // be modified.
     bytes_ = sizeof(UserData);
@@ -205,57 +206,36 @@ class User {
 
   // This routine will set this expansion to the multipole moments generated
   // by the given sources.
-  std::unique_ptr<User> S_to_M(dashmm::Point center, Source *first,
-                               Source *last) const {
+  std::unique_ptr<User> S_to_M(Source *first, Source *last) const {
     fprintf(stdout, "S->M for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, 1.0,
-                                          dashmm::kSourcePrimary}};
+    return std::unique_ptr<User>{new User{dashmm::kSourcePrimary}};
   }
 
   // This will generate a local expansion at the given center for the
   // given points.
-  std::unique_ptr<User> S_to_L(dashmm::Point center, Source *first,
-                               Source *last) const {
+  std::unique_ptr<User> S_to_L(Source *first, Source *last) const {
     fprintf(stdout, "S->L for %ld sources\n", last - first);
-    return std::unique_ptr<User>{new User{center, 1.0,
-                                          dashmm::kTargetPrimary}};
+    return std::unique_ptr<User>{new User{dashmm::kTargetPrimary}};
   }
 
   // This will translate a multipole expansion from a child node to its parent.
-  std::unique_ptr<User> M_to_M(int from_child, double s_size) const {
+  std::unique_ptr<User> M_to_M(int from_child) const {
     fprintf(stdout, "M->M from child %d\n", from_child);
-    double h = s_size / 2;
-    double px = data_->center.x() + (from_child % 2 == 0 ? h : -h);
-    double py = data_->center.y() + (from_child % 4 <= 1 ? h : -h);
-    double pz = data_->center.z() + (from_child < 4 ? h : -h);
-    return std::unique_ptr<User>{new User{dashmm::Point{px, py, pz},
-                                          1.0, dashmm::kSourcePrimary}};
+    return std::unique_ptr<User>{new User{dashmm::kSourcePrimary}};
   }
 
   // This will translate a multipole expansion into a local expansion.
-  std::unique_ptr<User> M_to_L(dashmm::Index s_index, double s_size,
+  std::unique_ptr<User> M_to_L(dashmm::Index s_index,
                                dashmm::Index t_index) const {
     fprintf(stdout, "M->L\n");
-    int t2s_x = s_index.x() - t_index.x();
-    int t2s_y = s_index.y() - t_index.y();
-    int t2s_z = s_index.z() - t_index.z();
-    double tx = data_->center.x() - t2s_x * s_size;
-    double ty = data_->center.y() - t2s_y * s_size;
-    double tz = data_->center.z() - t2s_z * s_size;
-    return std::unique_ptr<User>{new User{dashmm::Point{tx, ty, tz},
-                                          1.0, dashmm::kTargetPrimary}};
+    return std::unique_ptr<User>{new User{dashmm::kTargetPrimary}};
   }
 
   // This will translate a local expansion from a parent node to one of
   // its children.
-  std::unique_ptr<User> L_to_L(int to_child, double t_size) const {
+  std::unique_ptr<User> L_to_L(int to_child) const {
     fprintf(stdout, "L->L to child %d\n", to_child);
-    double h = t_size / 2;
-    double cx = data_->center.x() + (to_child % 2 == 0 ? -h : h);
-    double cy = data_->center.y() + (to_child % 4 <= 1 ? -h : h);
-    double cz = data_->center.z() + (to_child < 4 ? -h : h);
-    return std::unique_ptr<User>{new User{dashmm::Point{cx, cy, cz},
-                                          1.0, dashmm::kTargetPrimary}};
+    return std::unique_ptr<User>{new User{dashmm::kTargetPrimary}};
   }
 
   // This will compute the effect of a multipole expansion on a set of
@@ -279,26 +259,25 @@ class User {
 
   // This will compute the translation from a source-side multipole moment
   // to a source-side intermediate expansion.
-  std::unique_ptr<expansion_t> M_to_I(dashmm::Index s_index) const {
+  std::unique_ptr<expansion_t> M_to_I() const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
   // This will compute the translation from a source-side intermediate
   // expansion to a target-side intermediate expansion.
-  std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index, double s_size,
+  std::unique_ptr<expansion_t> I_to_I(dashmm::Index s_index,
                                       dashmm::Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
   // This will compute the translation from a target-side intermediate
   // expansion to a target-side local expansion.
-  std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index,
-                                      double t_size) const {
+  std::unique_ptr<expansion_t> I_to_L(dashmm::Index t_index) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
   // The routine will add the provided expansion to this expansion.
-  void add_expansion(const User *temp1) {
+  void add_expansion(const User *temp) {
     fprintf(stdout, "Adding an expansion\n");
   }
 

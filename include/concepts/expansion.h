@@ -75,7 +75,7 @@ class Expansion {
   ///
   /// The scale value that will be provided to the expansion will be provided
   /// by the compute_scale static member of this class.
-  Expansion(Point center, double scale, ExpansionRole role);
+  Expansion(ExpansionRole role, double scale = 1.0, Point center = Point{});
 
   /// The second creates the expansion from previously existing data specified
   /// with a ViewSet object.
@@ -173,8 +173,7 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting multipole expansion
-  std::unique_ptr<expansion_t> S_to_M(Point center, source_t *first,
-                                      source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_M(source_t *first, source_t *last) const;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -187,8 +186,7 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(Point center, source_t *first,
-                                      source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_L(source_t *first, source_t *last) const;
 
   /// Change center of a multipole expansion
   ///
@@ -201,8 +199,7 @@ class Expansion {
   /// \param s_size - the size of the child node
   ///
   /// \returns - The resulting multipole expansion
-  std::unique_ptr<expansion_t> M_to_M(int from_child,
-                                      double s_size) const;
+  std::unique_ptr<expansion_t> M_to_M(int from_child) const;
 
   /// Convert a multipole to a local expansion
   ///
@@ -214,8 +211,7 @@ class Expansion {
   /// \param t_index - the index specifying the target node
   ///
   /// \returns - The resulting local expansion.
-  std::unique_ptr<expansion_t> M_to_L(Index s_index, double s_size,
-                                      Index t_index) const;
+  std::unique_ptr<expansion_t> M_to_L(Index s_index, Index t_index) const;
 
   /// Convert a local expansion to a local expansion for a child
   ///
@@ -227,8 +223,7 @@ class Expansion {
   /// \param t_size - the size of the child node.
   ///
   /// \returns - The resulting local expansion.
-  std::unique_ptr<expansion_t> L_to_L(int to_child,
-                                      double t_size) const;
+  std::unique_ptr<expansion_t> L_to_L(int to_child) const;
 
   /// Apply a multipole expansion to a set of targets
   ///
@@ -257,7 +252,7 @@ class Expansion {
   ///                  applies
   ///
   /// \returns - the resulting intermediate expansion.
-  std::unique_ptr<expansion_t> M_to_I(Index s_index) const;
+  std::unique_ptr<expansion_t> M_to_I() const;
 
   /// Compute an intermediate expansion from an intermediate expansion.
   ///
@@ -269,8 +264,7 @@ class Expansion {
   ///                  expansion should apply.
   ///
   /// \returns - the resulting intermediate expansion.
-  std::unique_ptr<expansion_t> I_to_I(Index s_index, double s_size,
-                                      Index t_index) const;
+  std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const;
 
   /// Compute a local expansion from an intermediate expansion.
   ///
@@ -280,7 +274,7 @@ class Expansion {
   ///                 applies.
   ///
   /// \returns - the resulting local expansion.
-  std::unique_ptr<expansion_t> I_to_L(Index t_index, double t_size) const;
+  std::unique_ptr<expansion_t> I_to_L(Index t_index) const;
 
   /// Add an expansion to this expansion
   void add_expansion(const expansion_t *temp);
