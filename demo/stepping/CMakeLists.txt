@@ -1,4 +1,4 @@
-add_executable(stepping stepping.cc)
+add_executable(stepping EXCLUDE_FROM_ALL stepping.cc)
 include_directories(
   ${HPX_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/include/)

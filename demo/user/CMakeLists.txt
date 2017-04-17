@@ -1,4 +1,4 @@
-add_executable(user usermain.cc)
+add_executable(user EXCLUDE_FROM_ALL usermain.cc)
 include_directories(
   ${HPX_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/include/)

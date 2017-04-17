@@ -12,6 +12,7 @@ pkg_search_module (HPX REQUIRED hpx)
 add_subdirectory(src)
 add_subdirectory(include)
 add_subdirectory(demo)
+add_subdirectory(test)
 
 include (InstallRequiredSystemLibraries)
 set (CPACK_RESOURCE_FILE LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)

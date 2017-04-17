@@ -1,4 +1,4 @@
-add_executable(basic testmain.cc)
+add_executable(basic EXCLUDE_FROM_ALL testmain.cc)
 include_directories(
   ${HPX_INCLUDE_DIRS}
   ${PROJECT_SOURCE_DIR}/include/)
