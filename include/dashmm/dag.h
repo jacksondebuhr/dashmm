@@ -68,6 +68,9 @@ class DAGNode {
   /// Return how many input edges we need
   size_t in_count() const {return in_count_;}
 
+  /// Return the number of out edges
+  size_t out_count() const {return out_edges.size();}
+
   /// Return the index of the related tree node
   Index index() const;
 

@@ -137,10 +137,11 @@ public:
     return data[i];
   }
 
-  void S_to_M(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
+    expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_yukawa_table_->p();
     const double *sqf = builtin_yukawa_table_->sqf();
     double lambda = builtin_yukawa_table_->lambda();
@@ -186,6 +187,8 @@ public:
     delete [] legendre;
     delete [] powers_ephi;
     delete [] bessel;
+
+    return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {

@@ -50,7 +50,7 @@ public:
   using target_t = Target;
   using expansion_t = Helmholtz<Source, Target>;
 
-  Helmholtz(ExpansionRole role, double scale = 1.0, Point center = Point{}) 
+  Helmholtz(ExpansionRole role, double scale = 1.0, Point center = Point{})
     : views_{ViewSet{role, center, scale}} {
     // View size for each spherical harmonic expansion
     int p = builtin_helmholtz_table_->p();
@@ -69,15 +69,15 @@ public:
       // On the source side, propagating waves along the positive and negative
       // direction of a given axis are conjugate of each other. As a result,
       // only the one along the positive direction is saved
-      size_t bytes_p = sizeof(dcomplex_t) * n_p; 
-      size_t bytes_e = sizeof(dcomplex_t) * n_e; 
-      
-      for (int i = 0; i < 3; ++i) {
-        int j = 3 * i; 
+      size_t bytes_p = sizeof(dcomplex_t) * n_p;
+      size_t bytes_e = sizeof(dcomplex_t) * n_e;
 
-        // Propagating wave 
-        char *data1 = new char[bytes_p](); 
-        views_.add_view(j, bytes_p, data1); 
+      for (int i = 0; i < 3; ++i) {
+        int j = 3 * i;
+
+        // Propagating wave
+        char *data1 = new char[bytes_p]();
+        views_.add_view(j, bytes_p, data1);
 
         // Evanescent wave positive axis
         char *data2 = new char[bytes_e]();
@@ -151,10 +151,11 @@ public:
     return data[i];
   }
 
-  void S_to_M(Source *first, Source *last) const {
-    double scale = views_.scale(); 
-    Point center = views_.center(); 
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
+  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
+    double scale = views_.scale();
+    Point center = views_.center();
+    expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p();
     const double *sqf = builtin_helmholtz_table_->sqf();
     double omega = builtin_helmholtz_table_->omega();
@@ -199,13 +200,15 @@ public:
 
     delete [] legendre;
     delete [] powers_ephi;
-    delete [] bessel; 
+    delete [] bessel;
+
+    return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     int p = builtin_helmholtz_table_->p();
     const double *sqf = builtin_helmholtz_table_->sqf();
@@ -259,13 +262,13 @@ public:
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
-    double scale = views_.scale(); 
-    expansion_t *retval{new expansion_t{kSourcePrimary}};  
-    int p = builtin_helmholtz_table_->p(); 
+    double scale = views_.scale();
+    expansion_t *retval{new expansion_t{kSourcePrimary}};
+    int p = builtin_helmholtz_table_->p();
 
-    // Get precomputed Wigner d-matrix for rotation about the y-axis 
-    const double *d1 = (from_child < 4 ? 
-                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3.0)) : 
+    // Get precomputed Wigner d-matrix for rotation about the y-axis
+    const double *d1 = (from_child < 4 ?
+                        builtin_helmholtz_table_->dmat_plus(1.0 / sqrt(3.0)) :
                         builtin_helmholtz_table_->dmat_plus(-1.0 / sqrt(3.0)));
     const double *d2 = (from_child < 4 ?
                         builtin_helmholtz_table_->dmat_minus(1.0 / sqrt(3.0)) :
@@ -304,8 +307,8 @@ public:
     rotate_sph_y(W1, d2, W2, false);
     rotate_sph_z(W2, -alpha, W1, false);
 
-    delete [] W2; 
-    return std::unique_ptr<expansion_t>{retval};    
+    delete [] W2;
+    return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> M_to_L(Index s_indx, Index t_index) const {
@@ -316,10 +319,10 @@ public:
     // The function is called on the parent box and \p t_size is its child's
     // size.
     double scale = views_.scale();
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
 
     // Table of rotation angle about z-axis, as an integer multiple of pi / 4
-    const int tab_alpha[8] = {5, 7, 3, 1, 5, 7, 3, 1}; 
+    const int tab_alpha[8] = {5, 7, 3, 1, 5, 7, 3, 1};
 
     // Get rotation angle
     double alpha = tab_alpha[to_child] * M_PI_4;
@@ -366,13 +369,13 @@ public:
   }
 
   void M_to_T(Target *first, Target *last) const {
-    double scale = views_.scale(); 
-    int p = builtin_helmholtz_table_->p(); 
-    double omega = builtin_helmholtz_table_->omega(); 
-    double *legendre = new double[(p + 1) * (p + 2) / 2]; 
-    dcomplex_t *bessel = new dcomplex_t[p + 1]; 
-    dcomplex_t *powers_ephi = new dcomplex_t[p + 1]; 
-    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0)); 
+    double scale = views_.scale();
+    int p = builtin_helmholtz_table_->p();
+    double omega = builtin_helmholtz_table_->omega();
+    double *legendre = new double[(p + 1) * (p + 2) / 2];
+    dcomplex_t *bessel = new dcomplex_t[p + 1];
+    dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
+    dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, views_.center());
@@ -672,7 +675,7 @@ public:
     dcomplex_t *Evan_mz =
       reinterpret_cast<dcomplex_t *>(views_.view_data(8));
 
-    ViewSet views{kTargetIntermediate}; 
+    ViewSet views{kTargetIntermediate};
     int n_e = builtin_helmholtz_table_->n_e(scale);
     int n_p = builtin_helmholtz_table_->n_p(scale);
     size_t bytes_e = n_e * sizeof(dcomplex_t);
@@ -742,7 +745,7 @@ public:
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
-    expansion_t *retval{new expansion_t{kTargetPrimary}}; 
+    expansion_t *retval{new expansion_t{kTargetPrimary}};
     int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
       (t_index.x() % 2);
 
@@ -757,7 +760,7 @@ public:
       reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
 
     int n_e = builtin_helmholtz_table_->n_e(scale);
-    int n_p = builtin_helmholtz_table_->n_p(scale); 
+    int n_p = builtin_helmholtz_table_->n_p(scale);
     dcomplex_t *S = new dcomplex_t[(n_e + n_p) * 6]();
     dcomplex_t *sProp_mz = S;
     dcomplex_t *sProp_pz = sProp_mz + n_p;
@@ -1121,55 +1124,55 @@ private:
     if (is_local) {
       for (int n = 0; n <= p; ++n) {
         for (int mp = -n; mp <= -1; ++mp) {
-          MR[curr] = 0; 
-          
-          // Get L_n^0 
-          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
-          // Get d_n^{mp, 0} 
-          const double *coeff = &d[hidx(n, mp, 0)]; 
+          MR[curr] = 0;
 
-          MR[curr] = Ln[0] * coeff[0]; 
-          double power_m = -1; 
+          // Get L_n^0
+          const dcomplex_t *Ln = &M[lidx(n, 0)];
+          // Get d_n^{mp, 0}
+          const double *coeff = &d[hidx(n, mp, 0)];
+
+          MR[curr] = Ln[0] * coeff[0];
+          double power_m = -1;
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
-            power_m = -power_m; 
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]);
+            power_m = -power_m;
           }
-          curr++; 
+          curr++;
         }
 
-        double power_mp = 1; 
+        double power_mp = 1;
         for (int mp = 0; mp <= n; ++mp) {
-          MR[curr] = 0; 
-          
-          const dcomplex_t *Ln = &M[lidx(n, 0)]; 
-          const double *coeff = &d[hidx(n, mp, 0)]; 
+          MR[curr] = 0;
 
-          MR[curr] += Ln[0] * coeff[0]; 
-          double power_m = -1; 
+          const dcomplex_t *Ln = &M[lidx(n, 0)];
+          const double *coeff = &d[hidx(n, mp, 0)];
+
+          MR[curr] += Ln[0] * coeff[0];
+          double power_m = -1;
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]); 
+            MR[curr] += (Ln[m] * power_m * coeff[m] + Ln[-m] * coeff[-m]);
             power_m = -power_m;
           }
 
-          MR[curr++] *= power_mp; 
-          power_mp = -power_mp; 
+          MR[curr++] *= power_mp;
+          power_mp = -power_mp;
         }
       }
     } else {
       for (int n = 0; n <= p; ++n) {
-        double power_mp = 1; 
+        double power_mp = 1;
         for (int mp = 0; mp <= n; ++mp) {
-          const double *coeff = &d[hidx(n, mp, 0)]; 
-          const dcomplex_t *Mn = &M[midx(n, 0)]; 
+          const double *coeff = &d[hidx(n, mp, 0)];
+          const dcomplex_t *Mn = &M[midx(n, 0)];
 
           MR[curr] = Mn[0] * coeff[0];
-          double power_m = -1; 
+          double power_m = -1;
           for (int m = 1; m <= n; ++m) {
-            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]); 
+            MR[curr] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]);
             power_m = -power_m;
           }
 
-          MR[curr++] *= power_mp; 
+          MR[curr++] *= power_mp;
           power_mp = -power_mp;
         }
       }
@@ -1217,11 +1220,11 @@ private:
     const int *sm = builtin_helmholtz_table_->sm_e(scale);
     int s = builtin_helmholtz_table_->s_e();
 
-    int offset = 0; 
+    int offset = 0;
     for (int k = 0; k < s; ++k) {
       double factor_z = zs[4 * k + z];
       for (int j = 0; j < m[k] / 2; ++j) {
-        int idx = (sm[k] + j) * 7 + 3; 
+        int idx = (sm[k] + j) * 7 + 3;
         dcomplex_t factor_xy = xs[idx + x] * ys[idx + y];
         M[offset] += W[offset] * factor_z * factor_xy;
         offset++;
@@ -1284,10 +1287,10 @@ private:
         for (int j = 1; j <= mk2; ++j) {
           int widx = sm_e[k] + j - 1;
           int aidx = smf_e[k] + (j - 1) * f_e[k] + m - 1;
-          z[f_e[k] + m] += 
-            (Evan[widx] - conj(Evan[widx])) * conj(ealphaj_e[aidx]); 
-          z[f_e[k] - m] += 
-            (Evan[widx] - conj(Evan[widx])) * ealphaj_e[aidx]; 
+          z[f_e[k] + m] +=
+            (Evan[widx] - conj(Evan[widx])) * conj(ealphaj_e[aidx]);
+          z[f_e[k] - m] +=
+            (Evan[widx] - conj(Evan[widx])) * ealphaj_e[aidx];
         }
       }
 
@@ -1296,91 +1299,91 @@ private:
         for (int j = 1; j <= mk2; ++j) {
           int widx = sm_e[k] + j - 1;
           int aidx = smf_e[k] + (j - 1) * f_e[k] + m - 1;
-          z[f_e[k] + m] += 
-            (Evan[widx] + conj(Evan[widx])) * conj(ealphaj_e[aidx]); 
-          z[f_e[k] - m] += 
-            (Evan[widx] + conj(Evan[widx])) * ealphaj_e[aidx]; 
+          z[f_e[k] + m] +=
+            (Evan[widx] + conj(Evan[widx])) * conj(ealphaj_e[aidx]);
+          z[f_e[k] - m] +=
+            (Evan[widx] + conj(Evan[widx])) * ealphaj_e[aidx];
         }
       }
 
       legendre_Plm_evan_scaled(p, x_e[k] / wd, scale, legendre_e);
 
-      dcomplex_t factor1{0.0, -w_e[k] / wd / m_e[k]}; 
+      dcomplex_t factor1{0.0, -w_e[k] / wd / m_e[k]};
       for (int n = 0; n <= p; ++n) {
-        int mmax = (n <= f_e[k] ? n : f_e[k]); 
+        int mmax = (n <= f_e[k] ? n : f_e[k]);
 
-        // L_n^0 
-        W1[lidx(n, 0)] += z[f_e[k]] * legendre_e[midx(n, 0)] * factor1; 
+        // L_n^0
+        W1[lidx(n, 0)] += z[f_e[k]] * legendre_e[midx(n, 0)] * factor1;
 
         for (int m = 1; m <= mmax; m += 4) {
-          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] * 
-            dcomplex_t{0.0, 1.0}; 
-          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
-          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] *
+            dcomplex_t{0.0, 1.0};
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp;
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp;
         }
 
         for (int m = 2; m <= mmax; m += 4) {
-          dcomplex_t temp = -factor1 * legendre_e[midx(n, m)]; 
-          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
-          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
-        } 
+          dcomplex_t temp = -factor1 * legendre_e[midx(n, m)];
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp;
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp;
+        }
 
         for (int m = 3; m <= mmax; m += 4) {
-          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] * 
-            dcomplex_t{0.0, -1.0}; 
-          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
-          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
-        } 
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)] *
+            dcomplex_t{0.0, -1.0};
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp;
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp;
+        }
 
         for (int m = 4; m <= mmax; m += 4) {
-          dcomplex_t temp = factor1 * legendre_e[midx(n, m)]; 
-          W1[lidx(n, m)] += z[f_e[k] + m] * temp; 
-          W1[lidx(n, -m)] += z[f_e[k] - m] * temp; 
+          dcomplex_t temp = factor1 * legendre_e[midx(n, m)];
+          W1[lidx(n, m)] += z[f_e[k] + m] * temp;
+          W1[lidx(n, -m)] += z[f_e[k] - m] * temp;
         }
       }
-      
+
       delete [] z;
     }
 
     for (int k = 0; k < s_p; ++k) {
-      // Computes sum_{j=1}^{m_p[k]} Prop(k,j) e^{-i * m * alpha_j} 
-      dcomplex_t *z = new dcomplex_t[f_p[k] * 2 + 1](); 
-      
-      // m = 0; 
+      // Computes sum_{j=1}^{m_p[k]} Prop(k,j) e^{-i * m * alpha_j}
+      dcomplex_t *z = new dcomplex_t[f_p[k] * 2 + 1]();
+
+      // m = 0;
       for (int j = 1; j <= m_p[k]; ++j) {
-        int idx = sm_p[k] + j - 1; 
-        z[f_p[k]] += Prop[idx]; 
+        int idx = sm_p[k] + j - 1;
+        z[f_p[k]] += Prop[idx];
       }
 
 
       // m = 1, ..., f_p[k]
       for (int m = 1; m <= f_p[k]; m++) {
         for (int j = 1; j <= m_p[k]; ++j) {
-          int widx = sm_p[k] + j - 1; 
-          int aidx = smf_p[k] + (j - 1) * f_p[k] + m - 1; 
-          z[f_p[k] + m] += conj(ealphaj_p[aidx]) * Prop[widx]; 
-          z[f_p[k] - m] += ealphaj_p[aidx] * Prop[widx]; 
+          int widx = sm_p[k] + j - 1;
+          int aidx = smf_p[k] + (j - 1) * f_p[k] + m - 1;
+          z[f_p[k] + m] += conj(ealphaj_p[aidx]) * Prop[widx];
+          z[f_p[k] - m] += ealphaj_p[aidx] * Prop[widx];
         }
       }
 
-      legendre_Plm_prop_scaled(p, cos(x_p[k]), scale, legendre_p); 
+      legendre_Plm_prop_scaled(p, cos(x_p[k]), scale, legendre_p);
 
-      double factor1 = w_p[k] / m_p[k]; 
+      double factor1 = w_p[k] / m_p[k];
 
       for (int n = 0; n <= p; ++n) {
-        int mmax = (n <= f_p[k] ? n : f_p[k]); 
+        int mmax = (n <= f_p[k] ? n : f_p[k]);
 
-        // Process L_n^0 
-        W1[lidx(n, 0)] += z[f_p[k]] * legendre_p[midx(n, 0)] * factor1; 
-        
+        // Process L_n^0
+        W1[lidx(n, 0)] += z[f_p[k]] * legendre_p[midx(n, 0)] * factor1;
+
         for (int m = 1; m <= mmax; ++m) {
-          // L_n^m 
-          W1[lidx(n, m)] += z[f_p[k] + m] * legendre_p[midx(n, m)] * factor1; 
+          // L_n^m
+          W1[lidx(n, m)] += z[f_p[k] + m] * legendre_p[midx(n, m)] * factor1;
           // L_n^{-m}
-          W1[lidx(n, -m)] += z[f_p[k] - m] * legendre_p[midx(n, m)] * factor1; 
+          W1[lidx(n, -m)] += z[f_p[k] - m] * legendre_p[midx(n, m)] * factor1;
         }
       }
-      delete [] z; 
+      delete [] z;
     }
 
     // Scale the local expansion by

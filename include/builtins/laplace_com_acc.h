@@ -158,9 +158,11 @@ class LaplaceCOMAcc {
   }
 
   void S_to_M(Source *first, Source *last) const {
-    calc_mtot(first, last);
-    calc_xcom(first, last);
-    calc_Q(first, last);
+    expansion_t *temp{new expansion_t{kSourcePrimary}};
+    temp->calc_mtot(first, last);
+    temp->calc_xcom(first, last);
+    temp->calc_Q(first, last);
+    return std::unique_ptr<expansion_t>{temp};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {

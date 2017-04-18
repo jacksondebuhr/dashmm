@@ -1560,27 +1560,6 @@ class DualTree {
     return retval;
   }
 
-  /// Sets the edge lists of the expansion LCOs
-  ///
-  /// This is a separate phase as the DAG is constructed before the LCOs
-  /// serving the work for a DAG node are created. Once the expansion LCOs
-  /// are created, the addresses can then be shared with any LCO that needs
-  /// that information.
-  ///
-  /// This is an asynchronous operation. The work will have started when this
-  /// function returns, but it may not have ended. There is no returned LCO
-  /// as the termination detection cannot trigger before this is done.
-  ///
-  /// \param dag - DAG object
-  void setup_edge_lists(DAG *dag) {
-    DAGNode **sdata = dag->source_nodes.data();
-    size_t n_snodes = dag->source_nodes.size();
-    DAGNode **tdata = dag->target_nodes.data();
-    size_t n_tnodes = dag->target_nodes.size();
-    hpx_call(HPX_HERE, edge_lists_, HPX_NULL,
-             &sdata, &n_snodes, &tdata, &n_tnodes);
-  }
-
   /// Initiate the DAG evaluation
   ///
   /// This starts the work of the evalution by starting the S->* work at the
@@ -2539,27 +2518,21 @@ class DualTree {
 
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
-      std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{kSourcePrimary,
-            expansion_t::compute_scale(node->idx), n_center}
-      };
-      expansionlco_t expand(node->dag.normal()->in_count(),
-                            node->dag.normal()->out_edges.size(),
-                            node->idx, std::move(input_expand),
+      expansionlco_t expand(node->dag.normal(),
+                            node->idx, kSourcePrimary,
+                            expansion_t::compute_scale(node->idx),
+                            n_center,
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
 
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
-      std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{kSourceIntermediate,
-            expansion_t::compute_scale(node->idx), n_center}
-      };
-      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
-                                node->dag.interm()->out_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm(),
                                 node->idx,
-                                std::move(interm_expand),
+                                kSourceIntermediate,
+                                expansion_t::compute_scale(node->idx),
+                                n_center,
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
@@ -2611,27 +2584,22 @@ class DualTree {
 
     // create the normal expansion if needed
     if (node->dag.has_normal() && node->dag.normal()->locality == myrank) {
-      std::unique_ptr<expansion_t> input_expand{
-        new expansion_t{kTargetPrimary,
-            expansion_t::compute_scale(node->idx), n_center}
-      };
-      expansionlco_t expand(node->dag.normal()->in_count(),
-                            node->dag.normal()->out_edges.size(),
-                            node->idx, std::move(input_expand),
+      expansionlco_t expand(node->dag.normal(),
+                            node->idx,
+                            kTargetPrimary,
+                            expansion_t::compute_scale(node->idx),
+                            n_center,
                             rwtree);
       node->dag.set_normal_expansion(expand.lco());
     }
 
     // If there is to be an intermediate expansion, create that
     if (node->dag.has_interm() && node->dag.interm()->locality == myrank) {
-      std::unique_ptr<expansion_t> interm_expand{
-        new expansion_t{kTargetIntermediate,
-            expansion_t::compute_scale(node->idx), n_center}
-      };
-      expansionlco_t intexp_lco(node->dag.interm()->in_count(),
-                                node->dag.interm()->out_edges.size(),
+      expansionlco_t intexp_lco(node->dag.interm(),
                                 node->idx,
-                                std::move(interm_expand),
+                                kTargetIntermediate,
+                                expansion_t::compute_scale(node->idx),
+                                n_center,
                                 rwtree);
       node->dag.set_interm_expansion(intexp_lco.lco());
     }
@@ -2665,32 +2633,6 @@ class DualTree {
                     done, nullptr, 0);
     }
 
-    return HPX_SUCCESS;
-  }
-
-  /// Action to set the edge lists of the LCOs
-  ///
-  /// \param snodes - source DAG nodes
-  /// \param n_snodes - the number of source nodes
-  /// \param tnodes - target DAG nodes
-  /// \param n_tnodes - the number of target nodes
-  ///
-  /// \returns - HPX_SUCCESS
-  static int edge_lists_handler(DAGNode **snodes, size_t n_snodes,
-                                DAGNode **tnodes, size_t n_tnodes) {
-    int myrank = hpx_get_my_rank();
-    for (size_t i = 0; i < n_snodes; ++i) {
-      if (snodes[i]->locality == myrank) {
-        expansionlco_t expand{snodes[i]->global_addx};
-        expand.set_out_edge_data(snodes[i]->out_edges);
-      }
-    }
-    for (size_t i = 0; i < n_tnodes; ++i) {
-      if (tnodes[i]->locality == myrank) {
-        expansionlco_t expand{tnodes[i]->global_addx};
-        expand.set_out_edge_data(tnodes[i]->out_edges);
-      }
-    }
     return HPX_SUCCESS;
   }
 
@@ -2858,7 +2800,7 @@ class DualTree {
         case Operation::StoM:
           {
             expansionlco_t expand{edge[i].target};
-            expand.S_to_M(sources, n_src);
+            expand.S_to_M(sources, n_src, edge[i].idx);
           }
           break;
         case Operation::StoL:
@@ -3159,7 +3101,6 @@ class DualTree {
   static hpx_action_t termination_detection_;
   static hpx_action_t create_S_expansions_from_DAG_;
   static hpx_action_t create_T_expansions_from_DAG_;
-  static hpx_action_t edge_lists_;
   static hpx_action_t instigate_dag_eval_;
   static hpx_action_t instigate_dag_eval_remote_;
 };
@@ -3256,12 +3197,6 @@ template <typename S, typename T,
                     template <typename, typename> class> class M>
 hpx_action_t DualTree<S, T, E, M>::create_T_expansions_from_DAG_ =
     HPX_ACTION_NULL;
-
-template <typename S, typename T,
-          template <typename, typename> class E,
-          template <typename, typename,
-                    template <typename, typename> class> class M>
-hpx_action_t DualTree<S, T, E, M>::edge_lists_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,

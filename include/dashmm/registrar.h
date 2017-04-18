@@ -77,8 +77,7 @@ public:
                         HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         expansionlco_t::spawn_out_edges_,
-                        expansionlco_t::spawn_out_edges_handler,
-                        HPX_INT);
+                        expansionlco_t::spawn_out_edges_handler);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         expansionlco_t::spawn_out_edges_from_remote_,
                         expansionlco_t::spawn_out_edges_from_remote_handler,
@@ -225,10 +224,6 @@ class DualTreeRegistrar {
                         dualtree_t::create_T_expansions_from_DAG_,
                         dualtree_t::create_T_expansions_from_DAG_handler,
                         HPX_ADDR, HPX_POINTER, HPX_POINTER, HPX_ADDR);
-    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        dualtree_t::edge_lists_,
-                        dualtree_t::edge_lists_handler,
-                        HPX_POINTER, HPX_SIZE_T, HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::instigate_dag_eval_,
                         dualtree_t::instigate_dag_eval_handler,
