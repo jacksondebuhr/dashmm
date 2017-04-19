@@ -338,7 +338,7 @@ class Evaluator {
 #endif
     // END EVALUATE
 
-    fprintf(stdout, "Evalute: %d - C/D %lg - A %lg - E %lg\n",
+    fprintf(stdout, "Evaluate: %d - C/D %lg - A %lg - E %lg\n",
             hpx_get_my_rank(),
             distribute_deltat, allocate_deltat, evaluate_deltat);
 
