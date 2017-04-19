@@ -126,7 +126,7 @@ class ExpansionLCO {
 
     // Fill in the values
     ldata->node = dagnode;
-    ldata->yet_to_arrive = dagnode->incount();
+    ldata->yet_to_arrive = dagnode->in_count();
     ldata->index = index;
     ldata->rwaddr = rwtree;
     ldata->center = center;
@@ -166,10 +166,10 @@ class ExpansionLCO {
   ///
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  void S_to_M(Source *sources, size_t n_src, Index idx) {
+  void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOM_BEGIN();
     double scale = expansion_t::compute_scale(idx);
-    ViewSet views{kNoRoleNeeded, Point{}, scale};
+    ViewSet views{kNoRoleNeeded, center, scale};
     expansion_t local{views};
     auto multi = local.S_to_M(sources, &sources[n_src]);
     contribute(std::move(multi));
@@ -392,7 +392,7 @@ class ExpansionLCO {
 
     // Shortcut to the work in the case of a single locality
     if (hpx_get_num_ranks() == 1) {
-      spawn_out_edges_work(head, 0, head->out_edge_count - 1);
+      spawn_out_edges_work(head, out_edges, 0, out_edge_count - 1);
       delete head->data;
       head->data = nullptr;
       hpx_lco_release(lco_, head);
@@ -620,8 +620,9 @@ class ExpansionLCO {
     // serialized data. head->data is an object with the correct interpretation
     // and is _not_ the data this wants. Instead, we do the arithmetic.
     // This is slightly inelegant.
-    char *serial = reinterpret_cast<char *>(head) + head->expansion_size;
-    destination.contribute_M_to_T(head->expansion_size, serial);
+    //char *serial = reinterpret_cast<char *>(head) + sizeof(Header);
+    //destination.contribute_M_to_T(head->expansion_size, serial);
+    destination.contribute_M_to_T(head->data);
   }
 
   /// Serve an L->T edge
@@ -636,8 +637,9 @@ class ExpansionLCO {
     // serialized data. head->data is an object with the correct interpretation
     // and is _not_ the data this wants. Instead, we do the arithmetic.
     // This is slightly inelegant.
-    char *serial = reinterpret_cast<char *>(head) + head->expansion_size;
-    destination.contribute_L_to_T(head->expansion_size, serial);
+    //char *serial = reinterpret_cast<char *>(head) + sizeof(Header);
+    //destination.contribute_L_to_T(head->expansion_size, serial);
+    destination.contribute_L_to_T(head->data);
   }
 
   /// Serve an M->I edge

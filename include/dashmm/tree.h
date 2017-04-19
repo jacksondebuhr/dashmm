@@ -2800,7 +2800,8 @@ class DualTree {
         case Operation::StoM:
           {
             expansionlco_t expand{edge[i].target};
-            expand.S_to_M(sources, n_src, edge[i].idx);
+            Point center = domain.center_from_index(edge[i].idx);
+            expand.S_to_M(center, sources, n_src, edge[i].idx);
           }
           break;
         case Operation::StoL:

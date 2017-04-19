@@ -125,30 +125,53 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_M_to_T(size_t bytes, char *data) const {
-    size_t inputsize = sizeof(MtoT) + bytes;
+  void contribute_M_to_T(expansion_t *expand
+                         /*size_t bytes, char *data*/) const {
+    //say we had an expansion coming in
+    ViewSet views{expand->get_all_views()};
+    size_t inputsize = sizeof(MtoT) + views.bytes();
     MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
-    assert(input);
     input->code = kMtoT;
-    input->bytes = bytes;
-    memcpy(input->data, data, bytes);
+    input->bytes = views.bytes();
+    WriteBuffer serial{(char *)input + sizeof(MtoT), views.bytes()};
+    views.serialize(serial);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
     delete [] input;
+
+    //size_t inputsize = sizeof(MtoT) + bytes;
+    //MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
+    //assert(input);
+    //input->code = kMtoT;
+    //input->bytes = bytes;
+    //memcpy(input->data, data, bytes);
+    //hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
+    //delete [] input;
   }
 
   /// Contribute a L->T operation to the referred targets
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_L_to_T(size_t bytes, char *data) const {
-    size_t inputsize = sizeof(LtoT) + bytes;
+  void contribute_L_to_T(expansion_t *expand
+                         /*size_t bytes, char *data*/) const {
+    ViewSet views{expand->get_all_views()};
+    size_t inputsize = sizeof(LtoT) + views.bytes();
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
-    assert(input);
     input->code = kLtoT;
-    input->bytes = bytes;
-    memcpy(input->data, data, bytes);
+    input->bytes = views.bytes();
+    WriteBuffer serial{(char *)input + sizeof(LtoT), views.bytes()};
+    views.serialize(serial);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
     delete [] input;
+
+    //size_t inputsize = sizeof(LtoT) + bytes;
+    //LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
+    //assert(input);
+    //input->code = kLtoT;
+    //input->bytes = bytes;
+    //memcpy(input->data, data, bytes);
+    //hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
+    //delete [] input;
   }
 
  private:
