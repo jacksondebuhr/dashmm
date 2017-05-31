@@ -189,7 +189,7 @@ class ArrayMapAction {
   /// \param alldone - an LCO to manage completion detection
   /// \param leaf - the leaf action to take
   /// \param env - the environment to pass to the leaf action
-  /// \param data - the global data to be handled by tis action
+  /// \param data - the global data to be handled by this action
   ///
   /// \returns - HPX_SUCCESS
   static int spawn_handler(size_t count, size_t total_count,
