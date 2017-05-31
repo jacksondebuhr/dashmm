@@ -145,6 +145,19 @@ class ExpansionLCO {
   /// Destroy the GAS data referred by the object.
   void destroy() {
     if (data_ != HPX_NULL) {
+      // TODO: We added this to clean up any that did not have the out edges
+      // handled. Figure out why this was needed.
+      //
+      // Does it have to do with nodes that have no out edges? I thought we
+      // were pruning those.
+      void *lva{nullptr};
+      assert(hpx_gas_try_pin(data_, &lva));
+      Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
+      if (ldata->data != nullptr) {
+        delete ldata->data;
+      }
+      hpx_gas_unpin(data_);
+
       hpx_lco_delete_sync(data_);
       data_ = HPX_NULL;
     }
