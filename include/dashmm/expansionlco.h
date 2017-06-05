@@ -393,7 +393,7 @@ class ExpansionLCO {
     // We put the edge data into the record form that we will be using, being
     // sure to sort the edges by locality before doing so.
     int out_edge_count = head->node->out_count();
-    OutEdgeRecord out_edges[out_edge_count];
+    OutEdgeRecord *out_edges = new OutEdgeRecord[out_edge_count];
     std::sort(head->node->out_edges.begin(), head->node->out_edges.end(),
               DAG::compare_edge_locality);
     for (int i = 0; i < out_edge_count; ++i) {
@@ -409,6 +409,7 @@ class ExpansionLCO {
       delete head->data;
       head->data = nullptr;
       hpx_lco_release(lco_, head);
+      delete [] out_edges;
       return HPX_SUCCESS;
     }
 
@@ -477,6 +478,7 @@ class ExpansionLCO {
     delete head->data;
     head->data = nullptr;
     hpx_lco_release(lco_, head);
+    delete [] out_edges;
 
     // done
     return HPX_SUCCESS;
