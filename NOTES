@@ -14,17 +14,17 @@ TODO: The remote stuff should be an RDMA into a preallocated buffer. At least,
 TODO: Decide if the current solution for the DAG vector capacity problem is
       good enough, or if we should instead work toward collecting the tree
       sizes.
-
 TODO: This is likely the big limiter in the short term on problem size. We
       need to improve the memory use of the explicit DAG. If there were a way
       to perhaps clean that up before we really begin the execution that would
       be awesome, or to start to delete it when it begins. But there is a good
       deal of waste and repetition there. The fact of the explicit DAG is nice,
       but it needs to be made more efficient.
-
+          There has been some work on this, and I am not sure if there is not
+          more we can do. Take a look, and if we have basically done it, we
+          should just go ahead and remove this item from this list.
 TODO: Think about if there are places that RDMA could improve the performance.
       That might have us putting more into the GAS.
-
 TODO: be more clear about when an expansion needs to own data and when not.
 TODO: Inside expansionlco.h, we do a forward declaration of DualTree. This seems
       like an inelegant solution, and perhaps one that relies on the
@@ -37,6 +37,10 @@ TODO: From tree.h line 2240
     // local segments unpinned. src_data and trg_data will unpin the segment
     // when the scope we introduce here is closed. Perhaps add unpin(), but
     // that detracts from the RAII nature of the current ArrayData object.
+
+
+Related to Drake's Work
+-----------------------
 TODO: Think about the following issue
   The out edge spawn action will have to be ready to either do the current thing,
   or send an action to the remote locality that will first look up the address
@@ -51,14 +55,28 @@ TODO: Think about the following issue
 TODO: Deal with the return messages about the addresses of the remote LCOs
     (Do we even want to do this? There is an issue with termination detection
      here.)
-TODO: Related to the above: If we are not using AGAS, and probably never will,
-      is there any reason to bind the expansion data into the LCO? That might
-      simplify things quite a bit. It is worth thinking about. We might be
-      able to obviate the need for the ViewSet and all of that crap.
 TODO: Another thing might be to send this to the tree and not the LCO. Then the
       tree can eventually build up a complete list over the iterations.
       Again, there is a termination problem with this, but it is a different
       perspective.
+TODO: Split Evaluate into pieces and expose more interface to users
+    - NOTE: This is not a vital thing to accomplish for 1.0.0
+    - Enable repeat use of a DAG
+    - Potentially provide objects representing the tree and so on to the user
+      and some utility routines to use the resulting objects
+
+
+Related to Silvio's Work
+------------------------
+TODO: Decide if we should also test Hilbert ordering on the top level distrib
+      of the tree. This might have some better locality.
+TODO: Further, should we allow for a non-space-filling curve distribution.
+      This might be a way to make a non-contiguous chunk on the SFC a better
+      overall distribution.
+
+
+Software Engineering/Good Practice Related
+------------------------------------------
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
@@ -70,19 +88,9 @@ TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
           integers for the accuracy.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
-TODO: Decide if we should also test Hilbert ordering on the top level distrib
-      of the tree. This might have some better locality.
-TODO: Further, should we allow for a non-space-filling curve distribution.
-      This might be a way to make a non-contiguous chunk on the SFC a better
-      overall distribution.
 TODO: Documentation clean up throughout
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
-TODO: Split Evaluate into pieces and expose more interface to users
-    - NOTE: This is not a vital thing to accomplish for 1.0.0
-    - Enable repeat use of a DAG
-    - Potentially provide objects representing the tree and so on to the user
-      and some utility routines to use the resulting objects
 TODO: Finish interface
     - NOTE: this is not a vital thing to accomplish for 1.0.0
     - Make it so that an advanced user could call all the needed stuff directly
@@ -94,8 +102,6 @@ TODO: The expansion concept does not allow for access of the kernel parameters.
    a problem, but it could be.
 TODO: Another idea from Bo: Store the edges in one place and then just index
       into that. Cuts down on the representation by quite a bit.
-TODO: Probably don't save the actual expansion data in the LCO. AGAS is not
-      being used, so why protect against it being used in the future.
 TODO: FORTRAN skeleten Expansion. Somehow link to a user's existing FORTRAN
       operations.
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
@@ -115,8 +121,6 @@ TODO: Make the way that Expansions manage their data not suck as much as it
       -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
                    first grant likely.
 TODO: Make S->* static members of Expansion.
-        In a complication, there S->M is now not in the pattern of the rest of
-        the operators. Not sure what to do about this.
 TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
       and so on. Extending this, should we do the same thing for other
       subsystems?
@@ -139,6 +143,8 @@ TODO: Perhaps we want to parameterize the nodes with some user data? So
 TODO: Should we use exceptions in the main interface to return errors? This is
   probably cleaner. the catch is that I would need to work out what happens
   when I emit an exception in an HPX action.
+TODO: ViewSet is not something I particularly like. See if there is a way to
+  make this less awful.
 
 
 
