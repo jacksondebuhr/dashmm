@@ -26,8 +26,10 @@ namespace dashmm {
 
 
 ReturnCode init(int *argc, char ***argv) {
-  if (HPX_SUCCESS != hpx_init(argc, argv)) {
-    return kRuntimeError;
+  if (!hpx_initialized()) {
+    if (HPX_SUCCESS != hpx_init(argc, argv)) {
+      return kRuntimeError;
+    }
   }
 
 #ifdef DASHMM_INSTRUMENTATION
@@ -40,8 +42,10 @@ ReturnCode init(int *argc, char ***argv) {
 }
 
 
-ReturnCode finalize() {
-  hpx_finalize();
+ReturnCode finalize(bool shutdown) {
+  if (shutdown) {
+    hpx_finalize();
+  }
 
   return kSuccess;
 }

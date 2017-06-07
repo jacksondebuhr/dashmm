@@ -50,8 +50,10 @@ ReturnCode init(int *argc, char ***argv);
 /// This will finalize the runtime system supporting DASHMM and will free any
 /// resources claimed by DASHMM.
 ///
+/// \param shutdown - true if DASHMM should shut down the runtime system
+///
 /// \return kSuccess
-ReturnCode finalize();
+ReturnCode finalize(bool shutdown = true);
 
 
 } // namespace dashmm
