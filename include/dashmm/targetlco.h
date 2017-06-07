@@ -152,8 +152,7 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_L_to_T(expansion_t *expand
-                         /*size_t bytes, char *data*/) const {
+  void contribute_L_to_T(expansion_t *expand) const {
     ViewSet views{expand->get_all_views()};
     size_t inputsize = sizeof(LtoT) + views.bytes();
     LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
@@ -163,15 +162,6 @@ class TargetLCO {
     views.serialize(serial);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
     delete [] input;
-
-    //size_t inputsize = sizeof(LtoT) + bytes;
-    //LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
-    //assert(input);
-    //input->code = kLtoT;
-    //input->bytes = bytes;
-    //memcpy(input->data, data, bytes);
-    //hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
-    //delete [] input;
   }
 
  private:

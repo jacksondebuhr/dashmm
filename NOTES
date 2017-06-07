@@ -77,6 +77,7 @@ TODO: Further, should we allow for a non-space-filling curve distribution.
 
 Software Engineering/Good Practice Related
 ------------------------------------------
+TODO: Update INSTALL for the fact of cmake
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
@@ -109,21 +110,17 @@ TODO: Should we explicitly enforce the singleton nature of Evaluator?
          users.)
 
 ========================================
-This that definitely would break the API
+Things that definitely would break the API
 ========================================
-
 
 TODO: Make the way that Expansions manage their data not suck as much as it
       does now. Really. There is a strange complicated dance happening with
       all of this, and it will be easy for a user to muck it up.
-      -----> NOTE: this will mean breaking changes, and a definite bump to
-                   2.0.0.
-      -----> NOTE: This seems like we are going to get 2.0.0 by the end of the
-                   first grant likely.
-TODO: Make S->* static members of Expansion.
-TODO: should we put all the DAG stuff into a namespace DAG? So dashmm::DAG::Edge
-      and so on. Extending this, should we do the same thing for other
-      subsystems?
+TODO: ViewSet is not something I particularly like. See if there is a way to
+  make this less awful. (This is basically the same as above)
+TODO: should we put all the DAG stuff into a namespace DAG? So 
+      dashmm::dag::Edge and so on. Extending this, should we do the same thing 
+      for other subsystems?
         This would be okay, but what would DAG turn into? dag::DAG? That's
         pretty goofy...
 TODO: Work out if there is a better way to apply the distribution. We shall
@@ -134,17 +131,16 @@ TODO: Work out if there is a better way to apply the distribution. We shall
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
   * It would be nice if we were to decouple some of the use of the tree and the
-  construction of the tree. The ultimate goal would be to perhaps allow the user
-  to supply their tree to us, like if they had a better method to make it, or
-  if their code already needs to make a tree for some reason. Then DASHMM could
-  just do the DAG and so on. This would also allow us to try other constructions
-  more easily. We basically would be able to hot swap implementations. Also,
-  this might make it simpler to make a tree that can update adiabadically.
+  construction of the tree. The ultimate goal would be to perhaps allow the 
+  user to supply their tree to us, like if they had a better method to make 
+  it, or if their code already needs to make a tree for some reason. Then 
+  DASHMM could just do the DAG and so on. This would also allow us to try 
+  other constructions more easily. We basically would be able to hot swap 
+  implementations. Also, this might make it simpler to make a tree that can 
+  update adiabadically.
 TODO: Should we use exceptions in the main interface to return errors? This is
   probably cleaner. the catch is that I would need to work out what happens
   when I emit an exception in an HPX action.
-TODO: ViewSet is not something I particularly like. See if there is a way to
-  make this less awful.
 
 
 
@@ -154,8 +150,8 @@ TODO: ViewSet is not something I particularly like. See if there is a way to
 
 
 FUTURE BUILT-INs
- * We should also in the near term get a base nearest neighbor search. This will
-   be essential for SPH and Phil's MFV methods.
+ * We should also in the near term get a base nearest neighbor search. This 
+   will be essential for SPH and Phil's MFV methods.
    This would be useful in much wider contexts, however.
  * Do LaplaceCOM with softened force (ala GADGET)
  * Do one for Ewald technique for periodic BCs
