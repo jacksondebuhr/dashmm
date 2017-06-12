@@ -311,7 +311,7 @@ SegmentCollator SQLiteWriter::EventTable(
       " WorkerId INTEGER,"
       " TimeNs INTEGER,"
       " PRIMARY KEY (id),"
-      " FOREIGN KEY (TypeId) REFERENCES Eventtype (id),"
+      " FOREIGN KEY (TypeId) REFERENCES Eventtype (id)"
       " FOREIGN KEY (Locality) REFERENCES Locality (id),"
       " FOREIGN KEY (WorkerId) REFERENCES Worker (id));"};
     SQLiteStatement makeit{db_, creation};
@@ -349,7 +349,7 @@ SegmentCollator SQLiteWriter::EventTable(
           tstart.Reset(false);
         }
 
-        if (!workseg.collate(evt, genid.curr())) {
+        if (!workseg.collate(evt, genid.curr(), loc, gid)) {
           fprintf(stderr, "Event id %lu - Event type '%s'\n", genid.curr(),
                   evt->event_type().c_str());
           throw std::runtime_error("Something with segments.");
@@ -373,7 +373,7 @@ SegmentCollator SQLiteWriter::EventTable(
       segments.combine(workseg);
     });
 
-    if (tcounter > 0 && tcounter < 100000) {
+    if (tcounter > 0 && tcounter < 10000) {
       while (tend.Step()) { }
     }
   }
@@ -393,17 +393,24 @@ void SQLiteWriter::SegmentTable(const SegmentCollator &segs) {
       " SegmentId INTEGER,"
       " StartEvent INTEGER,"
       " EndEvent INTEGER,"
+      " StartNs INTEGER,"
+      " EndNs INTEGER,"
+      " Locality INTEGER,"
+      " WorkerId INTEGER,"
       " PRIMARY KEY(id),"
       " FOREIGN KEY (StartEvent) REFERENCES Event(id),"
-      " FOREIGN KEY (EndEvent) REFERENCES Event(id));"};
+      " FOREIGN KEY (EndEvent) REFERENCES Event(id),"
+      " FOREIGN KEY (Locality) REFERENCES Locality (id),"
+      " FOREIGN KEY (WorkerId) REFERENCES Worker (id));"};
     SQLiteStatement makeit{db_, creation};
     while (makeit.Step()) { }
   }
 
   { // INSERT
     std::string addrow{
-      "INSERT INTO Segment (id, SegmentId, StartEvent, EndEvent)"
-      "  VALUES (?, ?, ?, ?);"};
+      "INSERT INTO Segment (id, SegmentId, StartEvent, EndEvent,"
+      "  StartNs, EndNs, Locality, WorkerId)"
+      "  VALUES (?, ?, ?, ?, ?, ?, ?, ?);"};
     SQLiteStatement addit{db_, addrow};
 
     std::string transtart{"BEGIN TRANSACTION;"};
@@ -425,6 +432,10 @@ void SQLiteWriter::SegmentTable(const SegmentCollator &segs) {
       addit.Bind(2, (sqlite3_int64)curr->segment());
       addit.Bind(3, (sqlite3_int64)curr->begin());
       addit.Bind(4, (sqlite3_int64)curr->end());
+      addit.Bind(5, (sqlite3_int64)curr->start());
+      addit.Bind(6, (sqlite3_int64)curr->finish());
+      addit.Bind(7, (sqlite3_int64)curr->locality());
+      addit.Bind(8, (sqlite3_int64)curr->workerId());
       while (addit.Step()) { }
       addit.Reset();
 
@@ -435,7 +446,7 @@ void SQLiteWriter::SegmentTable(const SegmentCollator &segs) {
       }
     }
 
-    if (tcounter > 0 && tcounter < 100000) {
+    if (tcounter > 0 && tcounter < 10000) {
       while (tend.Step()) { }
     }
   }

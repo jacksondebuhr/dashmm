@@ -18,10 +18,14 @@ class Segment {
       : id_{-1},
         begin_{-1},
         end_{-1},
+        loc_{-1},
+        worker_{-1},
+        start_{0},
+        finish_{0},
         has_begin_{false},
         has_end_{false} { }
 
-  bool claim(const Event *evt, int eid) {
+  bool claim(const Event *evt, int eid, int loc, int worker) {
     if (full()) {
       fprintf(stderr, "Segment is already full\n");
       return false;
@@ -35,9 +39,16 @@ class Segment {
       }
       begin_ = eid;
       has_begin_ = true;
+      start_ = evt->stamp();
+      loc_ = loc;
+      worker_ = worker;
     } else if (!has_end_) {
       if (evt->segment_type() != id_) {
         fprintf(stderr, "ERROR: segment type does not match\n");
+        return false;
+      }
+      if (loc != loc_ || worker_ != worker) {
+        fprintf(stderr, "ERROR: locality and worker do not match\n");
         return false;
       }
       if (!evt->end()) {
@@ -46,6 +57,7 @@ class Segment {
       }
       end_ = eid;
       has_end_ = true;
+      finish_ = evt->stamp();
     }
 
     return true;
@@ -56,11 +68,19 @@ class Segment {
   int segment() const {return id_;}
   int begin() const {return begin_;}
   int end() const {return end_;}
+  uint64_t start() const {return start_;}
+  uint64_t finish() const {return finish_;}
+  int locality() const {return loc_;}
+  int workerId() const {return worker_;}
 
  private:
   int id_;
   int begin_;
   int end_;
+  int loc_;
+  int worker_;
+  uint64_t start_;
+  uint64_t finish_;
   bool has_begin_;
   bool has_end_;
 };
@@ -70,7 +90,7 @@ class SegmentCollator {
  public:
   SegmentCollator() : partial_{}, full_{} { }
 
-  bool collate(const Event *evt, int eid) {
+  bool collate(const Event *evt, int eid, int loc, int worker) {
     int sid = evt->segment_type();
     if (sid == 0) return true;
 
@@ -85,7 +105,7 @@ class SegmentCollator {
     }
 
     // claim the event
-    if (!(partial_[sid])->claim(evt, eid)) {
+    if (!(partial_[sid])->claim(evt, eid, loc, worker)) {
       return false;
     }
 

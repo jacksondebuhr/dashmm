@@ -70,9 +70,23 @@ int main(int argc, char **argv) {
     fprintf(stdout, "Time window: [%lg %lg] (ms)\n",
             minns / 1.0e6, maxns / 1.0e6);
 
+    /*
+    auto window = runtrace.window(minns, maxns);
+    std::vector<int> segs{};
+    for (int seg = traceutils::segment::kDASHMMStoT;
+         seg <= traceutils::segment::kDASHMMItoL; ++seg) {
+      segs.push_back(seg);
+    }
+
+    traceutils::Utilization util{runtrace};
+    util("test.txt", minns, maxns, 100, segs);
+    //*/
+
     // now go ahead and put it out as an SQLite database
+    //*
     traceutils::SQLiteWriter out{"trace.db", runtrace};
     out.write();
+    //*/
 
 
   } catch (std::runtime_error &err) {
