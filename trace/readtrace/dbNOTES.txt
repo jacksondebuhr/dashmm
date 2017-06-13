@@ -88,3 +88,39 @@ StartEvent INTEGER FOREIGN KEY REFERENCES Event.id
 
 EndEvent INTEGER FOREIGN KEY REFERENCES Event.id
   The id of the final event in this segment
+
+StartNs INTEGER
+  The timestamp of the starting event
+
+EndNs INTEGER
+  The timestamp of the ending event
+
+Locality INTEGER FOREIGN KEY REFERENCES Locality.id
+  The locality on which this segment occurred
+
+WorkerId INTEGER FOREIGN KEY REFERENCES Worker.id
+  The worker that performed the work of this segment
+
+
+
+OKAY: How do we collect what we want?
+===============================================
+
+These will get the range of the trace in timestamp space.
+
+> SELECT min(TimeNs) FROM Event;
+> SELECT max(TimeNs) FROM Event;
+
+We can then divide these results to get at the bins and widths and things
+in time.
+
+
+To answer the question of how many segments were in a timeframe, something
+like
+
+> SELECT SegmentId, count(SegmentId) FROM Segment
+> ... WHERE StartNs >= $start || EndNs >= $start || StartNs <= $end || EndNs <= $end
+> ... GROUP BY SegmentId;
+
+This gives a list of counts of any segments overlapping the given interval.
+So instead, we can just collect the records, and process them for overlap.

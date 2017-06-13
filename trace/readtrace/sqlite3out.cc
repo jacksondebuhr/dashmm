@@ -169,6 +169,8 @@ void SQLiteWriter::WorkerTable() {
       addit.Bind(1, (sqlite3_int64)w.gid());
       addit.Bind(2, (sqlite3_int64)w.id());
       addit.Bind(3, (sqlite3_int64)w.locality());
+      while (addit.Step()) { }
+      addit.Reset();
     });
   }
   fprintf(stdout, "DONE\n"); fflush(stdout);
