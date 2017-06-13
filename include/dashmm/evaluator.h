@@ -270,12 +270,11 @@ class Evaluator {
 
   //HANDLES FOR ITERATIVE
 
-  static int create_tree_handler(const Array<source_t> &sources, const Array<source_t> &targets, 									 int &refinement_limit){
+  static int create_tree_handler(const Array<source_t> &sources, const Array<target_t> &targets, 									 int &refinement_limit){
 		// BEGIN TREE CREATION
     hpx_time_t creation_begin = hpx_time_now();
     RankWise<dualtree_t> global_tree =
-        dualtree_t::create(refinement_limit, sources,
-                           targets);
+    dualtree_t::create(refinement_limit, sources, targets);
     hpx_addr_t partitiondone =
         dualtree_t::partition(global_tree, sources, targets);
     hpx_lco_wait(partitiondone);
