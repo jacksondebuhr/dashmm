@@ -40,6 +40,8 @@ int spmd_test_handler(){
 	int* my_array = new int[num_ranks];
 	my_array[my_rank] = my_rank;
 
+	//wait on an LCO before exiting
+	
 	std::cout<<"Leaving broadcast handler"<<std::endl;
 	hpx_exit(sizeof(int*),&my_array);
 }
@@ -109,6 +111,10 @@ int clean(hpx_addr_t grid){
 	return e;
 }
  
+
+
+
+
 int main(int argc, char *argv[]) {
   // initialize hpx 
   if (hpx_init(&argc, &argv)) {
@@ -125,10 +131,12 @@ int main(int argc, char *argv[]) {
 
 	//create an array of ranks from multiple localities
 	int* my_array = spmd_test();
-	for(int i=0;i<hpx_get_num_ranks();++i){
-		std::cout<<my_array[i]<<" "<<std::endl;
-	}
 
+	if(get_my_rank() == 0){
+		for(int i=0;i<hpx_get_num_ranks();++i){
+			std::cout<<my_array[i]<<" "<<std::endl;
+		}
+	}
   //free some global memory
 	int e = clean(grid);
 
