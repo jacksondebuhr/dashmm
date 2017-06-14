@@ -18,7 +18,7 @@
 
 /// \file
 /// \brief Definition of DASHMM Evaluator object
-
+#include <iostream>
 
 #include <hpx/hpx.h>
 #include <libhpx/libhpx.h>
@@ -105,16 +105,17 @@ class Evaluator {
 	//REGISTER ACTIONS FOR ITERATIVE
 	
 	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, 
-						create_tree_, create_tree_handler, 
-						HPX_POINTER, HPX_POINTER, HPX_INT);
-
+												create_tree_, create_tree_handler, 
+												HPX_ADDR, HPX_ADDR, HPX_INT);
+					
 	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         create_DAG_, create_DAG_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_INT, 
+												HPX_POINTER, HPX_POINTER, HPX_ADDR);
 
 	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         do_eval_, do_eval_handler,
-                        HPX_POINTER);
+                        HPX_ADDR, HPX_ADDR);
 
 	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         clear_DAG_, clear_DAG_handler,
@@ -127,27 +128,47 @@ class Evaluator {
 
 	//INTERFACE FUNCTIONS FOR ITERATIVE 
 	
-	RankWise<dualtree_t> create_tree(const Array<source_t> &sources, const Array<source_t> &targets, 										 								int &refinement_limit){
-		RankWise<dualtree_t> global_tree;
-		hpx_run(&create_tree_, &global_tree, &sources, &targets, &refinement_limit);
-		return global_tree;
+	hpx_addr_t create_tree(const Array<source_t> &sources, const Array<source_t> &targets, 										 								int refinement_limit){
+		//rwaddr holds points to the global_tree
+		hpx_addr_t rwaddr = HPX_NULL;
+		hpx_addr_t sources_addr = sources.data();
+		hpx_addr_t targets_addr = targets.data();
+
+		hpx_run(&create_tree_, &rwaddr, &sources_addr, &targets_addr, &refinement_limit);
+		return rwaddr;
 	}
 
-	DAG**	create_DAG(const RankWise<dualtree_t> &global_tree, int &n_digit, 
-										const std::vector<double> &kernelparams, distropolicy_t &distro, 
-										method_t &method){
+	hpx_addr_t create_DAG(hpx_addr_t rwaddr, const method_t &method, int n_digits, 
+												const std::vector<double> &kernel_params, 
+												const distropolicy_t &distro = distropolicy_t { }){
+
+		int n_params = kernel_params.size(); 
+		const double* kernelparams = &kernel_params[0];
+		const distropolicy_t* distro_ptr = &distro;
+		const method_t* method_ptr = &method;
+
+		hpx_addr_t middone = hpx_lco_and_new(hpx_get_num_ranks());
+    assert(middone != HPX_NULL);
+
 		//dags holds the local adresses of the dag for each locality 
-		DAG** dags;		
-		hpx_run_spmd(&create_DAG_, &dags, &global_tree, &n_digit, &kernelparams, &distro, &method);
-		return dags;
+		RankWise<DAG*> dags{HPX_NULL};
+		dags.allocate(); //How to get access to setting an induvidual element?
+		RankLocal<DAG*> my_dag_ptr = dags.here();
+		DAG* cur_rank_dag;
+		hpx_run_spmd(&create_DAG_, &cur_rank_dag, &rwaddr, &n_digits, &kernelparams, &n_params, 
+																			&distro_ptr, &method_ptr, &middone);
+		*my_dag_ptr = cur_rank_dag;
+
+		hpx_addr_t dags_rwaddr = dags.data();
+		return dags_rwaddr;
+	}
+
+	int do_eval(hpx_addr_t rwaddr, hpx_addr_t dags_rwaddr){
+		int e = hpx_run_spmd(&do_eval_, NULL, &rwaddr, &dags_rwaddr);
+		return e;
 	}
 
 //Only consider the above for now
-
-	int do_eval(DAG &dag){
-		int e = hpx_run_spmd(&do_eval_, NULL, &dag);
-		return e;
-	}
 
 	int	clear_DAG(DAG &dag){
 		int e = hpx_run_spmd(&clear_DAG_, NULL, &dag);
@@ -270,20 +291,25 @@ class Evaluator {
 
   //HANDLES FOR ITERATIVE
 
-  static int create_tree_handler(const Array<source_t> &sources, const Array<target_t> &targets, 									 int &refinement_limit){
+  static int create_tree_handler(hpx_addr_t sources_addr, hpx_addr_t targets_addr, 
+																int refinement_limit){
+	
+		Array<source_t> sources{sources_addr};
+		Array<target_t> targets{targets_addr};
+
 		// BEGIN TREE CREATION
-    hpx_time_t creation_begin = hpx_time_now();
-    RankWise<dualtree_t> global_tree =
-    dualtree_t::create(refinement_limit, sources, targets);
+    hpx_time_t creation_begin = hpx_time_now(); 
+		RankWise<dualtree_t> global_tree =
+    dualtree_t::create(refinement_limit, sources, targets); 
+
     hpx_addr_t partitiondone =
-        dualtree_t::partition(global_tree, sources, targets);
+        dualtree_t::partition(global_tree, sources, targets); 
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
     hpx_time_t creation_end = hpx_time_now();
     double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
     fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
     // END TREE CREATION
-
 		// Save tree global address in message
     hpx_addr_t rwaddr = global_tree.data();
 
@@ -293,28 +319,26 @@ class Evaluator {
     hpx_addr_t alldone = hpx_lco_and_new(hpx_get_num_ranks());
     assert(alldone != HPX_NULL);
     // The third is the expansion creation done LCO
-    hpx_addr_t middone = hpx_lco_and_new(hpx_get_num_ranks());
-    assert(middone != HPX_NULL);
+    
 		//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-		hpx_exit(sizeof(RankWise<dualtree_t>), &global_tree);
+		hpx_exit(sizeof(hpx_addr_t), &rwaddr);
   }
 
-  static int create_DAG_handler(const RankWise<dualtree_t> &global_tree, int &n_digit, 
-																const std::vector<double> &kernelparams, distropolicy_t &distro, 
-																method_t &method){
+  static int create_DAG_handler(hpx_addr_t rwaddr, int n_digits, 
+																double* kernelparams, int n_params, distropolicy_t* distro_ptr, 
+																method_t* method_ptr, hpx_addr_t middone){
+		distropolicy_t distro = *distro_ptr;		
+		method_t method = *method_ptr;
+		
+
 		// Generate the table
-    //RankWise<dualtree_t> global_tree{parms->rwaddr};
+    RankWise<dualtree_t> global_tree{rwaddr};
     auto tree = global_tree.here();
     double domain_size = tree->domain()->size();
 
-		/*//Problems:
-    size_t n_params = (msg_size - sizeof(EvaluateParams)) / sizeof(double);
-    std::vector<double> kernel_params(parms->kernelparams,
-                                      &parms->kernelparams[n_params]); //ASK JACKSON ABOUT THIS
-		//end Problems
-
-    expansion_t::update_table(n_digits, domain_size, kernel_params);*/
+    //copy kernel params into a vector to update the table
+    std::vector<double> kernel_params(kernelparams, &kernelparams[n_params]);
+    expansion_t::update_table(n_digits, domain_size, kernel_params);
     tree->set_method(method);
 
     // Get ready to evaluate
@@ -322,86 +346,15 @@ class Evaluator {
     hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     distro.compute_distribution(*dag);
-    //if (hpx_get_my_rank() == 0) {
-    //  dag->printedges(hpx_get_num_ranks());
-    //}
+   
     hpx_time_t distribute_end = hpx_time_now();
     double distribute_deltat = hpx_time_diff_us(distribute_begin,
                                                 distribute_end);
-    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-    //        distribute_deltat);
     // END DISTRIBUTE
 
     // BEGIN ALLOCATE
     hpx_time_t allocate_begin = hpx_time_now();
 
-		//Problems:
-    /*tree->create_expansions_from_DAG(parms->rwaddr);
-
-    // NOTE: the previous has to finish for the following. So the previous
-    // is a synchronous operation. The next three, however, are not. They all
-    // get their work going when they come to it and then they return.
-    hpx_lco_and_set(parms->middone, HPX_NULL);
-    hpx_lco_wait(parms->middone);
-    hpx_time_t allocate_end = hpx_time_now();
-    double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
-    // END ALLOCATE
-		//end Problems*/
-
-		//create an array of DAG* to keep track of each localities dag
-		int num_ranks = hpx_get_num_ranks(); //CONSIDER SAVING IN A VARIABLE
-		int my_rank = hpx_get_my_rank();
-		DAG** dags = new DAG* [num_ranks];
-		dags[my_rank] = dag;
-
-		hpx_exit(sizeof(DAG**),dags);
-  }
-
-  static int do_eval_handler(DAG** dags){
-		
-	}
-
-  static int clear_DAG_handler(){}
-  static int clear_tree_handler(){}
-
-  //Local handlers for iterative 
-
-  //this creates the table and the DAG 
-  /*static int create_table_rank_local_handler(const RankWise<dualtree_t> &global_tree, int &n_digits, 
-																						const std::vector<double> &kernelparams, distropolicy_t, 
-																						&distro, method_t &method){
-	
-	// Generate the table
-    auto tree = global_tree.here();
-    double domain_size = tree->domain()->size();
-
-    //size_t n_params = (msg_size - sizeof(EvaluateParams)) / sizeof(double);
-    //std::vector<double> kernel_params(parms->kernelparams,
-                                      //&parms->kernelparams[n_params]);
-
-	//make a copy of the kernel parameters
-	std::vector<double> kernel_params(kernelparams);
-    expansion_t::update_table(n_digits, domain_size, kernel_params);
-    tree->set_method(method);
-
-	// Get ready to evaluate
-    // BEGIN DISTRIBUTE
-    hpx_time_t distribute_begin = hpx_time_now();
-    DAG *dag = tree->create_DAG();
-    distro.compute_distribution(*dag);
-    //if (hpx_get_my_rank() == 0) {
-    //  dag->printedges(hpx_get_num_ranks());
-    //}
-    hpx_time_t distribute_end = hpx_time_now();
-    double distribute_deltat = hpx_time_diff_us(distribute_begin,
-                                                distribute_end);
-    //fprintf(stdout, "Evaluate: DAG creation and distribution: %lg [us]\n",
-    //        distribute_deltat);
-    // END DISTRIBUTE
-
-    // BEGIN ALLOCATE
-    hpx_time_t allocate_begin = hpx_time_now();
     tree->create_expansions_from_DAG(rwaddr);
 
     // NOTE: the previous has to finish for the following. So the previous
@@ -414,8 +367,60 @@ class Evaluator {
     //fprintf(stdout, "Evaluate: LCO allocation: %lg [us]\n", allocate_deltat);
     // END ALLOCATE
 
-	return HPX_SUCCESS;
-  }*/
+		if (hpx_get_my_rank() == 0) {
+			std::cout<<"about to print edges"<<std::endl;
+    	dag->printedges(hpx_get_num_ranks());
+    }
+
+		hpx_exit(sizeof(DAG*),dag);
+  }
+
+  static int do_eval_handler(hpx_addr_t rwaddr, hpx_addr_t dags_rwaddr){
+		std::cout<<"In do_eval_handler"<<std::endl;
+		RankWise<dualtree_t> global_tree{rwaddr};
+    auto tree = global_tree.here();
+		//get the rank respective dag from the global list of dags
+		RankWise<DAG*> dags{dags_rwaddr};
+		DAG* dag = *(dags.here()); //This doesn't exist or points to trash
+
+		std::cout<<dag<<std::endl;
+		dag->printedges(hpx_get_num_ranks());
+		
+		std::cout<<"got the local dag and tree"<<std::endl;
+
+		// BEGIN EVALUATE
+#ifdef DASHMM_INSTRUMENTATION
+    libhpx_inst_phase_begin();
+    // This is repeated, because the previous call is an atomic operation with
+    // a relaxed memory model. That means the first of these only sometimes
+    // will emit an event. In (simple and likely incomplete) testing, two
+    // is sufficient to always emit at least one.
+    EVENT_TRACE_DASHMM_ZEROREF();
+    EVENT_TRACE_DASHMM_ZEROREF();
+#endif
+		std::cout<<"About to evaluate"<<std::endl;
+    hpx_time_t evaluate_begin = hpx_time_now();
+
+		//SEGFAULT HERE
+    tree->start_DAG_evaluation(global_tree, dag);std::cout<<"here"<<std::endl;
+
+
+    hpx_addr_t heredone = tree->setup_termination_detection(dag);
+    hpx_lco_wait(heredone);
+    hpx_time_t evaluate_end = hpx_time_now();
+    double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
+    //fprintf(stdout, "Evaluate: DAG evaluation: %lg [us]\n", evaluate_deltat);
+
+#ifdef DASHMM_INSTRUMENTATION
+    libhpx_inst_phase_end();
+#endif
+    // END EVALUATE
+		std::cout<<"Leaving do_eval_handler"<<std::endl;
+		hpx_exit(0, nullptr);		
+	}
+
+  static int clear_DAG_handler(){}
+  static int clear_tree_handler(){}
 
   /// The evaluation action implementation
   ///

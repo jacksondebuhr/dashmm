@@ -275,22 +275,14 @@ void perform_time_stepping(InputArguments args) {
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
   // Time-stepping
-
-	//Build the Tree and the Dag before iteratively evaluating
-	hpx_addr_t tree_addr = bheval.create_tree(source_handle, source_handle, 
-																						args.refinement_limit);
-	hpx_addr_t dags_addr = bheval.create_DAG (tree_addr,method, 0, 
-																						std::vector<double>{});
   for (int step = 0; step < args.steps; ++step) {
     if (dashmm::get_my_rank() == 0) {
       fprintf(stdout, "Starting step %d...\n", step);
     }
 
     double t0 = getticks();
-    //err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
-                          //method, 0, std::vector<double>{});
-		err = bheval.do_eval(tree_addr, dags_addr);
-	
+    err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
+                          method, 0, std::vector<double>{});
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
@@ -302,8 +294,6 @@ void perform_time_stepping(InputArguments args) {
     t_eval += elapsed(t1, t0);
     t_update += elapsed(t2, t1);
   }
-	//Clean the Tree and the Dag
-	
 
   // Report on loop
   fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
