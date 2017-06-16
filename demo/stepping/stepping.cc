@@ -302,8 +302,9 @@ void perform_time_stepping(InputArguments args) {
     t_eval += elapsed(t1, t0);
     t_update += elapsed(t2, t1);
   }
-	//Clean the Tree and the Dag
-	
+	//Clear the Tree and the Dag
+	bheval.clear_DAG(dags_addr);
+	bheval.clear_tree(tree_addr);
 
   // Report on loop
   fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
