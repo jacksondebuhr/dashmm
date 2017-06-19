@@ -153,6 +153,17 @@ class DAG {
                                  || op == Operation::StoT;
   }
 
+  /// partition the nodes by local vs remote
+  void partitionLocal(int locality) {
+    auto loc_comp = [&locality](const DAGNode *a) -> bool {
+      return a->locality == locality;
+    };
+    std::partition(source_leaves.begin(), source_leaves.end(), loc_comp);
+    std::partition(target_leaves.begin(), target_leaves.end(), loc_comp);
+    std::partition(source_nodes.begin(), source_nodes.end(), loc_comp);
+    std::partition(target_nodes.begin(), target_nodes.end(), loc_comp);
+  }
+
   void printedges(int n);
 
   std::vector<DAGNode *> source_leaves;

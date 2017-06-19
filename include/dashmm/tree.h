@@ -50,9 +50,14 @@
 namespace dashmm {
 
 
-// This is in the user interface
-// NOTE: Will this change?
-using TreeHandler = hpx_addr_t;
+// TODO: Will this change?
+/// Handle to a tree.
+///
+/// This is an opaque object that should only be used as a handle by the
+/// users of DASHMM. Note that this is a handle, and should be freely 
+/// copied as it merely references the underlying data, and does not own that
+/// data.
+using DualTreeHandle = hpx_addr_t;
 
 // Forward declare Registrars for the objects in this file
 template <typename Record>
@@ -1578,11 +1583,11 @@ class DualTree {
   void start_DAG_evaluation(RankWise<dualtree_t> &global_tree, DAG *dag) {
     hpx_addr_t rwaddr = global_tree.data();
 
-    // Sort by locality
+    // The DAG nodes are sorted local vs not. Find the partition point
     int rank = hpx_get_my_rank();
-    auto partition_point = std::partition(
+    auto partition_point = std::partition_point(
       dag->source_leaves.begin(), dag->source_leaves.end(),
-      [rank](const DAGNode *a) -> bool {
+      [&rank](const DAGNode *a) -> bool {
         return a->locality == rank;
       });
     size_t count = partition_point - dag->source_leaves.begin();

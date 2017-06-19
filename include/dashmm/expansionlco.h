@@ -114,9 +114,9 @@ class ExpansionLCO {
                Point center,
                hpx_addr_t rwtree) {
     // Create the LCO
-    size_t bytes = 0;
+    int yta = dagnode->in_count();
     data_ = hpx_lco_user_new(sizeof(Header), init_, operation_, predicate_,
-                             &bytes, sizeof(bytes));
+                             &yta, sizeof(yta));
     assert(data_ != HPX_NULL);
 
     // Now get a ref to the data
@@ -126,7 +126,6 @@ class ExpansionLCO {
 
     // Fill in the values
     ldata->node = dagnode;
-    ldata->yet_to_arrive = dagnode->in_count();
     ldata->index = index;
     ldata->rwaddr = rwtree;
     ldata->center = center;
@@ -148,20 +147,19 @@ class ExpansionLCO {
     // while this happens.
     hpx_lco_reset_sync(data_);
 
-    // According to HPX-5 docs, the reset does nothing to the underlying
-    // LCO buffer, except in the case of UserLCO where it reruns the original
-    // initialization action. In this case, that action did nothing, so any
-    // data set should still be good. So all we need to do is set the counter
-    // yet_to_arrive and redo the call_when.
     void *lva{nullptr};
     assert(hpx_gas_try_pin(data_, &lva));
     Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
-    ldata->yet_to_arrive = dagnode->in_count();
-    hpx_gas_unpin(data_);
 
-    if (dagnode->out_count() != 0) {
+    // According to HPX-5 docs, the reset does nothing to the underlying
+    // LCO buffer, except in the case of UserLCO where it reruns the original
+    // initialization action. In this case, that action only sets the 
+    // yet_to_arrive counter, so all the other data should be good to go.
+    if (ldata->node->out_count() != 0) {
       hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL);
     }
+
+    hpx_gas_unpin(data_);
   }
 
   /// Destroy the GAS data referred by the object.
@@ -325,7 +323,9 @@ class ExpansionLCO {
   /// \param init - the initialization data for the LCO
   /// \param init_bytes - the size of the initialization data for the LCO
   static void init_handler(Header *head, size_t bytes,
-                           size_t *init, size_t init_bytes) { }
+                           int *init, size_t init_bytes) {
+    head->yet_to_arrive = *init;
+  }
 
   /// The set operation handler for the Expansion LCO
   ///
