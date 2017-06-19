@@ -91,6 +91,13 @@ class TargetLCO {
     assert(lco_ != HPX_NULL);
   }
 
+  void reset() {
+    // We use the synchronous version because this is called to from
+    // a parallel region, so we can assume that other threads make progress
+    // while this happens.
+    hpx_lco_reset_sync(lco_);
+  }
+
   /// Destroy the LCO
   void destroy() {
     if (lco_ != HPX_NULL) {

@@ -55,9 +55,13 @@ class DAGNode {
     : out_edges{}, locality{-1}, color{0},
       global_addx{HPX_NULL}, parent_{p}, in_count_{0} { }
 
+  ~DAGNode() {
+    parent->remove_node(this);
+  }
+
   /// Utility routine to add an edge to the DAG
   void add_out_edge(DAGNode *end, Operation op, int weight) {
-    out_edges.push_back(DAGEdge{/*this,*/ end, op, weight});
+    out_edges.push_back(DAGEdge{end, op, weight});
   }
 
   /// Utility routine to track a new input edge
@@ -122,6 +126,22 @@ class DAG {
  public:
   DAG() : source_leaves{}, source_nodes{}, target_nodes{}, target_leaves{} { }
 
+  // TODO: improve this to use unique_ptr to make this automatic
+  ~DAG() {
+    for (size_t i = 0; i < source_leaves.size(); ++i) {
+      delete source_leaves[i];
+    }
+    for (size_t i = 0; i < source_nodes.size(); ++i) {
+      delete source_nodes[i];
+    }
+    for (size_t i = 0; i < target_nodes.size(); ++i) {
+      delete target_nodes[i];
+    }
+    for (size_t i = 0; i < target_leaves.size(); ++i) {
+      delete target_leaves[i];
+    }
+  }
+
   /// Comparison routine that will used to sort edges by locality
   static bool compare_edge_locality(const DAGEdge &a, const DAGEdge &b) {
     return (a.target->locality < b.target->locality);
@@ -185,18 +205,6 @@ class DAGInfo {
   /// outside of an HPX-5 thread.
   ~DAGInfo() {
     hpx_lco_delete_sync(lock_);
-    if (normal_) {
-      delete normal_;
-      normal_ = nullptr;
-    }
-    if (interm_ != nullptr) {
-      delete interm_;
-      interm_ = nullptr;
-    }
-    if (parts_ != nullptr) {
-      delete parts_;
-      parts_ = nullptr;
-    }
   }
 
   /// Return the index of the associated Tree Node
@@ -276,6 +284,19 @@ class DAGInfo {
 
   /// Return the source or target DAG node
   DAGNode *parts() const {return parts_;}
+
+  /// Remove a DAG node
+  void remove_node(DAGNode *child) {
+    if (child != nullptr) {
+      if (normal_ == child) {
+        normal_ = nullptr;
+      } else if (interm_ == child) {
+        interm_ = nullptr;
+      } else if (parts_ == child) {
+        parts_ = nullptr;
+      }
+    }
+  }
 
   /// Sets the global data for the normal DAG node
   ///

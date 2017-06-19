@@ -142,6 +142,28 @@ class ExpansionLCO {
     }
   }
 
+  void reset() {
+    // We use the synchronous version because this is called to from
+    // a parallel region, so we can assume that other threads make progress
+    // while this happens.
+    hpx_lco_reset_sync(data_);
+
+    // According to HPX-5 docs, the reset does nothing to the underlying
+    // LCO buffer, except in the case of UserLCO where it reruns the original
+    // initialization action. In this case, that action did nothing, so any
+    // data set should still be good. So all we need to do is set the counter
+    // yet_to_arrive and redo the call_when.
+    void *lva{nullptr};
+    assert(hpx_gas_try_pin(data_, &lva));
+    Header *ldata = static_cast<Header *>(hpx_lco_user_get_user_data(lva));
+    ldata->yet_to_arrive = dagnode->in_count();
+    hpx_gas_unpin(data_);
+
+    if (dagnode->out_count() != 0) {
+      hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL);
+    }
+  }
+
   /// Destroy the GAS data referred by the object.
   void destroy() {
     if (data_ != HPX_NULL) {
@@ -253,18 +275,6 @@ class ExpansionLCO {
 
     // NOTE: No release is needed. The argument will go out of scope at this
     // point, and the data will be freed.
-  }
-
-  /// Reset the underlying LCO
-  ///
-  /// This will not only reset the underlying LCO, but will also perform an
-  /// 'empty' set of the out edge data. The intent of this method is for use
-  /// in cases where a DAG is reused multiple times. At the moment, this
-  /// functionality is not available in DASHMM, but will be soon.
-  void reset() {
-    if (data_ == HPX_NULL) return;
-
-    hpx_lco_reset_sync(data_);
   }
 
  private:

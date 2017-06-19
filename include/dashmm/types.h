@@ -70,6 +70,7 @@ enum ExpansionRole {
   kNoRoleNeeded = 4
 };
 
+
 /// Operation codes to indicate the type of edge
 enum class Operation {
   Nop,

@@ -49,6 +49,11 @@
 
 namespace dashmm {
 
+
+// This is in the user interface
+// NOTE: Will this change?
+using TreeHandler = hpx_addr_t;
+
 // Forward declare Registrars for the objects in this file
 template <typename Record>
 class NodeRegistrar;
