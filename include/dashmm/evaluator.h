@@ -102,75 +102,82 @@ class Evaluator {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         evaluate_cleanup_, evaluate_cleanup_handler,
                         HPX_ADDR, HPX_ADDR, HPX_ADDR);
-	//REGISTER ACTIONS FOR ITERATIVE
+	  //REGISTER ACTIONS FOR ITERATIVE
 	
-	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, 
+	  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE, 
 												create_tree_, create_tree_handler, 
 												HPX_ADDR, HPX_ADDR, HPX_INT);
 					
-	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+	  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         create_DAG_, create_DAG_handler,
                         HPX_ADDR, HPX_INT, HPX_POINTER, HPX_INT, 
 												HPX_POINTER, HPX_POINTER);
 
-	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        do_eval_, do_eval_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
+	  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        execute_DAG_, execute_DAG_handler,
+                        HPX_ADDR, HPX_POINTER, HPX_ADDR);
 
-	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        clear_DAG_, clear_DAG_handler,
-                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        reset_DAG_, reset_DAG_handler,
+                        HPX_POINTER);
 
-	HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        clear_tree_, clear_tree_handler,
+	  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        destroy_DAG_, destroy_DAG_handler,
+                        HPX_POINTER);
+
+	  HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        destroy_tree_, destroy_tree_handler,
                         HPX_ADDR);
-  }
+    }
 
 	//INTERFACE FUNCTIONS FOR ITERATIVE 
 	
-	hpx_addr_t create_tree(const Array<source_t> &sources, const Array<source_t> &targets, 										 								int refinement_limit){
+	hpx_addr_t create_tree(const Array<source_t> &sources, const Array<source_t> 
+                         &targets, int refinement_limit) {
 		//rwaddr holds points to the global_tree
 		hpx_addr_t rwaddr = HPX_NULL;
 		hpx_addr_t sources_addr = sources.data();
 		hpx_addr_t targets_addr = targets.data();
 
-		hpx_run(&create_tree_, &rwaddr, &sources_addr, &targets_addr, &refinement_limit);
+		hpx_run(&create_tree_, &rwaddr, &sources_addr, &targets_addr, 
+            &refinement_limit);
 		return rwaddr;
 	}
 
-	hpx_addr_t create_DAG(hpx_addr_t rwaddr, const method_t &method, int n_digits, 
+	DAG* create_DAG(hpx_addr_t rwaddr, const method_t &method, int n_digits, 
 												const std::vector<double> &kernel_params, 
-												const distropolicy_t &distro = distropolicy_t { }){
+												const distropolicy_t &distro = distropolicy_t { }) {
 
 		int n_params = kernel_params.size(); 
 		const double* kernelparams = &kernel_params[0];
 		const distropolicy_t* distro_ptr = &distro;
 		const method_t* method_ptr = &method;
 
-		hpx_addr_t dags_rwaddr = HPX_NULL;
-		hpx_run_spmd(&create_DAG_, &dags_rwaddr, &rwaddr, &n_digits, &kernelparams, &n_params, 
-																			&distro_ptr, &method_ptr);
-		return dags_rwaddr;
+		DAG* dag = nullptr;
+		hpx_run_spmd(&create_DAG_, &dag, &rwaddr, &n_digits, &kernelparams, 
+                 &n_params, &distro_ptr, &method_ptr);
+		return dag;
 	}
 
-	int do_eval(hpx_addr_t rwaddr, hpx_addr_t dags_rwaddr){
-		std::cout<<"In do_eval"<<std::endl;
-
+	int execute_DAG(hpx_addr_t rwaddr, DAG* dag) {
 		hpx_addr_t middone = hpx_lco_and_new(hpx_get_num_ranks());
     assert(middone != HPX_NULL);
 
-		int e = hpx_run_spmd(&do_eval_, NULL, &rwaddr, &dags_rwaddr, &middone);
-		std::cout<<"Leaving do_eval"<<std::endl;
+		int e = hpx_run_spmd(&execute_DAG_, NULL, &rwaddr, &dag, &middone);
 		return e;
 	}
 
-	int	clear_DAG(hpx_addr_t dags_rwaddr){
-		int e = hpx_run_spmd(&clear_DAG_, NULL, &dags_rwaddr);
+  int reset_DAG(DAG* dag) {
+    return 0;
+  }
+
+	int	destroy_DAG(DAG* dag) {
+		int e = hpx_run_spmd(&destroy_DAG_, NULL, &dag);
 		return e;
 	}
 
-	int	clear_tree(hpx_addr_t rwaddr){
-		int e = hpx_run(&clear_tree_, NULL, &rwaddr);
+	int	destroy_tree(hpx_addr_t rwaddr) {
+		int e = hpx_run(&destroy_tree_, NULL, &rwaddr);
 		return e;
 	}
 	
@@ -225,7 +232,7 @@ class Evaluator {
     size_t n_params = kernelparams.size();
     size_t total_size = sizeof(EvaluateParams) + n_params * sizeof(double);
     EvaluateParams *args =
-        reinterpret_cast<EvaluateParams *>(new char[total_size]); //CONSIDER CHANGING
+        reinterpret_cast<EvaluateParams *>(new char[total_size]);
     args->sources = sources;
     args->targets = targets;
     args->refinement_limit = refinement_limit;
@@ -265,9 +272,10 @@ class Evaluator {
   //The actions for repeated evaluation
   static hpx_action_t create_tree_;
   static hpx_action_t create_DAG_;
-  static hpx_action_t do_eval_;
-  static hpx_action_t clear_DAG_;
-  static hpx_action_t clear_tree_; 
+  static hpx_action_t execute_DAG_;
+  static hpx_action_t reset_DAG_;
+  static hpx_action_t destroy_DAG_;
+  static hpx_action_t destroy_tree_; 
 
   /// Parameters to evaluations
   struct EvaluateParams {
@@ -285,8 +293,9 @@ class Evaluator {
 
   //HANDLES FOR ITERATIVE
 
-  static int create_tree_handler(hpx_addr_t sources_addr, hpx_addr_t targets_addr, 
-																int refinement_limit){
+  static int create_tree_handler(hpx_addr_t sources_addr, 
+                                 hpx_addr_t targets_addr, 
+																 int refinement_limit) {
 	
 		Array<source_t> sources{sources_addr};
 		Array<target_t> targets{targets_addr};
@@ -312,8 +321,10 @@ class Evaluator {
   }
 
   static int create_DAG_handler(hpx_addr_t rwaddr, int n_digits, 
-																double* kernelparams, int n_params, distropolicy_t* distro_ptr, 
-																method_t* method_ptr){
+																double* kernelparams, int n_params,
+                                distropolicy_t* distro_ptr, 
+																method_t* method_ptr) {
+
 		distropolicy_t distro = *distro_ptr;		
 		method_t method = *method_ptr;
 		
@@ -340,23 +351,14 @@ class Evaluator {
             distribute_deltat);
     // END DISTRIBUTE
 
-		//make a rankwise object to hold the dag at each rank
-		RankWise<DAG*> dags;
-		dags.allocate();
-		//RankLocal<DAG*> local_rank_dag = dags.here();
-		*(dags.here()) = dag;
-		hpx_addr_t dags_rwaddr = dags.data();
-
-		hpx_exit(sizeof(hpx_addr_t),&dags_rwaddr);
+    //return a pointer to the Dag at this rank 
+		hpx_exit(sizeof(DAG*), &dag);
   }
 
-  static int do_eval_handler(hpx_addr_t rwaddr, hpx_addr_t dags_rwaddr, hpx_addr_t middone){
-		std::cout<<"In do_eval_handler"<<std::endl;
+  static int execute_DAG_handler(hpx_addr_t rwaddr, DAG* dag, 
+                                 hpx_addr_t middone) {
 		RankWise<dualtree_t> global_tree{rwaddr};
     auto tree = global_tree.here();
-		//get the rank respective dag from the global list of dags
-		RankWise<DAG*> dags{dags_rwaddr};
-		DAG* dag = *(dags.here());
 
 		// BEGIN ALLOCATE
     hpx_time_t allocate_begin = hpx_time_now();
@@ -404,22 +406,19 @@ class Evaluator {
 		hpx_lco_delete_sync(heredone);
 		hpx_lco_delete_sync(middone);
 		tree->destroy_DAG_LCOs(*dag);
-		std::cout<<"Leaving do_eval_handler"<<std::endl;
 		hpx_exit(0, nullptr);		
 	}
 
-  static int clear_DAG_handler(hpx_addr_t dags_rwaddr){
-		//free the dag local to each rank
-		RankWise<DAG*> dags{dags_rwaddr};
-		DAG* dag = *(dags.here());
+  static int reset_DAG_handler(DAG* dag) {
+    hpx_exit(0, nullptr);
+  }
+
+  static int destroy_DAG_handler(DAG* dag) {
 		delete dag;
-		//free the global rankwise object
-		dags.destroy();
-		
 		hpx_exit(0, nullptr);
 	}
 
-  static int clear_tree_handler(hpx_addr_t rwaddr){
+  static int destroy_tree_handler(hpx_addr_t rwaddr) {
     // clean up tree and table
     RankWise<dualtree_t> global_tree{rwaddr};
     dualtree_t::destroy(global_tree);
@@ -635,19 +634,25 @@ template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::do_eval_ = HPX_ACTION_NULL;
+hpx_action_t Evaluator<S, T, E, M>::execute_DAG_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::clear_DAG_ = HPX_ACTION_NULL;
+hpx_action_t Evaluator<S, T, E, M>::reset_DAG_ = HPX_ACTION_NULL;
 
 template <typename S, typename T,
           template <typename, typename> class E,
           template <typename, typename,
                     template <typename, typename> class> class M>
-hpx_action_t Evaluator<S, T, E, M>::clear_tree_ = HPX_ACTION_NULL;
+hpx_action_t Evaluator<S, T, E, M>::destroy_DAG_ = HPX_ACTION_NULL;
+
+template <typename S, typename T,
+          template <typename, typename> class E,
+          template <typename, typename,
+                    template <typename, typename> class> class M>
+hpx_action_t Evaluator<S, T, E, M>::destroy_tree_ = HPX_ACTION_NULL;
 
 } // namespace dashmm
 
