@@ -275,23 +275,15 @@ void perform_time_stepping(InputArguments args) {
   dashmm::BH<Particle, Particle, dashmm::LaplaceCOMAcc> method{0.6};
 
   // Time-stepping
-
-	//Build the Tree and the Dag before iteratively evaluating
-	dashmm::DualTreeHandle tree_addr =
-      bheval.create_tree(source_handle, source_handle, args.refinement_limit);
-  std::vector<double> kparm{};
-	auto dag = bheval.create_DAG(tree_addr, 0, &kparm, &method);
-
   for (int step = 0; step < args.steps; ++step) {
     if (dashmm::get_my_rank() == 0) {
       fprintf(stdout, "Starting step %d...\n", step);
     }
 
     double t0 = getticks();
-    //err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
-                          //method, 0, std::vector<double>{});
-		err = bheval.execute_DAG(tree_addr, dag.get());
-
+    std::vector<double> kparm{};
+    err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
+                          &method, 0, &kparm);
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
@@ -299,15 +291,10 @@ void perform_time_stepping(InputArguments args) {
     source_handle.map(update_action, &dt);
     double t2 = getticks();
 
-    bheval.reset_DAG(dag.get());
-
     // Collect timing
     t_eval += elapsed(t1, t0);
     t_update += elapsed(t2, t1);
   }
-	//Clear the Tree and the Dag
-	bheval.destroy_DAG(tree_addr, std::move(dag));
-	bheval.destroy_tree(tree_addr);
 
   // Report on loop
   fprintf(stdout, "\nEvaluation took %lg [us]\n", t_eval);
