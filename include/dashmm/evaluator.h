@@ -100,16 +100,17 @@ class Evaluator {
                         HPX_ADDR, HPX_ADDR, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         create_DAG_, create_DAG_handler,
-                        HPX_ADDR, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_INT, HPX_POINTER,
+                        HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         execute_DAG_, execute_DAG_handler,
-                        HPX_ADDR, HPX_INT, HPX_POINTER, HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         reset_DAG_, reset_DAG_handler,
                         HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         destroy_DAG_, destroy_DAG_handler,
-                        HPX_ADDR. HPX_POINTER);
+                        HPX_ADDR, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         destroy_tree_, destroy_tree_handler,
                         HPX_ADDR);
@@ -126,7 +127,7 @@ class Evaluator {
   /// This will create a DualTree object from the given sources and targets
   /// and the given refinement limit. This is a synchronous call that should
   /// only be called from outside the runtime. The tree is an object managed
-  /// by DASHMM that can be referred to by the returned handle. To destroy 
+  /// by DASHMM that can be referred to by the returned handle. To destroy
   /// the tree resulting from this method, see destroy_tree() below.
   ///
   /// \param sources - the Array of source data
@@ -135,7 +136,7 @@ class Evaluator {
   ///
   /// \returns - a handle to the DualTree
   DualTreeHandle create_tree(const Array<source_t> &sources,
-                             const Array<source_t> &targets,
+                             const Array<target_t> &targets,
                              int refinement_limit) {
     hpx_addr_t sources_addr{sources.data()};
     hpx_addr_t targets_addr{targets.data()};
@@ -163,11 +164,14 @@ class Evaluator {
   ///
   /// \returns - the DAG object for this locality.
   std::unique_ptr<DAG> create_DAG(DualTreeHandle tree,
+                                  int n_digits,
+                                  const std::vector<double> *kernel_params,
                                   const method_t *method,
                                   distropolicy_t distro = distropolicy_t{}) {
     const distropolicy_t *distro_ptr{&distro};
     DAG *dag{nullptr};
-    hpx_run_spmd(&create_DAG_, &dag, &tree, &distro_ptr, &method);
+    hpx_run_spmd(&create_DAG_, &dag, &tree, &n_digits, &kernel_params,
+                 &method, &distro_ptr);
     return std::unique_ptr<DAG>{dag};
   }
 
@@ -193,12 +197,9 @@ class Evaluator {
   ///
   /// \returns - kSuccess or kRuntimeError when there is trouble in the
   ///            runtime.
-  ReturnCode execute_DAG(DualTreeHandle tree, 
-                         int n_digits,
-                         const std::vector<double> *kernel_params, 
+  ReturnCode execute_DAG(DualTreeHandle tree,
                          DAG *dag) {
-    if (HPX_SUCCESS == hpx_run_spmd(&execute_DAG_, nullptr, &tree, 
-                                    &n_digits, &kernel_params, &dag)) {
+    if (HPX_SUCCESS == hpx_run_spmd(&execute_DAG_, nullptr, &tree, &dag)) {
       return kSuccess;
     } else {
       return kRuntimeError;
@@ -247,7 +248,7 @@ class Evaluator {
 
   /// Destroy a DualTree
   ///
-  /// This will destroy and let the system reclaim any resources used by a 
+  /// This will destroy and let the system reclaim any resources used by a
   /// DualTree.
   ///
   /// \param tree - a handle to a DualTree
@@ -306,7 +307,8 @@ class Evaluator {
                       int n_digits, const std::vector<double> *kernelparams,
                       distropolicy_t distro = distropolicy_t{}) {
     DualTreeHandle tree = create_tree(sources, targets, refinement_limit);
-    auto dag = create_DAG(tree, method, n_digits, kernelparams, distro);
+    auto dag = create_DAG(tree, n_digits, kernelparams,
+                          method, distro);
     if (kRuntimeError == execute_DAG(tree, dag.get())) {
       // TODO: what do we do about that? How to clean up?
       // These are a real problem.
@@ -351,12 +353,12 @@ class Evaluator {
     Array<target_t> targets{targets_addr};
 
     hpx_time_t creation_begin = hpx_time_now();
-    RankWise<dualtree_t> global_tree = dualtree_t::create(refinement_limit, 
-                                                          sources, 
+    RankWise<dualtree_t> global_tree = dualtree_t::create(refinement_limit,
+                                                          sources,
                                                           targets);
 
-    hpx_addr_t partitiondone = dualtree_t::partition(global_tree, 
-                                                     sources, 
+    hpx_addr_t partitiondone = dualtree_t::partition(global_tree,
+                                                     sources,
                                                      targets);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
@@ -369,12 +371,16 @@ class Evaluator {
   }
 
   static int create_DAG_handler(hpx_addr_t rwaddr,
-                                const distropolicy_t *distro_ptr,
-                                const method_t *method_ptr) {
+                                int n_digits,
+                                const std::vector<double> *kernel_params,
+                                const method_t *method_ptr,
+                                const distropolicy_t *distro_ptr) {
     RankWise<dualtree_t> global_tree{rwaddr};
     auto tree = global_tree.here();
     method_t method{*method_ptr};
     tree->set_method(method);
+    double domain_size = tree->domain()->size();
+    expansion_t::update_table(n_digits, domain_size, *kernel_params);
 
     // This creates and distributes the explicit DAG
     hpx_time_t distribute_begin = hpx_time_now();
@@ -403,13 +409,10 @@ class Evaluator {
     hpx_exit(sizeof(DAG *), &dag);
   }
 
-  static int execute_DAG_handler(hpx_addr_t rwaddr, int n_digits,
-                                const std::vector<double> *kernel_params, 
-                                DAG *dag) {
+  static int execute_DAG_handler(hpx_addr_t rwaddr,
+                                 DAG *dag) {
     RankWise<dualtree_t> global_tree{rwaddr};
     auto tree = global_tree.here();
-    double domain_size = tree->domain()->size();
-    expansion_t::update_table(n_digits, domain_size, *kernel_params);
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_begin();
@@ -466,14 +469,16 @@ class Evaluator {
     reset_something_LCOs(nodes, reset_target_LCOs_);
   }
 
-  static void reset_something_LCOs(std::vector<DAGNode *> &nodes, 
+  static void reset_something_LCOs(std::vector<DAGNode *> &nodes,
                                    hpx_action_t act) {
+    if (nodes.size() == 0) return;
+
     int rank = hpx_get_my_rank();
     auto loc_comp = [&rank](const DAGNode * a) -> bool {
       return a->locality == rank;
     };
-    auto part_point = std::partition_point(nodes.begin(), 
-                                           nodes.end(), 
+    auto part_point = std::partition_point(nodes.begin(),
+                                           nodes.end(),
                                            loc_comp);
     size_t count = part_point - nodes.begin();
 
@@ -489,7 +494,6 @@ class Evaluator {
     hpx_addr_t done = hpx_lco_and_new(n_workers);
 
     DAGNode **data = nodes.data();
-    size_t parc_size = 2 * sizeof(DAGNode *);
     for (size_t start = 0; start < count; start += delta) {
       size_t end = start + delta;
       if (end > count) {

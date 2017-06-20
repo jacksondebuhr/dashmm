@@ -277,9 +277,10 @@ void perform_time_stepping(InputArguments args) {
   // Time-stepping
 
 	//Build the Tree and the Dag before iteratively evaluating
-	hpx_addr_t tree_addr = bheval.create_tree(source_handle, source_handle, 
-																						args.refinement_limit);
-	dashmm::DAG* dag = bheval.create_DAG (tree_addr,method, 0, std::vector<double>{});
+	dashmm::DualTreeHandle tree_addr =
+      bheval.create_tree(source_handle, source_handle, args.refinement_limit);
+  std::vector<double> kparm{};
+	auto dag = bheval.create_DAG(tree_addr, 0, &kparm, &method);
 
   for (int step = 0; step < args.steps; ++step) {
     if (dashmm::get_my_rank() == 0) {
@@ -289,8 +290,8 @@ void perform_time_stepping(InputArguments args) {
     double t0 = getticks();
     //err = bheval.evaluate(source_handle, source_handle, args.refinement_limit,
                           //method, 0, std::vector<double>{});
-		err = bheval.execute_DAG(tree_addr, dag);
-	
+		err = bheval.execute_DAG(tree_addr, dag.get());
+
     assert(err == dashmm::kSuccess);
     double t1 = getticks();
 
@@ -298,12 +299,14 @@ void perform_time_stepping(InputArguments args) {
     source_handle.map(update_action, &dt);
     double t2 = getticks();
 
+    bheval.reset_DAG(dag.get());
+
     // Collect timing
     t_eval += elapsed(t1, t0);
     t_update += elapsed(t2, t1);
   }
 	//Clear the Tree and the Dag
-	bheval.destroy_DAG(dag);
+	bheval.destroy_DAG(tree_addr, std::move(dag));
 	bheval.destroy_tree(tree_addr);
 
   // Report on loop

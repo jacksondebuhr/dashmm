@@ -473,27 +473,30 @@ void perform_evaluation_test(InputArguments args) {
       dashmm::BH<SourceData, TargetData, dashmm::LaplaceCOM> method{0.6};
 
       t0 = getticks();
+      std::vector<double> kparm{};
       err = laplace_bh.evaluate(source_handle, target_handle,
-                                args.refinement_limit, method,
-                                args.accuracy, std::vector<double>{});
+                                args.refinement_limit, &method,
+                                args.accuracy, &kparm);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     } else if (args.method == std::string{"fmm"}) {
       dashmm::FMM<SourceData, TargetData, dashmm::Laplace> method{};
 
       t0 = getticks();
+      std::vector<double> kparm{};
       err = laplace_fmm.evaluate(source_handle, target_handle,
-                                 args.refinement_limit, method,
-                                 args.accuracy, std::vector<double>{});
+                                 args.refinement_limit, &method,
+                                 args.accuracy, &kparm);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     } else if (args.method == std::string{"fmm97"}) {
       dashmm::FMM97<SourceData, TargetData, dashmm::Laplace> method{};
 
       t0 = getticks();
+      std::vector<double> kparm{};
       err = laplace_fmm97.evaluate(source_handle, target_handle,
-                                   args.refinement_limit, method,
-                                   args.accuracy, std::vector<double>{});
+                                   args.refinement_limit, &method,
+                                   args.accuracy, &kparm);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     }
@@ -504,8 +507,8 @@ void perform_evaluation_test(InputArguments args) {
 
       t0 = getticks();
       err = yukawa_fmm97.evaluate(source_handle, target_handle,
-                                  args.refinement_limit, method,
-                                  args.accuracy, kernelparms);
+                                  args.refinement_limit, &method,
+                                  args.accuracy, &kernelparms);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     }
@@ -516,8 +519,8 @@ void perform_evaluation_test(InputArguments args) {
 
       t0 = getticks();
       err = helmholtz_fmm97.evaluate(source_handle, target_handle,
-                                     args.refinement_limit, method,
-                                     args.accuracy, kernelparms);
+                                     args.refinement_limit, &method,
+                                     args.accuracy, &kernelparms);
       assert(err == dashmm::kSuccess);
       tf = getticks();
     }
@@ -568,24 +571,25 @@ void perform_evaluation_test(InputArguments args) {
 
     //do direct evaluation
     if (args.kernel == "laplace") {
+      std::vector<double> kparm{};
       dashmm::Direct<SourceData, TargetData, dashmm::LaplaceCOM> direct{};
       err = laplace_direct.evaluate(source_handle, test_handle,
-                                    args.refinement_limit, direct,
-                                    args.accuracy, std::vector<double>{});
+                                    args.refinement_limit, &direct,
+                                    args.accuracy, &kparm);
       assert(err == dashmm::kSuccess);
     } else if (args.kernel == "yukawa") {
       dashmm::Direct<SourceData, TargetData, dashmm::Yukawa> direct{};
       std::vector<double> kernelparms(1, 0.1);
       err = yukawa_direct.evaluate(source_handle, test_handle,
-                                   args.refinement_limit, direct,
-                                   args.accuracy, kernelparms);
+                                   args.refinement_limit, &direct,
+                                   args.accuracy, &kernelparms);
       assert(err == dashmm::kSuccess);
     } else if (args.kernel == "helmholtz") {
       dashmm::Direct<SourceData, TargetData, dashmm::Helmholtz> direct{};
       std::vector<double> kernelparms(1, 0.1);
       err = helmholtz_direct.evaluate(source_handle, test_handle,
-                                      args.refinement_limit, direct,
-                                      args.accuracy, kernelparms);
+                                      args.refinement_limit, &direct,
+                                      args.accuracy, &kernelparms);
       assert(err == dashmm::kSuccess);
     }
 

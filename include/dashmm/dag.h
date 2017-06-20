@@ -20,6 +20,7 @@
 /// \brief Interface for intermediate representation of DAG
 
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -56,7 +57,7 @@ class DAGNode {
       global_addx{HPX_NULL}, parent_{p}, in_count_{0} { }
 
   ~DAGNode() {
-    parent->remove_node(this);
+    //parent_->remove_node(this);
   }
 
   /// Utility routine to add an edge to the DAG

@@ -208,8 +208,9 @@ void perform_evaluation_test(InputArguments args) {
   dashmm::FMM<SourceData, TargetData, User> method{};
 
   // All that is left is to call evaluate from the Evaluator object.
+  std::vector<double> kparm{};
   err = usereval.evaluate(source_handle, target_handle, args.refinement_limit,
-                          method, args.accuracy, std::vector<double>{});
+                          &method, args.accuracy, &kparm);
 
   // Clean up resources
   err = source_handle.destroy();
