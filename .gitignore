@@ -3,3 +3,5 @@ doc/docsource/latex
 doc/docsource/html
 trace/segv
 *.o
+build/
+test/data/

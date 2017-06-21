@@ -31,8 +31,9 @@ namespace dashmm {
 /// Array objects in DASHMM are two part objects in the global address space.
 /// The Array points to the meta data which is the information below.
 /// Somewhere else in the global address space will be the data itself.
+template <typename T>
 struct ArrayMetaData {
-  char *data;           /// address of local segment of the array
+  T *data;              /// address of local segment of the array
   size_t local_count;   /// the number of records in the local portion
   size_t total_count;   /// the total number of records in all portions
   size_t size;          /// the size (bytes) of each record
