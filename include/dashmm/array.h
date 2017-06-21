@@ -19,8 +19,9 @@
 /// \file
 /// \brief Definitions needed to interact with DASHMM array objects.
 
-
+#include <cassert>
 #include <cstdlib>
+#include <cstring>
 
 #include <memory>
 
@@ -29,63 +30,11 @@
 #include "dashmm/arraymetadata.h"
 #include "dashmm/arraymapaction.h"
 #include "dashmm/arrayref.h"
+#include "dashmm/reductionops.h"
 #include "dashmm/types.h"
 
 
 namespace dashmm {
-
-
-/// Action for Array meta data allocation
-extern hpx_action_t allocate_array_meta_action;
-
-/// Action for local portions of Array allocation
-extern hpx_action_t allocate_local_work_action;
-
-/// Action to delete organizational stucture for Array allocation
-extern hpx_action_t allocate_array_destroy_reducer_action;
-
-/// Action for Array deallocation
-extern hpx_action_t deallocate_array_action;
-
-/// Action for return code reducer creation
-extern hpx_action_t get_or_put_retcode_reducer_action;
-
-/// Action to delete the reducer once done
-extern hpx_action_t get_or_put_reducer_delete_action;
-
-/// Action for putting data into an Array
-extern hpx_action_t array_put_action;
-
-/// Action for getting data from an Array
-extern hpx_action_t array_get_action;
-
-/// Action for getting local counts
-extern hpx_action_t array_local_count_action;
-
-/// Action for getting total count
-extern hpx_action_t array_total_count_action;
-
-/// Action for collection
-extern hpx_action_t array_collect_action;
-
-/// Action for segment request
-extern hpx_action_t array_segment_request_action;
-
-
-/// Return data from allocation action
-struct ArrayMetaAllocRunReturn {
-  hpx_addr_t meta;
-  hpx_addr_t reducer;
-  hpx_addr_t retcode;
-  int code;
-};
-
-
-/// Return data from segment request
-struct SegmentReturn {
-  char *segment;
-  size_t count;
-};
 
 
 /// Array class
@@ -135,7 +84,7 @@ class Array {
   size_t count() const {
     assert(valid());
     size_t retval{0};
-    hpx_run_spmd(&array_local_count_action, &retval, &data_);
+    hpx_run_spmd(&array_local_count_, &retval, &data_);
     return retval;
   }
 
@@ -148,7 +97,7 @@ class Array {
   size_t length() const {
     assert(valid());
     size_t retval{0};
-    hpx_run_spmd(&array_total_count_action, &retval, &data_);
+    hpx_run_spmd(&array_total_count_, &retval, &data_);
     return retval;
   }
 
@@ -184,7 +133,7 @@ class Array {
     }
 
     ArrayMetaAllocRunReturn metadata{HPX_NULL, HPX_NULL, HPX_NULL, 0};
-    hpx_run(&allocate_array_meta_action, &metadata);
+    hpx_run(&allocate_array_meta_, &metadata);
     if (metadata.code != kSuccess) {
       return static_cast<ReturnCode>(metadata.code);
     }
@@ -194,14 +143,14 @@ class Array {
 
     size_t size = sizeof(T);
     int runcode{0};
-    hpx_run_spmd(&allocate_local_work_action, &runcode,
+    hpx_run_spmd(&allocate_local_work_, &runcode,
                  &metadata.meta, &metadata.reducer, &metadata.retcode,
                  &size, &record_count, &segment);
     if (runcode != kSuccess) {
       retval = kAllocationError;
     }
 
-    hpx_run(&allocate_array_destroy_reducer_action, nullptr,
+    hpx_run(&allocate_array_destroy_reducer_, nullptr,
             &metadata.reducer, &metadata.retcode);
 
     return retval;
@@ -216,7 +165,7 @@ class Array {
   ///
   /// \returns - kSuccess on success; kRuntimeError otherwise.
   ReturnCode destroy() {
-    if (HPX_SUCCESS == hpx_run(&deallocate_array_action, nullptr, &data_)) {
+    if (HPX_SUCCESS == hpx_run(&deallocate_array_, nullptr, &data_)) {
       data_ = HPX_NULL;
       return kSuccess;
     } else {
@@ -247,13 +196,13 @@ class Array {
     assert(valid());
 
     hpx_addr_t reducer{HPX_NULL};
-    hpx_run(&get_or_put_retcode_reducer_action, &reducer);
+    hpx_run(&get_or_put_retcode_reducer_, &reducer);
 
     int runcode{kSuccess};
-    hpx_run_spmd(&array_get_action, &runcode, &data_, &first, &last, &out_data,
+    hpx_run_spmd(&array_get_, &runcode, &data_, &first, &last, &out_data,
                  &reducer);
 
-    hpx_run(&get_or_put_reducer_delete_action, nullptr, &reducer);
+    hpx_run(&get_or_put_reducer_delete_, nullptr, &reducer);
 
     return static_cast<ReturnCode>(runcode);
   }
@@ -281,13 +230,13 @@ class Array {
     assert(valid());
 
     hpx_addr_t reducer{HPX_NULL};
-    hpx_run(&get_or_put_retcode_reducer_action, &reducer);
+    hpx_run(&get_or_put_retcode_reducer_, &reducer);
 
     int runcode = kSuccess;
-    hpx_run_spmd(&array_put_action, &runcode, &data_, &first, &last, &in_data,
+    hpx_run_spmd(&array_put_, &runcode, &data_, &first, &last, &in_data,
                  &reducer);
 
-    hpx_run(&get_or_put_reducer_delete_action, nullptr, &reducer);
+    hpx_run(&get_or_put_reducer_delete_, nullptr, &reducer);
 
     return static_cast<ReturnCode>(runcode);
   }
@@ -309,10 +258,10 @@ class Array {
   ///            is empty.
   T *segment(size_t &count) {
     SegmentReturn retval{nullptr, 0};
-    hpx_run_spmd(&array_segment_request_action, &retval, &data_);
+    hpx_run_spmd(&array_segment_request_, &retval, &data_);
 
     count = retval.count;
-    return (T *)retval.segment;
+    return retval.segment;
   }
 
   /// Produce an ArrayRef from the Array
@@ -327,11 +276,11 @@ class Array {
   ArrayRef<T> ref() const {
     int rank = hpx_get_my_rank();
     hpx_addr_t global = hpx_addr_add(data_,
-                                     sizeof(ArrayMetaData) * rank,
-                                     sizeof(ArrayMetaData));
-    ArrayMetaData *local{nullptr};
+                                     sizeof(ArrayMetaData<T>) * rank,
+                                     sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
-    ArrayRef<T> retval{(T *)local->data, local->local_count};
+    ArrayRef<T> retval{local->data, local->local_count};
     hpx_gas_unpin(global);
     return retval;
   }
@@ -349,13 +298,13 @@ class Array {
   char *replace(ArrayRef<T> ref) {
     int rank = hpx_get_my_rank();
     hpx_addr_t global = hpx_addr_add(data_,
-                                     sizeof(ArrayMetaData) * rank,
-                                     sizeof(ArrayMetaData));
-    ArrayMetaData *local{nullptr};
+                                     sizeof(ArrayMetaData<T>) * rank,
+                                     sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
 
     char *retval = local->data;
-    local->data = (char *)ref.data();
+    local->data = ref.data();
     local->local_count = ref.n();
 
     hpx_gas_unpin(global);
@@ -387,7 +336,7 @@ class Array {
   /// Collect all of an array's data into a single local array
   ///
   /// This will return a newly allocated array containing all of the records
-  /// in the global address space that are represented by this object. The
+  /// represented by this Array (note the difference in spelling). The
   /// ordering of the records is not guaranteed, and so users should track
   /// record identity in some way. This does not modify the data in the
   /// global address space. Instead, this copies the entire array into one
@@ -397,31 +346,505 @@ class Array {
   /// Only rank zero will return data. All other ranks will receive nullptr
   /// from this routine.
   ///
-  /// \returns - smart pointer containing the local allocation; Note the
-  ///            return type -- it is suggested to use auto when calling this
-  ///            rotuine.
-  std::unique_ptr<T[], void(*)(T *)> collect() {
+  /// \returns - smart pointer containing the local allocation
+  std::unique_ptr<T[]> collect() {
     assert(valid());
 
     T *retval{nullptr};
-    hpx_run(&array_collect_action, &retval, &data_);
+    hpx_run(&array_collect_, &retval, &data_);
 
     if (hpx_get_my_rank()) {
       retval = nullptr;
     }
 
-    // We have to specify a deleter here because internally HPX does not know
-    // the type T, so it allocates as an array of char.
-    return std::unique_ptr<T[], void(*)(T *)>(retval, [](T *ptr) {
-      delete [] reinterpret_cast<char *>(ptr);
-    });
+    return std::unique_ptr<T[]>(retval);
   }
 
  private:
-  /// The global address of the Array meta data.
+  friend class ArrayRegistrar<T>;
+
   hpx_addr_t data_;
+
+  static hpx_action_t array_local_count_;
+  static hpx_action_t array_total_count_;
+  static hpx_action_t allocate_array_meta_;
+  static hpx_action_t allocate_local_work_;
+  static hpx_action_t allocate_array_destroy_reducer_;
+  static hpx_action_t deallocate_array_;
+  static hpx_action_t deallocate_array_local_;
+  static hpx_action_t get_or_put_retcode_reducer_;
+  static hpx_action_t get_or_put_reducer_delete_;
+  static hpx_action_t array_get_;
+  static hpx_action_t array_put_;
+  static hpx_action_t array_segment_request_;
+  static hpx_action_t array_collect_;
+  static hpx_action_t array_collect_request_;
+  static hpx_action_t array_collect_receive_;
+
+  /// Return data from allocation action
+  struct ArrayMetaAllocRunReturn {
+    hpx_addr_t meta;
+    hpx_addr_t reducer;
+    hpx_addr_t retcode;
+    int code;
+  };
+
+  /// Return data from segment request
+  struct SegmentReturn {
+    T *segment;
+    size_t count;
+  };
+
+
+  /// Action to return the local length of the Array
+  ///
+  /// \param data - global address of the Array's meta data
+  ///
+  /// \returns - HPX_SUCCESS
+  static int array_local_count_handler(hpx_addr_t data) {
+    hpx_addr_t global = hpx_addr_add(data,
+        sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+        sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    size_t retval = local->local_count;
+
+    hpx_gas_unpin(global);
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Action to return the Array's total length
+  ///
+  /// \param data - global address of the Array's meta data
+  ///
+  /// \returns - HPX_SUCCESS
+  static int array_total_count_handler(hpx_addr_t data) {
+    hpx_addr_t global = hpx_addr_add(data,
+                                     sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+                                     sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    size_t retval = local->total_count;
+
+    hpx_gas_unpin(global);
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Action for allocating Array metadata
+  ///
+  /// This action is called on a single rank to allocate some collective
+  /// data that is needed to allocate an array. The returned information is
+  /// broadcast back to every rank during hpx_exit().
+  ///
+  /// \returns - HPX_SUCCESS
+  static int allocate_array_meta_handler() {
+    ArrayMetaAllocRunReturn retval{HPX_NULL, HPX_NULL, kSuccess};
+
+    int ranks = hpx_get_num_ranks();
+    retval.meta = hpx_gas_alloc_cyclic(ranks, sizeof(ArrayMetaData<T>), 0);
+    if (retval.meta == HPX_NULL) {
+      retval.code = kAllocationError;
+      hpx_exit(sizeof(retval), &retval);
+    }
+
+    retval.reducer = hpx_lco_reduce_new(ranks, sizeof(size_t) * ranks,
+                                        size_sum_ident, size_sum_op);
+    if (retval.reducer == HPX_NULL) {
+      hpx_gas_free_sync(retval.meta);
+      retval.meta = HPX_NULL;
+      retval.code = kAllocationError;
+    }
+
+    retval.retcode = hpx_lco_reduce_new(ranks, sizeof(int),
+                                        int_max_ident_op, int_max_op);
+    if (retval.retcode == HPX_NULL) {
+      hpx_gas_free_sync(retval.meta);
+      hpx_lco_delete_sync(retval.reducer);
+      retval.meta = HPX_NULL;
+      retval.reducer = HPX_NULL;
+      retval.code = kAllocationError;
+    }
+
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Action for allocation rank-local segments of an Array
+  ///
+  /// This action, called in a SPMD fashion on all ranks, will both participate
+  /// in a reduction to count the total size of the array and will allocate the
+  /// local segment when that reduction is complete.
+  ///
+  /// \param data - the global address of the ArrayMetaData
+  /// \param reducer - the address of the reduction LCO used to compute the
+  ///                   total array length
+  /// \param record_size - the size of each record
+  /// \param record_count - the number of records for this rank
+  ///
+  /// \returns - HPX_SUCCESS
+  static int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
+                                         hpx_addr_t retcode,
+                                         size_t record_size,
+                                         size_t record_count,
+                                         T *segment) {
+    int ranks = hpx_get_num_ranks();
+    int my_rank = hpx_get_my_rank();
+    size_t *contrib = new size_t [ranks];
+    assert(contrib);
+    for (int i = 0; i < ranks; ++i) {
+      if (i >= my_rank) {
+        contrib[i] = record_count;
+      } else {
+        contrib[i] = 0;
+      }
+    }
+
+    hpx_lco_set(reducer, sizeof(size_t) * ranks, contrib, HPX_NULL, HPX_NULL);
+    hpx_lco_get(reducer, sizeof(size_t) * ranks, contrib);
+
+    // Pin local part of the meta data
+    hpx_addr_t global = hpx_addr_add(data,
+        hpx_get_my_rank() * sizeof(ArrayMetaData<T>),
+        sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+    local->local_count = record_count;
+    local->total_count = contrib[ranks - 1];
+    local->size = record_size;
+    local->data = segment;
+
+    delete [] contrib;
+
+    int retval{0};
+    if (record_count && local->data == nullptr) {
+      try {
+        local->data = new T[record_count]{};
+      } catch (std::bad_alloc &ba) {
+        retval = kAllocationError;
+      }
+    }
+
+    hpx_lco_set_lsync(retcode, sizeof(int), &retval, HPX_NULL);
+    hpx_lco_get(retcode, sizeof(int), &retval);
+
+    hpx_gas_unpin(global);
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Action to deallocate the reduction LCO used during Array allocation
+  ///
+  /// \param reducer - the global address of the reduction LCO
+  ///
+  /// \returns - HPX_SUCCESS
+  static int allocate_array_destroy_reducer_handler(hpx_addr_t reducer,
+                                                    hpx_addr_t retcode) {
+    hpx_lco_delete_sync(reducer);
+    hpx_lco_delete_sync(retcode);
+    hpx_exit(0, nullptr);
+  }
+
+  /// Action that deallocates an array object
+  ///
+  /// This will delete the ArrayMetaData and the records themselves.
+  ///
+  /// \param obj - the global address of the array's meta data
+  ///
+  /// \returns - HPX_SUCCESS
+  static int deallocate_array_handler(hpx_addr_t obj) {
+    hpx_bcast_rsync(deallocate_array_local_, &obj);
+    hpx_gas_free_sync(obj);
+    hpx_exit(0, nullptr);
+  }
+
+  /// Action that deletes the local portion of an Array
+  ///
+  /// This action is the target of a broadcast. It will delete the local portion
+  /// of the Array's global memory.
+  ///
+  /// \param meta - the global address of the Array's meta data.
+  ///
+  /// \returns - HPX_SUCCESS
+  static int deallocate_array_local_handler(hpx_addr_t meta) {
+    hpx_addr_t global = hpx_addr_add(meta,
+          sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+          sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    if (local->data != HPX_NULL) {
+      delete [] local->data;
+    }
+
+    hpx_gas_unpin(global);
+
+    return HPX_SUCCESS;
+  }
+
+  /// Action that allocates a reducer for return codes
+  ///
+  /// To be very careful, we collect the returns codes from each rank and
+  /// take the maximum value.
+  ///
+  /// \returns - HPX_SUCCESS
+  static int get_or_put_retcode_reducer_handler(void) {
+    hpx_addr_t retval = hpx_lco_reduce_new(hpx_get_num_ranks(),
+        sizeof(int), int_max_ident_op, int_max_op);
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Action that deletes a reducer for return codes
+  ///
+  /// \param lco - the LCO's address
+  ///
+  /// \returns - HPX_SUCCESS
+  static int get_or_put_reducer_delete_handler(hpx_addr_t lco) {
+    hpx_lco_delete_sync(lco);
+    hpx_exit(0, nullptr);
+  }
+
+  /// Get data from an array object
+  ///
+  /// This will read records from a global array into @p out_data. This
+  /// action is not well behaved as regards bad input arguments. This will
+  /// likely be updated in the future.
+  ///
+  /// \param obj - the global address of the ArrayMetaData
+  /// \param first - the first record to read
+  /// \param last - the last (exclusive) record to read
+  /// \param out_data - a buffer into which the read data is stored
+  /// \param reducer - the LCO that will reduce the error codes from each rank
+  ///
+  /// \returns - HPX_SUCCESS
+  static int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
+                               T *out_data, hpx_addr_t reducer) {
+    int retval = kSuccess;
+
+    hpx_addr_t global = hpx_addr_add(obj,
+          sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+          sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    if (!hpx_gas_try_pin(global, (void **)&local)) {
+      retval = kRuntimeError;
+    } else {
+      if (last > local->local_count || last < first) {
+        retval = kDomainError;
+      } else if (local->local_count) {
+        assert(local->data != nullptr);
+
+        T *beginning = local->data + first;
+        size_t copy_size = (last - first) * sizeof(T);
+        memcpy(out_data, beginning, copy_size);
+      }
+
+      hpx_gas_unpin(global);
+    }
+
+    // reduce on error condition
+    hpx_lco_set_lsync(reducer, sizeof(int), &retval, HPX_NULL);
+    hpx_lco_get(reducer, sizeof(int), &retval);
+
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  /// Put data into an array object
+  ///
+  /// This will fill records in a global array with @p in_data. This
+  /// action is not well behaved as regards bad input arguments. This will likely
+  /// be updated in the future.
+  ///
+  /// \param obj - the global address of the ArrayMetaData
+  /// \param first - the first record to put data into
+  /// \param last - the last (exclusive) record to put data into
+  /// \param in_data - the data to copy into the records
+  /// \param reducer - the LCO that will combine error codes from each rank
+  ///
+  /// \returns - HPX_SUCCESS
+  static int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
+                               T *in_data, hpx_addr_t reducer) {
+    int retval = kSuccess;
+
+    hpx_addr_t global = hpx_addr_add(obj,
+            sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+            sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    if (!hpx_gas_try_pin(global, (void **)&local)) {
+      retval = kRuntimeError;
+    } else {
+      if (last > local->local_count || last < first) {
+        retval = kDomainError;
+      } else if (local->local_count) {
+        assert(local->data != nullptr);
+
+        T *beginning = local->data + first;
+        size_t copy_size = (last - first) * sizeof(T);
+        memcpy(beginning, in_data, copy_size);
+      }
+
+      hpx_gas_unpin(global);
+    }
+
+    hpx_lco_set_lsync(reducer, sizeof(int), &retval, HPX_NULL);
+    hpx_lco_get(reducer, sizeof(int), &retval);
+
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  static int array_segment_request_handler(hpx_addr_t data) {
+    hpx_addr_t global = hpx_addr_add(data,
+          sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+          sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    // collect info
+    SegmentReturn retval{};
+    retval.segment = local->data;
+    retval.count = local->local_count;
+
+    hpx_gas_unpin(global);
+
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  static int array_collect_handler(hpx_addr_t data) {
+    // collect counts from GAS
+    int my_rank = hpx_get_my_rank();
+    int n_rank = hpx_get_num_ranks();
+
+    ArrayMetaData<T> *meta = (ArrayMetaData<T> *)hpx_malloc_registered(
+                                          sizeof(ArrayMetaData<T>) * n_rank);
+    for (int i = 0; i < n_rank; ++i) {
+      hpx_addr_t target = hpx_addr_add(data,
+                                       sizeof(ArrayMetaData<T>) * i,
+                                       sizeof(ArrayMetaData<T>));
+      hpx_gas_memget_sync(&meta[i], target, sizeof(ArrayMetaData<T>));
+    }
+
+    // do some arithmetic
+    size_t *offsets = new size_t[n_rank];
+    offsets[0] = 0;
+    for (int i = 1; i < n_rank; ++i) {
+      offsets[i] = offsets[i - 1] + meta[i - 1].local_count;
+    }
+
+    // create AND gate for completion detection
+    hpx_addr_t done = hpx_lco_and_new(n_rank);
+
+    // allocate space for result
+    T *retval{nullptr};
+    retval = new T[meta[my_rank].total_count];
+
+    // call on each rank with location and and gate and data
+    for (int i = 0; i < n_rank; ++i) {
+      if (i != my_rank) {
+        T *location = retval + offsets[i];
+        hpx_call(HPX_THERE(i), array_collect_request_, HPX_NULL,
+                 &data, &done, &location);
+      }
+    }
+
+    // copy my segment over
+    memcpy(retval + offsets[my_rank],
+           meta[my_rank].data,
+           meta[my_rank].size * meta[my_rank].local_count);
+    hpx_lco_and_set(done, HPX_NULL);
+
+    // wait for results
+    hpx_lco_wait(done);
+    hpx_lco_delete_sync(done);
+
+    hpx_free_registered(meta);
+    delete [] offsets;
+
+    hpx_exit(sizeof(retval), &retval);
+  }
+
+  static int array_collect_request_handler(hpx_addr_t data, hpx_addr_t done,
+                                           T *location) {
+    hpx_addr_t global = hpx_addr_add(data,
+              sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+              sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    // get a parcel of the right size
+    size_t arrsize = sizeof(T) * local->local_count;
+    size_t msgsize = sizeof(char *) + arrsize;
+    hpx_parcel_t *p = hpx_parcel_acquire(nullptr, msgsize);
+    char *parc_data = (char *)hpx_parcel_get_data(p);
+    T **loc = reinterpret_cast<T **>(parc_data);
+    *loc = location;
+
+    // copy data into it
+    char *arrdata = parc_data + sizeof(T *);
+    memcpy(arrdata, local->data, arrsize);
+
+    // send parcel
+    hpx_parcel_set_action(p, array_collect_receive_);
+    hpx_parcel_set_target(p, HPX_THERE(0));
+    hpx_parcel_set_cont_action(p, hpx_lco_set_action);
+    hpx_parcel_set_cont_target(p, done);
+    hpx_parcel_send_sync(p);
+
+    hpx_gas_unpin(global);
+
+    return HPX_SUCCESS;
+  }
+
+  static int array_collect_receive_handler(char *data, size_t size) {
+    char *location = *(reinterpret_cast<char **>(data));
+    memcpy(location, data + sizeof(char *), size - sizeof(char *));
+    return HPX_SUCCESS;
+  }
+
 };
 
+
+template <typename T>
+hpx_action_t Array<T>::array_local_count_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_total_count_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::allocate_array_meta_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::allocate_local_work_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::allocate_array_destroy_reducer_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::deallocate_array_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::deallocate_array_local_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::get_or_put_retcode_reducer_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::get_or_put_reducer_delete_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_get_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_put_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_segment_request_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_collect_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_collect_request_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_collect_receive_ = HPX_ACTION_NULL;
 
 } // namespace dashmm
 

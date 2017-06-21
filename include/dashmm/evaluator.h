@@ -335,6 +335,8 @@ class Evaluator {
   TreeRegistrar<Source, Target, Source, Expansion, Method> streereg_;
   TreeRegistrar<Source, Target, Target, Expansion, Method> ttreereg_;
   DualTreeRegistrar<Source, Target, Expansion, Method> dtreereg_;
+  ArrayRegistrar<Source> sarrreg_;
+  ArrayRegistrar<Target> tarrreg_;
 
   // The actions for evaluate
   static hpx_action_t create_tree_;

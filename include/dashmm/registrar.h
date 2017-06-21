@@ -25,8 +25,78 @@
 #include "dashmm/tree.h"
 
 
-
 namespace dashmm {
+
+
+/// Object that handles action registration for Array objects
+template <typename T>
+class ArrayRegistrar {
+ public:
+  using array_t = Array<T>;
+  ArrayRegistrar() {
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_local_count_,
+                        array_t::array_local_count_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_total_count_,
+                        array_t::array_total_count_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::allocate_array_meta_,
+                        array_t::allocate_array_meta_handler);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::allocate_local_work_,
+                        array_t::allocate_local_work_handler,
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_SIZE_T,
+                        HPX_SIZE_T, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array::allocate_array_destroy_reducer_,
+                        array::allocate_array_destroy_reducer_handler,
+                        HPX_ADDR, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::deallocate_array_,
+                        array_t::deallocate_array_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::deallocate_array_local_,
+                        array_t::deallocate_array_local_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::get_or_put_retcode_reducer_,
+                        array_t::get_or_put_retcode_reducer_handler);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::get_or_put_reducer_delete_,
+                        array_t::get_or_put_reducer_delete_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_get_,
+                        array_t::array_get_handler,
+                        HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T,
+                        HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_put_,
+                        array_t::array_put_handler,
+                        HPX_ADDR, HPX_SIZE_T, HPX_SIZE_T,
+                        HPX_POINTER, HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_segment_request_,
+                        array_t::array_segment_request_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_collect_,
+                        array_t::array_collect_handler,
+                        HPX_ADDR);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
+                        array_t::array_collect_request_,
+                        array_t::array_collect_request_handler,
+                        HPX_ADDR, HPX_ADDR, HPX_POINTER);
+    HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
+                        array_t::array_collect_receive_,
+                        array_t::array_collect_receive_handler,
+                        HPX_POINTER, HPX_SIZE_T);
+  }
+}
 
 
 /// Object that handles action registration for TargetLCOs
@@ -35,7 +105,7 @@ template <typename Source, typename Target,
           template <typename, typename,
                     template <typename, typename> class> class Method>
 class TargetLCORegistrar {
-public:
+ public:
   using targetlco_t = TargetLCO<Source, Target, Expansion, Method>;
 
   TargetLCORegistrar() {
@@ -60,7 +130,7 @@ template <typename Source, typename Target,
           template <typename, typename,
                     template <typename, typename> class> class Method>
 class ExpansionLCORegistrar {
-public:
+ public:
   using expansionlco_t = ExpansionLCO<Source, Target, Expansion, Method>;
 
   ExpansionLCORegistrar() {

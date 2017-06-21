@@ -127,11 +127,11 @@ class ArrayMapAction {
   static int root_handler(hpx_action_t leaf, const E *env,
                           hpx_addr_t meta_data) {
     hpx_addr_t global = hpx_addr_add(meta_data,
-                                     sizeof(ArrayMetaData) * hpx_get_my_rank(),
-                                     sizeof(ArrayMetaData));
-    ArrayMetaData *local{nullptr};
+            sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+            sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
-    char *data = local->data;
+    T *data = local->data;
     size_t total_count = local->local_count;
     hpx_gas_unpin(global);
 
@@ -189,15 +189,15 @@ class ArrayMapAction {
   /// \param alldone - an LCO to manage completion detection
   /// \param leaf - the leaf action to take
   /// \param env - the environment to pass to the leaf action
-  /// \param data - the global data to be handled by this action
+  /// \param data - the data to be handled by this action
   ///
   /// \returns - HPX_SUCCESS
   static int spawn_handler(size_t count, size_t total_count,
                            size_t chunk_size, hpx_addr_t alldone,
-                           hpx_action_t leaf, const E *env, char *data) {
+                           hpx_action_t leaf, const E *env, T *data) {
     if (count <= chunk_size) {
       map_function_t lfunc = (map_function_t)hpx_action_get_handler(leaf);
-      lfunc((T *)data, count, env);
+      lfunc(data, count, env);
       hpx_lco_set_lsync(alldone, 0, nullptr, HPX_NULL);
     } else {
       size_t num_chunks = count / chunk_size;
@@ -208,7 +208,7 @@ class ArrayMapAction {
       size_t num_left = num_chunks / 2;
       size_t count_left = num_left * chunk_size;
       size_t count_right = count - count_left;
-      char *data_right = data + sizeof(T) * count_left;
+      T *data_right = data + count_left;
 
       hpx_call(HPX_HERE, spawn_, HPX_NULL, &count_left, &total_count,
                &chunk_size, &alldone, &leaf, &env, &data);
