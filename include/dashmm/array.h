@@ -141,11 +141,10 @@ class Array {
 
     ReturnCode retval{kSuccess};
 
-    size_t size = sizeof(T);
     int runcode{0};
     hpx_run_spmd(&allocate_local_work_, &runcode,
                  &metadata.meta, &metadata.reducer, &metadata.retcode,
-                 &size, &record_count, &segment);
+                 &record_count, &segment);
     if (runcode != kSuccess) {
       retval = kAllocationError;
     }
@@ -421,8 +420,8 @@ class Array {
   /// \returns - HPX_SUCCESS
   static int array_total_count_handler(hpx_addr_t data) {
     hpx_addr_t global = hpx_addr_add(data,
-                                     sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
-                                     sizeof(ArrayMetaData<T>));
+            sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+            sizeof(ArrayMetaData<T>));
     ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
 
@@ -485,7 +484,6 @@ class Array {
   /// \returns - HPX_SUCCESS
   static int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
                                          hpx_addr_t retcode,
-                                         size_t record_size,
                                          size_t record_count,
                                          T *segment) {
     int ranks = hpx_get_num_ranks();
@@ -511,7 +509,6 @@ class Array {
     assert(hpx_gas_try_pin(global, (void **)&local));
     local->local_count = record_count;
     local->total_count = contrib[ranks - 1];
-    local->size = record_size;
     local->data = segment;
 
     delete [] contrib;
@@ -747,7 +744,7 @@ class Array {
     // copy my segment over
     memcpy(retval + offsets[my_rank],
            meta[my_rank].data,
-           meta[my_rank].size * meta[my_rank].local_count);
+           sizeof(T) * meta[my_rank].local_count);
     hpx_lco_and_set(done, HPX_NULL);
 
     // wait for results
@@ -845,6 +842,7 @@ hpx_action_t Array<T>::array_collect_request_ = HPX_ACTION_NULL;
 
 template <typename T>
 hpx_action_t Array<T>::array_collect_receive_ = HPX_ACTION_NULL;
+
 
 } // namespace dashmm
 

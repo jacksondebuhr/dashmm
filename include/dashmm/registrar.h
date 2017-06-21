@@ -48,7 +48,7 @@ class ArrayRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         array_t::allocate_local_work_,
                         array_t::allocate_local_work_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_SIZE_T,
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR,
                         HPX_SIZE_T, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         array::allocate_array_destroy_reducer_,
