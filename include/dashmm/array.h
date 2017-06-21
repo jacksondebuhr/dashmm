@@ -37,6 +37,10 @@
 namespace dashmm {
 
 
+template <typename T>
+class ArrayRegistrar;
+
+
 /// Array class
 ///
 /// Arrays are template classes parameterized over the data type of the

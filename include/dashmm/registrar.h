@@ -51,8 +51,8 @@ class ArrayRegistrar {
                         HPX_ADDR, HPX_ADDR, HPX_ADDR,
                         HPX_SIZE_T, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
-                        array::allocate_array_destroy_reducer_,
-                        array::allocate_array_destroy_reducer_handler,
+                        array_t::allocate_array_destroy_reducer_,
+                        array_t::allocate_array_destroy_reducer_handler,
                         HPX_ADDR, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         array_t::deallocate_array_,
@@ -96,7 +96,7 @@ class ArrayRegistrar {
                         array_t::array_collect_receive_handler,
                         HPX_POINTER, HPX_SIZE_T);
   }
-}
+};
 
 
 /// Object that handles action registration for TargetLCOs
