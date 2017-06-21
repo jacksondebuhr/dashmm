@@ -54,7 +54,7 @@ namespace dashmm {
 /// Handle to a tree.
 ///
 /// This is an opaque object that should only be used as a handle by the
-/// users of DASHMM. Note that this is a handle, and should be freely 
+/// users of DASHMM. Note that this is a handle, and should be freely
 /// copied as it merely references the underlying data, and does not own that
 /// data.
 using DualTreeHandle = hpx_addr_t;
@@ -940,7 +940,7 @@ class Tree {
 
       if (num_points > 0) {
         record_t *sorted_data = reinterpret_cast<record_t *>(
-                                    new char[num_points * sizeof(record_t)]);
+                                    new record_t[num_points]);
         sorted_ref = arrayref_t{sorted_data, num_points};
 
         for (int i = first; i <= last; ++i) {
@@ -2445,12 +2445,12 @@ class DualTree {
     }
 
     // Replace segment in the array
-    char *old_src_data = sources.replace(tree->source_tree_->sorted_);
+    source_t *old_src_data = sources.replace(tree->source_tree_->sorted_);
     if (old_src_data != nullptr) {
       delete [] old_src_data;
     }
     if (!tree->same_sandt_) {
-      char *old_tar_data = targets.replace(tree->target_tree_->sorted_);
+      target_t *old_tar_data = targets.replace(tree->target_tree_->sorted_);
       if (old_tar_data != nullptr) {
         delete [] old_tar_data;
       }

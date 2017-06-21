@@ -27,7 +27,6 @@
 
 #include <hpx/hpx.h>
 
-#include "dashmm/arrayref.h"
 #include "dashmm/buffer.h"
 #include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
@@ -153,7 +152,7 @@ class ExpansionLCO {
 
     // According to HPX-5 docs, the reset does nothing to the underlying
     // LCO buffer, except in the case of UserLCO where it reruns the original
-    // initialization action. In this case, that action only sets the 
+    // initialization action. In this case, that action only sets the
     // yet_to_arrive counter, so all the other data should be good to go.
     if (ldata->node->out_count() != 0) {
       hpx_call_when(data_, data_, spawn_out_edges_, HPX_NULL);
@@ -343,13 +342,11 @@ class ExpansionLCO {
   /// \param rhs - the input buffer
   /// \param bytes - the size of the input buffer
   static void operation_handler(Header *lhs, void *rhs, size_t bytes) {
-    // TODO: consider introducing a new event type for this allocation.
     if (lhs->data == nullptr) {
       // We are the first, so allocate the data and so on
       lhs->data = new expansion_t{lhs->role, lhs->scale, lhs->center};
       lhs->expansion_size = lhs->data->get_all_views().bytes();
     }
-    // TODO: the end of the considered event type.
 
     // decrement the counter
     lhs->yet_to_arrive -= 1;

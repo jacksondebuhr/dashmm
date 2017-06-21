@@ -294,7 +294,7 @@ class Array {
   ///
   /// \returns - the address of the previous data segment; the user assumes
   ///            ownership of this data.
-  char *replace(ArrayRef<T> ref) {
+  T *replace(ArrayRef<T> ref) {
     int rank = hpx_get_my_rank();
     hpx_addr_t global = hpx_addr_add(data_,
                                      sizeof(ArrayMetaData<T>) * rank,
@@ -302,7 +302,7 @@ class Array {
     ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
 
-    char *retval = local->data;
+    T *retval = local->data;
     local->data = ref.data();
     local->local_count = ref.n();
 
