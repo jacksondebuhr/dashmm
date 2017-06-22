@@ -1114,6 +1114,8 @@ private:
         offset++;
       }
     }
+
+    delete [] powers_ealpha; 
   }
 
   void rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR,

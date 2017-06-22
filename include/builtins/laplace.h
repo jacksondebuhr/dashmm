@@ -49,6 +49,25 @@ namespace dashmm {
 /// This expansion is most relevant for interactions that have both signs
 /// of the charge.
 ///
+
+void slap_s_to_m(Point dist, double q, double scale, dcomplex_t *M); 
+void slap_s_to_l(Point dist, double q, double scale, dcomplex_t *L); 
+
+void lap_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR); 
+void lap_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR); 
+
+void lap_m_to_m(int from_child, const dcomplex_t *M, dcomplex_t *W); 
+void lap_l_to_l(int to_child, const dcomplex_t *L, dcomplex_t *W); 
+void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id); 
+//void lap_i_to_i(Index &s_index, Index &t_index, const dcomplex_t *S[6], 
+//                ViewSet &views); 
+void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
+                int id, ViewSet &t_views); 
+void lap_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L);
+void lap_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z); 
+void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L); 
+
+
 /// This class is a template with parameters for the source and target
 /// types.
 ///
@@ -141,53 +160,11 @@ class Laplace {
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    int p = builtin_laplace_table_->p();
-    const double *sqf = builtin_laplace_table_->sqf();
-
-    double *legendre = new double[(p + 1) * (p + 2) / 2];
-    double *powers_r = new double[p + 1];
-    dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
-    powers_r[0] = 1.0;
-    powers_ephi[0] = dcomplex_t{1.0, 0.0};
-
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center);
-      double q = i->charge;
-      double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-      double r = dist.norm();
-
-      double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-
-      // Compute exp(-i * phi) for the azimuthal angle phi
-      dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                         dcomplex_t{dist.x() / proj, -dist.y() / proj});
-
-      // Compute powers of r
-      r *= scale;
-      for (int j = 1; j <= p; ++j) {
-        powers_r[j] = powers_r[j - 1] * r;
-      }
-
-      // Compute powers of exp(-i * phi)
-      for (int j = 1; j <= p; ++j) {
-        powers_ephi[j] = powers_ephi[j - 1] * ephi;
-      }
-
-      // Compute multipole expansion M_n^m
-      legendre_Plm(p, ctheta, legendre);
-      for (int m = 0; m <= p; ++m) {
-        for (int n = m; n <= p; ++n) {
-          M[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-            legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-        }
-      }
+      slap_s_to_m(dist, i->charge, scale, M); 
     }
-
-    delete [] legendre;
-    delete [] powers_r;
-    delete [] powers_ephi;
-
-    return std::unique_ptr<expansion_t>{retval};
+   return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
@@ -195,128 +172,18 @@ class Laplace {
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    int p = builtin_laplace_table_->p();
-    const double *sqf = builtin_laplace_table_->sqf();
-
-    double *legendre = new double[(p + 1) * (p + 2) / 2];
-    double *powers_r = new double[p + 1];
-    dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
-    powers_ephi[0] = dcomplex_t{1.0, 0.0};
-
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, center);
-      double q = i->charge;
-      double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-      double r = dist.norm();
-
-      // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-
-      // Compute exp(-i * phi) for the azimuthal angle phi
-      dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                         dcomplex_t{dist.x() / proj, -dist.y() / proj});
-
-      // Compute powers of 1 / r
-      powers_r[0] = 1.0 / r;
-      r *= scale;
-      for (int j = 1; j <= p; ++j) {
-        powers_r[j] = powers_r[j - 1] / r;
-      }
-
-      // Compute powers of exp(-i * phi)
-      for (int j = 1; j <= p; ++j) {
-        powers_ephi[j] = powers_ephi[j - 1] * ephi;
-      }
-
-      // compute local expansion L_n^m
-      legendre_Plm(p, ctheta, legendre);
-      for (int m = 0; m <= p; ++m) {
-        for (int n = m; n <= p; ++n) {
-          L[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-            legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-        }
-      }
+      Point dist = point_sub(i->position, center); 
+      slap_s_to_l(dist, i->charge, scale, L);
     }
-
-    delete [] legendre;
-    delete [] powers_r;
-    delete [] powers_ephi;
-
     return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> M_to_M(int from_child) const {
     expansion_t *retval{new expansion_t{kSourcePrimary}};
-
-    int p = builtin_laplace_table_->p();
-    const double *sqbinom = builtin_laplace_table_->sqbinom();
-
-    // Get precomputed Wigner d-matrix for rotation about the y-axis
-    const double *d1 = (from_child < 4 ?
-                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) :
-                        builtin_laplace_table_->dmat_plus(-1.0 / sqrt(3.0)));
-    const double *d2 = (from_child < 4 ?
-                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) :
-                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0)));
-
-    // Shift distance along the z-axis, combined with Y_n^0(pi, 0)
-    const double rho = -sqrt(3) / 2;
-
-    // Compute powers of rho
-    double *powers_rho = new double[p + 1];
-    powers_rho[0] = 1.0;
-    for (int i = 1; i <= p; ++i) {
-      powers_rho[i] = powers_rho[i - 1] * rho;
-    }
-
-    dcomplex_t *W1 =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-
-    // Table of rotation angle about the z-axis, as an integer multiple of pi/4
-    const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
-    // Get rotation angle about the z-axis
-    double alpha = tab_alpha[from_child] * M_PI_4;
-
-    // Rotate the multipole expansion of the child box about z-axis
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    rotate_sph_z(M, alpha, W1);
-
-    // Rotate the previous result further about the y-axis
-    rotate_sph_y(W1, d1, W2);
-
-    // Offset to operate multipole expansion
-    int offset = 0;
-
-    // Shift along the z-axis by a distance of rho, write result in W1
-    for (int n = 0; n <= p; ++n) {
-      for (int m = 0; m <= n; ++m) {
-        W1[offset] = W2[offset];
-        for (int k = 1; k <= n - m; ++k) {
-          W1[offset] += W2[midx(n - k, m)] * powers_rho[k] *
-            sqbinom[midx(n - m, k)] * sqbinom[midx(n + m, k)];
-        }
-        offset++;
-      }
-    }
-
-    // Reverse rotate the shifted harmonic expansion about the y-axis
-    rotate_sph_y(W1, d2, W2);
-
-    // Reverse rotate the previous result further about the z-axis
-    rotate_sph_z(W2, -alpha, W1);
-
-    double temp = 1;
-    offset = 0;
-    for (int n = 0; n <= p; ++n) {
-      for (int m = 0; m <= n; ++m) {
-        W1[offset++] *= temp;
-      }
-      temp /= 2;
-    }
-
-    delete [] W2;
-    delete [] powers_rho;
+    dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    lap_m_to_m(from_child, M, W); 
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -365,11 +232,11 @@ class Laplace {
       // Get precomputed Wigner d-matrix for rotation about y-axis
       const double *d1 = builtin_laplace_table_->dmat_plus(t2s_z / rho);
       const double *d2 = builtin_laplace_table_->dmat_minus(t2s_z / rho);
-      rotate_sph_z(M, beta, W1);
-      rotate_sph_y(W1, d1, W2);
+      lap_rotate_sph_z(M, beta, W1);
+      lap_rotate_sph_y(W1, d1, W2);
       M_to_L_zp(W2, powers_rho, W1);
-      rotate_sph_y(W1, d2, W2);
-      rotate_sph_z(W2, -beta, W1);
+      lap_rotate_sph_y(W1, d2, W2);
+      lap_rotate_sph_z(W2, -beta, W1);
     }
 
     delete [] W2;
@@ -379,76 +246,9 @@ class Laplace {
 
   std::unique_ptr<expansion_t> L_to_L(int to_child) const {
     expansion_t *retval{new expansion_t{kTargetPrimary}};
-    int p = builtin_laplace_table_->p();
-    const double *sqbinom = builtin_laplace_table_->sqbinom();
-
-    // Get precomputed Wigner d-matrix for rotation about the y-axis
-    const double *d1 = (to_child < 4 ?
-                        builtin_laplace_table_->dmat_plus(1.0 / sqrt(3.0)) :
-                        builtin_laplace_table_->dmat_plus(-1.0 / sqrt(3.0)));
-    const double *d2 = (to_child < 4 ?
-                        builtin_laplace_table_->dmat_minus(1.0 / sqrt(3.0)) :
-                        builtin_laplace_table_->dmat_minus(-1.0 / sqrt(3.0)));
-
-    // Shift distance along the z-axis, combined with Y_n^0(pi, 0)
-    const double rho = -sqrt(3) / 4;
-
-    // Compute powers of rho
-    double *powers_rho = new double[p + 1];
-    powers_rho[0] = 1.0;
-    for (int i = 1; i <= p; ++i) {
-      powers_rho[i] = powers_rho[i - 1] * rho;
-    }
-
-    dcomplex_t *W1 =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-
-    // Table of rotation angle about the z-axis as an integer multiple of pi / 4
-    const int tab_alpha[8] = {1, 3, 7, 5, 1, 3, 7, 5};
-    // Get rotation angle about the z-axis
-    double alpha = tab_alpha[to_child] * M_PI_4;
-
-    // Rotate the local expansion of the parent box about z-axis
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    rotate_sph_z(L, alpha, W1);
-
-    // Rotate the previous result further about the y-axis
-    rotate_sph_y(W1, d1, W2);
-
-    // Offset to operate local expansion
-    int offset = 0;
-
-    // Shift along the z-axis by a distance of rho, write result in W1
-    for (int n = 0; n <= p; ++n) {
-      for (int m = 0; m <= n; ++m) {
-        W1[offset] = W2[offset];
-        for (int k = 1; k <= p - n; k++) {
-          W1[offset] += W2[midx(n + k, m)] * powers_rho[k] *
-                        sqbinom[midx(n + k - m, k)] *
-                        sqbinom[midx(n + k + m, k)];
-        }
-        offset++;
-      }
-    }
-
-    // Reverse rotate the shifted harmonic expansion about the y-axis
-    rotate_sph_y(W1, d2, W2);
-
-    // Reverse rotate the previous result further about the z-axis
-    rotate_sph_z(W2, -alpha, W1);
-
-    double temp = 1;
-    offset = 0;
-    for (int n = 0; n <= p; ++n) {
-      for (int m = 0; m <= n; ++m) {
-        W1[offset++] *= temp;
-      }
-      temp /= 2;
-    }
-
-    delete [] W2;
-    delete [] powers_rho;
+    dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    lap_l_to_l(to_child, L, W); 
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -587,369 +387,22 @@ class Laplace {
   std::unique_ptr<expansion_t> M_to_I() const {
     expansion_t *retval{new expansion_t{kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-
-    // Addresses of the views
-    dcomplex_t *E_px =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    dcomplex_t *E_mx =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(1));
-    dcomplex_t *E_py =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(2));
-    dcomplex_t *E_my =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(3));
-    dcomplex_t *E_pz =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(4));
-    dcomplex_t *E_mz =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(5));
-
-    // Addresses of exponential expansions in the positive axis direction
-    dcomplex_t *EP[3] = {E_px, E_py, E_pz};
-    // Addresses of exponential expansions in the negative axis direction
-    dcomplex_t *EM[3] = {E_mx, E_my, E_mz};
-
-    int p = builtin_laplace_table_->p();
-    int s = builtin_laplace_table_->s();
-    int nsh = (p + 1) * (p + 2) / 2;
-    const double *weight_ = builtin_laplace_table_->weight();
-    const int *m_ = builtin_laplace_table_->m();
-    const int *f_ = builtin_laplace_table_->f();
-    const int *smf_ = builtin_laplace_table_->smf();
-    const double *d1 = builtin_laplace_table_->dmat_plus(0.0);
-    const double *d2 = builtin_laplace_table_->dmat_minus(0.0);
-    const double *lambdaknm = builtin_laplace_table_->lambdaknm();
-    const dcomplex_t *ealphaj = builtin_laplace_table_->ealphaj();
-
-    // Allocate scratch space to handle x- and y-direction
-    // exponential expansions
-    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-
-    // Setup y-direction. Rotate the multipole expansion M about z-axis by -pi /
-    // 2, making (x, y, z) frame (-y, x, z). Next, rotate it again about the new
-    // y axis by -pi / 2. The (-y, x, z) in the first rotated frame becomes (z,
-    // x, y) in the final frame.
-    rotate_sph_z(M, -M_PI / 2, W1);
-    rotate_sph_y(W1, d2, W2);
-
-    // Setup x-direction. Rotate the multipole expansion M about y axis by pi /
-    // 2. This makes (x, y, z) frame into (-z, y, x).
-    rotate_sph_y(M, d1, W1);
-
-    // Addresses of the spherical harmonic expansions
-    const dcomplex_t *SH[3] = {W1, W2, M};
-
-    for (int dir = 0; dir <= 2; ++dir) {
-      int offset = 0;
-      for (int k = 0; k < s ; ++k) {
-        double weight = weight_[k] / m_[k];
-
-        // Compute sum_{n = m}^p M_n^m * lambda_k^n / sqrt((n+m)! * (n - m)!)
-        // z1 handles M_n^m where n is even
-        dcomplex_t *z1 = new dcomplex_t[f_[k] + 1];
-        // z2 handles M_n^m where n is odd
-        dcomplex_t *z2 = new dcomplex_t[f_[k] + 1];
-
-        // Process M_n^0 terms
-        z1[0] = 0;
-        z2[0] = 0;
-        for (int n = 0; n <= p; n += 2) {
-          z1[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)];
-        }
-        for (int n = 1; n <= p; n += 2) {
-          z2[0] += SH[dir][midx(n, 0)] * lambdaknm[k * nsh + midx(n, 0)];
-        }
-
-        // Process M_n^m terms for nonzero m
-        for (int m = 1; m <= f_[k]; m += 2) {
-          z1[m] = 0;
-          z2[m] = 0;
-          for (int n = m; n <= p; n += 2) {
-            z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          }
-          for (int n = m + 1; n <= p; n += 2) {
-            z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          }
-        }
-
-        for (int m = 2; m <= f_[k]; m += 2) {
-          z1[m] = 0;
-          z2[m] = 0;
-          for (int n = m; n <= p; n += 2) {
-            z1[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          }
-          for (int n = m + 1; n <= p; n += 2) {
-            z2[m] += SH[dir][midx(n, m)] * lambdaknm[k * nsh + midx(n, m)];
-          }
-        }
-
-        // Compute W(k, j)
-        for (int j = 1; j <= m_[k] / 2; ++j) {
-          dcomplex_t up = z1[0] + z2[0]; // accumulate +dir
-          dcomplex_t dn = z1[0] - z2[0]; // accumulate -dir
-          dcomplex_t power_I {0.0, 1.0};
-          for (int m = 1; m <= f_[k]; ++m) {
-            int idx = smf_[k] + (j - 1) * f_[k] + (m - 1);
-            up += 2 * real(ealphaj[idx] * (z1[m] + z2[m])) * power_I;
-            dn += 2 * real(ealphaj[idx] * (z1[m] - z2[m])) * power_I;
-            power_I *= dcomplex_t{0.0, 1.0};
-          }
-          EP[dir][offset] = weight * up;
-          EM[dir][offset] = weight * dn;
-          offset++;
-        }
-
-        delete [] z1;
-        delete [] z2;
-      }
-    }
-
-    delete [] W1;
-    delete [] W2;
-
+    lap_m_to_i(M, retval->views_, 0); 
     return std::unique_ptr<expansion_t>(retval);
   }
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
-    // t_index is the index of the parent node on the target side
-
-    // Compute index offsets between the current source node and the 1st child
-    // of the parent node
-    int dx = s_index.x() - t_index.x() * 2;
-    int dy = s_index.y() - t_index.y() * 2;
-    int dz = s_index.z() - t_index.z() * 2;
-
-    // Exponential expansions on the source side
-    int nexp = builtin_laplace_table_->nexp();
-    const dcomplex_t *S_px =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    const dcomplex_t *S_mx =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(1));
-    const dcomplex_t *S_py =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(2));
-    const dcomplex_t *S_my =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(3));
-    const dcomplex_t *S_pz =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(4));
-    const dcomplex_t *S_mz =
-      reinterpret_cast<dcomplex_t *>(views_.view_data(5));
-
-    ViewSet views{kTargetIntermediate};
-
-    // Each S is going to generate between 1 and 3 views of the exponential
-    // expansions on the target side.
-    size_t view_size = nexp * sizeof(dcomplex_t);
-    dcomplex_t *T1 = new dcomplex_t[nexp]();
-    dcomplex_t *T2 = new dcomplex_t[nexp]();
-    dcomplex_t *T3 = new dcomplex_t[nexp]();
-    char *C1 = reinterpret_cast<char *>(T1);
-    char *C2 = reinterpret_cast<char *>(T2);
-    char *C3 = reinterpret_cast<char *>(T3);
-    dcomplex_t *T[3] = {T1, T2, T3};
-    char *C[3] = {C1, C2, C3};
-    bool used[3] = {false, false, false};
-
-    for (int i = 0; i < 3; ++i) {
-      int tag = merge_and_shift_table[dx + 2][dy + 2][dz + 2][i];
-
-      if (tag == -1)
-        break;
-
-      if (tag <= 1) {
-        e2e(T[i], S_mz, dx, dy, 0);
-      } else if (tag <= 5) {
-        e2e(T[i], S_my, dz, dx, 0);
-      } else if (tag <= 13) {
-        e2e(T[i], S_mx, -dz, dy, 0);
-      } else if (tag <= 15) {
-        e2e(T[i], S_pz, -dx, -dy, 0);
-      } else if (tag <= 19) {
-        e2e(T[i], S_py, -dz, -dx, 0);
-      } else {
-        e2e(T[i], S_px, dz, -dy, 0);
-      }
-
-      views.add_view(tag, view_size, C[i]);
-      used[i] = true;
-    }
-
-    if (used[1] == false)
-      delete [] T2;
-
-    if (used[2] == false)
-      delete [] T3;
-
+    ViewSet views{kTargetIntermediate}; 
+    lap_i_to_i(s_index, t_index, views_, 0, views); 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
   }
 
   std::unique_ptr<expansion_t> I_to_L(Index t_index) const {
-    // t_index and t_size is the index and size of the child
+    // t_index is the index of the child
     expansion_t *retval{new expansion_t{kTargetPrimary}};
-
-    int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
-      (t_index.x() % 2);
-
-    double scale = views_.scale() * 2;
-
-    int nexp = builtin_laplace_table_->nexp();
-
-    dcomplex_t *E[28]{nullptr};
-    for (int i = 0; i < 28; ++i) {
-      E[i] = reinterpret_cast<dcomplex_t *>(views_.view_data(i));
-    }
-    dcomplex_t *L =
-      reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    dcomplex_t *S = new dcomplex_t[nexp * 6]();
-    dcomplex_t *S_mz = S;
-    dcomplex_t *S_pz = S + nexp;
-    dcomplex_t *S_my = S + 2 * nexp;
-    dcomplex_t *S_py = S + 3 * nexp;
-    dcomplex_t *S_mx = S + 4 * nexp;
-    dcomplex_t *S_px = S + 5 * nexp;
-
-    switch (to_child) {
-    case 0:
-      e2e(S_mz, E[uall], 0, 0, 3);
-      e2e(S_mz, E[u1234], 0, 0, 2);
-      e2e(S_pz, E[dall], 0, 0, 2);
-
-      e2e(S_my, E[nall], 0, 0, 3);
-      e2e(S_my, E[n1256], 0, 0, 2);
-      e2e(S_my, E[n12], 0, 0, 2);
-      e2e(S_py, E[sall], 0, 0, 2);
-
-      e2e(S_mx, E[eall], 0, 0, 3);
-      e2e(S_mx, E[e1357], 0, 0, 2);
-      e2e(S_mx, E[e13], 0, 0, 2);
-      e2e(S_mx, E[e1], 0, 0, 2);
-      e2e(S_px, E[wall], 0, 0, 2);
-      break;
-    case 1:
-      e2e(S_mz, E[uall], -1, 0, 3);
-      e2e(S_mz, E[u1234], -1, 0, 2);
-      e2e(S_pz, E[dall], 1, 0, 2);
-
-      e2e(S_my, E[nall], 0, -1, 3);
-      e2e(S_my, E[n1256], 0, -1, 2);
-      e2e(S_my, E[n12], 0, -1, 2);
-      e2e(S_py, E[sall], 0, 1, 2);
-
-      e2e(S_mx, E[eall], 0, 0, 2);
-      e2e(S_px, E[wall], 0, 0, 3);
-      e2e(S_px, E[w2468], 0, 0, 2);
-      e2e(S_px, E[w24], 0, 0, 2);
-      e2e(S_px, E[w2], 0, 0, 2);
-      break;
-    case 2:
-      e2e(S_mz, E[uall], 0, -1, 3);
-      e2e(S_mz, E[u1234], 0, -1, 2);
-      e2e(S_pz, E[dall], 0, 1, 2);
-
-      e2e(S_my, E[nall], 0, 0, 2);
-      e2e(S_py, E[sall], 0, 0, 3);
-      e2e(S_py, E[s3478], 0, 0, 2);
-      e2e(S_py, E[s34], 0, 0, 2);
-
-      e2e(S_mx, E[eall], 0, -1, 3);
-      e2e(S_mx, E[e1357], 0, -1, 2);
-      e2e(S_mx, E[e13], 0, -1, 2);
-      e2e(S_mx, E[e3], 0, -1, 2);
-      e2e(S_px, E[wall], 0, 1, 2);
-      break;
-    case 3:
-      e2e(S_mz, E[uall], -1, -1, 3);
-      e2e(S_mz, E[u1234], -1, -1, 2);
-      e2e(S_pz, E[dall], 1, 1, 2);
-
-      e2e(S_my, E[nall], 0, -1, 2);
-      e2e(S_py, E[sall], 0, 1, 3);
-      e2e(S_py, E[s3478], 0, 1, 2);
-      e2e(S_py, E[s34], 0, 1, 2);
-
-      e2e(S_mx, E[eall], 0, -1, 2);
-      e2e(S_px, E[wall], 0, 1, 3);
-      e2e(S_px, E[w2468], 0, 1, 2);
-      e2e(S_px, E[w24], 0, 1, 2);
-      e2e(S_px, E[w4], 0, 1, 2);
-      break;
-    case 4:
-      e2e(S_mz, E[uall], 0, 0, 2);
-      e2e(S_pz, E[dall], 0, 0, 3);
-      e2e(S_pz, E[d5678], 0, 0, 2);
-
-      e2e(S_my, E[nall], -1, 0, 3);
-      e2e(S_my, E[n1256], -1, 0, 2);
-      e2e(S_my, E[n56], -1, 0, 2);
-      e2e(S_py, E[sall], 1, 0, 2);
-
-      e2e(S_mx, E[eall], 1, 0, 3);
-      e2e(S_mx, E[e1357], 1, 0, 2);
-      e2e(S_mx, E[e57], 1, 0, 2);
-      e2e(S_mx, E[e5], 1, 0, 2);
-      e2e(S_px, E[wall], -1, 0, 2);
-      break;
-    case 5:
-      e2e(S_mz, E[uall], -1, 0, 2);
-      e2e(S_pz, E[dall], 1, 0, 3);
-      e2e(S_pz, E[d5678], 1, 0, 2);
-
-      e2e(S_my, E[nall], -1, -1, 3);
-      e2e(S_my, E[n1256], -1, -1, 2);
-      e2e(S_my, E[n56], -1, -1, 2);
-      e2e(S_py, E[sall], 1, 1, 2);
-
-      e2e(S_mx, E[eall], 1, 0, 2);
-      e2e(S_px, E[wall], -1, 0, 3);
-      e2e(S_px, E[w2468], -1, 0, 2);
-      e2e(S_px, E[w68], -1, 0, 2);
-      e2e(S_px, E[w6], -1, 0, 2);
-      break;
-    case 6:
-      e2e(S_mz, E[uall], 0, -1, 2);
-      e2e(S_pz, E[dall], 0, 1, 3);
-      e2e(S_pz, E[d5678], 0, 1, 2);
-
-      e2e(S_my, E[nall], -1, 0, 2);
-      e2e(S_py, E[sall], 1, 0, 3);
-      e2e(S_py, E[s3478], 1, 0, 2);
-      e2e(S_py, E[s78], 1, 0, 2);
-
-      e2e(S_mx, E[eall], 1, -1, 3);
-      e2e(S_mx, E[e1357], 1, -1, 2);
-      e2e(S_mx, E[e57], 1, -1, 2);
-      e2e(S_mx, E[e7], 1, -1, 2);
-      e2e(S_px, E[wall], -1, 1, 2);
-      break;
-    case 7:
-      e2e(S_mz, E[uall], -1, -1, 2);
-      e2e(S_pz, E[dall], 1, 1, 3);
-      e2e(S_pz, E[d5678], 1, 1, 2);
-
-      e2e(S_my, E[nall], -1, -1, 2);
-      e2e(S_py, E[sall], 1, 1, 3);
-      e2e(S_py, E[s3478], 1, 1, 2);
-      e2e(S_py, E[s78], 1, 1, 2);
-
-      e2e(S_mx, E[eall], 1, -1, 2);
-      e2e(S_px, E[wall], -1, 1, 3);
-      e2e(S_px, E[w2468], -1, 1, 2);
-      e2e(S_px, E[w68], -1, 1, 2);
-      e2e(S_px, E[w8], -1, 1, 2);
-      break;
-    }
-
-    for (int i = 0; i < 6 * nexp; ++i) {
-      S[i] *= scale;
-    }
-
-    e2l(S_mz, 'z', false, L);
-    e2l(S_pz, 'z', true, L);
-    e2l(S_my, 'y', false, L);
-    e2l(S_py, 'y', true, L);
-    e2l(S_mx, 'x', false, L);
-    e2l(S_px, 'x', true, L);
-
-    delete [] S;
+    dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
+    lap_i_to_l(views_, 0, t_index, L); 
     return std::unique_ptr<expansion_t>(retval);
   }
 
@@ -1006,56 +459,6 @@ class Laplace {
 
  private:
   ViewSet views_;
-
-  void rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) const {
-    int p = builtin_laplace_table_->p();
-
-    // Compute exp(i * alpha)
-    dcomplex_t ealpha{cos(alpha), sin(alpha)};
-
-    // Compute powers of exp(i * alpha)
-    dcomplex_t *powers_ealpha = new dcomplex_t[p + 1];
-    powers_ealpha[0] = dcomplex_t{1.0, 0.0};
-    for (int j = 1; j <= p; ++j) {
-      powers_ealpha[j] = powers_ealpha[j - 1] * ealpha;
-    }
-
-    int offset = 0;
-    for (int n = 0; n <= p; n++) {
-      for (int m = 0; m <= n; m++) {
-        MR[offset] = M[offset] * powers_ealpha[m];
-        offset++;
-      }
-    }
-
-    delete [] powers_ealpha;
-  }
-
-  void rotate_sph_y(const dcomplex_t *M, const double *d,
-                    dcomplex_t *MR) const {
-    int p = builtin_laplace_table_->p();
-
-    int offset = 0;
-    for (int n = 0; n <= p; ++n) {
-      int power_mp = 1;
-      for (int mp = 0; mp <= n; ++mp) {
-        // Retrieve address of wigner d-matrix entry d_n^{mp, 0}
-        const double *coeff = &d[didx(n, mp, 0)];
-        // Get address of original harmonic expansion M_n^0
-        const dcomplex_t *Mn = &M[midx(n, 0)];
-        // Compute rotated spherical harmonic M_n^mp
-        MR[offset] = Mn[0] * coeff[0];
-        double power_m = -1;
-        for (int m = 1; m <= n; ++m) {
-          MR[offset] += (Mn[m] * power_m * coeff[m] + conj(Mn[m]) * coeff[-m]);
-          power_m = -power_m;
-        }
-        MR[offset++] *= power_mp;
-        power_mp = -power_mp;
-      }
-    }
-  }
-
   void M_to_L_zp(const dcomplex_t *M, const double *rho, dcomplex_t *L) const {
     int p = builtin_laplace_table_->p();
     const double *sqbinom = builtin_laplace_table_->sqbinom();
@@ -1092,139 +495,6 @@ class Laplace {
         offset++;
       }
     }
-  }
-
-  void e2e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z) const {
-    const dcomplex_t *xs = builtin_laplace_table_->xs();
-    const dcomplex_t *ys = builtin_laplace_table_->ys();
-    const double *zs = builtin_laplace_table_->zs();
-    int s = builtin_laplace_table_->s();
-    const int *m = builtin_laplace_table_->m();
-    const int *sm = builtin_laplace_table_->sm();
-
-    int offset = 0;
-    for (int k = 0; k < s; ++k) {
-      // Shifting factor in z direction
-      double factor_z = zs[4 * k + z];
-      for (int j = 0; j < m[k] / 2; ++j) {
-        int sidx = (sm[k] + j) * 7 + 3;
-        // Shifting factor in x direction
-        dcomplex_t factor_x = xs[sidx + x];
-        // Shifting factor in y direction
-        dcomplex_t factor_y = ys[sidx + y];
-        M[offset] += W[offset] * factor_z * factor_y * factor_x;
-        offset++;
-      }
-    }
-  }
-
-  void e2l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) const {
-    const double *sqf = builtin_laplace_table_->sqf();
-    const dcomplex_t *ealphaj = builtin_laplace_table_->ealphaj();
-    const double *lambda = builtin_laplace_table_->lambda();
-    const int *m_ = builtin_laplace_table_->m();
-    const int *sm_ = builtin_laplace_table_->sm();
-    const int *f_ = builtin_laplace_table_->f();
-    const int *smf_ = builtin_laplace_table_->smf();
-    int p = builtin_laplace_table_->p();
-    int s = builtin_laplace_table_->s();
-
-    dcomplex_t *contrib = nullptr;
-    dcomplex_t *W1 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-    dcomplex_t *W2 = new dcomplex_t[(p + 1) * (p + 2) / 2];
-
-    for (int k = 0; k < s; ++k) {
-      int Mk2 = m_[k] / 2;
-
-      // Compute sum_{j = 1}^{M(k)} W(k, j) exp(-i * m * alpha_j)
-      dcomplex_t *z = new dcomplex_t[f_[k] + 1];
-
-      // m = 0
-      z[0] = 0.0;
-      for (int j = 1; j <= Mk2; ++j) {
-        int idx = sm_[k] + j - 1;
-        z[0] += (E[idx] + conj(E[idx]));
-      }
-
-      // m = 1, ..., F(k), where m is odd
-      for (int m = 1; m <= f_[k]; m += 2) {
-        z[m] = 0.0;
-        for (int j = 1; j <= Mk2; ++j) {
-          int idx1 = sm_[k] + j - 1;
-          int idx2 = smf_[k] + (j - 1) * f_[k] + m - 1;
-          z[m] += (E[idx1] - conj(E[idx1])) * conj(ealphaj[idx2]);
-        }
-      }
-
-      // m = 2, ..., F(k), where m is even
-      for (int m = 2; m <= f_[k]; m += 2) {
-        z[m] = 0.0;
-        for (int j = 1; j <= Mk2; ++j) {
-          int idx1 = sm_[k] + j - 1;
-          int idx2 = smf_[k] + (j - 1) * f_[k] + m - 1;
-          z[m] += (E[idx1] + conj(E[idx1])) * conj(ealphaj[idx2]);
-        }
-      }
-
-      // Compute lambda_k's contribution
-      double power_lambdak = 1.0; // (-lambda_k)^n
-      for (int n = 0; n <= p; ++n) {
-        int mmax = fmin(n, f_[k]);
-        for (int m = 0; m <= mmax; ++m) {
-          W1[midx(n, m)] += power_lambdak * z[m];
-        }
-        power_lambdak *= -lambda[k];
-      }
-      delete [] z;
-    }
-
-    if (!sgn) {
-      // If the exponential expansion is not along the positive direction of the
-      // axis with respect to the source, flip the sign of the converted L_n^m
-      // terms where n is odd.
-      int offset = 1; // address of L_1^0
-      for (int n = 1; n <= p; n += 2) {
-        for (int m = 0; m <= n; ++m) {
-          W1[offset++] *= -1;
-        }
-        offset += (n + 2); // skip the storage for the even value of n
-      }
-    }
-
-    // Scale the local expansion by i^m / sqrt((n - m)!(n + m)!)
-    int offset = 0;
-    for (int n = 0; n <= p; ++n) {
-      dcomplex_t power_I{1.0, 0.0};
-      for (int m = 0; m <= n; ++m) {
-        W1[offset++] *= power_I / sqf[n - m] / sqf[n + m];
-        power_I *= dcomplex_t{0.0, 1.0};
-      }
-    }
-
-    if (dir == 'z') {
-      contrib = W1;
-    } else if (dir == 'y') {
-      const double *d = builtin_laplace_table_->dmat_plus(0.0);
-      rotate_sph_y(W1, d, W2);
-      rotate_sph_z(W2, M_PI / 2, W1);
-      contrib = W1;
-    } else if (dir == 'x') {
-      const double *d = builtin_laplace_table_->dmat_minus(0.0);
-      rotate_sph_y(W1, d, W2);
-      contrib = W2;
-    }
-
-    // Merge converted local expansion with the stored one
-    offset = 0;
-    for (int n = 0; n <= p; ++n) {
-      for (int m = 0; m <= n; ++m) {
-        L[offset] += contrib[offset];
-        offset++;
-      }
-    }
-
-    delete [] W1;
-    delete [] W2;
   }
 };
 
