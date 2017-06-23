@@ -23,6 +23,8 @@
 #include <cassert>
 #include <cstring>
 
+#include <algorithm>
+
 
 namespace dashmm {
 
@@ -217,6 +219,20 @@ class WriteBuffer : public Buffer {
   template <typename T>
   bool write(const T value) {
     return write(reinterpret_cast<const char *>(&value), sizeof(T));
+  }
+
+  // overload for typed arrays of objects
+  template <typename T>
+  bool write(const T *value, size_t count = 1) {
+    size_t bytes = sizeof(T) * count;
+    if (remain_ < bytes) return false;
+    T *current = reinterpret_cast<T *>(offset_);
+    std::copy(value, value + count, current);
+
+    offset_ += bytes;
+    remain_ -= bytes;
+
+    return true;
   }
 };
 

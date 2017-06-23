@@ -120,7 +120,15 @@ class TargetLCO {
     input->code = kStoT;
     input->count = n;
     if (n != 0) {
-      memcpy(input->sources, sources, sizeof(source_t) * n);
+      // TODO: serialize/deserialize
+      // This one is especially annoying, as we will have just deserialized
+      // these sources on some code paths. Perhaps we can modify
+      // instigate_dag_eval_work to take both kinds, and only serialize if
+      // needed. Though, it should be possible to just send the pointers
+      // if we make this a synchronous set...
+      // That would be more or less okay, given that this would be a local
+      // set. That just goes right through, right?
+      std::copy(sources, sources + n, input->sources);
     }
 
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
@@ -132,8 +140,7 @@ class TargetLCO {
   ///
   /// \param bytes - the size of the serialized expansion data
   /// \param data - the serialized expansion data
-  void contribute_M_to_T(expansion_t *expand
-                         /*size_t bytes, char *data*/) const {
+  void contribute_M_to_T(expansion_t *expand) const {
     //say we had an expansion coming in
     ViewSet views{expand->get_all_views()};
     size_t inputsize = sizeof(MtoT) + views.bytes();
@@ -144,15 +151,6 @@ class TargetLCO {
     views.serialize(serial);
     hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
     delete [] input;
-
-    //size_t inputsize = sizeof(MtoT) + bytes;
-    //MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
-    //assert(input);
-    //input->code = kMtoT;
-    //input->bytes = bytes;
-    //memcpy(input->data, data, bytes);
-    //hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
-    //delete [] input;
   }
 
   /// Contribute a L->T operation to the referred targets
