@@ -33,7 +33,6 @@
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
-#include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/traceevents.h"
 #include "dashmm/types.h"
@@ -638,12 +637,6 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_M_to_T does not rely on this information.
     targetlco_t destination{target};
-    // NOTE: Also, we use the known expansion size to roll to the correct
-    // serialized data. head->data is an object with the correct interpretation
-    // and is _not_ the data this wants. Instead, we do the arithmetic.
-    // This is slightly inelegant.
-    //char *serial = reinterpret_cast<char *>(head) + sizeof(Header);
-    //destination.contribute_M_to_T(head->expansion_size, serial);
     destination.contribute_M_to_T(head->data);
   }
 
@@ -655,12 +648,6 @@ class ExpansionLCO {
     // NOTE: we do not put in the correct number of targets. This is fine
     // because contribute_L_to_T does not rely on this information.
     targetlco_t destination{target};
-    // NOTE: Also, we use the known expansion size to roll to the correct
-    // serialized data. head->data is an object with the correct interpretation
-    // and is _not_ the data this wants. Instead, we do the arithmetic.
-    // This is slightly inelegant.
-    //char *serial = reinterpret_cast<char *>(head) + sizeof(Header);
-    //destination.contribute_L_to_T(head->expansion_size, serial);
     destination.contribute_L_to_T(head->data);
   }
 

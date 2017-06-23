@@ -44,13 +44,11 @@
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
 #include "dashmm/reductionops.h"
-#include "dashmm/shareddata.h"
 
 
 namespace dashmm {
 
 
-// TODO: Will this change?
 /// Handle to a tree.
 ///
 /// This is an opaque object that should only be used as a handle by the
@@ -939,8 +937,7 @@ class Tree {
       }
 
       if (num_points > 0) {
-        record_t *sorted_data = reinterpret_cast<record_t *>(
-                                    new record_t[num_points]);
+        record_t *sorted_data = new record_t[num_points];
         sorted_ref = arrayref_t{sorted_data, num_points};
 
         for (int i = first; i <= last; ++i) {
@@ -952,9 +949,9 @@ class Tree {
             // Copy local points before merging remote points
             curr->lock();
             auto sorted = curr->parts.data();
-            memcpy(sorted + curr->first(),
-                   &temp[local_offset[i]],
-                   sizeof(record_t) * local_count[i]);
+            for (size_t j = 0; j < local_count[i]; ++j) {
+              sorted[j + curr->first()] = temp[local_offset[i] + j];
+            }
 
             if (curr->increment_first(local_count[i])) {
               // This grid does not expect remote points.
@@ -2220,6 +2217,7 @@ class DualTree {
     }
 
     // Parcel message length
+    // TODO: Update this for serialization/deserialization
     size_t bytes = sizeof(hpx_addr_t) + sizeof(int) * 4;
     if (send_ns) {
       bytes += sizeof(int) * range + sizeof(source_t) * send_ns;
@@ -2252,13 +2250,21 @@ class DualTree {
 
     char *meta_s = static_cast<char *>(data) + sizeof(hpx_addr_t) +
       sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
+    source_t *meta_cast = reinterpret_cast<source_t *>(meta_s);
     if (send_ns) {
-      memcpy(meta_s, &sources[offset_s[first]], sizeof(source_t) * send_ns);
+      // TODO: Update this for serialization/deserialization
+      std::copy(&sources[offset_s[first]],
+                &sources[offset_s[first] + send_ns],
+                meta_cast);
     }
 
-    char *meta_t = meta_s + send_ns * sizeof(source_t);
     if (send_nt) {
-      memcpy(meta_t, &targets[offset_t[first]], sizeof(target_t) * send_nt);
+      target_t *meta_t =
+          reinterpret_cast<target_t *>(meta_s + send_ns * sizeof(source_t));
+      // TODO: Update this for serialization/deserialization
+      std::copy(&targets[offset_t[first]],
+                &targets[offset_t[first] + send_nt],
+                meta_t);
     }
 
     hpx_parcel_set_target(p, HPX_THERE(rank));
@@ -2672,6 +2678,7 @@ class DualTree {
                 DAG::compare_edge_locality);
 
       // Make scratch space for the sends
+      // TODO: This will need a serialization/deserialization update
       size_t source_size = sizeof(Source) * sources.n();
       size_t header_size = source_size + sizeof(size_t)
           + sizeof(hpx_addr_t);
@@ -2686,8 +2693,8 @@ class DualTree {
         WriteBuffer headdata(scratch, header_size);
         assert(headdata.write(sources.n()));
 
-        ReadBuffer sourcedata((char *)sref, source_size);
-        assert(headdata.write(sourcedata));
+        // TODO: This needs a serialization/deserialization update
+        assert(headdata.write(sref, sources.n()));
 
         assert(headdata.write(rwtree));
       }
@@ -2728,12 +2735,6 @@ class DualTree {
           hpx_parcel_t *parc = hpx_parcel_acquire(scratch, parcel_size);
           hpx_parcel_set_action(parc, instigate_dag_eval_remote_);
           hpx_parcel_set_target(parc, HPX_THERE(curr_rank));
-          // PRIORITY - set the priority for this parcel. What would it be?
-          //  The remotes are all S->T here. We know that because the DAGNode
-          //  in question is a leaf, and DASHMM fixes the related M to be the
-          //  same locality. So the remotes cannot be the S->M and so they have
-          //  no particular priority.
-
           hpx_parcel_send_sync(parc);
         }
 
@@ -2763,6 +2764,7 @@ class DualTree {
     size_t n_src{};
     input.read(&n_src);
 
+    // TODO: deserialize the sources
     Source *sources = input.interpret_array<Source>(n_src);
 
     hpx_addr_t tree_addx{};
@@ -2784,6 +2786,8 @@ class DualTree {
       }
     }
 
+    // TODO: make sure the sources here are not the serialized version.
+    // this function depends on having proper source objects.
     instigate_dag_eval_work(n_src, sources, local_tree->domain_,
                             n_edges, edges);
 
@@ -2833,7 +2837,6 @@ class DualTree {
             // S_to_T on expansion LCOs do not need any of the
             // expansionlco_t's state, so we create a default object.
             expansionlco_t expand{HPX_NULL};
-            // HERE
             targetlco_t targets{edge[i].target};
             expand.S_to_T(sources, n_src, targets);
           }

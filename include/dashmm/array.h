@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <algorithm>
 #include <memory>
 
 #include <hpx/hpx.h>
@@ -632,10 +633,7 @@ class Array {
         retval = kDomainError;
       } else if (local->local_count) {
         assert(local->data != nullptr);
-
-        T *beginning = local->data + first;
-        size_t copy_size = (last - first) * sizeof(T);
-        memcpy(out_data, beginning, copy_size);
+        std::copy(&local->data[first], &local->data[last], out_data);
       }
 
       hpx_gas_unpin(global);
@@ -676,10 +674,7 @@ class Array {
         retval = kDomainError;
       } else if (local->local_count) {
         assert(local->data != nullptr);
-
-        T *beginning = local->data + first;
-        size_t copy_size = (last - first) * sizeof(T);
-        memcpy(beginning, in_data, copy_size);
+        std::copy(in_data, &in_data[last], &local->data[first]);
       }
 
       hpx_gas_unpin(global);
@@ -746,9 +741,12 @@ class Array {
     }
 
     // copy my segment over
-    memcpy(retval + offsets[my_rank],
-           meta[my_rank].data,
-           sizeof(T) * meta[my_rank].local_count);
+    {
+      T *c_start = meta[my_rank].data;
+      T *c_end = &meta[my_rank].data[meta[my_rank].local_count];
+      T *d_start = &retval[offsets[my_rank]];
+      std::copy(c_start, c_end, d_start);
+    }
     hpx_lco_and_set(done, HPX_NULL);
 
     // wait for results
@@ -778,8 +776,9 @@ class Array {
     *loc = location;
 
     // copy data into it
-    char *arrdata = parc_data + sizeof(T *);
-    memcpy(arrdata, local->data, arrsize);
+    // TODO: This will need to be updated to serialization/deserialization
+    T *arrdata = reinterpret_cast<T *>(parc_data + sizeof(T *));
+    std::copy(local->data, &local->data[local->local_count], arrdata);
 
     // send parcel
     hpx_parcel_set_action(p, array_collect_receive_);
@@ -794,8 +793,11 @@ class Array {
   }
 
   static int array_collect_receive_handler(char *data, size_t size) {
-    char *location = *(reinterpret_cast<char **>(data));
-    memcpy(location, data + sizeof(char *), size - sizeof(char *));
+    T *location = *(reinterpret_cast<T **>(data));
+    T *incoming = reinterpret_cast<T *>(data + sizeof(T *));
+    size_t count = (size - sizeof(T *)) / sizeof(T);
+    // TODO this will need to be upgraded to serialization and deserialization
+    std::copy(incoming, &incoming[count], location);
     return HPX_SUCCESS;
   }
 
