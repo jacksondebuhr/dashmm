@@ -33,7 +33,6 @@
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
-#include "dashmm/shareddata.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/traceevents.h"
 #include "dashmm/types.h"

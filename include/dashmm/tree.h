@@ -44,7 +44,6 @@
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
 #include "dashmm/reductionops.h"
-#include "dashmm/shareddata.h"
 
 
 namespace dashmm {
