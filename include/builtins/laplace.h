@@ -50,22 +50,24 @@ namespace dashmm {
 /// of the charge.
 ///
 
-void slap_s_to_m(Point dist, double q, double scale, dcomplex_t *M); 
-void slap_s_to_l(Point dist, double q, double scale, dcomplex_t *L); 
-
 void lap_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR); 
 void lap_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR); 
 
+void lap_s_to_m(Point dist, double q, double scale, dcomplex_t *M); 
+void lap_s_to_l(Point dist, double q, double scale, dcomplex_t *L);
 void lap_m_to_m(int from_child, const dcomplex_t *M, dcomplex_t *W); 
 void lap_l_to_l(int to_child, const dcomplex_t *L, dcomplex_t *W); 
 void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id); 
-//void lap_i_to_i(Index &s_index, Index &t_index, const dcomplex_t *S[6], 
-//                ViewSet &views); 
 void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
                 int id, ViewSet &t_views); 
 void lap_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L);
 void lap_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z); 
 void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L); 
+
+std::vector<double> lap_m_to_t(Point dist, double scale, 
+                               const dcomplex_t *M, bool g = false);
+std::vector<double> lap_l_to_t(Point dist, double scale, 
+                               const dcomplex_t *L, bool g = false);
 
 
 /// This class is a template with parameters for the source and target
@@ -162,7 +164,7 @@ class Laplace {
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center);
-      slap_s_to_m(dist, i->charge, scale, M); 
+      lap_s_to_m(dist, i->charge, scale, M); 
     }
    return std::unique_ptr<expansion_t>{retval};
   }
@@ -174,7 +176,7 @@ class Laplace {
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center); 
-      slap_s_to_l(dist, i->charge, scale, L);
+      lap_s_to_l(dist, i->charge, scale, L);
     }
     return std::unique_ptr<expansion_t>{retval};
   }
@@ -254,119 +256,24 @@ class Laplace {
 
   void M_to_T(Target *first, Target *last) const {
     double scale = views_.scale();
-    int p = builtin_laplace_table_->p();
-    const double *sqf = builtin_laplace_table_->sqf();
-
-    double *legendre = new double[(p + 1) * (p + 2) / 2];
-    double *powers_r = new double[p + 1];
-    dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
-    powers_ephi[0] = dcomplex_t{1.0, 0.0};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center());
-      dcomplex_t potential{0.0, 0.0};
-      double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-      double r = dist.norm();
-
-      // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-
-      // Compute exp(i * phi) for the azimuthal angle phi
-      dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                         dcomplex_t{dist.x() / proj, dist.y() / proj});
-
-      // Compute powers of 1 / r
-      powers_r[0] = 1.0 / r;
-      r *= scale;
-      for (int j = 1; j <= p; ++j) {
-        powers_r[j] = powers_r[j - 1] / r;
-      }
-
-      // Compute powers of exp(i * phi)
-      for (int j = 1; j <= p; ++j) {
-        powers_ephi[j] = powers_ephi[j - 1] * ephi;
-      }
-
-      // Evaluate the multipole expansion M_n^0
-      legendre_Plm(p, ctheta, legendre);
-      for (int n = 0; n <= p; ++n) {
-        potential += M[midx(n, 0)] * powers_r[n] * legendre[midx(n, 0)];
-      }
-
-      // Evaluate the multipole expansions M_n^m, where m = 1, ..., p
-      for (int m = 1; m <= p; ++m) {
-        for (int n = m; n <= p; ++n) {
-          potential += 2.0 * real(M[midx(n, m)] * powers_ephi[m]) *
-            powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-        }
-      }
-
-      i->phi += potential;
+      Point dist = point_sub(i->position, views_.center()); 
+      auto result = lap_m_to_t(dist, scale, M); 
+      i->phi += result[0];
     }
-
-    delete [] powers_r;
-    delete [] powers_ephi;
-    delete [] legendre;
   }
 
   void L_to_T(Target *first, Target *last) const {
-    int p = builtin_laplace_table_->p();
     double scale = views_.scale();
-    const double *sqf = builtin_laplace_table_->sqf();
-
-    double *legendre = new double[(p + 1) * (p + 2) / 2];
-    double *powers_r = new double[p + 1];
-    dcomplex_t *powers_ephi = new dcomplex_t[p + 1];
-    powers_r[0] = 1.0;
-    powers_ephi[0] = dcomplex_t{1.0, 0.0};
-
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center());
-      dcomplex_t potential{0.0, 0.0};
-      double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-      double r = dist.norm();
-
-      // Compute cosine of the polar angle theta
-      double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-
-      // Compute exp(i * phi) for the azimuthal angle phi
-      dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                         dcomplex_t{dist.x() / proj, dist.y() / proj});
-
-      // Compute powers of r
-      r *= scale;
-      for (int j = 1; j <= p; ++j) {
-        powers_r[j] = powers_r[j - 1] * r;
-      }
-
-      // Compute powers of exp(i * phi)
-      for (int j = 1; j <= p; ++j) {
-        powers_ephi[j] = powers_ephi[j - 1] * ephi;
-      }
-
-      // Evaluate the local expansion L_n^0
-      legendre_Plm(p, ctheta, legendre);
-      for (int n = 0; n <= p; ++n) {
-        potential += L[midx(n, 0)] * powers_r[n] * legendre[midx(n, 0)];
-      }
-
-      // Evaluate the local expansions L_n^m, where m = 1, ..., p
-      for (int m = 1; m <= p; ++m) {
-        for (int n = m; n <= p; ++n) {
-          potential += 2.0 * real(L[midx(n, m)] * powers_ephi[m]) *
-            powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-        }
-      }
-
-      i->phi += potential;
+      Point dist = point_sub(i->position, views_.center()); 
+      auto result = lap_l_to_t(dist, scale, L); 
+      i->phi += result[0];
     }
-
-    delete [] powers_r;
-    delete [] powers_ephi;
-    delete [] legendre;
   }
 
   void S_to_T(Source *s_first, Source *s_last,

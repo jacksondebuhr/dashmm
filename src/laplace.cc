@@ -15,84 +15,6 @@
 
 namespace dashmm {
 
-
-void slap_s_to_m(Point dist, double q, double scale, dcomplex_t *M) {
-  int p = builtin_laplace_table_->p();
-  const double *sqf = builtin_laplace_table_->sqf();
-
-  std::vector<double> legendre((p + 1) * (p + 2) / 2); 
-  std::vector<double> powers_r(p + 1); 
-  std::vector<dcomplex_t> powers_ephi(p + 1); 
-
-  powers_r[0] = 1.0; 
-  powers_ephi[0] = dcomplex_t{1.0, 0.0}; 
-
-  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-  double r = dist.norm();
-  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-
-  // Compute exp(-i * phi) for the azimuthal angle phi
-  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                     dcomplex_t{dist.x() / proj, -dist.y() / proj});
-
-  // Compute powers of r
-  r *= scale;
-  for (int j = 1; j <= p; ++j) 
-    powers_r[j] = powers_r[j - 1] * r;
-  
-  // Compute powers of exp(-i * phi)
-  for (int j = 1; j <= p; ++j) 
-    powers_ephi[j] = powers_ephi[j - 1] * ephi;
-  
-  // Compute multipole expansion M_n^m
-  legendre_Plm(p, ctheta, legendre.data());
-  for (int m = 0; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
-      M[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-        legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-    }
-  }
-}
-
-void slap_s_to_l(Point dist, double q, double scale, dcomplex_t *L) {
-  int p = builtin_laplace_table_->p();
-  const double *sqf = builtin_laplace_table_->sqf();
-
-  std::vector<double> legendre((p + 1) * (p + 2) / 2); 
-  std::vector<double> powers_r(p + 1); 
-  std::vector<dcomplex_t> powers_ephi(p + 1); 
-  powers_ephi[0] = dcomplex_t{1.0, 0.0};
-
-  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
-  double r = dist.norm();
-
-  // Compute cosine of the polar angle theta
-  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
-  
-  // Compute exp(-i * phi) for the azimuthal angle phi
-  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
-                     dcomplex_t{dist.x() / proj, -dist.y() / proj});
-
-  // Compute powers of 1 / r
-  powers_r[0] = 1.0 / r;
-  r *= scale;
-  for (int j = 1; j <= p; ++j) 
-    powers_r[j] = powers_r[j - 1] / r;
-  
-  // Compute powers of exp(-i * phi)
-  for (int j = 1; j <= p; ++j) 
-    powers_ephi[j] = powers_ephi[j - 1] * ephi;
-  
-  // compute local expansion L_n^m
-  legendre_Plm(p, ctheta, legendre.data());
-  for (int m = 0; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
-      L[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
-        legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
-    }
-  }
-}
-
 void lap_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR) {
   int p = builtin_laplace_table_->p();
   
@@ -136,6 +58,83 @@ void lap_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR) {
       power_mp = -power_mp;
     }
   }  
+}
+
+void lap_s_to_m(Point dist, double q, double scale, dcomplex_t *M) {
+  int p = builtin_laplace_table_->p();
+  const double *sqf = builtin_laplace_table_->sqf();
+
+  std::vector<double> legendre((p + 1) * (p + 2) / 2); 
+  std::vector<double> powers_r(p + 1); 
+  std::vector<dcomplex_t> powers_ephi(p + 1); 
+
+  powers_r[0] = 1.0; 
+  powers_ephi[0] = dcomplex_t{1.0, 0.0}; 
+
+  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
+  double r = dist.norm();
+  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
+
+  // Compute exp(-i * phi) for the azimuthal angle phi
+  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
+                     dcomplex_t{dist.x() / proj, -dist.y() / proj});
+
+  // Compute powers of r
+  r *= scale;
+  for (int j = 1; j <= p; ++j) 
+    powers_r[j] = powers_r[j - 1] * r;
+  
+  // Compute powers of exp(-i * phi)
+  for (int j = 1; j <= p; ++j) 
+    powers_ephi[j] = powers_ephi[j - 1] * ephi;
+  
+  // Compute multipole expansion M_n^m
+  legendre_Plm(p, ctheta, legendre.data());
+  for (int m = 0; m <= p; ++m) {
+    for (int n = m; n <= p; ++n) {
+      M[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
+        legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
+    }
+  }
+}
+
+void lap_s_to_l(Point dist, double q, double scale, dcomplex_t *L) {
+  int p = builtin_laplace_table_->p();
+  const double *sqf = builtin_laplace_table_->sqf();
+
+  std::vector<double> legendre((p + 1) * (p + 2) / 2); 
+  std::vector<double> powers_r(p + 1); 
+  std::vector<dcomplex_t> powers_ephi(p + 1); 
+  powers_ephi[0] = dcomplex_t{1.0, 0.0};
+
+  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
+  double r = dist.norm();
+
+  // Compute cosine of the polar angle theta
+  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
+  
+  // Compute exp(-i * phi) for the azimuthal angle phi
+  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
+                     dcomplex_t{dist.x() / proj, -dist.y() / proj});
+
+  // Compute powers of 1 / r
+  powers_r[0] = 1.0 / r;
+  r *= scale;
+  for (int j = 1; j <= p; ++j) 
+    powers_r[j] = powers_r[j - 1] / r;
+  
+  // Compute powers of exp(-i * phi)
+  for (int j = 1; j <= p; ++j) 
+    powers_ephi[j] = powers_ephi[j - 1] * ephi;
+  
+  // compute local expansion L_n^m
+  legendre_Plm(p, ctheta, legendre.data());
+  for (int m = 0; m <= p; ++m) {
+    for (int n = m; n <= p; ++n) {
+      L[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
+        legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
+    }
+  }
 }
 
 void lap_m_to_m(int from_child, const dcomplex_t *M, dcomplex_t *W) {
@@ -929,6 +928,108 @@ void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L) {
   delete [] W2;
 }
 
+std::vector<double> lap_m_to_t(Point dist, double scale, 
+                               const dcomplex_t *M, bool g) {
+  std::vector<double> retval; 
+
+  int p = builtin_laplace_table_->p();
+  const double *sqf = builtin_laplace_table_->sqf();
+  std::vector<double> legendre((p + 2) * (p + 3) / 2); 
+  std::vector<double> powers_r(p + 2); 
+  std::vector<dcomplex_t> powers_ephi(p + 2); 
+  powers_ephi[0] = dcomplex_t{1.0, 0.0}; 
+
+  // Compute potential first 
+  dcomplex_t potential{0.0, 0.0}; 
+  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
+  double r = dist.norm();
+  
+  // Compute cosine of the polar angle theta
+  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
+
+  // Compute exp(i * phi) for the azimuthal angle phi
+  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
+                     dcomplex_t{dist.x() / proj, dist.y() / proj});
+
+  // Compute powers of 1 / r
+  powers_r[0] = 1.0 / r;
+  r *= scale;
+  for (int j = 1; j <= p + 1; ++j) 
+    powers_r[j] = powers_r[j - 1] / r;
+  
+  // Compute powers of exp(i * phi)
+  for (int j = 1; j <= p; ++j) 
+    powers_ephi[j] = powers_ephi[j - 1] * ephi;
+
+  // Evaluate the multipole expansion M_n^0
+  legendre_Plm(p + 1, ctheta, legendre.data());
+  for (int n = 0; n <= p; ++n) 
+    potential += M[midx(n, 0)] * powers_r[n] * legendre[midx(n, 0)];
+
+
+  // Evaluate the multipole expansions M_n^m, where m = 1, ..., p
+  for (int m = 1; m <= p; ++m) {
+    for (int n = m; n <= p; ++n) {
+      potential += 2.0 * real(M[midx(n, m)] * powers_ephi[m]) *
+        powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
+    }
+  }
+
+  
+  retval.push_back(real(potential)); 
+
+  return retval; 
+}
+
+std::vector<double> lap_l_to_t(Point dist, double scale, 
+                               const dcomplex_t *L, bool g) {
+  std::vector<double> retval; 
+
+  int p = builtin_laplace_table_->p();
+  const double *sqf = builtin_laplace_table_->sqf();
+  std::vector<double> legendre((p + 2) * (p + 3) / 2); 
+  std::vector<double> powers_r(p + 2); 
+  std::vector<dcomplex_t> powers_ephi(p + 2); 
+  powers_r[0] = 1.0;
+  powers_ephi[0] = dcomplex_t{1.0, 0.0};
+
+  // Compute potential first
+  dcomplex_t potential{0.0, 0.0};
+  double proj = sqrt(dist.x() * dist.x() + dist.y() * dist.y());
+  double r = dist.norm();
+
+  // Compute cosine of the polar angle theta
+  double ctheta = (r <= 1e-14 ? 1.0 : dist.z() / r);
+
+  // Compute exp(i * phi) for the azimuthal angle phi
+  dcomplex_t ephi = (proj / r <= 1e-14 ? dcomplex_t{1.0, 0.0} :
+                     dcomplex_t{dist.x() / proj, dist.y() / proj});
+
+  // Compute powers of r
+  r *= scale;
+  for (int j = 1; j <= p + 1; ++j) 
+    powers_r[j] = powers_r[j - 1] * r;
+  
+  // Compute powers of exp(i * phi)
+  for (int j = 1; j <= p; ++j) 
+    powers_ephi[j] = powers_ephi[j - 1] * ephi;
+  
+  // Evaluate the local expansion L_n^0
+  legendre_Plm(p + 1, ctheta, legendre.data());
+  for (int n = 0; n <= p; ++n) 
+    potential += L[midx(n, 0)] * powers_r[n] * legendre[midx(n, 0)];
+  
+  // Evaluate the local expansions L_n^m, where m = 1, ..., p
+  for (int m = 1; m <= p; ++m) {
+    for (int n = m; n <= p; ++n) {
+      potential += 2.0 * real(L[midx(n, m)] * powers_ephi[m]) *
+        powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
+    }
+  }
+
+  retval.push_back(real(potential)); 
+  return retval; 
+}
 
 } // namespace dashmm
 
