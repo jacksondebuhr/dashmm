@@ -2838,7 +2838,6 @@ class DualTree {
             // S_to_T on expansion LCOs do not need any of the
             // expansionlco_t's state, so we create a default object.
             expansionlco_t expand{HPX_NULL};
-            // HERE
             targetlco_t targets{edge[i].target};
             expand.S_to_T(sources, n_src, targets);
           }

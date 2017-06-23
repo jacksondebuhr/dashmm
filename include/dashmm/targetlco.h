@@ -114,59 +114,24 @@ class TargetLCO {
   /// \param n - the number of sources
   /// \param sources - the sources themselves
   void contribute_S_to_T(size_t n, source_t *sources) const {
-    size_t inputsize = sizeof(StoT) + sizeof(source_t) * n;
-    StoT *input = reinterpret_cast<StoT *>(new char [inputsize]);
-    assert(input);
-    input->code = kStoT;
-    input->count = n;
-    if (n != 0) {
-      // TODO: serialize/deserialize
-      // This one is especially annoying, as we will have just deserialized
-      // these sources on some code paths. Perhaps we can modify
-      // instigate_dag_eval_work to take both kinds, and only serialize if
-      // needed. Though, it should be possible to just send the pointers
-      // if we make this a synchronous set...
-      // That would be more or less okay, given that this would be a local
-      // set. That just goes right through, right?
-      std::copy(sources, sources + n, input->sources);
-    }
-
-    hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
-
-    delete [] input;
+    StoT input{kStoT, n, sources};
+    hpx_lco_set_rsync(lco_, sizeof(StoT), &input);
   }
 
   /// Contribute a M->T operation to the referred targets
   ///
-  /// \param bytes - the size of the serialized expansion data
-  /// \param data - the serialized expansion data
-  void contribute_M_to_T(expansion_t *expand) const {
-    //say we had an expansion coming in
-    ViewSet views{expand->get_all_views()};
-    size_t inputsize = sizeof(MtoT) + views.bytes();
-    MtoT *input = reinterpret_cast<MtoT *>(new char [inputsize]);
-    input->code = kMtoT;
-    input->bytes = views.bytes();
-    WriteBuffer serial{(char *)input + sizeof(MtoT), views.bytes()};
-    views.serialize(serial);
-    hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
-    delete [] input;
+  /// \param expand - the expansion containing the M
+  void contribute_M_to_T(const expansion_t *expand) const {
+    MtoT input{kMtoT, expand};
+    hpx_lco_set_rsync(lco_, sizeof(input), &input);
   }
 
   /// Contribute a L->T operation to the referred targets
   ///
-  /// \param bytes - the size of the serialized expansion data
-  /// \param data - the serialized expansion data
-  void contribute_L_to_T(expansion_t *expand) const {
-    ViewSet views{expand->get_all_views()};
-    size_t inputsize = sizeof(LtoT) + views.bytes();
-    LtoT *input = reinterpret_cast<LtoT *>(new char [inputsize]);
-    input->code = kLtoT;
-    input->bytes = views.bytes();
-    WriteBuffer serial{(char *)input + sizeof(LtoT), views.bytes()};
-    views.serialize(serial);
-    hpx_lco_set_lsync(lco_, inputsize, input, HPX_NULL);
-    delete [] input;
+  /// \param expand - the expansion containing the L
+  void contribute_L_to_T(const expansion_t *expand) const {
+    LtoT input{kLtoT, expand};
+    hpx_lco_set_rsync(lco_, sizeof(input), &input);
   }
 
  private:
@@ -183,21 +148,19 @@ class TargetLCO {
   struct StoT {
     int code;
     size_t count;
-    source_t sources[];
+    source_t *sources;
   };
 
   /// M->T parameters type
   struct MtoT {
     int code;
-    size_t bytes;
-    char data[];
+    const expansion_t *exp;
   };
 
   /// L->T parameters type
   struct LtoT {
     int code;
-    size_t bytes;
-    char data[];
+    const expansion_t *exp;
   };
 
   /// Codes to define what the LCO set is doing.
@@ -218,7 +181,6 @@ class TargetLCO {
   /// This takes a number of forms based on the input code.
   static void operation_handler(Data *lhs, void *rhs, size_t bytes) {
     int *code = reinterpret_cast<int *>(rhs);
-    ReadBuffer readbuf{(char *)rhs, bytes};
 
     lhs->yet_to_arrive -= 1;
     assert(lhs->yet_to_arrive >= 0);
@@ -228,42 +190,27 @@ class TargetLCO {
     }
 
     if (*code == kStoT) {
-      // The input contains the sources
       EVENT_TRACE_DASHMM_STOT_BEGIN();
       StoT *input = static_cast<StoT *>(rhs);
 
       if (input->count) {
         target_t *targets{lhs->targets.data()};
-
         expansion_t expand(ViewSet{});
         expand.S_to_T(input->sources, &input->sources[input->count],
                        targets, &targets[lhs->targets.n()]);
-
       }
       EVENT_TRACE_DASHMM_STOT_END();
     } else if (*code == kMtoT) {
       EVENT_TRACE_DASHMM_MTOT_BEGIN();
-      readbuf.interpret<MtoT>();
-
+      MtoT *input = static_cast<MtoT *>(rhs);
       target_t *targets{lhs->targets.data()};
-
-      ViewSet views{};
-      views.interpret(readbuf);
-      expansion_t expand(views);
-      expand.M_to_T(targets, &targets[lhs->targets.n()]);
-      expand.release();
+      input->exp->M_to_T(targets, &targets[lhs->targets.n()]);
       EVENT_TRACE_DASHMM_MTOT_END();
     } else if (*code == kLtoT) {
       EVENT_TRACE_DASHMM_LTOT_BEGIN();
-      readbuf.interpret<LtoT>();
-
+      LtoT *input = static_cast<LtoT *>(rhs);
       target_t *targets{lhs->targets.data()};
-
-      ViewSet views{};
-      views.interpret(readbuf);
-      expansion_t expand(views);
-      expand.L_to_T(targets, &targets[lhs->targets.n()]);
-      expand.release();
+      input->exp->L_to_T(targets, &targets[lhs->targets.n()]);
       EVENT_TRACE_DASHMM_LTOT_END();
     } else {
       assert(0 && "Incorrect code to TargetLCO");
