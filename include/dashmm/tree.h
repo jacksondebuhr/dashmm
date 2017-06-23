@@ -2251,19 +2251,21 @@ class DualTree {
 
     char *meta_s = static_cast<char *>(data) + sizeof(hpx_addr_t) +
       sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
+    source_t *meta_cast = reinterpret_cast<source_t *>(meta_s);
     if (send_ns) {
       // TODO: Update this for serialization/deserialization
-      for (size_t i = 0; i < send_ns; ++i) {
-        meta_s[i] = sources[offset_s[first] + i];
-      }
+      std::copy(&sources[offset_s[first]],
+                &sources[offset_s[first] + send_ns],
+                meta_cast);
     }
 
-    char *meta_t = meta_s + send_ns * sizeof(source_t);
     if (send_nt) {
+      target_t *meta_t =
+          reinterpret_cast<target_t *>(meta_s + send_ns * sizeof(source_t));
       // TODO: Update this for serialization/deserialization
-      for (size_t i = 0; i < send_nt; ++i) {
-        meta_t[i] = targets[offset_t[first] + i];
-      }
+      std::copy(&targets[offset_t[first]],
+                &targets[offset_t[first] + send_nt],
+                meta_t);
     }
 
     hpx_parcel_set_target(p, HPX_THERE(rank));
