@@ -24,6 +24,8 @@ namespace dashmm {
 
 class Serializer {
  public:
+  virtual ~Serializer() { }
+  
   /// Return the serial size of the given object
   ///
   /// \param object - pointer to the object in question

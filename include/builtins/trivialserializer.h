@@ -31,6 +31,8 @@ namespace dashmm {
 template <typename T>
 class TrivialSerializer {
  public:
+  ~TrivialSerializer() { }
+
   size_t size(void *object) const override {
     return sizeof(T);
   }

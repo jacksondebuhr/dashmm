@@ -796,7 +796,12 @@ class Array {
     assert(hpx_gas_try_pin(global, (void **)&local));
 
     // get a parcel of the right size
-    size_t arrsize = sizeof(T) * local->local_count;
+    size_t arrsize{0};
+    for (size_t i = 0; i < local->local_count; ++i) {
+      // We have to count each individually because each object may have a
+      // different serialized size.
+      arrsize += local->manager->size(local->data + i);
+    }
     size_t msgsize = sizeof(char *) + arrsize;
     hpx_parcel_t *p = hpx_parcel_acquire(nullptr, msgsize);
     char *parc_data = (char *)hpx_parcel_get_data(p);
@@ -804,9 +809,10 @@ class Array {
     *loc = location;
 
     // copy data into it
-    // TODO: This will need to be updated to serialization/deserialization
-    T *arrdata = reinterpret_cast<T *>(parc_data + sizeof(T *));
-    std::copy(local->data, &local->data[local->local_count], arrdata);
+    void *arrdata = static_cast<void *>(parc_data + sizeof(T *));
+    for (size_t i = 0; i < local->local_count; ++i) {
+      arrdata = local->manager->serialize(local->data + i, arrdata);
+    }
 
     // send parcel
     hpx_parcel_set_action(p, array_collect_receive_);
@@ -822,10 +828,12 @@ class Array {
 
   static int array_collect_receive_handler(char *data, size_t size) {
     T *location = *(reinterpret_cast<T **>(data));
-    T *incoming = reinterpret_cast<T *>(data + sizeof(T *));
-    size_t count = (size - sizeof(T *)) / sizeof(T);
-    // TODO this will need to be upgraded to serialization and deserialization
-    std::copy(incoming, &incoming[count], location);
+    char *incoming = data + sizeof(T *);
+    char *final = data + size;
+    size_t i{0};
+    while (incoming != final) {
+      incoming = local->manager->deserialize(incoming, location + i++);
+    }
     return HPX_SUCCESS;
   }
 
@@ -840,6 +848,7 @@ class Array {
     }
     local->manager = manager;
     hpx_gas_unpin(global);
+    hpx_exit(0, nullptr);
   }
 
 };
