@@ -34,6 +34,8 @@
 #include "dashmm/reductionops.h"
 #include "dashmm/types.h"
 
+#include "builtins/trivialserializer.h"
+
 
 namespace dashmm {
 
@@ -354,6 +356,8 @@ class Array {
   std::unique_ptr<T[]> collect() {
     assert(valid());
 
+    // I need a step to put the serializer into a known location...
+
     T *retval{nullptr};
     hpx_run(&array_collect_, &retval, &data_);
 
@@ -362,6 +366,28 @@ class Array {
     }
 
     return std::unique_ptr<T[]>(retval);
+  }
+
+  /// Set the serialization manager for the Array
+  ///
+  /// This will associate the given serialization manager object with this
+  /// Array. This will then be used inside any DASHMM routine that needs it
+  /// when dealing with this data.
+  ///
+  /// It is important that the same type be given to each rank when calling
+  /// this method, otherwise inconsistencies could result.
+  ///
+  /// \param manager - the Serializer object to associate with this Array
+  ///
+  /// \returns - kSuccess on success; kRuntimeError if there was a problem in
+  ///            the runtime.
+  ReturnCode set_manager(std::unique_ptr<Serializer> manager) {
+    Serializer *ptr = manager.release();
+    if (HPX_SUCCESS != hpx_run_spmd(array_set_manager_, nullptr,
+                                    &ptr, &data_)) {
+      return kRuntimeError;
+    }
+    return kSuccess;
   }
 
  private:
@@ -384,6 +410,7 @@ class Array {
   static hpx_action_t array_collect_;
   static hpx_action_t array_collect_request_;
   static hpx_action_t array_collect_receive_;
+  static hpx_action_t array_set_manager_;
 
   /// Return data from allocation action
   struct ArrayMetaAllocRunReturn {
@@ -515,6 +542,7 @@ class Array {
     local->local_count = record_count;
     local->total_count = contrib[ranks - 1];
     local->data = segment;
+    local->manager = new TrivialSerializer{};
 
     delete [] contrib;
 
@@ -801,6 +829,19 @@ class Array {
     return HPX_SUCCESS;
   }
 
+  static int array_set_manager_handler(Serializer *manager, hpx_addr_t data) {
+    hpx_addr_t global = hpx_addr_add(data,
+              sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+              sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+    if (local->manager != nullptr) {
+      delete local->manager;
+    }
+    local->manager = manager;
+    hpx_gas_unpin(global);
+  }
+
 };
 
 
@@ -848,6 +889,9 @@ hpx_action_t Array<T>::array_collect_request_ = HPX_ACTION_NULL;
 
 template <typename T>
 hpx_action_t Array<T>::array_collect_receive_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_set_manager_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm
