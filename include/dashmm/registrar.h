@@ -97,7 +97,7 @@ class ArrayRegistrar {
                         HPX_POINTER, HPX_SIZE_T);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         array_t::array_set_manager_,
-                        aaray_t::array_set_manager_handler,
+                        array_t::array_set_manager_handler,
                         HPX_POINTER, HPX_ADDR);
   }
 };

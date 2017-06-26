@@ -542,7 +542,7 @@ class Array {
     local->local_count = record_count;
     local->total_count = contrib[ranks - 1];
     local->data = segment;
-    local->manager = new TrivialSerializer{};
+    local->manager = new TrivialSerializer<T>{};
 
     delete [] contrib;
 
@@ -802,14 +802,17 @@ class Array {
       // different serialized size.
       arrsize += local->manager->size(local->data + i);
     }
-    size_t msgsize = sizeof(char *) + arrsize;
+    size_t msgsize = sizeof(hpx_addr_t) + sizeof(T *) + arrsize;
     hpx_parcel_t *p = hpx_parcel_acquire(nullptr, msgsize);
     char *parc_data = (char *)hpx_parcel_get_data(p);
-    T **loc = reinterpret_cast<T **>(parc_data);
+    hpx_addr_t *gmdata = reinterpret_cast<hpx_addr_t *>(parc_data);
+    *gmdata = data;
+    T **loc = reinterpret_cast<T **>(parc_data + sizeof(hpx_addr_t));
     *loc = location;
 
     // copy data into it
-    void *arrdata = static_cast<void *>(parc_data + sizeof(T *));
+    void *arrdata = static_cast<void *>(parc_data + sizeof(T *)
+                                          + sizeof(hpx_addr_t));
     for (size_t i = 0; i < local->local_count; ++i) {
       arrdata = local->manager->serialize(local->data + i, arrdata);
     }
@@ -827,13 +830,23 @@ class Array {
   }
 
   static int array_collect_receive_handler(char *data, size_t size) {
-    T *location = *(reinterpret_cast<T **>(data));
-    char *incoming = data + sizeof(T *);
+    hpx_addr_t *meta = reinterpret_cast<hpx_addr_t *>(data);
+    hpx_addr_t global = hpx_addr_add(*meta,
+              sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+              sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    T *location = *(reinterpret_cast<T **>(data + sizeof(hpx_addr_t)));
+    char *incoming = data + sizeof(hpx_addr_t) + sizeof(T *);
     char *final = data + size;
     size_t i{0};
     while (incoming != final) {
-      incoming = local->manager->deserialize(incoming, location + i++);
+      incoming = (char *)local->manager->deserialize(incoming, location + i++);
     }
+
+    hpx_gas_unpin(global);
+
     return HPX_SUCCESS;
   }
 
