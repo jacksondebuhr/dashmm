@@ -147,9 +147,9 @@ LaplaceTable::~LaplaceTable() {
 }
 
 void LaplaceTable::generate_sqf() {
-  sqf_ = new double[2 * p_ + 1];
+  sqf_ = new double[2 * p_ + 3];
   sqf_[0] = 1.0;
-  for (int i = 1; i <= p_ * 2; ++i) {
+  for (int i = 1; i <= p_ * 2 + 2; ++i) {
     sqf_[i] = sqf_[i - 1] * sqrt(i);
   }
 }
