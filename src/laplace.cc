@@ -811,8 +811,52 @@ std::vector<double> lap_m_to_t(Point dist, double scale,
     }
   }
 
-  
   retval.push_back(real(potential)); 
+
+  if (g) {
+    // Compute field values
+    dcomplex_t zs1{0.0, 0.0}, zs2{0.0, 0.0}, zs3{0.0, 0.0}; 
+    double fx = 0, fy = 0, fz = 0; 
+    
+    // M_0^0 term
+    zs1 += powers_ephi[1] * real(M[midx(0, 0)]) * powers_r[1] * 
+      legendre[midx(1, 1)];
+    fz = real(M[midx(0, 0)]) * powers_r[1] * legendre[midx(1, 0)];
+
+    // M_n^0 terms, n = 1, ..., p
+    for (int n = 1; n <= p; ++n) {
+      zs1 += powers_ephi[1] * real(M[midx(n, 0)]) * powers_r[n + 1] * 
+        legendre[midx(n + 1, 1)]; 
+      zs2 += M[midx(n, 1)] * powers_r[n + 1] * legendre[midx(n + 1, 0)] 
+        * sqf[n + 1] / sqf[n - 1]; 
+      fz += real(M[midx(n, 0)]) * powers_r[n + 1] * legendre[midx(n + 1, 0)]
+        * (n + 1);
+    }
+
+    // M_n^m terms, n = 1, ..., p, m = 1, ..., n
+    for (int n = 1; n <= p; ++n) {
+      for (int m = 1; m <= n; ++m) {
+        zs1 += M[midx(n, m)] * powers_r[n + 1] * powers_ephi[m + 1] * 
+          legendre[midx(n + 1, m + 1)] * sqf[n - m] / sqf[n + m];
+        if (m > 1) {
+          zs2 += M[midx(n, m)] * powers_r[n + 1] * powers_ephi[m - 1] * 
+            legendre[midx(n + 1, m - 1)] * sqf[n - m + 2] / sqf[n - m] *
+            sqf[n - m + 2] / sqf[n + m]; 
+        }
+        zs3 += M[midx(n, m)] * powers_r[n + 1] * powers_ephi[m] * 
+          legendre[midx(n + 1, m)] * sqf[n - m + 1] / sqf[n - m] * 
+          sqf[n - m + 1] / sqf[n + m];         
+      }
+    }
+
+    fx = real(zs2 - zs1); 
+    fy = -imag(zs2 + zs1); 
+    fz += 2.0 * real(zs3); 
+
+    retval.push_back(fx / scale); 
+    retval.push_back(fy / scale);
+    retval.push_back(fz / scale); 
+  }
 
   return retval; 
 }
@@ -864,6 +908,52 @@ std::vector<double> lap_l_to_t(Point dist, double scale,
   }
 
   retval.push_back(real(potential)); 
+
+  if (g) {
+    // Compute field values 
+    dcomplex_t zs1{0.0, 0.0}, zs2{0.0, 0.0}, zs3{0.0, 0.0}; 
+    double fx = 0, fy = 0, fz = 0; 
+    
+    // L_n^0 terms, n = 1, ..., p
+    for (int n = 1; n <= p; ++n) {
+      zs2 += L[midx(n, 1)] * powers_r[n - 1] * legendre[midx(n - 1, 0)] * 
+        sqf[n + 1] / sqf[n - 1]; 
+      fz += real(L[midx(n, 0)]) * powers_r[n - 1] * n * 
+        legendre[midx(n - 1, 0)];
+    }
+
+    // L_n^m terms, n = 1, ...., p, m = 1, ..., n
+    for (int n = 1; n <= p; ++n) {      
+      // zs3 for z derivative
+      for (int m = 1; m <= n - 1; ++m) {
+        zs3 += L[midx(n, m)] * powers_ephi[m] * powers_r[n - 1] * 
+          legendre[midx(n - 1, m)] * sqf[n - m] / sqf[n + m - 1] * 
+          sqf[n + m] / sqf[n + m - 1];
+      }
+
+      // zs2 for x, y derivatives
+      for (int m = 2; m <= n; ++m) {
+        zs2 += L[midx(n, m)] * powers_ephi[m - 1] * powers_r[n - 1] * 
+          legendre[midx(n - 1, m - 1)] * sqf[n - m] / sqf[n + m - 2] * 
+          sqf[n + m] / sqf[n + m - 2];
+      }
+
+      // zs1 for x, y derivatives
+      for (int m = 0; m <= n - 2; ++m) {
+        zs1 += L[midx(n, m)] * powers_ephi[m + 1] * powers_r[n - 1] * 
+          legendre[midx(n - 1, m + 1)] * sqf[n - m] / sqf[n + m];
+      }
+    }
+
+    fx = real(zs2 - zs1); 
+    fy = -imag(zs2 + zs1); 
+    fz += 2.0 * real(zs3); 
+
+    retval.push_back(fx * scale); 
+    retval.push_back(fy * scale); 
+    retval.push_back(fz * scale);
+  }
+
   return retval; 
 }
 
