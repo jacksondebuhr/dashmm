@@ -390,6 +390,29 @@ class Array {
     return kSuccess;
   }
 
+  /// Get serialization manager
+  ///
+  /// This returns the address of this rank's serialization manager of this
+  /// Array.
+  ///
+  /// NOTE: This should only be called from inside an HPX-5 epoch, and should
+  /// not be considered to be part of the user interface.
+  ///
+  /// \returns - the serializaion manager
+  Serializer *get_manager() const {
+    int rank = hpx_get_my_rank();
+    hpx_addr_t global = hpx_addr_add(data_,
+                                     sizeof(ArrayMetaData<T>) * rank,
+                                     sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    auto retval = local->manager;
+
+    hpx_gas_unpin(global);
+    return retval;
+  }
+
  private:
   friend class ArrayRegistrar<T>;
 

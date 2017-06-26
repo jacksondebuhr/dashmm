@@ -259,7 +259,8 @@ class DualTreeRegistrar {
                         dualtree_t::send_points_,
                         dualtree_t::send_points_handler,
                         HPX_INT, HPX_POINTER, HPX_POINTER, HPX_POINTER,
-                        HPX_POINTER, HPX_POINTER, HPX_POINTER, HPX_ADDR);
+                        HPX_POINTER, HPX_POINTER, HPX_POINTER,
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::create_dual_tree_,
                         dualtree_t::create_dual_tree_handler,

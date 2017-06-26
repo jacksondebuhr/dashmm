@@ -1065,7 +1065,7 @@ class Tree {
     n->lock();
     size_t first = n->first();
     record_t *p = n->parts.data();
-    memcpy(p + first, temp, sizeof(record_t) * n_arrived);
+    std::copy(temp, temp + n_arrived, p + first);
 
     if (n->increment_first(n_arrived)) {
       const DomainGeometry *geoarg = local_tree->domain();
@@ -1613,7 +1613,6 @@ class DualTree {
       hpx_parcel_set_target(parc, HPX_HERE);
       hpx_parcel_set_action(parc, instigate_dag_eval_);
       hpx_parcel_set_args(parc, &rwaddr, &first, &last);
-      // PRIORITY - set parcel priority to maximum
       hpx_parcel_send_sync(parc);
     }
   }
@@ -2095,6 +2094,15 @@ class DualTree {
     RankWise<dualtree_t> global_tree{*rwarg};
     auto local_tree = global_tree.here();
 
+    Serializer *source_manager{nullptr};
+    Serializer *target_manager{nullptr};
+    {
+      Array<source_t> sarr{rwarg[1]};
+      source_manager = sarr.get_manager();
+      Array<target_t> tarr{rwarg[2]};
+      target_manager = tarr.get_manager();
+    }
+
     // Wait until the buffer is allocated before merging incoming messages
     // We could do this as a call when, but then we need to be aware of the
     // addresses for every rank's LCO. For now, we do this, as it is simpler.
@@ -2104,7 +2112,7 @@ class DualTree {
     hpx_lco_wait(ttree->unif_done_);
 
     int *meta = reinterpret_cast<int *>(static_cast<char *>(args)
-                                        + sizeof(hpx_addr_t));
+                                        + 3 * sizeof(hpx_addr_t));
     int first = meta[0];
     int last = meta[1];
     int range = last - first + 1;
@@ -2112,23 +2120,37 @@ class DualTree {
     int recv_nt = meta[3];
     int *count_s = &meta[4]; // Used only if recv_ns > 0
     int *count_t = count_s + range * (recv_ns > 0); // Used only if recv_nt > 0
-    source_t *recv_s =
-      reinterpret_cast<source_t *>(static_cast<char *>(args) + sizeof(int) * 4 +
-                                sizeof(hpx_addr_t) +
+    char *recv_s = static_cast<char *>(args) + sizeof(int) * 4 +
+                                3 * sizeof(hpx_addr_t) +
                                 sizeof(int) * range * (recv_ns > 0) +
-                                sizeof(int) * range * (recv_nt > 0));
-    target_t *recv_t = reinterpret_cast<target_t *>(recv_s + recv_ns);
+                                sizeof(int) * range * (recv_nt > 0);
+    // Note that there are two copies now, the first is as the parcel data is
+    // deserialized, and the second is to add it to the buffer. This is
+    // essentially unavoidable.
+    source_t *sources = new source_t[recv_ns];
+    for (int i = 0; i < recv_ns; ++i) {
+      recv_s = (char *)source_manager->deserialize(recv_s, &sources[i]);
+    }
+    target_t *targets{nullptr};
+    if (recv_nt) {
+      targets = new target_t[recv_nt];
+      for (int i = 0; i < recv_nt; ++i) {
+        recv_s = (char *)target_manager->deserialize(recv_s, &targets[i]);
+      }
+    }
 
     hpx_addr_t done = hpx_lco_and_new(range * 2);
 
     if (recv_ns) {
+      int offset{0};
       for (int i = first; i <= last; ++i) {
         int incoming_ns = count_s[i - first];
         if (incoming_ns) {
           sourcenode_t *ns = &stree->unif_grid_[i];
+          source_t *batch = &sources[offset];
           hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
-                   &recv_s, &ns, &incoming_ns, rwarg);
-          recv_s += incoming_ns;
+                   &batch, &ns, &incoming_ns, rwarg);
+          offset += incoming_ns;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
         }
@@ -2140,13 +2162,15 @@ class DualTree {
     }
 
     if (recv_nt) {
+      int offset{0};
       for (int i = first; i <= last; ++i) {
         int incoming_nt = count_t[i - first];
         if (incoming_nt) {
           targetnode_t *nt = &ttree->unif_grid_[i];
+          target_t *batch = &targets[offset];
           hpx_call(HPX_HERE, targettree_t::merge_points_, done,
-                   &recv_t, &nt, &incoming_nt, rwarg);
-          recv_t += incoming_nt;
+                   &batch, &nt, &incoming_nt, rwarg);
+          offset += incoming_nt;
         } else {
           hpx_lco_and_set(done, HPX_NULL);
         }
@@ -2177,6 +2201,12 @@ class DualTree {
     // triggers this will spawn more work, but not in a synchronous way.
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
+
+    delete [] sources;
+    if (recv_nt) {
+      delete [] targets;
+    }
+
     return HPX_SUCCESS;
   }
 
@@ -2192,10 +2222,12 @@ class DualTree {
   /// \param offset_t - the target offsets
   /// \param sources - the source data
   /// \param targets - the target data
+  /// \param smeta - the source meta data address
   /// \param rwaddr - the global address of the dual tree
   static int send_points_handler(int rank, int *count_s, int *count_t,
                                  int *offset_s, int *offset_t,
                                  source_t *sources, target_t *targets,
+                                 hpx_addr_t smeta, hpx_addr_t tmeta,
                                  hpx_addr_t rwaddr) {
     RankWise<dualtree_t> global_tree{rwaddr};
     auto local_tree = global_tree.here();
@@ -2216,23 +2248,42 @@ class DualTree {
       send_nt = 0;
     }
 
+    // get access to the serializers
+    Serializer *source_manager{nullptr};
+    Serializer *target_manager{nullptr};
+    {
+      Array<source_t> sarr{smeta};
+      source_manager = sarr.get_manager();
+      Array<target_t> tarr{tmeta};
+      target_manager = tarr.get_manager();
+    }
+
     // Parcel message length
-    // TODO: Update this for serialization/deserialization
-    size_t bytes = sizeof(hpx_addr_t) + sizeof(int) * 4;
+    size_t bytes = sizeof(hpx_addr_t) * 3 + sizeof(int) * 4;
+    size_t bytes_source{0};
     if (send_ns) {
-      bytes += sizeof(int) * range + sizeof(source_t) * send_ns;
+      bytes += sizeof(int) * range;
+      for (int i = 0; i < send_ns; ++i) {
+        bytes_source += source_manager->size(&sources[offset_s[first] + i]);
+      }
+      bytes += bytes_source;
     }
     if (send_nt) {
-      bytes += sizeof(int) * range + sizeof(target_t) * send_nt;
+      bytes += sizeof(int) * range;
+      for (int i = 0; i < send_nt; ++i) {
+        bytes += target_manager->size(&targets[offset_t[first] + i]);
+      }
     }
 
     // Acquire parcel
     hpx_parcel_t *p = hpx_parcel_acquire(nullptr, bytes);
     void *data = hpx_parcel_get_data(p);
     hpx_addr_t *rwarg = static_cast<hpx_addr_t *>(data);
-    *rwarg = rwaddr;
-    int *meta = reinterpret_cast<int *>(
-                              static_cast<char *>(data) + sizeof(hpx_addr_t));
+    rwarg[0] = rwaddr;
+    rwarg[1] = smeta;
+    rwarg[2] = tmeta;
+    int *meta = reinterpret_cast<int *>(static_cast<char *>(data)
+                                          + 3 * sizeof(hpx_addr_t));
     meta[0] = first;
     meta[1] = last;
     meta[2] = send_ns;
@@ -2240,31 +2291,29 @@ class DualTree {
 
     int *count = &meta[4];
     if (send_ns) {
-      memcpy(count, &count_s[first], sizeof(int) * range);
+      std::copy(&count_s[first], &count_s[last + 1], count);
       count += range;
     }
-
     if (send_nt) {
-      memcpy(count, &count_t[first], sizeof(int) * range);
+      std::copy(&count_t[first], &count_t[last + 1], count);
     }
 
-    char *meta_s = static_cast<char *>(data) + sizeof(hpx_addr_t) +
+    char *meta_s = static_cast<char *>(data) + 3 * sizeof(hpx_addr_t) +
       sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
-    source_t *meta_cast = reinterpret_cast<source_t *>(meta_s);
     if (send_ns) {
-      // TODO: Update this for serialization/deserialization
-      std::copy(&sources[offset_s[first]],
-                &sources[offset_s[first] + send_ns],
-                meta_cast);
+      for (int i = 0; i < send_ns; ++i) {
+        meta_s = (char *)source_manager->serialize(
+                                &sources[offset_s[first] + i],
+                                meta_s);
+      }
     }
 
     if (send_nt) {
-      target_t *meta_t =
-          reinterpret_cast<target_t *>(meta_s + send_ns * sizeof(source_t));
-      // TODO: Update this for serialization/deserialization
-      std::copy(&targets[offset_t[first]],
-                &targets[offset_t[first] + send_nt],
-                meta_t);
+      for (int i = 0; i < send_nt; ++i) {
+        meta_s = (char *)target_manager->serialize(
+                                &targets[offset_t[first] + i],
+                                meta_s);
+      }
     }
 
     hpx_parcel_set_target(p, HPX_THERE(rank));
@@ -2378,7 +2427,7 @@ class DualTree {
         if (r != rank) {
           hpx_call(HPX_HERE, send_points_, HPX_NULL, &r, &local_scount,
                    &local_tcount, &local_offset_s, &local_offset_t,
-                   &p_s, &p_t, &rwtree);
+                   &p_s, &p_t, &sources_gas, &targets_gas, &rwtree);
         }
       }
       hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
