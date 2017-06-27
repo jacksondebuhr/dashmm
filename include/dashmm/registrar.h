@@ -250,7 +250,8 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::init_partition_,
                         dualtree_t::init_partition_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT);
+                        HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT,
+                        HPX_ADDR, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         dualtree_t::recv_points_,
                         dualtree_t::recv_points_handler,
@@ -264,7 +265,7 @@ class DualTreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::create_dual_tree_,
                         dualtree_t::create_dual_tree_handler,
-                        HPX_ADDR, HPX_ADDR, HPX_ADDR);
+                        HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::finalize_partition_,
                         dualtree_t::finalize_partition_handler,

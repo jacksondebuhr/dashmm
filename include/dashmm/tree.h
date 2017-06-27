@@ -1671,7 +1671,8 @@ class DualTree {
     hpx_addr_t domain_geometry = compute_domain_geometry(sources, targets,
                                                          same_sandt);
     RankWise<dualtree_t> retval = setup_basic_data(threshold, domain_geometry,
-                                                   same_sandt);
+                                                   same_sandt, sources,
+                                                   targets);
     hpx_lco_delete_sync(domain_geometry);
     return retval;
   }
@@ -1694,17 +1695,12 @@ class DualTree {
   /// \param targets - the target data
   ///
   /// \returns - an LCO indication completion of the partitioning.
-  static hpx_addr_t partition(RankWise<dualtree_t> global_tree,
-                              Array<Source> sources,
-                              Array<Target> targets) {
+  static hpx_addr_t partition(RankWise<dualtree_t> global_tree) {
     hpx_addr_t retval = hpx_lco_future_new(0);
     assert(retval != HPX_NULL);
 
     hpx_addr_t tree_gas = global_tree.data();
-    hpx_addr_t source_gas = sources.data();
-    hpx_addr_t target_gas = targets.data();
-    hpx_bcast_lsync(create_dual_tree_, retval,
-                    &tree_gas, &source_gas, &target_gas);
+    hpx_bcast_lsync(create_dual_tree_, retval, &tree_gas);
 
     return retval;
   }
@@ -1861,7 +1857,8 @@ class DualTree {
   /// \returns - HPX_SUCCESS
   static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
                                     int limit, hpx_addr_t domain_geometry,
-                                    int same_sandt) {
+                                    int same_sandt, hpx_addr_t source_gas,
+                                    hpx_addr_t target_gas) {
     RankWise<dualtree_t> global_tree{rwdata};
     auto tree = global_tree.here();
 
@@ -1875,6 +1872,8 @@ class DualTree {
     tree->target_tree_ =
       new Tree<Source, Target, Target, Expansion, Method>{};
     tree->same_sandt_ = same_sandt;
+    tree->source_gas = source_gas;
+    tree->target_gas = target_gas;
 
     // Call out to tree setup stuff
     hpx_addr_t setup_done = hpx_lco_and_new(2);
@@ -1919,7 +1918,9 @@ class DualTree {
   /// \returns - the Dual Tree
   static RankWise<dualtree_t> setup_basic_data(int threshold,
                                                hpx_addr_t domain_geometry,
-                                               bool same_sandt) {
+                                               bool same_sandt,
+                                               Array<source_t> sources,
+                                               Array<target_t> targets) {
     RankWise<dualtree_t> retval{};
     retval.allocate();
     if (!retval.valid()) {
@@ -1936,8 +1937,10 @@ class DualTree {
                                            int_sum_op);
     hpx_addr_t rwdata = retval.data();
     int ssat = (same_sandt ? 1 : 0);
+    hpx_addr_t sgas = sources.data();
+    hpx_addr_t tgas = targets.data();
     hpx_bcast_rsync(init_partition_, &rwdata, &ucount, &threshold,
-                    &domain_geometry, &ssat);
+                    &domain_geometry, &ssat, &sgas, &tgas);
 
     return retval;
   }
@@ -2360,18 +2363,16 @@ class DualTree {
   /// required to build the distributed trees.
   ///
   /// \param rwtree - the global address of the dual tree
-  /// \param sources_gas - the source data
-  /// \param targets_gas - the target data
   ///
   /// \return HPX_SUCCESS
-  static int create_dual_tree_handler(hpx_addr_t rwtree,
-                                      hpx_addr_t sources_gas,
-                                      hpx_addr_t targets_gas) {
+  static int create_dual_tree_handler(hpx_addr_t rwtree) {
     int rank = hpx_get_my_rank();
     int num_ranks = hpx_get_num_ranks();
 
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
+    auto sources_gas = tree->source_gas;
+    auto targets_gas = tree->target_gas;
 
     Array<source_t> sources{sources_gas};
     Array<target_t> targets{targets_gas};
@@ -2716,6 +2717,11 @@ class DualTree {
                                         DAGNode **last) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
+    Serializer *manager{nullptr};
+    {
+      Array<source_t> sarr{tree->source_gas};
+      manager = sarr.get_manager();
+    }
 
     for (DAGNode **iter = first; iter != last; ++iter) {
       DAGNode *parts = *iter;
@@ -2727,25 +2733,30 @@ class DualTree {
                 DAG::compare_edge_locality);
 
       // Make scratch space for the sends
-      // TODO: This will need a serialization/deserialization update
-      size_t source_size = sizeof(Source) * sources.n();
+      size_t source_size{0};
+      auto sref = sources.data();
+      for (size_t i = 0; i < sources.n(); ++i) {
+        source_size += manager->size(&sref[i]);
+      }
       size_t header_size = source_size + sizeof(size_t)
           + sizeof(hpx_addr_t);
       size_t total_size = header_size + sizeof(size_t)
           + parts->out_edges.size() * sizeof(DAGInstigationRecord);
       char *scratch = new char [total_size];
-      assert(scratch != nullptr);
 
       // Copy source data
-      auto sref = sources.data();
       {
-        WriteBuffer headdata(scratch, header_size);
-        assert(headdata.write(sources.n()));
+        hpx_addr_t *scratch_rw = reinterpret_cast<hpx_addr_t *>(scratch);
+        *scratch_rw = rwtree;
 
-        // TODO: This needs a serialization/deserialization update
-        assert(headdata.write(sref, sources.n()));
+        size_t *scratch_n = reinterpret_cast<size_t *>(scratch
+                                                       + sizeof(hpx_addr_t));
+        *scratch_n = sources.n();
 
-        assert(headdata.write(rwtree));
+        char *scratch_ptr = scratch + sizeof(size_t) + sizeof(hpx_addr_t);
+        for (size_t i = 0; i < sources.n(); ++i) {
+          scratch_ptr = (char *)manager->serialize(&sref[i], scratch_ptr);
+        }
       }
 
       int my_rank = hpx_get_my_rank();
@@ -2809,22 +2820,26 @@ class DualTree {
   /// \returns - HPX_SUCCESS
   static int instigate_dag_eval_remote_handler(char *message, size_t bytes) {
     // unpack message into arguments to the local work function
-    auto input = ReadBuffer(message, bytes);
-    size_t n_src{};
-    input.read(&n_src);
-
-    // TODO: deserialize the sources
-    Source *sources = input.interpret_array<Source>(n_src);
-
-    hpx_addr_t tree_addx{};
-    input.read(&tree_addx);
+    hpx_addr_t tree_addx = *(reinterpret_cast<hpx_addr_t *>(message));
     RankWise<dualtree_t> global_tree{tree_addx};
     auto local_tree = global_tree.here();
 
-    size_t n_edges{};
-    input.read(&n_edges);
+    size_t n_src = *(reinterpret_cast<size_t *>(message + sizeof(hpx_addr_t)));
+
+    // TODO: deserialize the sources
+    Source *sources = new Source[n_src];
+    char *msg_ptr = message + sizeof(size_t) + sizeof(hpx_addr_t);
+    {
+      Array<Source> sarr{local_tree->source_gas};
+      Serializer *manager = sarr.get_manager();
+      for (size_t i = 0; i < n_src; ++i) {
+        msg_ptr = (char *)manager->deserialize(msg_ptr, &sources[i]);
+      }
+    }
+
+    size_t n_edges = *(reinterpret_cast<size_t *>(msg_ptr));
     DAGInstigationRecord *edges
-        = input.interpret_array<DAGInstigationRecord>(n_edges);
+        = reinterpret_cast<DAGInstigationRecord *>(msg_ptr + sizeof(size_t));
 
     // Detect if the edges have unknown target addresses and lookup the
     // correct address
@@ -2835,10 +2850,10 @@ class DualTree {
       }
     }
 
-    // TODO: make sure the sources here are not the serialized version.
-    // this function depends on having proper source objects.
     instigate_dag_eval_work(n_src, sources, local_tree->domain_,
                             n_edges, edges);
+
+    delete [] sources;
 
     return HPX_SUCCESS;
   }
@@ -3137,6 +3152,7 @@ class DualTree {
   int refinement_limit_;      /// refinement threshold
   int unif_level_;            /// level of uniform partition
   int dim3_;                  /// number of uniform nodes
+  int same_sandt_;            /// Made from the same sources and targets
   hpx_addr_t unif_count_;     /// LCO reducing the uniform counts
   int *unif_count_value_;     /// local data storing the uniform counts
   int *distribute_;           /// the computed distribution of the nodes
@@ -3146,7 +3162,8 @@ class DualTree {
   sourcetree_t *source_tree_; /// The source tree
   targettree_t *target_tree_; /// The target tree
 
-  int same_sandt_;            /// Made from the same sources and targets
+  hpx_addr_t source_gas;      /// the source array meta data
+  hpx_addr_t target_gas;      /// the target array meta data
 
 
   static hpx_action_t domain_geometry_init_;
