@@ -2826,7 +2826,6 @@ class DualTree {
 
     size_t n_src = *(reinterpret_cast<size_t *>(message + sizeof(hpx_addr_t)));
 
-    // TODO: deserialize the sources
     Source *sources = new Source[n_src];
     char *msg_ptr = message + sizeof(size_t) + sizeof(hpx_addr_t);
     {
