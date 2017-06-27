@@ -22,6 +22,8 @@
 
 #include <hpx/hpx.h>
 
+#include "dashmm/serializer.h"
+
 
 namespace dashmm {
 
@@ -36,6 +38,7 @@ struct ArrayMetaData {
   T *data;              /// address of local segment of the array
   size_t local_count;   /// the number of records in the local portion
   size_t total_count;   /// the total number of records in all portions
+  Serializer *manager;  /// the current serialization manager
 };
 
 

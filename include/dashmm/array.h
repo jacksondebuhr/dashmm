@@ -34,6 +34,8 @@
 #include "dashmm/reductionops.h"
 #include "dashmm/types.h"
 
+#include "builtins/trivialserializer.h"
+
 
 namespace dashmm {
 
@@ -354,6 +356,8 @@ class Array {
   std::unique_ptr<T[]> collect() {
     assert(valid());
 
+    // I need a step to put the serializer into a known location...
+
     T *retval{nullptr};
     hpx_run(&array_collect_, &retval, &data_);
 
@@ -362,6 +366,51 @@ class Array {
     }
 
     return std::unique_ptr<T[]>(retval);
+  }
+
+  /// Set the serialization manager for the Array
+  ///
+  /// This will associate the given serialization manager object with this
+  /// Array. This will then be used inside any DASHMM routine that needs it
+  /// when dealing with this data.
+  ///
+  /// It is important that the same type be given to each rank when calling
+  /// this method, otherwise inconsistencies could result.
+  ///
+  /// \param manager - the Serializer object to associate with this Array
+  ///
+  /// \returns - kSuccess on success; kRuntimeError if there was a problem in
+  ///            the runtime.
+  ReturnCode set_manager(std::unique_ptr<Serializer> manager) {
+    Serializer *ptr = manager.release();
+    if (HPX_SUCCESS != hpx_run_spmd(array_set_manager_, nullptr,
+                                    &ptr, &data_)) {
+      return kRuntimeError;
+    }
+    return kSuccess;
+  }
+
+  /// Get serialization manager
+  ///
+  /// This returns the address of this rank's serialization manager of this
+  /// Array.
+  ///
+  /// NOTE: This should only be called from inside an HPX-5 epoch, and should
+  /// not be considered to be part of the user interface.
+  ///
+  /// \returns - the serializaion manager
+  Serializer *get_manager() const {
+    int rank = hpx_get_my_rank();
+    hpx_addr_t global = hpx_addr_add(data_,
+                                     sizeof(ArrayMetaData<T>) * rank,
+                                     sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    auto retval = local->manager;
+
+    hpx_gas_unpin(global);
+    return retval;
   }
 
  private:
@@ -384,6 +433,7 @@ class Array {
   static hpx_action_t array_collect_;
   static hpx_action_t array_collect_request_;
   static hpx_action_t array_collect_receive_;
+  static hpx_action_t array_set_manager_;
 
   /// Return data from allocation action
   struct ArrayMetaAllocRunReturn {
@@ -515,6 +565,7 @@ class Array {
     local->local_count = record_count;
     local->total_count = contrib[ranks - 1];
     local->data = segment;
+    local->manager = new TrivialSerializer<T>{};
 
     delete [] contrib;
 
@@ -768,17 +819,26 @@ class Array {
     assert(hpx_gas_try_pin(global, (void **)&local));
 
     // get a parcel of the right size
-    size_t arrsize = sizeof(T) * local->local_count;
-    size_t msgsize = sizeof(char *) + arrsize;
+    size_t arrsize{0};
+    for (size_t i = 0; i < local->local_count; ++i) {
+      // We have to count each individually because each object may have a
+      // different serialized size.
+      arrsize += local->manager->size(local->data + i);
+    }
+    size_t msgsize = sizeof(hpx_addr_t) + sizeof(T *) + arrsize;
     hpx_parcel_t *p = hpx_parcel_acquire(nullptr, msgsize);
     char *parc_data = (char *)hpx_parcel_get_data(p);
-    T **loc = reinterpret_cast<T **>(parc_data);
+    hpx_addr_t *gmdata = reinterpret_cast<hpx_addr_t *>(parc_data);
+    *gmdata = data;
+    T **loc = reinterpret_cast<T **>(parc_data + sizeof(hpx_addr_t));
     *loc = location;
 
     // copy data into it
-    // TODO: This will need to be updated to serialization/deserialization
-    T *arrdata = reinterpret_cast<T *>(parc_data + sizeof(T *));
-    std::copy(local->data, &local->data[local->local_count], arrdata);
+    void *arrdata = static_cast<void *>(parc_data + sizeof(T *)
+                                          + sizeof(hpx_addr_t));
+    for (size_t i = 0; i < local->local_count; ++i) {
+      arrdata = local->manager->serialize(local->data + i, arrdata);
+    }
 
     // send parcel
     hpx_parcel_set_action(p, array_collect_receive_);
@@ -793,12 +853,38 @@ class Array {
   }
 
   static int array_collect_receive_handler(char *data, size_t size) {
-    T *location = *(reinterpret_cast<T **>(data));
-    T *incoming = reinterpret_cast<T *>(data + sizeof(T *));
-    size_t count = (size - sizeof(T *)) / sizeof(T);
-    // TODO this will need to be upgraded to serialization and deserialization
-    std::copy(incoming, &incoming[count], location);
+    hpx_addr_t *meta = reinterpret_cast<hpx_addr_t *>(data);
+    hpx_addr_t global = hpx_addr_add(*meta,
+              sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+              sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+
+    T *location = *(reinterpret_cast<T **>(data + sizeof(hpx_addr_t)));
+    char *incoming = data + sizeof(hpx_addr_t) + sizeof(T *);
+    char *final = data + size;
+    size_t i{0};
+    while (incoming != final) {
+      incoming = (char *)local->manager->deserialize(incoming, location + i++);
+    }
+
+    hpx_gas_unpin(global);
+
     return HPX_SUCCESS;
+  }
+
+  static int array_set_manager_handler(Serializer *manager, hpx_addr_t data) {
+    hpx_addr_t global = hpx_addr_add(data,
+              sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
+              sizeof(ArrayMetaData<T>));
+    ArrayMetaData<T> *local{nullptr};
+    assert(hpx_gas_try_pin(global, (void **)&local));
+    if (local->manager != nullptr) {
+      delete local->manager;
+    }
+    local->manager = manager;
+    hpx_gas_unpin(global);
+    hpx_exit(0, nullptr);
   }
 
 };
@@ -848,6 +934,9 @@ hpx_action_t Array<T>::array_collect_request_ = HPX_ACTION_NULL;
 
 template <typename T>
 hpx_action_t Array<T>::array_collect_receive_ = HPX_ACTION_NULL;
+
+template <typename T>
+hpx_action_t Array<T>::array_set_manager_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm

@@ -37,6 +37,8 @@ TODO: From tree.h line 2240
     // local segments unpinned. src_data and trg_data will unpin the segment
     // when the scope we introduce here is closed. Perhaps add unpin(), but
     // that detracts from the RAII nature of the current ArrayData object.
+TODO: Clean up tree.h -- remove whatever possible from that into the evaluator
+      object. Break the file into multiple parts, Node, Tree, DualTree
 
 
 Related to Drake's Work
@@ -59,11 +61,6 @@ TODO: Another thing might be to send this to the tree and not the LCO. Then the
       tree can eventually build up a complete list over the iterations.
       Again, there is a termination problem with this, but it is a different
       perspective.
-TODO: Split Evaluate into pieces and expose more interface to users
-    - NOTE: This is not a vital thing to accomplish for 1.0.0
-    - Enable repeat use of a DAG
-    - Potentially provide objects representing the tree and so on to the user
-      and some utility routines to use the resulting objects
 
 
 Related to Silvio's Work
@@ -118,8 +115,8 @@ TODO: Make the way that Expansions manage their data not suck as much as it
       all of this, and it will be easy for a user to muck it up.
 TODO: ViewSet is not something I particularly like. See if there is a way to
   make this less awful. (This is basically the same as above)
-TODO: should we put all the DAG stuff into a namespace DAG? So 
-      dashmm::dag::Edge and so on. Extending this, should we do the same thing 
+TODO: should we put all the DAG stuff into a namespace DAG? So
+      dashmm::dag::Edge and so on. Extending this, should we do the same thing
       for other subsystems?
         This would be okay, but what would DAG turn into? dag::DAG? That's
         pretty goofy...
@@ -131,16 +128,18 @@ TODO: Work out if there is a better way to apply the distribution. We shall
 TODO: Perhaps we want to parameterize the nodes with some user data? So
       the user can use the tree for other things as well.
   * It would be nice if we were to decouple some of the use of the tree and the
-  construction of the tree. The ultimate goal would be to perhaps allow the 
-  user to supply their tree to us, like if they had a better method to make 
-  it, or if their code already needs to make a tree for some reason. Then 
-  DASHMM could just do the DAG and so on. This would also allow us to try 
-  other constructions more easily. We basically would be able to hot swap 
-  implementations. Also, this might make it simpler to make a tree that can 
+  construction of the tree. The ultimate goal would be to perhaps allow the
+  user to supply their tree to us, like if they had a better method to make
+  it, or if their code already needs to make a tree for some reason. Then
+  DASHMM could just do the DAG and so on. This would also allow us to try
+  other constructions more easily. We basically would be able to hot swap
+  implementations. Also, this might make it simpler to make a tree that can
   update adiabadically.
 TODO: Should we use exceptions in the main interface to return errors? This is
   probably cleaner. the catch is that I would need to work out what happens
   when I emit an exception in an HPX action.
+TODO: Change distropolicy_t to work like the serializer does now.
+TODO: Make stuff sent to expansion_t const where possible.
 
 
 
@@ -150,7 +149,7 @@ TODO: Should we use exceptions in the main interface to return errors? This is
 
 
 FUTURE BUILT-INs
- * We should also in the near term get a base nearest neighbor search. This 
+ * We should also in the near term get a base nearest neighbor search. This
    will be essential for SPH and Phil's MFV methods.
    This would be useful in much wider contexts, however.
  * Do LaplaceCOM with softened force (ala GADGET)

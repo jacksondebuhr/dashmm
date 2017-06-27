@@ -158,6 +158,10 @@ class Evaluator {
   /// operations on the return value will be defined).
   ///
   /// \param tree - Handle to the tree used to discover the DAG
+  /// \param n_digits - the number of digits of accuracy required for the
+  ///                   evaluation.
+  /// \param kernel_params - the parameters to the kernel to be used in the
+  ///                        evaluation
   /// \param method - an instance of a method to use during DAG discovery
   /// \param distro - an instance of a distribution policy used to distribute
   ///                 the DAG nodes.
@@ -189,10 +193,6 @@ class Evaluator {
   /// reset if it is to be used again (see reset_DAG).
   ///
   /// \param tree - handle to the DualTree
-  /// \param n_digits - the number of digits of accuracy required for the
-  ///                   evaluation.
-  /// \param kernel_params - the parameters to the kernel to be used in the
-  ///                        evaluation
   /// \param dag - the DAG to execute
   ///
   /// \returns - kSuccess or kRuntimeError when there is trouble in the
@@ -359,9 +359,7 @@ class Evaluator {
                                                           sources,
                                                           targets);
 
-    hpx_addr_t partitiondone = dualtree_t::partition(global_tree,
-                                                     sources,
-                                                     targets);
+    hpx_addr_t partitiondone = dualtree_t::partition(global_tree);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
     hpx_time_t creation_end = hpx_time_now();
