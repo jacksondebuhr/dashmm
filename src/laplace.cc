@@ -378,14 +378,14 @@ void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id) {
 }
 
 void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int id, ViewSet &t_views) {
+                int sid, int tid, ViewSet &t_views) {
   const dcomplex_t *S[6]{
-    reinterpret_cast<dcomplex_t *>(s_views.view_data(id)),
-      reinterpret_cast<dcomplex_t *>(s_views.view_data(id + 1)),
-      reinterpret_cast<dcomplex_t *>(s_views.view_data(id + 2)),
-      reinterpret_cast<dcomplex_t *>(s_views.view_data(id + 3)),
-      reinterpret_cast<dcomplex_t *>(s_views.view_data(id + 4)),
-      reinterpret_cast<dcomplex_t *>(s_views.view_data(id + 5))
+    reinterpret_cast<dcomplex_t *>(s_views.view_data(sid)),
+      reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 1)),
+      reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 2)),
+      reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 3)),
+      reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 4)),
+      reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 5))
       };
   
   // Compute index offsets between the current source node and the 1st child
@@ -430,7 +430,7 @@ void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
       lap_e_to_e(T[i], S[0], dz, -dy, 0);
     }
     
-    t_views.add_view(tag, view_size, C[i]);
+    t_views.add_view(tid + tag, view_size, C[i]);
     used[i] = true;
   }
   
@@ -444,34 +444,34 @@ void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
 void lap_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L) {
   double scale = views.scale() * 2;
   const dcomplex_t *E[28]{
-    reinterpret_cast<dcomplex_t *>(views.view_data(0)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(1)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(2)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(3)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(4)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(5)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(6)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(7)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(8)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(9)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(10)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(11)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(12)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(13)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(14)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(15)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(16)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(17)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(18)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(19)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(20)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(21)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(22)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(23)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(24)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(25)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(26)),
-      reinterpret_cast<dcomplex_t *>(views.view_data(27))
+    reinterpret_cast<dcomplex_t *>(views.view_data(id)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 1)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 2)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 3)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 4)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 5)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 6)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 7)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 8)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 9)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 10)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 11)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 12)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 13)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 14)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 15)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 16)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 17)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 18)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 19)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 20)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 21)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 22)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 23)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 24)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 25)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 26)),
+      reinterpret_cast<dcomplex_t *>(views.view_data(id + 27))
       };
 
   int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +

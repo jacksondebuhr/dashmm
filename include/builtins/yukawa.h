@@ -61,7 +61,7 @@ void yuk_l_to_l(int to_child, const dcomplex_t *L, double scale,
                 dcomplex_t *W); 
 void yuk_m_to_i(const dcomplex_t *M, ViewSet &views, double scale, int id); 
 void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int id, ViewSet &t_views); 
+                int sid, int tid, ViewSet &t_views); 
 void yuk_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L); 
 void yuk_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z, 
                 double scale); 
@@ -256,7 +256,7 @@ public:
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     ViewSet views{kTargetIntermediate};
-    yuk_i_to_i(s_index, t_index, views_, 0, views); 
+    yuk_i_to_i(s_index, t_index, views_, 0, 0, views); 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
   }

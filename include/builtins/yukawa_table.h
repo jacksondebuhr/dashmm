@@ -63,6 +63,7 @@ class YukawaTable {
   const dcomplex_t *ys(double scale) const {return ys_[level(scale)];}
   const double *zs(double scale) const {return zs_[level(scale)];}
   double size(double scale) const {return size_ * scale / scale_;}
+  int level(double scale) const {return log2(scale_ / scale);}
 
 private:
   int p_;
@@ -87,7 +88,6 @@ private:
   dcomplex_t **ys_;
   double **zs_;
 
-  int level(double scale) const {return log2(scale_ / scale);}
   void generate_sqf();
   void generate_scaled_wigner_dmat();
   void generate_scaled_dmat_of_beta(double beta, double *dp, double *dm);
