@@ -441,8 +441,8 @@ void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
     delete [] T3;
 }
 
-void lap_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L) {
-  double scale = views.scale() * 2;
+void lap_i_to_l(const ViewSet &views, int id, Index t_index, 
+                double scale, dcomplex_t *L) {
   const dcomplex_t *E[28]{
     reinterpret_cast<dcomplex_t *>(views.view_data(id)),
       reinterpret_cast<dcomplex_t *>(views.view_data(id + 1)),

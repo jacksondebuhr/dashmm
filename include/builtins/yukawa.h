@@ -61,8 +61,9 @@ void yuk_l_to_l(int to_child, const dcomplex_t *L, double scale,
                 dcomplex_t *W); 
 void yuk_m_to_i(const dcomplex_t *M, ViewSet &views, double scale, int id); 
 void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int sid, int tid, ViewSet &t_views); 
-void yuk_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L); 
+                int sid, int tid, double scale, ViewSet &t_views); 
+void yuk_i_to_l(const ViewSet &views, int id, Index t_index, double scale, 
+                dcomplex_t *L); 
 void yuk_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z, 
                 double scale); 
 void yuk_e_to_l(const dcomplex_t *E, char dir, bool sgn, double scale, 
@@ -256,7 +257,8 @@ public:
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     ViewSet views{kTargetIntermediate};
-    yuk_i_to_i(s_index, t_index, views_, 0, 0, views); 
+    double scale = views_.scale(); 
+    yuk_i_to_i(s_index, t_index, views_, 0, 0, scale, views); 
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
   }
@@ -265,7 +267,8 @@ public:
     // t_index is the index of the child
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    yuk_i_to_l(views_, 0, t_index, L); 
+    double scale = views_.scale() / 2.0; 
+    yuk_i_to_l(views_, 0, t_index, scale, L); 
     return std::unique_ptr<expansion_t>(retval);
   }
 

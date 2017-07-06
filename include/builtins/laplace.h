@@ -60,7 +60,8 @@ void lap_l_to_l(int to_child, const dcomplex_t *L, dcomplex_t *W);
 void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id); 
 void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
                 int sid, int tid, ViewSet &t_views); 
-void lap_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L);
+void lap_i_to_l(const ViewSet &views, int id, Index t_index, double scale, 
+                dcomplex_t *L); 
 void lap_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z); 
 void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L); 
 
@@ -309,7 +310,8 @@ class Laplace {
     // t_index is the index of the child
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    lap_i_to_l(views_, 0, t_index, L); 
+    double scale = views_.scale() * 2; 
+    lap_i_to_l(views_, 0, t_index, scale, L); 
     return std::unique_ptr<expansion_t>(retval);
   }
 

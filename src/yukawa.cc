@@ -438,7 +438,7 @@ void yuk_m_to_i(const dcomplex_t *M, ViewSet &views, double scale, int id) {
 }
 
 void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int sid, int tid, ViewSet &t_views) {
+                int sid, int tid, double scale, ViewSet &t_views) {
   const dcomplex_t *S[6]{
     reinterpret_cast<dcomplex_t *>(s_views.view_data(sid)),
       reinterpret_cast<dcomplex_t *>(s_views.view_data(sid + 1)),
@@ -455,7 +455,6 @@ void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
   int dz = s_index.z() - t_index.z() * 2;
 
   // Exponential expansions on the source side
-  double scale = s_views.scale(); 
   int nexp = builtin_yukawa_table_->nexp(scale);
 
   // Each S is going to generate between 1 and 3 views of the exponential
@@ -505,7 +504,8 @@ void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
   }
 }
 
-void yuk_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L) {
+void yuk_i_to_l(const ViewSet &views, int id, Index t_index, double scale, 
+                dcomplex_t *L) {
   const dcomplex_t *E[28]{
     reinterpret_cast<dcomplex_t *>(views.view_data(id)),
       reinterpret_cast<dcomplex_t *>(views.view_data(id + 1)),
@@ -542,7 +542,6 @@ void yuk_i_to_l(const ViewSet &views, int id, Index t_index, dcomplex_t *L) {
   int to_child = 4 * (t_index.z() % 2) + 2 * (t_index.y() % 2) +
     (t_index.x() % 2);
 
-  double scale = views.scale() / 2;
   int nexp = builtin_yukawa_table_->nexp(scale);
 
   dcomplex_t *S = new dcomplex_t[nexp * 6]();
