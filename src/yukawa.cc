@@ -225,7 +225,8 @@ std::vector<double> yuk_m_to_t(Point dist, double scale,
   int p = builtin_yukawa_table_->p();
   double lambda = builtin_yukawa_table_->lambda();
   std::vector<double> legendre((p + 2) * (p + 3) / 2); 
-  std::vector<double> bessel(p + 2);  // verify this, is p + 1 enough? 
+  std::vector<dcomplex_t> temp((p + 2) * (p + 3) / 2); 
+  std::vector<double> bessel(p + 2);  
   std::vector<dcomplex_t> powers_ephi(p + 2); 
 
   // Compute potential first 
@@ -242,41 +243,128 @@ std::vector<double> yuk_m_to_t(Point dist, double scale,
   
   // Compute powers of exp(i * phi)
   powers_ephi[0] = 1.0;
-  for (int j = 1; j <= p; j++) 
+  for (int j = 1; j <= p + 1; j++) 
     powers_ephi[j] = powers_ephi[j - 1] * ephi;
 
   // Compute scaled modified spherical bessel function
-  bessel_kn_scaled(p, lambda * r, scale, bessel.data());
+  bessel_kn_scaled(p + 1, lambda * r, scale, bessel.data());
 
   // Compute legendre polynomial
-  legendre_Plm(p, ctheta, legendre.data());
+  legendre_Plm(p + 1, ctheta, legendre.data());
   
   // Evaluate M_n^0
-  for (int n = 0; n <= p; ++n) 
-    potential += M[midx(n, 0)] * legendre[midx(n, 0)] * bessel[n];
-
+  for (int n = 0; n <= p; ++n) {
+    temp[midx(n, 0)] = bessel[n] * legendre[midx(n, 0)]; 
+    potential += M[midx(n, 0)] * temp[midx(n, 0)]; 
+ }
   
   // Evaluate M_n^m
   for (int n = 1; n <= p; ++n) {
     for (int m = 1; m <= n; ++m) {
-      potential += 2.0 * real(M[midx(n, m)] * powers_ephi[m]) *
-        bessel[n] * legendre[midx(n, m)];
+      temp[midx(n, m)] = bessel[n] * legendre[midx(n, m)] * powers_ephi[m]; 
+      potential += 2.0 * real(M[midx(n, m)] * temp[midx(n, m)]);
     }
   }
 
   retval.push_back(real(potential)); 
 
+  if (g) {
+    for (int m = 0; m <= p + 1; ++m) {
+      temp[midx(p + 1, m)] = bessel[p + 1] * legendre[midx(p + 1, m)] * 
+        powers_ephi[m];
+    }
+
+    // Compute field values 
+    dcomplex_t rpotz = 0.0, cpz = 0.0, tx = 0, ty = 0, tz = 0; 
+    double fx = 0, fy = 0, fz = 0;
+
+    // Contribution from n = 0, m = 0 term 
+    rpotz = M[midx(0, 0)] / scale; 
+    cpz = rpotz * temp[midx(1, 1)]; 
+    tx = -conj(cpz); 
+    ty = -rpotz * temp[midx(1, 0)]; 
+    tz = cpz; 
+
+    // Contribution from n = 1, m = 0 term 
+    rpotz = M[midx(1, 0)] / 3.0; 
+    cpz = rpotz / scale * temp[midx(2, 1)]; 
+    tx -= conj(cpz); 
+    ty -= rpotz * (temp[midx(0, 0)] * scale + 2.0 * temp[midx(2, 0)] / scale);
+    tz += cpz;
+
+    // Contribution from n > 1, m = 0 terms 
+    for (int n = 2; n <= p; ++n) {
+      rpotz = M[midx(n, 0)] / (2.0 * n + 1); 
+      cpz = rpotz * (temp[midx(n - 1, 1)] * scale - 
+                     temp[midx(n + 1, 1)] / scale);
+      tx += conj(cpz);
+      ty -= rpotz * (real(temp[midx(n - 1, 0)]) * ((double) n) * scale + 
+                     real(temp[midx(n + 1, 0)]) * ((double) (n + 1)) / scale);
+      tz -= cpz;
+    }
+    
+    fx = -lambda * real(tx - tz) / 2.0; 
+    fy = -lambda * real((tx + tz) * dcomplex_t{0.0, 1.0}) / 2.0; 
+    fz += lambda * real(ty);
+
+    // Contribution from n = 1, m = 1
+    cpz = M[midx(1, 1)] / 3.0; 
+    tx = -cpz * (temp[midx(0, 0)] * scale - temp[midx(2, 0)] / scale) * 2.0; 
+    ty = -cpz * temp[midx(2, 1)] / scale; 
+    tz = cpz * temp[midx(2, 2)] / scale; 
+
+    // Contributions for n = 2, ..., p
+    for (int n = 2; n <= p; ++n) {
+      for (int m = 1; m <= n - 2; ++m) {
+        cpz = M[midx(n, m)] / (2.0 * n + 1); 
+        tx -= cpz * (temp[midx(n - 1, m - 1)] * 
+                     ((double) (n + m - 1) * (n + m)) * scale - 
+                     temp[midx(n + 1, m - 1)] * 
+                     ((double) (n - m + 1) * (n - m + 2)) / scale);
+        ty -= cpz * (temp[midx(n - 1, m)] * ((double) (n + m)) * scale + 
+                     temp[midx(n + 1, m)] * ((double) (n - m + 1)) / scale);
+        tz -= cpz * (temp[midx(n - 1, m + 1)] * scale - 
+                     temp[midx(n + 1, m + 1)] / scale); 
+      }
+
+      // m = n - 1
+      cpz = M[midx(n, n - 1)] / (2.0 * n + 1); 
+      tx -= cpz * (temp[midx(n - 1, n - 2)] * 
+                   ((double) (n + n - 2) * (n + n - 1)) * scale - 
+                   temp[midx(n + 1, n - 2)] * 6.0 / scale);
+      ty -= cpz * (temp[midx(n - 1, n - 1)] * ((double) (n + n - 1)) * scale + 
+                   temp[midx(n + 1, n - 1)] * 2.0 / scale );
+      tz += cpz * temp[midx(n + 1, n)] / scale;
+
+      // m = n
+      cpz = M[midx(n, n)] / (2.0 * n + 1); 
+      tx -= cpz * (temp[midx(n - 1, n - 1)] * 
+                   ((double) (n + n - 1) * (n + n)) * scale - 
+                   temp[midx(n + 1, n - 1)] * 2.0 / scale);
+      ty -= cpz * temp[midx(n + 1, n)] / scale; 
+      tz += cpz * temp[midx(n + 1, n + 1)] / scale; 
+    }
+
+    fx -= lambda * real(tx - tz); 
+    fy -= lambda * real((tx + tz) * dcomplex_t{0.0, 1.0}); 
+    fz += 2.0 * lambda * real(ty);
+
+    retval.push_back(fx); 
+    retval.push_back(fy);
+    retval.push_back(fz); 
+  }
   return retval;
 }
 
 std::vector<double> yuk_l_to_t(Point dist, double scale, 
-                               const dcomplex_t *L, bool g){
+                               const dcomplex_t *L, bool g) {
   std::vector<double> retval; 
 
   int p = builtin_yukawa_table_->p();
   double lambda = builtin_yukawa_table_->lambda();
   std::vector<double> legendre((p + 2) * (p + 3) / 2);
-  std::vector<double> bessel(p + 2); // check this 
+  std::vector<dcomplex_t> temp((p + 2) * (p + 3) / 2); 
+  std::vector<double> bessel(p + 2); 
   std::vector<dcomplex_t> powers_ephi(p + 2); 
 
   // Compute potential first
@@ -293,29 +381,120 @@ std::vector<double> yuk_l_to_t(Point dist, double scale,
   
   // Compute powers of exp(i * phi)
   powers_ephi[0] = 1.0;
-  for (int j = 1; j <= p; ++j) 
+  for (int j = 1; j <= p + 1; ++j) 
     powers_ephi[j] = powers_ephi[j - 1] * ephi;
 
   // Compute scaled modified spherical bessel function
-  bessel_in_scaled(p, lambda * r, scale, bessel.data());
+  bessel_in_scaled(p + 1, lambda * r, scale, bessel.data());
 
   // Compute legendre polynomial
-  legendre_Plm(p, ctheta, legendre.data());
+  legendre_Plm(p + 1, ctheta, legendre.data());
 
   // Evaluate local expansion L_n^0
-  for (int n = 0; n <= p; ++n) 
-    potential += L[midx(n, 0)] * legendre[midx(n, 0)] * bessel[n];
+  for (int n = 0; n <= p; ++n) {
+    temp[midx(n, 0)] = bessel[n] * legendre[midx(n, 0)]; 
+    potential += L[midx(n, 0)] * temp[midx(n, 0)]; 
+  }
       
   // Evaluate L_n^m
   for (int n = 1; n <= p; ++n) {
     for (int m = 1; m <= n; ++m) {
-      int idx = midx(n, m);
-      potential += 2.0 * real(L[idx] * powers_ephi[m]) *
-        bessel[n] * legendre[idx];
+      temp[midx(n, m)] = bessel[n] * legendre[midx(n, m)] * powers_ephi[m];
+      potential += 2.0 * real(L[midx(n, m)] * temp[midx(n, m)]); 
     }
   }
 
   retval.push_back(real(potential)); 
+
+  if (g) {
+    for (int m = 0; m <= p + 1; ++m) {
+      temp[midx(p + 1, m)] = bessel[p + 1] * legendre[midx(p + 1, m)] * 
+        powers_ephi[m];
+    }
+
+    // Compute field values
+    dcomplex_t rpotz = 0.0, cpz = 0, tx = 0, ty = 0, tz = 0; 
+    double fx = 0, fy = 0, fz = 0;
+
+    // Contribution from n = 0, m = 0 term 
+    rpotz = L[midx(0, 0)] * scale; 
+    cpz = rpotz * temp[midx(1, 1)]; 
+    tx = conj(cpz); 
+    ty = rpotz * temp[midx(1, 0)]; 
+    tz = -cpz; 
+
+    // Contribution from n = 1, m = 0 term 
+    rpotz = L[midx(1, 0)] / 3.0; 
+    cpz = rpotz * scale * temp[midx(2, 1)]; 
+    tx += conj(cpz); 
+    ty += rpotz * (temp[midx(0, 0)] / scale + 
+                   2.0 * temp[midx(2, 0)] * scale); 
+    tz -= cpz;
+    
+    // Contribution from n > 1, m = 0 term 
+    for (int n = 2; n <= p; ++n) {
+      rpotz = L[midx(n, 0)] / (2.0 * n + 1); 
+      cpz = rpotz * (temp[midx(n - 1, 1)] / scale - 
+                     temp[midx(n + 1, 1)] * scale);
+      tx -= conj(cpz); 
+      ty += rpotz * (real(temp[midx(n - 1, 0)]) * ((double) n) / scale + 
+                     real(temp[midx(n + 1, 0)]) * ((double) (n + 1)) * scale);
+      tz += cpz;
+    }
+
+    fx -= lambda * real(tx - tz) / 2.0; 
+    fy -= lambda * real((tx + tz) * dcomplex_t{0.0, 1.0}) / 2.0; 
+    fz += lambda * real(ty); 
+
+    // Contribution from n = 1, m = 1
+    cpz = L[midx(1, 1)] / 3.0; 
+    tx = cpz * (real(temp[midx(0, 0)]) / scale - 
+                real(temp[midx(2, 0)]) * scale) * 2.0; 
+    cpz *= scale; 
+    ty = cpz * temp[midx(2, 1)]; 
+    tz = -cpz * temp[midx(2, 2)]; 
+    
+    // Contribution from n = 2, ..., p, 
+    for (int n = 2; n <= p; ++n) {
+      for (int m = 1; m <= n - 2; ++m) {
+        cpz = L[midx(n, m)] / (2.0 * n + 1); 
+        tx += cpz * (temp[midx(n - 1, m - 1)] * 
+                     ((double) (n + m - 1) * (n + m)) / scale -
+                     temp[midx(n + 1, m - 1)] * 
+                     ((double) (n - m + 1) * (n - m + 2)) * scale);
+        ty += cpz * (temp[midx(n - 1, m)] * ((double) (n + m)) / scale + 
+                     temp[midx(n + 1, m)] * ((double) (n - m + 1)) * scale);
+        tz += cpz * (temp[midx(n - 1, m + 1)] / scale - 
+                     temp[midx(n + 1, m + 1)] * scale);
+      }
+      
+      // m = n - 1
+      cpz = L[midx(n, n - 1)] / (2.0 * n + 1); 
+      tx += cpz * (temp[midx(n - 1, n - 2)] * 
+                   ((double) (n + n - 2) * (n + n - 1)) / scale - 
+                   temp[midx(n + 1, n - 2)] * 6.0 * scale);
+      ty += cpz * (temp[midx(n - 1, n - 1)] * 
+                   ((double) (n + n - 1)) / scale + 
+                   temp[midx(n + 1, n - 1)] * 2.0 * scale);
+      tz -= cpz * temp[midx(n + 1, n)] * scale;
+
+      // m = n
+      cpz = L[midx(n, n)] / (2.0 * n + 1); 
+      tx += cpz * (temp[midx(n - 1, n - 1)] * 
+                   ((double) (n + n - 1) * (n + n)) / scale - 
+                   temp[midx(n + 1, n - 1)] * 2.0 * scale); 
+      ty += cpz * temp[midx(n + 1, n)] * scale; 
+      tz -= cpz * temp[midx(n + 1, n + 1)] * scale; 
+    }
+
+    fx -= lambda * real(tx - tz); 
+    fy -= lambda * real((tx + tz) * dcomplex_t{0.0, 1.0}); 
+    fz += 2.0 * lambda * real(ty);
+
+    retval.push_back(fx); 
+    retval.push_back(fy);
+    retval.push_back(fz); 
+  }
 
   return retval; 
 }
