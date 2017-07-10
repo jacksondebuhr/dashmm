@@ -891,7 +891,7 @@ std::vector<double> lap_l_to_t(Point dist, double scale,
     powers_r[j] = powers_r[j - 1] * r;
   
   // Compute powers of exp(i * phi)
-  for (int j = 1; j <= p; ++j) 
+  for (int j = 1; j <= p + 1; ++j) 
     powers_ephi[j] = powers_ephi[j - 1] * ephi;
   
   // Evaluate the local expansion L_n^0
@@ -951,7 +951,7 @@ std::vector<double> lap_l_to_t(Point dist, double scale,
 
     retval.push_back(fx * scale); 
     retval.push_back(fy * scale); 
-    retval.push_back(fz * scale);
+    retval.push_back(-fz * scale);
   }
 
   return retval; 
