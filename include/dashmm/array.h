@@ -29,7 +29,7 @@
 #include <hpx/hpx.h>
 
 #include "dashmm/arraymetadata.h"
-#include "dashmm/arraymapaction.h"
+#include "dashmm/arrayforeachaction.h"
 #include "dashmm/arrayref.h"
 #include "dashmm/reductionops.h"
 #include "dashmm/types.h"
@@ -317,12 +317,12 @@ class Array {
     return retval;
   }
 
-  /// Map an action onto each record in the Array
+  /// Perform an action for each each record in the Array
   ///
   /// This will cause the action represented by @p act, to be
   /// invoked on all the entries of the array. The action will ultimatly work
   /// on segments of the array. The environment. @p env, is provided unmodified
-  /// to each segment. Please see the ArrayMapAction for more details.
+  /// to each segment. Please see the ArrayForEachAction for more details.
   ///
   /// This acts on a rank-by-rank basis. Each rank will participate, and will
   /// handle the records in the array owned by the rank. In principle, the
@@ -333,7 +333,7 @@ class Array {
   ///
   /// \return - kSuccess
   template <typename E, int F>
-  ReturnCode map(const ArrayMapAction<T, E, F> &act, const E *env) {
+  ReturnCode forEach(const ArrayForEachAction<T, E, F> &act, const E *env) {
     assert(valid());
     hpx_run_spmd(&act.root_, nullptr, &act.leaf_, &env, &data_);
     return kSuccess;
