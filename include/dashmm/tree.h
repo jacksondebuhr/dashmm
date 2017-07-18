@@ -917,12 +917,12 @@ class Tree {
     // Compute global_offset
     int my_rank = hpx_get_my_rank();
     int *global_offset = new int[dim3]();
-    size_t num_points = global_count[0];
+    size_t num_points = rank_map[0] == my_rank ? global_count[0] : 0;
     for (int i = 1; i < dim3; ++i) {
       int increment{0};
       if (rank_map[i] == my_rank) {
         num_points += global_count[i];
-        increment = global_count[i - 1];
+        increment = rank_map[i - 1] == my_rank ? global_count[i - 1] : 0;
       }
       global_offset[i] = global_offset[i - 1] + increment;
     }
@@ -1875,9 +1875,6 @@ class DualTree {
                              (var[5] + var[4] - length) / 2}, length};
     tree->domain_ = geo;
 
-    // Set the shared version
-    //shared::set_geo(geo);
-
     // Wait for setup to be done
     hpx_lco_wait(setup_done);
     hpx_lco_delete_sync(setup_done);
@@ -2304,7 +2301,7 @@ class DualTree {
 
     int *count = &meta[3];
     if (send_ns) {
-      for (int i = 0; i <= local_tree->dim3_; ++i) {
+      for (int i = 0; i < local_tree->dim3_; ++i) {
         if (local_tree->rank_of_unif_grid(i) == rank) {
           *count = count_s[i];
           count += 1;
