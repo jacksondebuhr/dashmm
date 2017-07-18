@@ -383,7 +383,7 @@ class Array {
   ///            the runtime.
   ReturnCode set_manager(std::unique_ptr<Serializer> manager) {
     Serializer *ptr = manager.release();
-    if (HPX_SUCCESS != hpx_run_spmd(array_set_manager_, nullptr,
+    if (HPX_SUCCESS != hpx_run_spmd(&array_set_manager_, nullptr,
                                     &ptr, &data_)) {
       return kRuntimeError;
     }
