@@ -38,6 +38,7 @@
 // DASHMM
 #include "dashmm/array.h"
 #include "dashmm/dag.h"
+#include "dashmm/distributer.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
 #include "dashmm/index.h"
@@ -1935,6 +1936,14 @@ class DualTree {
 
     const int *s = global; // Source counts
     const int *t = &global[len]; // Target counts
+
+		// create a sqrt(len) x sqrt(len) grid to hold cumulative counts
+
+		// create a Cell Grid from the cumulative counts
+
+		// partition
+
+		// make an array in morton order holding ranks indecies to send cell's work
 
     int *cumulative = new int[len + 1];
     cumulative[0] = 0;
