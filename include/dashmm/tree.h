@@ -598,13 +598,17 @@ class Tree {
           // The final level does need the ordering
           for (int i = 0; i < 8; ++i) {
             Index cindex = snode->idx.child(i);
-            uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
-            snode->child[i] = &tree->unif_grid_[morton];
-            tree->unif_grid_[morton].idx = cindex;
-            tree->unif_grid_[morton].dag.set_index(cindex);
-            tree->unif_grid_[morton].parent = snode;
-            tree->unif_grid_[morton].add_lock();
-            tree->unif_grid_[morton].add_completion();
+            //uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
+            uint64_t kval = simple_key(cindex.x(),
+                                       cindex.y(),
+                                       cindex.z(),
+                                       1 << unif_level);
+            snode->child[i] = &tree->unif_grid_[kval];
+            tree->unif_grid_[kval].idx = cindex;
+            tree->unif_grid_[kval].dag.set_index(cindex);
+            tree->unif_grid_[kval].parent = snode;
+            tree->unif_grid_[kval].add_lock();
+            tree->unif_grid_[kval].add_completion();
           }
         }
       }
@@ -695,7 +699,8 @@ class Tree {
                          (int)(dim * (p->position.y() - corner.y()) * scale));
       int zid = std::min(dim - 1,
                          (int)(dim * (p->position.z() - corner.z()) * scale));
-      gid[i] = morton_key(xid, yid, zid);
+      //gid[i] = morton_key(xid, yid, zid);
+      gid[i] = simple_key(xid, yid, zid, dim);
       count[gid[i]]++;
     }
 
@@ -1121,6 +1126,17 @@ class Tree {
     return key;
   }
 
+  /// Compute the simple 3d key of an index
+  ///
+  /// \param x - the x component
+  /// \param y - the y component
+  /// \parma z - the z component
+  /// \param max - the max value of any component at the uniform refinement
+  ///              level. This will be 2^unif_level
+  static uint64_t simple_key(unsigned x, unsigned y, unsigned z, unsigned max) {
+    return x + y * max + z * max * max;
+  }
+
   /// Compute the uniform grid index for a given Index
   ///
   /// \param idx - the index of the node
@@ -1135,11 +1151,15 @@ class Tree {
       return -1;
     }
 
+    int max = 1 << uniflevel;
+
     if (delta > 0) {
       Index tester = idx.parent(delta);
-      return morton_key(tester.x(), tester.y(), tester.z());
+      //return morton_key(tester.x(), tester.y(), tester.z());
+      return simple_key(tester.x(), tester.y(), tester.z(), max);
     } else {
-      return morton_key(idx.x(), idx.y(), idx.z());
+      //return morton_key(idx.x(), idx.y(), idx.z());
+      return simple_key(idx.x(), idx.y(), idx.z(), max);
     }
   }
 
