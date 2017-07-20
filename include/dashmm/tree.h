@@ -716,11 +716,7 @@ class Tree {
 
   /// Reorder the particles according to their place in the uniform grid
   ///
-  /// This will rearrange the particles into their bin order. This is a stable
-  /// reordering.
-  ///
-  /// This routine is adapted from a routine in the publicly available code
-  /// GADGET-2 (http://wwwmpa.mpa-garching.mpg.de/gadget/).
+  /// This will rearrange the particles into their bin order.
   ///
   /// \param p_in - the input records; will be sorted
   /// \param npts - the number of records
@@ -753,30 +749,17 @@ class Tree {
     int source_sort, save_sort;
     int isource, isave, idest;
 
-    // Do an O(N) rearrangement
+    // O(N) in place rearrangement
     for (int i = 0; i < npts; ++i) {
-      if (gid_of_points[i] != i) {
-        source = p_in[i];
-        source_sort = gid_of_points[i];
-        isource = gid_of_points[i];
-        idest = gid_of_points[i];
+      while (gid_of_points[i] != i) {
+        record_t save = p_in[gid_of_points[i]];
+        int idx = gid_of_points[gid_of_points[i]];
 
-        do {
-          save = p_in[idest];
-          save_sort = gid_of_points[idest];
-          isave = gid_of_points[idest];
+        p_in[gid_of_points[i]] = p_in[i];
+        gid_of_points[gid_of_points[i]] = gid_of_points[i];
 
-          p_in[idest] = source;
-          gid_of_points[idest] = source_sort;
-
-          if (idest == i) break;
-
-          source = save;
-          source_sort = save_sort;
-          isource = isave;
-
-          idest = isource;
-        } while (1);
+        gid_of_points[i] = idx;
+        p_in[i] = save;
       }
     }
 
