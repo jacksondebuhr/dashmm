@@ -57,8 +57,17 @@ class LaplaceTable {
   const int *sm() const {return sm_;}
   const int *f() const {return f_;}
   const int *smf() const {return smf_;}
+  
+  int n_digits() const {return n_digits_;} 
+  double size() const {return size_;} 
+  void update(double size) {
+    size_ = size; 
+    scale_ = 1.0 / size;
+  }
 
  private:
+  int n_digits_;  // store the last input to the constructor 
+  double size_;   // store the last input to the constructor
   int p_;
   double scale_; // scaling factor of level 0 to normalize box size to 1
   double *sqf_;

@@ -30,6 +30,7 @@ YukawaTable::YukawaTable(int n_digits, double size, double lambda) {
   int p_table[] = {0, 0, 0, 9, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0};
   int s_table[] = {0, 0, 0, 9, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0};
 
+  n_digits_ = n_digits; 
   lambda_ = lambda;
   size_ = size;
   scale_ = (lambda * size > 1.0 ? 1.0 / size : lambda) * size;
@@ -565,9 +566,14 @@ void YukawaTable::generate_l2l() {
 }
 
 void update_yukawa_table(int n_digits, double size, double lambda) {
-  if (builtin_yukawa_table_ == nullptr)
+  if (builtin_yukawa_table_ == nullptr) {
+    // Create the update if it does not exist
     builtin_yukawa_table_ =
       std::unique_ptr<YukawaTable>{new YukawaTable{n_digits, size, lambda}};
+  } else if (builtin_yukawa_table_->update(n_digits, size, lambda)) {
+    // Replace the existing one with the updated one 
+    builtin_yukawa_table_.reset(new YukawaTable{n_digits, size, lambda});
+  }
 }
 
 

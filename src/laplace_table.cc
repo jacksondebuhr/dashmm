@@ -26,6 +26,8 @@ std::unique_ptr<LaplaceTable> builtin_laplace_table_;
 
 
 LaplaceTable::LaplaceTable(int n_digits, double size) {
+  n_digits_ = n_digits; 
+  size_ = size; 
   scale_ = 1.0 / size;
   int expan_length[] = {0, 4, 7, 9, 13, 16, 18, 23, 26, 29,
                         33, 36, 40, 43, 46};
@@ -410,13 +412,16 @@ void update_laplace_table(int n_digits, double size) {
   // Once we are fully distrib, this must be wrapped up somehow in SharedData
   // or something similar.
 
-  // Need to add the capability to check if \p n_digits is the same as the one
-  // stored. If not, delete the current table and generate one with the updated
-  // accuracy requirement.
-
   if (builtin_laplace_table_ == nullptr) {
+    // Create the table if it does not exist
     builtin_laplace_table_ =
       std::unique_ptr<LaplaceTable>{new LaplaceTable{n_digits, size}};
+  } else if (builtin_laplace_table_->n_digits() != n_digits) {
+    // Replace the existing table with one for the new accuracy requirement
+    builtin_laplace_table_.reset(new LaplaceTable{n_digits, size});
+  } else if (builtin_laplace_table_->size() != size) {
+    // Just need to update the scaling factor
+    builtin_laplace_table_->update(size);
   }
 }
 

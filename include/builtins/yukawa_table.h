@@ -64,10 +64,16 @@ class YukawaTable {
   const double *zs(double scale) const {return zs_[level(scale)];}
   double size(double scale) const {return size_ * scale / scale_;}
   int level(double scale) const {return log2(scale_ / scale);}
+  bool update(int n_digits, double size, double lambda) const {
+    if (n_digits != n_digits_ || size != size_ || lambda != lambda_) 
+      return true;
+    return false;
+  }
 
 private:
   int p_;
   int s_;
+  int n_digits_;  
   double lambda_;
   double size_;
   double scale_; // scaling factor of level 0 to avoid under-/over-flow
