@@ -482,28 +482,33 @@ class Evaluator {
                                            loc_comp);
     size_t count = part_point - nodes.begin();
 
-    int n_workers = hpx_get_num_threads();
-    size_t delta = count / n_workers;
-    if (!delta) {
-      delta = count;
-    }
-    if (count % n_workers) {
-      ++delta;
-    }
-
-    hpx_addr_t done = hpx_lco_and_new(n_workers);
-
+    int n_workers = hpx_get_num_threads(); 
+    size_t delta = count / n_workers; 
+    size_t remainder = count % n_workers; 
+    hpx_addr_t done = hpx_lco_and_new(n_workers); 
     DAGNode **data = nodes.data();
-    for (size_t start = 0; start < count; start += delta) {
-      size_t end = start + delta;
-      if (end > count) {
-        end = count;
-      }
-      DAGNode **first = &data[start];
-      DAGNode **last = &data[end];
+
+    for (int i = 0; i < remainder; ++i) {
+      size_t start = i * (delta + 1); 
+      size_t end = start + delta + 1; 
+      DAGNode **first = &data[start]; 
+      DAGNode **last = &data[end]; 
       hpx_call(HPX_HERE, act, done, &first, &last);
     }
 
+    if (delta) {
+      size_t offset = (delta + 1) * remainder; 
+      for (int i = remainder; i < n_workers; ++i) {
+        size_t start = offset + (i - remainder) * delta; 
+        size_t end = start + delta; 
+        DAGNode **first = &data[start]; 
+        DAGNode **last = &data[end]; 
+        hpx_call(HPX_HERE, act, done, &first, &last);
+      }
+    } else {
+      hpx_lco_and_set_num(done, n_workers - remainder, HPX_NULL);
+    }
+     
     hpx_lco_wait(done);
     hpx_lco_delete_sync(done);
   }
