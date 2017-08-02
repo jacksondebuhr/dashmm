@@ -204,7 +204,7 @@ private:
 		for(int x=0;x<length;++x){
 			for(int y=0;y<length;++y){
 				for(int z=0;z<length;++z){
-					uint64_t key = simple_key(x, y, z, length); // TODO: see if fixed (changed to hilbert order)
+					uint64_t key = hilbert_key(x, y, z, length); // TODO: see if fixed (changed to hilbert order)
 					int index = grid[x][y][z]->index;
 					assert(index >= 0);
 					retval[key] = index;

@@ -2492,8 +2492,6 @@ class DualTree {
       hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
       assert(dual_tree_complete != HPX_NULL);
 
-			std::cout<<"rank "<<hpx_get_my_rank()<<" sent points"<<std::endl;
-
       for (int i = 0; i < tree->dim3_; ++i) {
         if (tree->rank_of_unif_grid(i) == rank) {
           if (*(tree->unif_count_src(i)) == 0) {

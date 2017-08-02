@@ -363,7 +363,7 @@ class Evaluator {
                                                           targets);
 
     hpx_addr_t partitiondone = dualtree_t::partition(global_tree);
-		std::cout<<"rank "<<hpx_get_my_rank()<<" partitioned (evaluator)"<<std::endl;
+		std::cout<<"rank "<<hpx_get_my_rank()<<" partitioned"<<std::endl;
 
 		//std::terminate();
 
