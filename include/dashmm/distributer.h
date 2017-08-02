@@ -65,14 +65,6 @@ public:
 		// get respective partition indecies and return in simple order
 		int* retval = rank_indecies();
 
-	
-		// print indecies here
-		std::cout<<"Indecies:"<<std::endl;
-		for(int i=0;i<length*length*length;++i){
-			std::cout<<retval[i]<<" ";
-		}
-		std::cout<<std::endl;
-
 		return retval;
 	}
 
@@ -204,7 +196,7 @@ private:
 		for(int x=0;x<length;++x){
 			for(int y=0;y<length;++y){
 				for(int z=0;z<length;++z){
-					uint64_t key = simple_key(x, y, z, length); // TODO: see if fixed (changed to hilbert order)
+					uint64_t key = simple_key(x, y, z, length);
 					int index = grid[x][y][z]->index;
 					assert(index >= 0);
 					retval[key] = index;

@@ -929,11 +929,8 @@ class Tree {
     int *global_offset = new int[dim3]();
     size_t num_points = rank_map[0] == my_rank ? global_count[0] : 0;
     for (int i = 1; i < dim3; ++i) {
-      int increment{0};
-      if (rank_map[i] == my_rank) {
-        num_points += global_count[i];
-        increment = rank_map[i - 1] == my_rank ? global_count[i - 1] : 0;
-      }
+      num_points += rank_map[i] == my_rank ? global_count[i] : 0;
+      int increment = rank_map[i - 1] == my_rank ? global_count[i - 1] : 0;
       global_offset[i] = global_offset[i - 1] + increment;
     }
 
@@ -1965,7 +1962,7 @@ class DualTree {
   /// \param global - the global counts
   /// \param len - the number of unform grid nodes
   void distribute_points(int num_ranks, const int *global, int len) {
-		
+
     const int *s = global; // Source counts
     const int *t = &global[len]; // Target counts
 
@@ -1982,23 +1979,22 @@ class DualTree {
 
 		rank_map_ = new int [dim3_];
 		assert(rank_map_);
-
+/*
 		// Debug: hardcode in an alternating rank_map_ for 2 ranks
 		for(int i = 0; i < dim3_; ++i) {
 			rank_map_[i] = i % 2;
-		}
+		}*/
 
-		/* // Actuall thing that should work
+		// Actuall thing that should work
 		for(int i = 0; i < dim3_; ++i) {
 			rank_map_[i] = rm[i];
-		}*/
+		}
 
 		// see what rank map is
 		for(int i = 0; i < dim3_; ++i) {
 			std::cout << rank_map_[i] << " "; 
 		}
 		std::cout << std::endl;
-
 
   }
 
