@@ -12,8 +12,8 @@
 // =============================================================================
 
 
-#ifndef __DASHMM_ARRAY_MAP_ACTION_H__
-#define __DASHMM_ARRAY_MAP_ACTION_H__
+#ifndef __DASHMM_ARRAY_FOR_EACH_ACTION_H__
+#define __DASHMM_ARRAY_FOR_EACH_ACTION_H__
 
 
 /// \file
@@ -33,24 +33,25 @@ template <typename T>
 class Array;
 
 
-/// ArrayMapAction
+/// ArrayForEachAction
 ///
 /// A class that represents an action that can be invoked on the elements of
 /// a DASHMM array. It is a template requiring the type for the array
 /// records, an environment that is passed to each invocation of the
-/// associated action and an integer specifying how parallel to make the mapped
-/// action.
+/// associated action and an integer specifying how parallel to make the for
+/// each action.
 ///
 /// To specify the action, the user will provide a function pointer with the
 /// following signature: void func(T *, const size_t, const E *),
-/// which has been aliased as map_function_t. When writing such a function,
-/// it is important to know that the meaning of the provided arguments:
+/// which has been aliased as for_each_function_t. When writing such a
+/// function, it is important to know that the meaning of the provided
+/// arguments:
 ///
 /// * The first is a pointer to an array of T objects. These are the data on
 ///   which the action will act.
 /// * The second is the total count of records to be examined in the current
 ///   call of the function.
-/// * The final is the environment passed into the Array<T>::map() function
+/// * The final is the environment passed into the Array<T>::forEach() function
 ///   call.
 ///
 /// As an example, the following function might perform the position update for
@@ -65,7 +66,7 @@ class Array;
 /// ~~~
 ///
 /// For each action to be applied to a given sort of array, the user will need
-/// to create another instance of an ArrayMapAction. These objects manage
+/// to create another instance of an ArrayForEachAction. These objects manage
 /// registration of the action with the HPX-5 runtime, which means these objects
 /// must be created before the call to dashmm::init().
 ///
@@ -81,22 +82,22 @@ class Array;
 /// value of 1; unless the amount of work per record is very non-uniform,
 /// there should be little need to use another value.
 template <typename T, typename E, int factor = 1>
-class ArrayMapAction {
+class ArrayForEachAction {
  public:
   static_assert(factor >= 0, "Decomposition factor must be non-negative");
 
   /// The function type for functions mapped onto Array elements.
-  using map_function_t = void (*)(T *, const size_t, const E *);
+  using for_each_function_t = void (*)(T *, const size_t, const E *);
 
-  /// Construct the ArrayMapAction
+  /// Construct the ArrayForEachAction
   ///
   /// The only method for the object is the constructor, which takes a pointer
   /// to the function that will serve as the action represented by this object.
   /// This will ultimately register the needed information with the HPX-5
   /// runtime.
-  ArrayMapAction(map_function_t f) {
-    // If this is the first ArrayMapAction of this type, we need to register
-    // the shared actions.
+  ArrayForEachAction(for_each_function_t f) {
+    // If this is the first ArrayForEachAction of this type, we need to
+    // register the shared actions.
     if (!registered_) {
       HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_DEFAULT, root_, root_handler,
                           HPX_ACTION_T, HPX_POINTER, HPX_ADDR);
@@ -196,7 +197,8 @@ class ArrayMapAction {
                            size_t chunk_size, hpx_addr_t alldone,
                            hpx_action_t leaf, const E *env, T *data) {
     if (count <= chunk_size) {
-      map_function_t lfunc = (map_function_t)hpx_action_get_handler(leaf);
+      for_each_function_t lfunc =
+            (for_each_function_t)hpx_action_get_handler(leaf);
       lfunc(data, count, env);
       hpx_lco_set_lsync(alldone, 0, nullptr, HPX_NULL);
     } else {
@@ -226,16 +228,16 @@ class ArrayMapAction {
 };
 
 template <typename T, typename E, int factor>
-int ArrayMapAction<T, E, factor>::registered_ = 0;
+int ArrayForEachAction<T, E, factor>::registered_ = 0;
 
 template <typename T, typename E, int factor>
-hpx_action_t ArrayMapAction<T, E, factor>::root_ = HPX_ACTION_NULL;
+hpx_action_t ArrayForEachAction<T, E, factor>::root_ = HPX_ACTION_NULL;
 
 template <typename T, typename E, int factor>
-hpx_action_t ArrayMapAction<T, E, factor>::spawn_ = HPX_ACTION_NULL;
+hpx_action_t ArrayForEachAction<T, E, factor>::spawn_ = HPX_ACTION_NULL;
 
 
 } // namespace dashmm
 
 
-#endif // __DASHMM_ARRAY_MAP_ACTION_H__
+#endif // __DASHMM_ARRAY_FOR_EACH_ACTION_H__

@@ -50,7 +50,7 @@ struct InputArguments {
 
 
 // We make the prototype of this function available so that we might use this
-// function in an ArrayMapAction. See below.
+// function in an ArrayForEachAction. See below.
 void update_particles(Particle *P, const size_t count, const double *dt);
 
 
@@ -60,9 +60,9 @@ void update_particles(Particle *P, const size_t count, const double *dt);
 dashmm::Evaluator<Particle, Particle,
                   dashmm::LaplaceCOMAcc, dashmm::BH> bheval{ };
 
-// We also create the ArrayMapAction object before dashmm::init so it too
+// We also create the ArrayForEachAction object before dashmm::init so it too
 // can register the relevant actions with the runtime system.
-dashmm::ArrayMapAction<Particle, double> update_action{update_particles};
+dashmm::ArrayForEachAction<Particle, double> update_action{update_particles};
 
 
 // Print out help for the program.
@@ -213,7 +213,7 @@ void output_results(const std::string &fname, const Particle *sources,
 }
 
 
-// This function serves the action for the ArrayMapAction that will update the
+// This function serves the action for the ArrayForEachAction that will update the
 // positions of the particles given the computed acceleration. This function
 // is called on the particle data between each step, and allows the user to
 // perform updates in parallel without having to explicitly use parallel
@@ -288,7 +288,7 @@ void perform_time_stepping(InputArguments args) {
     double t1 = getticks();
 
     // Now update the positions based on the velocity
-    source_handle.map(update_action, &dt);
+    source_handle.forEach(update_action, &dt);
     double t2 = getticks();
 
     // Collect timing

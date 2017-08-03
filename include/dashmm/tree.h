@@ -40,6 +40,7 @@
 #include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
+#include "dashmm/hilbert.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
@@ -597,13 +598,17 @@ class Tree {
           // The final level does need the ordering
           for (int i = 0; i < 8; ++i) {
             Index cindex = snode->idx.child(i);
-            uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
-            snode->child[i] = &tree->unif_grid_[morton];
-            tree->unif_grid_[morton].idx = cindex;
-            tree->unif_grid_[morton].dag.set_index(cindex);
-            tree->unif_grid_[morton].parent = snode;
-            tree->unif_grid_[morton].add_lock();
-            tree->unif_grid_[morton].add_completion();
+            //uint64_t morton = morton_key(cindex.x(), cindex.y(), cindex.z());
+            uint64_t kval = simple_key(cindex.x(),
+                                       cindex.y(),
+                                       cindex.z(),
+                                       1 << unif_level);
+            snode->child[i] = &tree->unif_grid_[kval];
+            tree->unif_grid_[kval].idx = cindex;
+            tree->unif_grid_[kval].dag.set_index(cindex);
+            tree->unif_grid_[kval].parent = snode;
+            tree->unif_grid_[kval].add_lock();
+            tree->unif_grid_[kval].add_completion();
           }
         }
       }
@@ -623,47 +628,34 @@ class Tree {
   ///
   /// \param tree - the tree on which to act
   /// \param ndim - the size of the uniform grid
-  /// \param first - the first owned node of the uniform grid
-  /// \param last - the last (inclusive) owned node of the uniform grid
-  static int delete_tree_handler(tree_t *tree, int ndim, int first, int last) {
+  /// \param rmap - the rank map of the nodes
+  static int delete_tree_handler(tree_t *tree, int ndim, int *rmap) {
     // NOTE: The difference here is that there are two different allocation
     // schemes for the nodes.
 
-    for (int i = 0; i < first; ++i) {
-      node_t *curr = &tree->unif_grid_[i];
-      curr->delete_lock();
+    int rank = hpx_get_my_rank();
+    for (int i = 0; i < ndim; ++i) {
+      if (rmap[i] == rank) {
+        node_t *curr = &tree->unif_grid_[i];
+        curr->delete_lock();
 
-      for (int j = 0; j < 8; ++j) {
-        node_t *child = curr->child[j];
-        if (child) {
-          delete [] child;
-          break;
+        for (int j = 0; j < 8; ++j) {
+          if (curr->child[j]) {
+            node_t::destroy_branch(curr->child[j]);
+          }
         }
-      }
-    }
 
-    for (int i = first; i <= last; ++i) {
-      node_t *curr = &tree->unif_grid_[i];
-      curr->delete_lock();
+        hpx_lco_delete_sync(curr->complete());
+      } else {
+        node_t *curr = &tree->unif_grid_[i];
+        curr->delete_lock();
 
-      for (int j = 0; j < 8; ++j) {
-        if (curr->child[j]) {
-          node_t::destroy_branch(curr->child[j]);
-        }
-      }
-
-      hpx_lco_delete_sync(curr->complete());
-    }
-
-    for (int i = last + 1; i < ndim; ++i) {
-      node_t *curr = &tree->unif_grid_[i];
-      curr->delete_lock();
-
-      for (int j = 0; j < 8; ++j) {
-        node_t *child = curr->child[j];
-        if (child) {
-          delete [] child;
-          break;
+        for (int j = 0; j < 8; ++j) {
+          node_t *child = curr->child[j];
+          if (child) {
+            delete [] child;
+            break;
+          }
         }
       }
     }
@@ -707,7 +699,8 @@ class Tree {
                          (int)(dim * (p->position.y() - corner.y()) * scale));
       int zid = std::min(dim - 1,
                          (int)(dim * (p->position.z() - corner.z()) * scale));
-      gid[i] = morton_key(xid, yid, zid);
+      //gid[i] = morton_key(xid, yid, zid);
+      gid[i] = simple_key(xid, yid, zid, dim);
       count[gid[i]]++;
     }
 
@@ -885,8 +878,8 @@ class Tree {
   /// that will store the sorted data.
   ///
   /// \param tree - the tree object
-  /// \param first - the first node of the uniform grid owned by this rank
-  /// \param last - the last node of the uniform grid owned by this rank
+  /// \param dim3 - the number of uniform level nodes
+  /// \param rank_map - the node->rank map for the uniform nodes
   /// \param global_count - the global counts in each node of the uniform grid
   /// \param local_count - the local counts in each node of the uniform grid
   /// \param local_offset - where in the local data are the points for each node
@@ -898,7 +891,9 @@ class Tree {
   ///
   /// \returns - the global offset into this rank's data for each uniform grid
   ///            node's points.
-  static void init_point_exchange(tree_t *tree, int first, int last,
+  static void init_point_exchange(tree_t *tree,
+                                  int dim3,
+                                  int *rank_map,
                                   const int *global_count,
                                   const int *local_count,
                                   const int *local_offset,
@@ -906,49 +901,48 @@ class Tree {
                                   int threshold,
                                   const record_t *temp,
                                   node_t *n) {
-    int range = last - first + 1;
     arrayref_t sorted_ref{};
 
-    if (range > 0) {
-      // Compute global_offset
-      int *global_offset = new int[range]();
-      size_t num_points = global_count[first];
-      for (int i = first + 1; i <= last; ++i) {
-        num_points += global_count[i];
-        global_offset[i - first] = global_offset[i - first - 1] +
-                                   global_count[i - 1];
-      }
+    // Compute global_offset
+    int my_rank = hpx_get_my_rank();
+    int *global_offset = new int[dim3]();
+    size_t num_points = rank_map[0] == my_rank ? global_count[0] : 0;
+    for (int i = 1; i < dim3; ++i) {
+      num_points += rank_map[i] == my_rank ? global_count[i] : 0;
+      int increment = rank_map[i - 1] == my_rank ? global_count[i - 1] : 0;
+      global_offset[i] = global_offset[i - 1] + increment;
+    }
 
-      if (num_points > 0) {
-        record_t *sorted_data = new record_t[num_points];
-        sorted_ref = arrayref_t{sorted_data, num_points};
+    if (num_points > 0) {
+      record_t *sorted_data = new record_t[num_points];
+      sorted_ref = arrayref_t{sorted_data, num_points};
 
-        for (int i = first; i <= last; ++i) {
-          node_t *curr = &n[i];
-          curr->parts = sorted_ref.slice(global_offset[i - first],
-                                         global_count[i]);
+      for (int i = 0; i < dim3; ++i) {
+        if (rank_map[i] != my_rank) continue;
 
-          if (local_count[i]) {
-            // Copy local points before merging remote points
-            curr->lock();
-            auto sorted = curr->parts.data();
-            for (size_t j = 0; j < local_count[i]; ++j) {
-              sorted[j + curr->first()] = temp[local_offset[i] + j];
-            }
+        node_t *curr = &n[i];
+        curr->parts = sorted_ref.slice(global_offset[i], global_count[i]);
 
-            if (curr->increment_first(local_count[i])) {
-              // This grid does not expect remote points.
-              // Spawn adaptive partitioning
-              int ssat = 0;
-              hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-                       &curr, &geo, &threshold, &ssat);
-            }
-            curr->unlock();
+        if (local_count[i]) {
+          // Copy local points before merging remote points
+          curr->lock();
+          auto sorted = curr->parts.data();
+          for (size_t j = 0; j < local_count[i]; ++j) {
+            sorted[j + curr->first()] = temp[local_offset[i] + j];
           }
+
+          if (curr->increment_first(local_count[i])) {
+            // This grid does not expect remote points.
+            // Spawn adaptive partitioning
+            int ssat = 0;
+            hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
+                     &curr, &geo, &threshold, &ssat);
+          }
+          curr->unlock();
         }
       }
-      delete [] global_offset;
     }
+    delete [] global_offset;
 
     tree->sorted_ = sorted_ref;
     hpx_lco_and_set(tree->unif_done_, HPX_NULL);
@@ -963,8 +957,8 @@ class Tree {
   /// that will store the sorted data.
   ///
   /// \param tree - the tree object
-  /// \param first - the first node of the uniform grid owned by this rank
-  /// \param last - the last node of the uniform grid owned by this rank
+  /// \param dim3 - the number of uniform nodes
+  /// \param rank_map - the node->rank map for the uniform nodes
   /// \param global_count - the global counts in each node of the uniform grid
   /// \param local_count - the local counts in each node of the uniform grid
   /// \param local_offset - where in the local data are the points for each node
@@ -976,49 +970,45 @@ class Tree {
   /// \param snodes - the source nodes in the uniform grid
   /// \param source_tree - the source tree
   static void init_point_exchange_same_s_and_t(
-      tree_t *tree, int first, int last, const int *global_count,
-      const int *local_count, const int *local_offset,
-      const DomainGeometry *geo, int threshold, const record_t *temp,
-      node_t *n, sourcenode_t *snodes, sourcetree_t *source_tree) {
-    int range = last - first + 1;
-
-    if (range > 0) {
-      // Compute global_offset
-      int *global_offset = new int[range]();
-      size_t num_points = global_count[first];
-      for (int i = first + 1; i <= last; ++i) {
+          tree_t *tree, int dim3, int *rank_map, const int *global_count,
+          const int *local_count, const int *local_offset,
+          const DomainGeometry *geo, int threshold, const record_t *temp,
+          node_t *n, sourcenode_t *snodes, sourcetree_t *source_tree) {
+    int my_rank = hpx_get_my_rank();
+    size_t num_points{0};
+    for (int i = 0; i < dim3; ++i) {
+      if (rank_map[i] == my_rank) {
         num_points += global_count[i];
-        global_offset[i - first] = global_offset[i - first - 1] +
-                                   global_count[i - 1];
       }
+    }
 
-      if (num_points > 0) {
-        for (int i = first; i <= last; ++i) {
-          // When S == T, we need to set the parts on the target to be the
-          // parts on the equivalent source node
-          node_t *curr = &n[i];
-          sourcenode_t *curr_source = &snodes[i];
-          ArrayRef<Source> sparts = curr_source->parts;
-          curr->parts = arrayref_t{(record_t *)sparts.data(), sparts.n()};
+    if (num_points > 0) {
+      for (int i = 0; i < dim3; ++i) {
+        if (rank_map[i] != my_rank) continue;
 
-          if (local_count[i]) {
-            curr->lock();
-            // still need to increment first, and still need to partition
-            // if things are ready. The only catch is that we have to wait for
-            // the equivalent source node to be ready before we start.
-            if (curr->increment_first(local_count[i])) {
-              // This grid does not expect remote points.
-              // Spawn adaptive partitioning
-              int ssat = 1;
-              hpx_call_when(curr_source->complete(), HPX_HERE,
-                            node_t::partition_node_, HPX_NULL,
-                            &curr, &geo, &threshold, &ssat);
-            }
-            curr->unlock();
+        // When S == T, we need to set the parts on the target to be the
+        // parts on the equivalent source node
+        node_t *curr = &n[i];
+        sourcenode_t *curr_source = &snodes[i];
+        ArrayRef<Source> sparts = curr_source->parts;
+        curr->parts = arrayref_t{(record_t *)sparts.data(), sparts.n()};
+
+        if (local_count[i]) {
+          curr->lock();
+          // still need to increment first, and still need to partition
+          // if things are ready. The only catch is that we have to wait for
+          // the equivalent source node to be ready before we start.
+          if (curr->increment_first(local_count[i])) {
+            // This grid does not expect remote points.
+            // Spawn adaptive partitioning
+            int ssat = 1;
+            hpx_call_when(curr_source->complete(), HPX_HERE,
+                          node_t::partition_node_, HPX_NULL,
+                          &curr, &geo, &threshold, &ssat);
           }
+          curr->unlock();
         }
       }
-      delete [] global_offset;
     }
 
     // Again, the target tree reuses the data from the source tree
@@ -1076,8 +1066,11 @@ class Tree {
   /// \param rwgas - the address of the rankwise dual tree
   ///
   /// \returns - HPX_SUCCESS
-  static int merge_points_same_s_and_t_handler(targetnode_t *target_node,
-      int n_arrived, sourcenode_t *source_node, hpx_addr_t rwgas) {
+  static int merge_points_same_s_and_t_handler(
+          targetnode_t *target_node,
+          int n_arrived,
+          sourcenode_t *source_node,
+          hpx_addr_t rwgas) {
     RankWise<dualtree_t> global_tree{rwgas};
     auto local_tree = global_tree.here();
 
@@ -1113,6 +1106,17 @@ class Tree {
     return key;
   }
 
+  /// Compute the simple 3d key of an index
+  ///
+  /// \param x - the x component
+  /// \param y - the y component
+  /// \parma z - the z component
+  /// \param max - the max value of any component at the uniform refinement
+  ///              level. This will be 2^unif_level
+  static uint64_t simple_key(unsigned x, unsigned y, unsigned z, unsigned max) {
+    return x + y * max + z * max * max;
+  }
+
   /// Compute the uniform grid index for a given Index
   ///
   /// \param idx - the index of the node
@@ -1127,11 +1131,15 @@ class Tree {
       return -1;
     }
 
+    int max = 1 << uniflevel;
+
     if (delta > 0) {
       Index tester = idx.parent(delta);
-      return morton_key(tester.x(), tester.y(), tester.z());
+      //return morton_key(tester.x(), tester.y(), tester.z());
+      return simple_key(tester.x(), tester.y(), tester.z(), max);
     } else {
-      return morton_key(idx.x(), idx.y(), idx.z());
+      //return morton_key(idx.x(), idx.y(), idx.z());
+      return simple_key(idx.x(), idx.y(), idx.z(), max);
     }
   }
 
@@ -1296,7 +1304,7 @@ class DualTree {
   DualTree()
     : domain_{}, refinement_limit_{1}, unif_level_{1}, dim3_{8},
       unif_count_{HPX_NULL}, unif_count_value_{nullptr},
-      distribute_{nullptr}, method_{}, source_tree_{nullptr},
+      method_{}, source_tree_{nullptr},
       target_tree_{nullptr} { }
 
   /// We delete the copy constructor and copy assignement operator.
@@ -1402,18 +1410,13 @@ class DualTree {
 
   /// Destroy any allocated memory associated with this DualTree.
   void clear_data() {
-    int rank = hpx_get_my_rank();
-
-    int b = first(rank);
-    int e = last(rank);
-
     // Tell each tree to delete itself
     hpx_addr_t clear_done = hpx_lco_and_new(2);
     assert(clear_done != HPX_NULL);
     hpx_call(HPX_HERE, sourcetree_t::delete_tree_, clear_done,
-             &source_tree_, &dim3_, &b, &e);
+             &source_tree_, &dim3_, &rank_map_);
     hpx_call(HPX_HERE, targettree_t::delete_tree_, clear_done,
-             &target_tree_, &dim3_, &b, &e);
+             &target_tree_, &dim3_, &rank_map_);
     hpx_lco_wait(clear_done);
     hpx_lco_delete_sync(clear_done);
 
@@ -1424,15 +1427,8 @@ class DualTree {
     delete source_tree_;
     delete target_tree_;
 
-    delete [] distribute_;
     delete [] rank_map_;
   }
-
-  /// Return the first uniform grid node owned by the given rank.
-  int first(int rank) const {return rank == 0 ? 0 : distribute_[rank - 1] + 1;}
-
-  /// Return the last uniform grid node owned by the given rank.
-  int last(int rank) const {return distribute_[rank];}
 
   /// Return the rank owning the given unif grid node
   int rank_of_unif_grid(int idx) const {return rank_map_[idx];}
@@ -1880,9 +1876,6 @@ class DualTree {
                              (var[5] + var[4] - length) / 2}, length};
     tree->domain_ = geo;
 
-    // Set the shared version
-    //shared::set_geo(geo);
-
     // Wait for setup to be done
     hpx_lco_wait(setup_done);
     hpx_lco_delete_sync(setup_done);
@@ -1928,70 +1921,35 @@ class DualTree {
     return retval;
   }
 
-  /// Partition the available points among the localities
+  /// Distribute the uniforn level nodes
   ///
-  /// Given the uniform counts, this will provide a good guess at a
-  /// distribution of those points. This operates basically through the Morton
-  /// ordering of the uniform grid nodes, and aims to have segments of the
-  /// space-filling curve which have similar total counts.
+  /// Given the number of sources and targets in each node at the uniform level
+  /// of the tree, this will distribute those uniform level nodes amoung the
+  /// given number of ranks. This will allocate an array and return that
+  /// array to the caller; the caller assumes ownership of that array.
   ///
-  /// \param num_ranks - the number of localities to divide between
-  /// \param global - the global counts
-  /// \param len - the number of unform grid nodes
+  /// The input counts are provided as an array of integers that are back to
+  /// back, and have a length @p len, with the source counts per node in the
+  /// first half of @p global and the target counts per node in the second
+  /// half of @p global.
   ///
-  /// \returns - the distribution
-  static int *distribute_points(int num_ranks, const int *global, int len) {
-    int *ret = new int[num_ranks]();
-
-    const int *s = global; // Source counts
-    const int *t = &global[len]; // Target counts
-
-    int *cumulative = new int[len + 1];
-    cumulative[0] = 0;
-    for (int i = 1; i <= len; ++i) {
-      cumulative[i] = s[i-1] + t[i-1] + cumulative[i - 1];
-    }
-
-    int target_share = cumulative[len] / num_ranks;
-
-    for (int split = 1; split < num_ranks; ++split) {
-      int my_target = target_share * split;
-      auto fcn = [&my_target] (const int &a) -> bool {return a < my_target;};
-      int *splitter = std::partition_point(cumulative, &cumulative[len + 1],
-                                           fcn);
-      int upper_delta = *splitter - my_target;
-      assert(upper_delta >= 0);
-      int lower_delta = my_target - *(splitter - 1);
-      assert(lower_delta >= 0);
-      int split_index = upper_delta < lower_delta
-                          ? splitter - cumulative
-                          : (splitter - cumulative) - 1;
-      --split_index;
-      assert(split_index >= 0);
-
-      ret[split - 1] = split_index;
-    }
-    ret[num_ranks - 1] = len - 1;
-
-    delete [] cumulative;
-
-    return ret;
-  }
-
-  /// Generate the mapping from uniform grid node to locality
+  /// The mapping of the nodes to index in the provided @p global and the
+  /// returned array is according to a simple index. At the uniform level, if
+  /// the uniform level is l, there are N = 2^l nodes along each length of the
+  /// cubical domain. So indexed from the low corner, these nodes can be
+  /// described with three indices (ix, iy, iz). The order of each node in the
+  /// input and output data is computed with: ix + iy * N  + iz * N * N.
   ///
-  /// \param num_ranks - the number of localities
-  void generate_rank_map(int num_ranks) {
-    rank_map_ = new int [dim3_];
-    assert(rank_map_);
-
-    for (int i = 0; i < num_ranks; ++i) {
-      int b = first(i);
-      int e = last(i);
-      for (int j = b; j <= e; ++j) {
-        rank_map_[j] = i;
-      }
-    }
+  /// \param num_ranks - the number of ranks over which to distribute the nodes
+  /// \param global - the source and target counts per node
+  /// \param len - the number of uniform level nodes.
+  /// \param lvl - the uniform level.
+  ///
+  /// \returns - an array assigning each node to a rank. Caller assumes
+  ///            ownership of this array, and should destroy it when done with
+  ///            the data.
+  int *distribute_points(int num_ranks, const int *global, int len, int lvl) {
+    return distribute_points_hilbert(num_ranks, global, len, lvl);
   }
 
   /// Count and sort the local points
@@ -2099,14 +2057,12 @@ class DualTree {
 
     int *meta = reinterpret_cast<int *>(static_cast<char *>(args)
                                         + 3 * sizeof(hpx_addr_t));
-    int first = meta[0];
-    int last = meta[1];
-    int range = last - first + 1;
-    int recv_ns = meta[2];
-    int recv_nt = meta[3];
-    int *count_s = &meta[4]; // Used only if recv_ns > 0
+    int range = meta[0];
+    int recv_ns = meta[1];
+    int recv_nt = meta[2];
+    int *count_s = &meta[3]; // Used only if recv_ns > 0
     int *count_t = count_s + range * (recv_ns > 0); // Used only if recv_nt > 0
-    char *recv_s = static_cast<char *>(args) + sizeof(int) * 4 +
+    char *recv_s = static_cast<char *>(args) + sizeof(int) * 3 +
                                 3 * sizeof(hpx_addr_t) +
                                 sizeof(int) * range * (recv_ns > 0) +
                                 sizeof(int) * range * (recv_nt > 0);
@@ -2127,20 +2083,28 @@ class DualTree {
 
     hpx_addr_t done = hpx_lco_and_new(range * 2);
 
+    int myrank = hpx_get_my_rank();
     if (recv_ns) {
       int offset{0};
-      for (int i = first; i <= last; ++i) {
-        int incoming_ns = count_s[i - first];
-        if (incoming_ns) {
-          sourcenode_t *ns = &stree->unif_grid_[i];
-          source_t *batch = &sources[offset];
-          hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
-                   &batch, &ns, &incoming_ns, rwarg);
-          offset += incoming_ns;
-        } else {
-          hpx_lco_and_set(done, HPX_NULL);
+      int current_box{0};
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == myrank) {
+          int incoming_ns = count_s[current_box];
+          if (incoming_ns) {
+            sourcenode_t *ns = &stree->unif_grid_[i];
+            source_t *batch = &sources[offset];
+            hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
+                     &batch, &ns, &incoming_ns, rwarg);
+            offset += incoming_ns;
+          } else {
+            hpx_lco_and_set(done, HPX_NULL);
+          }
+          ++current_box;
         }
       }
+      // After that we should have treated the number of boxes the sender
+      // computed as needing data.
+      assert(current_box == range);
     } else {
       if (range) {
         hpx_lco_and_set_num(done, range, HPX_NULL);
@@ -2149,32 +2113,47 @@ class DualTree {
 
     if (recv_nt) {
       int offset{0};
-      for (int i = first; i <= last; ++i) {
-        int incoming_nt = count_t[i - first];
-        if (incoming_nt) {
-          targetnode_t *nt = &ttree->unif_grid_[i];
-          target_t *batch = &targets[offset];
-          hpx_call(HPX_HERE, targettree_t::merge_points_, done,
-                   &batch, &nt, &incoming_nt, rwarg);
-          offset += incoming_nt;
-        } else {
-          hpx_lco_and_set(done, HPX_NULL);
-        }
-      }
-    } else {
-      if (local_tree->same_sandt_ && recv_ns) {
-        // S == T means do a special version of merge.
-        for (int i = first; i <= last; ++i) {
-          int incoming_nt = count_s[i - first];
+      int current_box{0};
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == myrank) {
+          int incoming_nt = count_t[current_box];
           if (incoming_nt) {
             targetnode_t *nt = &ttree->unif_grid_[i];
-            sourcenode_t *ns = &stree->unif_grid_[i];
-            hpx_call(HPX_HERE, targettree_t::merge_points_same_s_and_t_,
-                     done, &nt, &incoming_nt, &ns, rwarg);
+            target_t *batch = &targets[offset];
+            hpx_call(HPX_HERE, targettree_t::merge_points_, done,
+                     &batch, &nt, &incoming_nt, rwarg);
+            offset += incoming_nt;
           } else {
             hpx_lco_and_set(done, HPX_NULL);
           }
+          ++current_box;
         }
+      }
+      // After that we should have treated the number of boxes the sender
+      // computed as needing data. Further, we do this test in both places
+      // in case it should be that there were no sources sent, but only
+      // tagets.
+      assert(current_box == range);
+    } else {
+      if (local_tree->same_sandt_ && recv_ns) {
+        // S == T means do a special version of merge.
+        int current_box{0};
+        for (int i = 0; i < local_tree->dim3_; ++i) {
+          if (local_tree->rank_of_unif_grid(i) == myrank) {
+            int incoming_nt = count_s[current_box];
+            if (incoming_nt) {
+              targetnode_t *nt = &ttree->unif_grid_[i];
+              sourcenode_t *ns = &stree->unif_grid_[i];
+              hpx_call(HPX_HERE, targettree_t::merge_points_same_s_and_t_,
+                       done, &nt, &incoming_nt, &ns, rwarg);
+            } else {
+              hpx_lco_and_set(done, HPX_NULL);
+            }
+            ++current_box;
+          }
+        }
+        // Same comment.
+        assert(current_box == range);
       } else {
         if (range) {
           hpx_lco_and_set_num(done, range, HPX_NULL);
@@ -2203,12 +2182,13 @@ class DualTree {
   ///
   /// \param rank - the rank to which we are sending
   /// \param count_s - the source counts
-  /// \param count_t - that target counts
+  /// \param count_t - the target counts
   /// \param offset_s - the source offsets
   /// \param offset_t - the target offsets
   /// \param sources - the source data
   /// \param targets - the target data
-  /// \param smeta - the source meta data address
+  /// \param smeta - the source meta data global address
+  /// \param tmeta - the target meta data global address
   /// \param rwaddr - the global address of the dual tree
   static int send_points_handler(int rank, int *count_s, int *count_t,
                                  int *offset_s, int *offset_t,
@@ -2219,14 +2199,15 @@ class DualTree {
     auto local_tree = global_tree.here();
 
     // Note: all the pointers are local to the calling rank.
-    int first = local_tree->first(rank);
-    int last = local_tree->last(rank);
-    int range = last - first + 1;
+    int range{0};
     int send_ns = 0;
     int send_nt = 0;
-    for (int i = first; i <= last; ++i) {
-      send_ns += count_s[i];
-      send_nt += count_t[i];
+    for (int i = 0; i < local_tree->dim3_; ++i) {
+      if (local_tree->rank_of_unif_grid(i) == rank) {
+        send_ns += count_s[i];
+        send_nt += count_t[i];
+        ++range;
+      }
     }
 
     // Clear out the target sends if S == T
@@ -2245,19 +2226,27 @@ class DualTree {
     }
 
     // Parcel message length
-    size_t bytes = sizeof(hpx_addr_t) * 3 + sizeof(int) * 4;
+    size_t bytes = sizeof(hpx_addr_t) * 3 + sizeof(int) * 3;
     size_t bytes_source{0};
     if (send_ns) {
       bytes += sizeof(int) * range;
-      for (int i = 0; i < send_ns; ++i) {
-        bytes_source += source_manager->size(&sources[offset_s[first] + i]);
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          for (int j = 0; j < count_s[i]; ++j) {
+            bytes_source += source_manager->size(&sources[offset_s[i] + j]);
+          }
+          bytes += bytes_source;
+        }
       }
-      bytes += bytes_source;
     }
     if (send_nt) {
       bytes += sizeof(int) * range;
-      for (int i = 0; i < send_nt; ++i) {
-        bytes += target_manager->size(&targets[offset_t[first] + i]);
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          for (int j = 0; j < count_t[i]; ++j) {
+            bytes += target_manager->size(&targets[offset_t[i] + j]);
+          }
+        }
       }
     }
 
@@ -2270,35 +2259,51 @@ class DualTree {
     rwarg[2] = tmeta;
     int *meta = reinterpret_cast<int *>(static_cast<char *>(data)
                                           + 3 * sizeof(hpx_addr_t));
-    meta[0] = first;
-    meta[1] = last;
-    meta[2] = send_ns;
-    meta[3] = send_nt;
+    meta[0] = range;
+    meta[1] = send_ns;
+    meta[2] = send_nt;
 
-    int *count = &meta[4];
+    int *count = &meta[3];
     if (send_ns) {
-      std::copy(&count_s[first], &count_s[last + 1], count);
-      count += range;
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          *count = count_s[i];
+          count += 1;
+        }
+      }
     }
     if (send_nt) {
-      std::copy(&count_t[first], &count_t[last + 1], count);
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          *count = count_t[i];
+          count += 1;
+        }
+      }
     }
 
     char *meta_s = static_cast<char *>(data) + 3 * sizeof(hpx_addr_t) +
-      sizeof(int) * (4 + range * (send_ns > 0) + range * (send_nt > 0));
+      sizeof(int) * (3 + range * (send_ns > 0) + range * (send_nt > 0));
     if (send_ns) {
-      for (int i = 0; i < send_ns; ++i) {
-        meta_s = (char *)source_manager->serialize(
-                                &sources[offset_s[first] + i],
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          for (int j = 0; j < count_s[i]; ++j) {
+            meta_s = (char *)source_manager->serialize(
+                                &sources[offset_s[i] + j],
                                 meta_s);
+          }
+        }
       }
     }
 
     if (send_nt) {
-      for (int i = 0; i < send_nt; ++i) {
-        meta_s = (char *)target_manager->serialize(
-                                &targets[offset_t[first] + i],
+      for (int i = 0; i < local_tree->dim3_; ++i) {
+        if (local_tree->rank_of_unif_grid(i) == rank) {
+          for (int j = 0; j < count_t[i]; ++j) {
+            meta_s = (char *)target_manager->serialize(
+                                &targets[offset_t[i] + j],
                                 meta_s);
+          }
+        }
       }
     }
 
@@ -2381,26 +2386,26 @@ class DualTree {
       // Compute point distribution
       hpx_lco_get(tree->unif_count_, sizeof(int) * (tree->dim3_ * 2),
                   tree->unif_count_src());
-      tree->distribute_ = distribute_points(num_ranks,
-                                            tree->unif_count_src(),
-                                            tree->dim3_);
-      tree->generate_rank_map(num_ranks);
+      tree->rank_map_ = tree->distribute_points(num_ranks,
+                                                tree->unif_count_src(),
+                                                tree->dim3_,
+                                                tree->unif_level_);
 
       // Exchange points
       sourcenode_t *ns = tree->source_tree_->unif_grid_;
       targetnode_t *nt = tree->target_tree_->unif_grid_;
-      int firstarg = tree->first(rank);
-      int lastarg = tree->last(rank);
-      sourcetree_t::init_point_exchange(tree->source_tree_, firstarg, lastarg,
+      sourcetree_t::init_point_exchange(tree->source_tree_, tree->dim3_,
+          tree->rank_map_,
           tree->unif_count_src(), local_scount, local_offset_s, &tree->domain_,
           tree->refinement_limit_, p_s, ns);
       if (!tree->same_sandt_) {
-        targettree_t::init_point_exchange(tree->target_tree_, firstarg, lastarg,
+        targettree_t::init_point_exchange(tree->target_tree_, tree->dim3_,
+            tree->rank_map_,
             tree->unif_count_tar(), local_tcount, local_offset_t,
             &tree->domain_, tree->refinement_limit_, p_t, nt);
       } else {
         targettree_t::init_point_exchange_same_s_and_t(tree->target_tree_,
-            firstarg, lastarg, tree->unif_count_tar(), local_tcount,
+            tree->dim3_, tree->rank_map_, tree->unif_count_tar(), local_tcount,
             local_offset_t, &tree->domain_, tree->refinement_limit_, p_t, nt,
             ns, tree->source_tree_);
       }
@@ -2417,57 +2422,50 @@ class DualTree {
       hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
       assert(dual_tree_complete != HPX_NULL);
 
-      for (int r = 0; r < num_ranks; ++r) {
-        int first = tree->first(r);
-        int last = tree->last(r);
+      for (int i = 0; i < tree->dim3_; ++i) {
+        if (tree->rank_of_unif_grid(i) == rank) {
+          if (*(tree->unif_count_src(i)) == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            source_t *arg = tree->sorted_src();
+            int typearg = 0;
+            assert(ns[i].complete() != HPX_NULL);
+            hpx_call_when_with_continuation(ns[i].complete(),
+                HPX_HERE, sourcetree_t::send_node_,
+                dual_tree_complete, hpx_lco_set_action,
+                &ns, &arg, &i, &rwtree, &typearg);
+          }
 
-        if (r == rank) {
-          for (int i = first; i <= last; ++i) {
-            if (*(tree->unif_count_src(i)) == 0) {
-              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-            } else {
-              source_t *arg = tree->sorted_src();
-              int typearg = 0;
-              assert(ns[i].complete() != HPX_NULL);
-              hpx_call_when_with_continuation(ns[i].complete(),
-                  HPX_HERE, sourcetree_t::send_node_,
-                  dual_tree_complete, hpx_lco_set_action,
-                  &ns, &arg, &i, &rwtree, &typearg);
-            }
-
-            if (*(tree->unif_count_tar(i)) == 0) {
-              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-            } else {
-              target_t *arg = tree->sorted_tar();
-              int typearg = 1;
-              assert(nt[i].complete() != HPX_NULL);
-              hpx_call_when_with_continuation(nt[i].complete(),
-                  HPX_HERE, targettree_t::send_node_,
-                  dual_tree_complete, hpx_lco_set_action,
-                  &nt, &arg, &i, &rwtree, &typearg);
-            }
+          if (*(tree->unif_count_tar(i)) == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            target_t *arg = tree->sorted_tar();
+            int typearg = 1;
+            assert(nt[i].complete() != HPX_NULL);
+            hpx_call_when_with_continuation(nt[i].complete(),
+                HPX_HERE, targettree_t::send_node_,
+                dual_tree_complete, hpx_lco_set_action,
+                &nt, &arg, &i, &rwtree, &typearg);
           }
         } else {
-          for (int i = first; i <= last; ++i) {
-            if (*(tree->unif_count_src(i)) == 0) {
-              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-            } else {
-              assert(ns[i].complete() != HPX_NULL);
-              hpx_call_when_with_continuation(ns[i].complete(),
-                  dual_tree_complete, hpx_lco_set_action,
-                  ns[i].complete(), hpx_lco_delete_action,
-                  nullptr, 0);
-            }
+          if (*(tree->unif_count_src(i)) == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            assert(ns[i].complete() != HPX_NULL);
+            hpx_call_when_with_continuation(ns[i].complete(),
+                dual_tree_complete, hpx_lco_set_action,
+                ns[i].complete(), hpx_lco_delete_action,
+                nullptr, 0);
+          }
 
-            if (*(tree->unif_count_tar(i)) == 0) {
-              hpx_lco_and_set(dual_tree_complete, HPX_NULL);
-            } else {
-              assert(nt[i].complete() != HPX_NULL);
-              hpx_call_when_with_continuation(nt[i].complete(),
-                  dual_tree_complete, hpx_lco_set_action,
-                  nt[i].complete(), hpx_lco_delete_action,
-                  nullptr, 0);
-            }
+          if (*(tree->unif_count_tar(i)) == 0) {
+            hpx_lco_and_set(dual_tree_complete, HPX_NULL);
+          } else {
+            assert(nt[i].complete() != HPX_NULL);
+            hpx_call_when_with_continuation(nt[i].complete(),
+                dual_tree_complete, hpx_lco_set_action,
+                nt[i].complete(), hpx_lco_delete_action,
+                nullptr, 0);
           }
         }
       }
@@ -3137,7 +3135,6 @@ class DualTree {
   int same_sandt_;            /// Made from the same sources and targets
   hpx_addr_t unif_count_;     /// LCO reducing the uniform counts
   int *unif_count_value_;     /// local data storing the uniform counts
-  int *distribute_;           /// the computed distribution of the nodes
   int *rank_map_;             /// map unif grid index to rank
   method_t method_;           /// method used during DAG discovery
 
