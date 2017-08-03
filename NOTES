@@ -41,7 +41,7 @@ TODO: Clean up tree.h -- remove whatever possible from that into the evaluator
       object. Break the file into multiple parts, Node, Tree, DualTree
 
 
-Related to Drake's Work
+Related to REU Work
 -----------------------
 TODO: Think about the following issue
   The out edge spawn action will have to be ready to either do the current thing,
@@ -61,10 +61,6 @@ TODO: Another thing might be to send this to the tree and not the LCO. Then the
       tree can eventually build up a complete list over the iterations.
       Again, there is a termination problem with this, but it is a different
       perspective.
-
-
-Related to Silvio's Work
-------------------------
 TODO: Decide if we should also test Hilbert ordering on the top level distrib
       of the tree. This might have some better locality.
 TODO: Further, should we allow for a non-space-filling curve distribution.
@@ -75,6 +71,7 @@ TODO: Further, should we allow for a non-space-filling curve distribution.
 Software Engineering/Good Practice Related
 ------------------------------------------
 TODO: Update INSTALL for the fact of cmake
+TODO: Update code comments
 TODO: clean up code where possible
 TODO: In tree, privatize anything possible
 TODO: The same is true everywhere I guess.
@@ -92,7 +89,7 @@ TODO: Documentation clean up throughout
 TODO: Finish interface
     - NOTE: this is not a vital thing to accomplish for 1.0.0
     - Make it so that an advanced user could call all the needed stuff directly
-      from an HPX thread.
+      from an HPX thread. <----- THIS ONE MAY BE MORE IMPORTANT THAN IT WAS
     - As a corollary to that, add assertions to routines that have
       inside / outside HPX restrictions
 TODO: The expansion concept does not allow for access of the kernel parameters.
