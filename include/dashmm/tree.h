@@ -40,6 +40,7 @@
 #include "dashmm/dag.h"
 #include "dashmm/domaingeometry.h"
 #include "dashmm/expansionlco.h"
+#include "dashmm/hilbert.h"
 #include "dashmm/index.h"
 #include "dashmm/point.h"
 #include "dashmm/rankwise.h"
@@ -1937,80 +1938,35 @@ class DualTree {
     return retval;
   }
 
-  /// Partition the available points among the localities
+  /// Distribute the uniforn level nodes
   ///
-  /// Given the uniform counts, this will provide a good guess at a
-  /// distribution of those points. This operates basically through the Morton
-  /// ordering of the uniform grid nodes, and aims to have segments of the
-  /// space-filling curve which have similar total counts.
+  /// Given the number of sources and targets in each node at the uniform level
+  /// of the tree, this will distribute those uniform level nodes amoung the
+  /// given number of ranks. This will allocate an array and return that
+  /// array to the caller; the caller assumes ownership of that array.
   ///
-  /// \param num_ranks - the number of localities to divide between
-  /// \param global - the global counts
-  /// \param len - the number of unform grid nodes
-  void distribute_points(int num_ranks, const int *global, int len) {
-    /*
-    int *ret = new int[num_ranks]();
-
-    const int *s = global; // Source counts
-    const int *t = &global[len]; // Target counts
-
-    int *cumulative = new int[len + 1];
-    cumulative[0] = 0;
-    for (int i = 1; i <= len; ++i) {
-      cumulative[i] = s[i-1] + t[i-1] + cumulative[i - 1];
-    }
-
-    int target_share = cumulative[len] / num_ranks;
-
-    for (int split = 1; split < num_ranks; ++split) {
-      int my_target = target_share * split;
-      auto fcn = [&my_target] (const int &a) -> bool {return a < my_target;};
-      int *splitter = std::partition_point(cumulative, &cumulative[len + 1],
-                                           fcn);
-      int upper_delta = *splitter - my_target;
-      assert(upper_delta >= 0);
-      int lower_delta = my_target - *(splitter - 1);
-      assert(lower_delta >= 0);
-      int split_index = upper_delta < lower_delta
-                          ? splitter - cumulative
-                          : (splitter - cumulative) - 1;
-      --split_index;
-      assert(split_index >= 0);
-
-      ret[split - 1] = split_index;
-    }
-    ret[num_ranks - 1] = len - 1;
-
-    // TODO: eventually, we shall no longer need this routine, because this
-    // will be responsible for computing the rank_map_ directly
-    generate_rank_map(num_ranks, ret);
-
-    delete [] cumulative;
-    delete [] ret;
-    */
-
-    rank_map_ = new int [dim3_];
-    assert(rank_map_);
-    for (int i = 0; i < len; ++i) {
-      rank_map_[i] = i % num_ranks;
-    }
-  }
-
-  /// Generate the mapping from uniform grid node to locality
+  /// The input counts are provided as an array of integers that are back to
+  /// back, and have a length @p len, with the source counts per node in the
+  /// first half of @p global and the target counts per node in the second
+  /// half of @p global.
   ///
-  /// \param num_ranks - the number of localities
-  /// \param distrib - the old-style morton order segment list
-  void generate_rank_map(int num_ranks, int *distrib) {
-    rank_map_ = new int [dim3_];
-    assert(rank_map_);
-
-    for (int i = 0; i < num_ranks; ++i) {
-      int b = i == 0 ? 0 : distrib[i - 1] + 1;
-      int e = distrib[i];
-      for (int j = b; j <= e; ++j) {
-        rank_map_[j] = i;
-      }
-    }
+  /// The mapping of the nodes to index in the provided @p global and the
+  /// returned array is according to a simple index. At the uniform level, if
+  /// the uniform level is l, there are N = 2^l nodes along each length of the
+  /// cubical domain. So indexed from the low corner, these nodes can be
+  /// described with three indices (ix, iy, iz). The order of each node in the
+  /// input and output data is computed with: ix + iy * N  + iz * N * N.
+  ///
+  /// \param num_ranks - the number of ranks over which to distribute the nodes
+  /// \param global - the source and target counts per node
+  /// \param len - the number of uniform level nodes.
+  /// \param lvl - the uniform level.
+  ///
+  /// \returns - an array assigning each node to a rank. Caller assumes
+  ///            ownership of this array, and should destroy it when done with
+  ///            the data.
+  int *distribute_points(int num_ranks, const int *global, int len, int lvl) {
+    return distribute_points_hilbert(num_ranks, global, len, lvl);
   }
 
   /// Count and sort the local points
@@ -2447,7 +2403,10 @@ class DualTree {
       // Compute point distribution
       hpx_lco_get(tree->unif_count_, sizeof(int) * (tree->dim3_ * 2),
                   tree->unif_count_src());
-      tree->distribute_points(num_ranks, tree->unif_count_src(), tree->dim3_);
+      tree->rank_map_ = tree->distribute_points(num_ranks,
+                                                tree->unif_count_src(),
+                                                tree->dim3_,
+                                                tree->unif_level_);
 
       // Exchange points
       sourcenode_t *ns = tree->source_tree_->unif_grid_;
