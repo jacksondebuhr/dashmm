@@ -20,7 +20,9 @@
 /// \brief Registrar objects for HPX-5 active objects
 
 
+#include "dashmm/dualtree.h"
 #include "dashmm/expansionlco.h"
+#include "dashmm/node.h"
 #include "dashmm/targetlco.h"
 #include "dashmm/tree.h"
 
