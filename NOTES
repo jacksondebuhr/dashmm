@@ -72,6 +72,9 @@ Related to REU Work
 -----------------------
 TODO: Test Drake's other ideas and code for the distribution. Merge the best
       into dev-v2.
+      ---> probably make the unif node distribution all be classes that derive
+           from some abstract base. And then let the user supply an instance
+           that they want to use, and have some suitable default.
 TODO: Start to isolate backend inside DASHMM. Integrate BARIUM
 
 

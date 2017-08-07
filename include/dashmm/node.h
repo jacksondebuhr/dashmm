@@ -185,7 +185,11 @@ class Node {
   /// \param geo - the domain geometry
   /// \param same_sandt - is this a run where the sources and targets are
   ///                     identical.
-  void partition(int threshold, DomainGeometry *geo, int same_sandt) {
+  void partition(int threshold, /*DomainGeometry *geo,*/
+                 double px, double py, double pz, double size,
+                 int same_sandt) {
+    DomainGeometry geo{Point{px, py, pz}, size};
+
     size_t num_points = num_parts();
     assert(num_points >= 1);
     bool is_leaf = num_points <= (size_t)threshold;
@@ -202,10 +206,10 @@ class Node {
       hpx_lco_and_set_num(complete_, 8, HPX_NULL);
     } else {
       // Compute center of the node
-      double h = geo->size() / pow(2, idx.level());
-      double center_x = geo->low().x() + (idx.x() + 0.5) * h;
-      double center_y = geo->low().y() + (idx.y() + 0.5) * h;
-      double center_z = geo->low().z() + (idx.z() + 0.5) * h;
+      double h = geo.size() / pow(2, idx.level());
+      double center_x = geo.low().x() + (idx.x() + 0.5) * h;
+      double center_y = geo.low().y() + (idx.y() + 0.5) * h;
+      double center_z = geo.low().z() + (idx.z() + 0.5) * h;
 
       // Get the local data
       record_t *p = parts.data();
@@ -266,7 +270,7 @@ class Node {
           child[i] = cnd;
 
           hpx_call(HPX_HERE, partition_node_, HPX_NULL,
-                   &cnd, &geo, &threshold, &same_sandt);
+                   &cnd, &px, &py, &pz, &size, &threshold, &same_sandt);
         } else {
           hpx_lco_and_set(complete_, HPX_NULL);
         }
@@ -468,9 +472,11 @@ class Node {
  private:
   friend class NodeRegistrar<Record>;
 
-  static int partition_node_handler(node_t *n, DomainGeometry *geo,
+  static int partition_node_handler(node_t *n, /*DomainGeometry *geo,*/
+                                    double px, double py, double pz,
+                                    double size,
                                     int threshold, int same_sandt) {
-    n->partition(threshold, geo, same_sandt);
+    n->partition(threshold, px, py, pz, size, same_sandt);
     return HPX_SUCCESS;
   }
 

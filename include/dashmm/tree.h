@@ -243,7 +243,6 @@ class Tree {
                          (int)(dim * (p->position.y() - corner.y()) * scale));
       int zid = std::min(dim - 1,
                          (int)(dim * (p->position.z() - corner.z()) * scale));
-      //gid[i] = morton_key(xid, yid, zid);
       gid[i] = simple_key(xid, yid, zid, dim);
       count[gid[i]]++;
     }
@@ -479,8 +478,13 @@ class Tree {
             // This grid does not expect remote points.
             // Spawn adaptive partitioning
             int ssat = 0;
+            Point geo_pt = geo->low();
+            double px = geo_pt.x();
+            double py = geo_pt.y();
+            double pz = geo_pt.z();
+            double size = geo->size();
             hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-                     &curr, &geo, &threshold, &ssat);
+                     &curr, &px, &py, &pz, &size, &threshold, &ssat);
           }
           curr->unlock();
         }
@@ -546,9 +550,14 @@ class Tree {
             // This grid does not expect remote points.
             // Spawn adaptive partitioning
             int ssat = 1;
+            Point geo_pt = geo->low();
+            double px = geo_pt.x();
+            double py = geo_pt.y();
+            double pz = geo_pt.z();
+            double size = geo->size();
             hpx_call_when(curr_source->complete(), HPX_HERE,
                           node_t::partition_node_, HPX_NULL,
-                          &curr, &geo, &threshold, &ssat);
+                          &curr, &px, &py, &pz, &size, &threshold, &ssat);
           }
           curr->unlock();
         }
@@ -574,10 +583,8 @@ class Tree {
   ///
   /// \returns - HPX_SUCCESS
   static int merge_points_handler(record_t *temp, node_t *n, int n_arrived,
-                                  hpx_addr_t rwgas) {
-    RankWise<dualtree_t> global_tree{rwgas};
-    auto local_tree = global_tree.here();
-
+                                  double px, double py, double pz, double size,
+                                  int thresh) {
     // Note: all the pointers are local to the calling rank.
     n->lock();
     size_t first = n->first();
@@ -585,11 +592,9 @@ class Tree {
     std::copy(temp, temp + n_arrived, p + first);
 
     if (n->increment_first(n_arrived)) {
-      const DomainGeometry *geoarg = local_tree->domain();
-      int thresh = local_tree->refinement_limit();
       int ssat = 0;
       hpx_call(HPX_HERE, node_t::partition_node_, HPX_NULL,
-               &n, &geoarg, &thresh, &ssat);
+               &n, &px, &py, &pz, &size, &thresh, &ssat);
     }
     n->unlock();
 
@@ -614,18 +619,14 @@ class Tree {
           targetnode_t *target_node,
           int n_arrived,
           sourcenode_t *source_node,
-          hpx_addr_t rwgas) {
-    RankWise<dualtree_t> global_tree{rwgas};
-    auto local_tree = global_tree.here();
-
+          double px, double py, double pz, double size,
+          int thresh) {
     target_node->lock();
     if (target_node->increment_first(n_arrived)) {
-      const DomainGeometry *geoarg = local_tree->domain();
-      int thresh = local_tree->refinement_limit();
       int ssat = 1;
       hpx_call_when(source_node->complete(),
                     HPX_HERE, node_t::partition_node_, HPX_NULL,
-                    &target_node, &geoarg, &thresh, &ssat);
+                    &target_node, &px, &py, &pz, &size, &thresh, &ssat);
     }
     target_node->unlock();
 
@@ -679,10 +680,8 @@ class Tree {
 
     if (delta > 0) {
       Index tester = idx.parent(delta);
-      //return morton_key(tester.x(), tester.y(), tester.z());
       return simple_key(tester.x(), tester.y(), tester.z(), max);
     } else {
-      //return morton_key(idx.x(), idx.y(), idx.z());
       return simple_key(idx.x(), idx.y(), idx.z(), max);
     }
   }
@@ -817,4 +816,4 @@ hpx_action_t Tree<S, T, R, E, M>::merge_points_same_s_and_t_ =
 } // namespace dashmm
 
 
-#endif
+#endif // __DASHMM_TREE_H__

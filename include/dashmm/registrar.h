@@ -172,7 +172,8 @@ class NodeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         node_t::partition_node_,
                         node_t::partition_node_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_INT);
+                        HPX_POINTER, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
+                        HPX_DOUBLE, HPX_INT, HPX_INT);
   }
 };
 
@@ -217,11 +218,14 @@ class TreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::merge_points_,
                         tree_t::merge_points_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_ADDR);
+                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_DOUBLE,
+                        HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_INT);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::merge_points_same_s_and_t_,
                         tree_t::merge_points_same_s_and_t_handler,
-                        HPX_POINTER, HPX_INT, HPX_POINTER, HPX_ADDR);
+                        HPX_POINTER, HPX_INT, HPX_POINTER,
+                        HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE, HPX_DOUBLE,
+                        HPX_INT);
   }
 };
 

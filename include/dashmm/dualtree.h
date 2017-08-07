@@ -886,8 +886,16 @@ class DualTree {
           if (incoming_ns) {
             sourcenode_t *ns = &stree->unif_grid_[i];
             source_t *batch = &sources[offset];
+            const DomainGeometry *geo = local_tree->domain();
+            Point geo_pt = geo->low();
+            double px = geo_pt.x();
+            double py = geo_pt.y();
+            double pz = geo_pt.z();
+            double size = geo->size();
+            int thresh = local_tree->refinement_limit();
             hpx_call(HPX_HERE, sourcetree_t::merge_points_, done,
-                     &batch, &ns, &incoming_ns, rwarg);
+                     &batch, &ns, &incoming_ns, &px, &py, &pz, &size,
+                     &thresh);
             offset += incoming_ns;
           } else {
             hpx_lco_and_set(done, HPX_NULL);
@@ -913,8 +921,16 @@ class DualTree {
           if (incoming_nt) {
             targetnode_t *nt = &ttree->unif_grid_[i];
             target_t *batch = &targets[offset];
+            const DomainGeometry *geo = local_tree->domain();
+            Point geo_pt = geo->low();
+            double px = geo_pt.x();
+            double py = geo_pt.y();
+            double pz = geo_pt.z();
+            double size = geo->size();
+            int thresh = local_tree->refinement_limit();
             hpx_call(HPX_HERE, targettree_t::merge_points_, done,
-                     &batch, &nt, &incoming_nt, rwarg);
+                     &batch, &nt, &incoming_nt, &px, &py, &pz, &size,
+                     &thresh);
             offset += incoming_nt;
           } else {
             hpx_lco_and_set(done, HPX_NULL);
@@ -937,8 +953,16 @@ class DualTree {
             if (incoming_nt) {
               targetnode_t *nt = &ttree->unif_grid_[i];
               sourcenode_t *ns = &stree->unif_grid_[i];
+              const DomainGeometry *geo = local_tree->domain();
+              Point geo_pt = geo->low();
+              double px = geo_pt.x();
+              double py = geo_pt.y();
+              double pz = geo_pt.z();
+              double size = geo->size();
+              int thresh = local_tree->refinement_limit();
               hpx_call(HPX_HERE, targettree_t::merge_points_same_s_and_t_,
-                       done, &nt, &incoming_nt, &ns, rwarg);
+                       done, &nt, &incoming_nt, &ns, &px, &py, &pz, &size,
+                       &thresh);
             } else {
               hpx_lco_and_set(done, HPX_NULL);
             }
