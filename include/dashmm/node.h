@@ -172,110 +172,45 @@ class Node {
 
   /// Partition the node
   ///
-  /// In addition to sorting the points associated with this node, this will
-  /// create the needed children and schedule the work of partitioning for
-  /// those children.
+  /// Perform a partition action with the given synchronization LCO. This can
+  /// be HPX_NULL, in which case this will be an asynchronous action invocation
+  /// of the partition action.
   ///
-  /// @p same_sandt will be nonzero only for target nodes, and only sometimes.
-  /// In this case, the following does not sort the records, but merely finds
-  /// the split point, which will have been established already by the source
-  /// tree partioning.
-  ///
-  /// \param threshold - the partitioning threshold
-  /// \param geo - the domain geometry
-  /// \param same_sandt - is this a run where the sources and targets are
-  ///                     identical.
-  void partition(int threshold, /*DomainGeometry *geo,*/
+  /// \param sync - synchronization LCO to trigger once action is complete
+  /// \param threshold - partitioning threshold
+  /// \param px - x position of low corner of domain
+  /// \param py - y position of low corner of domain
+  /// \param pz - z position of low corner of domain
+  /// \param size - size of domain
+  /// \param same_sandt - nonzero if this is a case where S==T
+  void partition(hpx_addr_t sync, int threshold,
                  double px, double py, double pz, double size,
                  int same_sandt) {
-    DomainGeometry geo{Point{px, py, pz}, size};
+    node_t *thisarg = this;
+    hpx_call(HPX_HERE, partition_node_, sync,
+             &thisarg, &px, &py, &pz, &size, &threshold, &same_sandt);
+  }
 
-    size_t num_points = num_parts();
-    assert(num_points >= 1);
-    bool is_leaf = num_points <= (size_t)threshold;
-
-    if (parent && parent->complete() != HPX_NULL) {
-      hpx_call_when_with_continuation(complete_,
-          parent->complete(), hpx_lco_set_action,
-          complete_, hpx_lco_delete_action,
-          nullptr, 0);
-    }
-
-    if (is_leaf) {
-      // No children means this node is done with partitioning
-      hpx_lco_and_set_num(complete_, 8, HPX_NULL);
-    } else {
-      // Compute center of the node
-      double h = geo.size() / pow(2, idx.level());
-      double center_x = geo.low().x() + (idx.x() + 0.5) * h;
-      double center_y = geo.low().y() + (idx.y() + 0.5) * h;
-      double center_z = geo.low().z() + (idx.z() + 0.5) * h;
-
-      // Get the local data
-      record_t *p = parts.data();
-
-      // Sort the particles among the children
-      record_t *splits[9]{};
-      splits[0] = p;
-      splits[8] = &p[num_points];
-
-      auto z_comp = [&center_z](record_t &a) {
-        return a.position.z() < center_z;
-      };
-      auto y_comp = [&center_y](record_t &a) {
-        return a.position.y() < center_y;
-      };
-      auto x_comp = [&center_x](record_t &a) {
-        return a.position.x() < center_x;
-      };
-
-      if (same_sandt) {
-        splits[4] = std::partition_point(splits[0], splits[8], z_comp);
-
-        splits[2] = std::partition_point(splits[0], splits[4], y_comp);
-        splits[6] = std::partition_point(splits[4], splits[8], y_comp);
-
-        splits[1] = std::partition_point(splits[0], splits[2], x_comp);
-        splits[3] = std::partition_point(splits[2], splits[4], x_comp);
-        splits[5] = std::partition_point(splits[4], splits[6], x_comp);
-        splits[7] = std::partition_point(splits[6], splits[8], x_comp);
-      } else {
-        splits[4] = std::partition(splits[0], splits[8], z_comp);
-
-        splits[2] = std::partition(splits[0], splits[4], y_comp);
-        splits[6] = std::partition(splits[4], splits[8], y_comp);
-
-        splits[1] = std::partition(splits[0], splits[2], x_comp);
-        splits[3] = std::partition(splits[2], splits[4], x_comp);
-        splits[5] = std::partition(splits[4], splits[6], x_comp);
-        splits[7] = std::partition(splits[6], splits[8], x_comp);
-      }
-
-      // Perform some counting
-      int stat[8]{};
-      int offset[8]{};
-
-      offset[0] = 0;
-      stat[0] = splits[1] - splits[0];
-      for (int i = 1; i < 8; ++i) {
-        stat[i] = splits[i + 1] - splits[i];
-        offset[i] = offset[i - 1] + stat[i - 1];
-      }
-
-      // Create child nodes
-      for (int i = 0; i < 8; ++i) {
-        if (stat[i]) {
-          auto cparts = parts.slice(offset[i], stat[i]);
-          node_t *cnd = new node_t{idx.child(i), cparts, this};
-          child[i] = cnd;
-
-          hpx_call(HPX_HERE, partition_node_, HPX_NULL,
-                   &cnd, &px, &py, &pz, &size, &threshold, &same_sandt);
-        } else {
-          hpx_lco_and_set(complete_, HPX_NULL);
-        }
-      }
-    }
+  /// Partition the node when the given LCO triggers
+  ///
+  /// Perform a partition action with the given synchronization LCO. This can
+  /// be HPX_NULL, in which case this will be an asynchronous action invocation
+  /// of the partition action.
+  ///
+  /// \param when - gate LCO on which to depend before starting the action
+  /// \param sync - synchronization LCO to trigger once action is complete
+  /// \param threshold - partitioning threshold
+  /// \param px - x position of low corner of domain
+  /// \param py - y position of low corner of domain
+  /// \param pz - z position of low corner of domain
+  /// \param size - size of domain
+  /// \param same_sandt - nonzero if this is a case where S==T
+  void partitionWhen(hpx_addr_t when, hpx_addr_t sync, int threshold,
+                     double px, double py, double pz, double size,
+                     int same_sandt) {
+    node_t *thisarg = this;
+    hpx_call_when(when, partition_node_, sync,
+                  &thisarg, &px, &py, &pz, &size, &threshold, &same_sandt);
   }
 
   /// Return the size of the branch below this node
@@ -461,22 +396,128 @@ class Node {
   }
 
 
+  // TODO: These should likely all be privatized.
   Index idx;                      /// index of the node
   arrayref_t parts;               /// segment for this node
   node_t *parent;                 /// parent node
   node_t *child[8];               /// children of this node
   DAGInfo dag;                    /// The DAG info for this node
 
-  static hpx_action_t partition_node_;
 
  private:
   friend class NodeRegistrar<Record>;
 
-  static int partition_node_handler(node_t *n, /*DomainGeometry *geo,*/
+  /// Partition the node
+  ///
+  /// In addition to sorting the points associated with this node, this will
+  /// create the needed children and schedule the work of partitioning for
+  /// those children.
+  ///
+  /// @p same_sandt will be nonzero only for target nodes, and only sometimes.
+  /// In this case, the following does not sort the records, but merely finds
+  /// the split point, which will have been established already by the source
+  /// tree partioning.
+  ///
+  /// \param n - the tree node in question
+  /// \param px - x position of low corner of domain
+  /// \param py - y position of low corner of domain
+  /// \param pz - z position of low corner of domain
+  /// \param size - size of domain
+  /// \param threshold - the partitioning threshold
+  /// \param same_sandt - is this a run where the sources and targets are
+  ///                     identical.
+  static int partition_node_handler(node_t *n,
                                     double px, double py, double pz,
                                     double size,
-                                    int threshold, int same_sandt) {
-    n->partition(threshold, px, py, pz, size, same_sandt);
+                                    int threshold,
+                                    int same_sandt) {
+    DomainGeometry geo{Point{px, py, pz}, size};
+
+    size_t num_points = n->num_parts();
+    assert(num_points >= 1);
+    bool is_leaf = num_points <= (size_t)threshold;
+
+    if (n->parent && n->parent->complete() != HPX_NULL) {
+      hpx_call_when_with_continuation(n->complete_,
+          n->parent->complete(), hpx_lco_set_action,
+          complete_, hpx_lco_delete_action,
+          nullptr, 0);
+    }
+
+    if (is_leaf) {
+      // No children means this node is done with partitioning
+      hpx_lco_and_set_num(n->complete_, 8, HPX_NULL);
+    } else {
+      // Compute center of the node
+      double h = geo.size() / pow(2, n->idx.level());
+      double center_x = geo.low().x() + (n->idx.x() + 0.5) * h;
+      double center_y = geo.low().y() + (n->idx.y() + 0.5) * h;
+      double center_z = geo.low().z() + (n->idx.z() + 0.5) * h;
+
+      // Get the local data
+      record_t *p = n->parts.data();
+
+      // Sort the particles among the children
+      record_t *splits[9]{};
+      splits[0] = p;
+      splits[8] = &p[num_points];
+
+      auto z_comp = [&center_z](record_t &a) {
+        return a.position.z() < center_z;
+      };
+      auto y_comp = [&center_y](record_t &a) {
+        return a.position.y() < center_y;
+      };
+      auto x_comp = [&center_x](record_t &a) {
+        return a.position.x() < center_x;
+      };
+
+      if (same_sandt) {
+        splits[4] = std::partition_point(splits[0], splits[8], z_comp);
+
+        splits[2] = std::partition_point(splits[0], splits[4], y_comp);
+        splits[6] = std::partition_point(splits[4], splits[8], y_comp);
+
+        splits[1] = std::partition_point(splits[0], splits[2], x_comp);
+        splits[3] = std::partition_point(splits[2], splits[4], x_comp);
+        splits[5] = std::partition_point(splits[4], splits[6], x_comp);
+        splits[7] = std::partition_point(splits[6], splits[8], x_comp);
+      } else {
+        splits[4] = std::partition(splits[0], splits[8], z_comp);
+
+        splits[2] = std::partition(splits[0], splits[4], y_comp);
+        splits[6] = std::partition(splits[4], splits[8], y_comp);
+
+        splits[1] = std::partition(splits[0], splits[2], x_comp);
+        splits[3] = std::partition(splits[2], splits[4], x_comp);
+        splits[5] = std::partition(splits[4], splits[6], x_comp);
+        splits[7] = std::partition(splits[6], splits[8], x_comp);
+      }
+
+      // Perform some counting
+      int stat[8]{};
+      int offset[8]{};
+
+      offset[0] = 0;
+      stat[0] = splits[1] - splits[0];
+      for (int i = 1; i < 8; ++i) {
+        stat[i] = splits[i + 1] - splits[i];
+        offset[i] = offset[i - 1] + stat[i - 1];
+      }
+
+      // Create child nodes
+      for (int i = 0; i < 8; ++i) {
+        if (stat[i]) {
+          auto cparts = n->parts.slice(offset[i], stat[i]);
+          node_t *cnd = new node_t{n->idx.child(i), cparts, this};
+          n->child[i] = cnd;
+          cnd->partition(HPX_NULL, threshold, px, py, pz, size, same_sandt);
+        } else {
+          hpx_lco_and_set(n->complete_, HPX_NULL);
+        }
+      }
+    }
+
     return HPX_SUCCESS;
   }
 
@@ -484,6 +525,8 @@ class Node {
   hpx_addr_t sema_;         /// restrict concurrent modification
   hpx_addr_t complete_;     /// This is used to indicate that partitioning is
                             ///  complete
+
+  static hpx_action_t partition_node_;
 };
 
 template <typename R>

@@ -332,8 +332,8 @@ class Evaluator {
   ExpansionLCORegistrar<Source, Target, Expansion, Method> elcoreg_;
   NodeRegistrar<Source> snodereg_;
   NodeRegistrar<Target> tnodereg_;
-  TreeRegistrar<Source, Target, Source, Expansion, Method> streereg_;
-  TreeRegistrar<Source, Target, Target, Expansion, Method> ttreereg_;
+  TreeRegistrar<Source, Target, Source> streereg_;
+  TreeRegistrar<Source, Target, Target> ttreereg_;
   DualTreeRegistrar<Source, Target, Expansion, Method> dtreereg_;
   ArrayRegistrar<Source> sarrreg_;
   ArrayRegistrar<Target> tarrreg_;

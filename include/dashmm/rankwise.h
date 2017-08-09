@@ -96,6 +96,15 @@ public:
   bool valid() const {return global_ != HPX_NULL && local_ != nullptr;}
   bool remote() const {return remote_;}
 
+  /// Give direct access to local version of the data
+  ///
+  /// Note that this could cause trouble if the returned value is used outside
+  /// the context of the RankLocal object, as it could refer to memory that
+  /// has been unpinned, and would thus be invalid. Use with care.
+  ///
+  /// \returns - local version of the represented data
+  T *local() {return local_};
+
   /// Typical dereferencing operations to allow for use of the RankLocal as
   /// if it were a pointer to the underlying type.
   T& operator*() {return *local_;}

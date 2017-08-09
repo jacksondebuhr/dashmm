@@ -179,16 +179,12 @@ class NodeRegistrar {
 
 
 /// Object that handles action registration for Tree
-template <typename Source, typename Target, typename Record,
-          template <typename, typename> class Expansion,
-          template <typename, typename,
-                    template <typename, typename> class> class Method>
+template <typename Source, typename Target, typename Record>
 class TreeRegistrar {
  public:
-  using tree_t = Tree<Source, Target, Record, Expansion, Method>;
+  using tree_t = Tree<Source, Target, Record>;
 
   TreeRegistrar() {
-    // Tree actions
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::setup_basics_,
                         tree_t::setup_basics_handler,
@@ -204,15 +200,15 @@ class TreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::send_node_,
                         tree_t::send_node_handler,
-                        HPX_POINTER, HPX_POINTER, HPX_INT, HPX_ADDR, HPX_INT);
+                        HPX_POINTER, HPX_INT, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::assign_points_,
-                        tree_t::assign_points_to_unif_grid,
+                        tree_t::assign_points_to_unif_grid_handler,
                         HPX_POINTER, HPX_INT, HPX_POINTER, HPX_INT,
                         HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::group_points_,
-                        tree_t::group_points_on_unif_grid,
+                        tree_t::group_points_on_unif_grid_handler,
                         HPX_POINTER, HPX_INT, HPX_INT, HPX_POINTER,
                         HPX_POINTER, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
@@ -240,7 +236,6 @@ class DualTreeRegistrar {
   using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   DualTreeRegistrar() {
-    // DualTree actions
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         dualtree_t::set_domain_geometry_,
                         dualtree_t::set_domain_geometry_handler,
@@ -257,7 +252,7 @@ class DualTreeRegistrar {
                         dualtree_t::init_partition_,
                         dualtree_t::init_partition_handler,
                         HPX_ADDR, HPX_ADDR, HPX_INT, HPX_ADDR, HPX_INT,
-                        HPX_ADDR, HPX_ADDR);
+                        HPX_ADDR, HPX_ADDR, HPX_ADDR, HPX_ADDR);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         dualtree_t::recv_points_,
                         dualtree_t::recv_points_handler,
