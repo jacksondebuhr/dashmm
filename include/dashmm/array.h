@@ -784,21 +784,10 @@ class Array {
 
     // call on each rank with location and and gate and data
     for (int i = 0; i < n_rank; ++i) {
-      if (i != my_rank) {
-        T *location = retval + offsets[i];
-        hpx_call(HPX_THERE(i), array_collect_request_, HPX_NULL,
-                 &data, &done, &location);
-      }
+      T *location = retval + offsets[i];
+      hpx_call(HPX_THERE(i), array_collect_request_, HPX_NULL,
+               &data, &done, &location);
     }
-
-    // copy my segment over
-    {
-      T *c_start = meta[my_rank].data;
-      T *c_end = &meta[my_rank].data[meta[my_rank].local_count];
-      T *d_start = &retval[offsets[my_rank]];
-      std::copy(c_start, c_end, d_start);
-    }
-    hpx_lco_and_set(done, HPX_NULL);
 
     // wait for results
     hpx_lco_wait(done);
