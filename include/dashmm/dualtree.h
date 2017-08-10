@@ -89,8 +89,8 @@ class DualTree {
   using targetnode_t = Node<Target>;
   using sourceref_t = ArrayRef<Source>;
   using targetref_t = ArrayRef<Target>;
-  using sourcetree_t = Tree<Source, Target, Source, Expansion, Method>;
-  using targettree_t = Tree<Source, Target, Target, Expansion, Method>;
+  using sourcetree_t = Tree<Source, Target, Source>;
+  using targettree_t = Tree<Source, Target, Target>;
   using dualtree_t = DualTree<Source, Target, Expansion, Method>;
 
   /// Construction is always default
@@ -232,7 +232,7 @@ class DualTree {
     // TODO: I am not happy with this. We should not have to ask for the root
     // from out here. But then what happens with apply? We do this simple thing
     // for now, and when we pull this unrelated thing out, we can fix this.
-    targetnode_t *trgaddx = ttree_->root_;
+    targetnode_t *trgaddx = ttree->root();
     hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
              &thetree, &trgaddx, &consider, &same_sandt_, &tdone);
 
@@ -260,9 +260,9 @@ class DualTree {
     auto ttree = target_tree_.here();
 
     // TODO: same complaint with root() here...
-    collect_DAG_nodes_from_S_node(stree_->root(), retval->source_leaves,
+    collect_DAG_nodes_from_S_node(stree->root(), retval->source_leaves,
                                   retval->source_nodes);
-    collect_DAG_nodes_from_T_node(ttree_->root(), retval->target_leaves,
+    collect_DAG_nodes_from_T_node(ttree->root(), retval->target_leaves,
                                   retval->target_nodes);
 
     // TODO: Note that these are non-binding requests, but this is the most
@@ -479,8 +479,8 @@ class DualTree {
     auto tree = global_tree.here();
     hpx_lco_delete_sync(tree->unif_count_);
 
-    global_tree.source_tree_.destroy();
-    global_tree.target_tree_.destroy();
+    tree->source_tree_.destroy();
+    tree->target_tree_.destroy();
     global_tree.destroy();
   }
 
@@ -644,13 +644,13 @@ class DualTree {
 
     {
       auto source_tree = tree->source_tree_.here();
-      *source_tree = new sourcetree_t{};
+      *source_tree = sourcetree_t{};
       source_tree->setupBasics(setup_done, tree->unif_level_);
     }
 
     {
       auto target_tree = tree->target_tree_.here();
-      *target_tree = new targettree_t{};
+      *target_tree = targettree_t{};
       target_tree->setupBasics(setup_done, tree->unif_level_);
     }
 
@@ -1189,7 +1189,7 @@ class DualTree {
       } else {
         ttree->initPointExchangeSameSAndT(tree->dim3_, tree->rank_map_,
                                           tree->unif_count_tar(), local_tcount,
-                                          local_offset_t, tree->domain_,
+                                          local_offset_t, tree->domain(),
                                           tree->refinement_limit_, p_t,
                                           stree.local());
       }

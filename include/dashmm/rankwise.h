@@ -103,7 +103,7 @@ public:
   /// has been unpinned, and would thus be invalid. Use with care.
   ///
   /// \returns - local version of the represented data
-  T *local() {return local_};
+  T *local() {return local_;};
 
   /// Typical dereferencing operations to allow for use of the RankLocal as
   /// if it were a pointer to the underlying type.

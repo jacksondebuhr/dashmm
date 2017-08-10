@@ -1,8 +1,10 @@
 THIS BRANCH TODO
 
-TODO: Clean up tree.h -- remove whatever possible from that into the evaluator
-      object. Break the file into multiple parts, Node, Tree, DualTree
-TODO: In tree, privatize anything possible
+TODO: check comments in node, tree and dualtree
+TODO: Clean up dualtree.h
+      remove whatever possible from that into the evaluator object.
+DONE: Break the file into multiple parts, Node, Tree, DualTree
+TODO: In node, tree and dualtree privatize anything possible
 
 TODO: The same is true everywhere I guess.
 
@@ -11,6 +13,7 @@ TODO: clean up code where possible
 TODO: Documentation clean up throughout
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
+TODO: Update the official documentation file that gets built into a pdf
 
 TODO: Should we explicitly enforce the singleton nature of Evaluator?
         (This is not a bad idea, but it can wait, as long as the docs warn

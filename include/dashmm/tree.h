@@ -87,7 +87,7 @@ class Tree {
   // TODO: I do not like this. See dualtree_t::create_DAG for the use case.
   // also dualtree_t::collect_DAG_nodes.
   // And dualtree_t::create_expansions_from_DAG
-  node_t root() {return root_;}
+  node_t *root() {return root_;}
 
   /// Setup some basic information during initial tree construction
   ///
@@ -99,7 +99,7 @@ class Tree {
   /// \param sync - the address of an LCO to use for synchronization
   /// \param unif_level - the uniform partitioning level
   void setupBasics(hpx_addr_t sync, int unif_level) {
-    sourcetree_t *thisarg = this;
+    tree_t *thisarg = this;
     hpx_call(HPX_HERE, setup_basics_, sync, &thisarg, &unif_level);
   }
 
@@ -355,7 +355,7 @@ class Tree {
                    int n_arrived,
                    const DomainGeometry *geo,
                    int thresh) {
-    sourcenode_t *node = &unif_grid_[n_idx];
+    node_t *node = &unif_grid_[n_idx];
     Point geo_pt = geo->low();
     double px = geo_pt.x();
     double py = geo_pt.y();
@@ -542,11 +542,9 @@ class Tree {
   }
 
 private:
-  // TODO: Decide if this works. Also, is it too wide open for other Tree
-  // types I don't intend? Is that even a worry since only DASHMM devs will
-  // look into this file?
-  template <typename Any>
-  friend class Tree<Source, Target, Any>;
+  // NOTE: One of these is superfluous
+  friend class Tree<Source, Target, Source>;
+  friend class Tree<Source, Target, Target>;
 
   friend class TreeRegistrar<Source, Target, Record>;
 

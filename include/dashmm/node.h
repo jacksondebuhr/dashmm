@@ -209,7 +209,7 @@ class Node {
                      double px, double py, double pz, double size,
                      int same_sandt) {
     node_t *thisarg = this;
-    hpx_call_when(when, partition_node_, sync,
+    hpx_call_when(when, HPX_HERE, partition_node_, sync,
                   &thisarg, &px, &py, &pz, &size, &threshold, &same_sandt);
   }
 
@@ -440,7 +440,7 @@ class Node {
     if (n->parent && n->parent->complete() != HPX_NULL) {
       hpx_call_when_with_continuation(n->complete_,
           n->parent->complete(), hpx_lco_set_action,
-          complete_, hpx_lco_delete_action,
+          n->complete_, hpx_lco_delete_action,
           nullptr, 0);
     }
 
@@ -509,7 +509,7 @@ class Node {
       for (int i = 0; i < 8; ++i) {
         if (stat[i]) {
           auto cparts = n->parts.slice(offset[i], stat[i]);
-          node_t *cnd = new node_t{n->idx.child(i), cparts, this};
+          node_t *cnd = new node_t{n->idx.child(i), cparts, n};
           n->child[i] = cnd;
           cnd->partition(HPX_NULL, threshold, px, py, pz, size, same_sandt);
         } else {
