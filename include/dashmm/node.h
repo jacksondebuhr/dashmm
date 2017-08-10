@@ -358,10 +358,10 @@ class Node {
   ///
   /// NOTE: This should be a safe recursion because the depth of the top
   /// part of the tree grows very slowly.
-  bool remove_downward_links(int limit, int level) {
+  bool removeDownwardLinks(int limit, int level) {
     if (level < limit) {
       for (int i = 0; i < 8; ++i) {
-        if (child[i] && child[i]->remove_downward_links(limit, level + 1)) {
+        if (child[i] && child[i]->removeDownwardLinks(limit, level + 1)) {
           child[i]->parent = nullptr; // Remove upward link
           child[i] = nullptr;         // Remove downward link
         }

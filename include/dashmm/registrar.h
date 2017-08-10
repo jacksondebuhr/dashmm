@@ -192,7 +192,7 @@ class TreeRegistrar {
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_ATTR_NONE,
                         tree_t::delete_tree_,
                         tree_t::delete_tree_handler,
-                        HPX_POINTER, HPX_INT, HPX_POINTER);
+                        HPX_ADDR, HPX_INT, HPX_POINTER);
     HPX_REGISTER_ACTION(HPX_DEFAULT, HPX_MARSHALLED,
                         tree_t::recv_node_,
                         tree_t::recv_node_handler,

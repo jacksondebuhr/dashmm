@@ -126,24 +126,6 @@ class DualTree {
   /// Return the refinement limit used to build the tree.
   int refinement_limit() const {return refinement_limit_;}
 
-  /// Return the uniform grid for the source tree.
-  sourcenode_t *unif_grid_source() {return source_tree_->unif_grid_;}
-
-  /// Return the uniform grid for the target tree.
-  targetnode_t *unif_grid_target() {return target_tree_->unif_grid_;}
-
-  /// Return the number of post-sorting sources.
-  size_t sorted_src_count() const {return source_tree_->sorted_.n();}
-
-  /// Return the number of post-sorting targets.
-  size_t sorted_tar_count() const {return target_tree_->sorted_.n();}
-
-  /// Return the sorted sources.
-  source_t *sorted_src() const {return source_tree_->sorted_.data();}
-
-  /// Return the sorted targets.
-  target_t *sorted_tar() const {return target_tree_->sorted_.data();}
-
   /// Return the method this object will use for DAG operations.
   const method_t &method() const {return method_;}
 
@@ -195,31 +177,23 @@ class DualTree {
     }
 
     if (search_source) {
-      return source_tree_->lookup_lco_addx(idx, op);
+      return source_tree_.here()->lookup_lco_addx(idx, op);
     } else {
-      return target_tree_->lookup_lco_addx(idx, op);
+      return target_tree_.here()->lookup_lco_addx(idx, op);
     }
   }
 
   /// Destroy any allocated memory associated with this DualTree.
   void clear_data() {
-    // Tell each tree to delete itself
     hpx_addr_t clear_done = hpx_lco_and_new(2);
     assert(clear_done != HPX_NULL);
-    hpx_call(HPX_HERE, sourcetree_t::delete_tree_, clear_done,
-             &source_tree_, &dim3_, &rank_map_);
-    hpx_call(HPX_HERE, targettree_t::delete_tree_, clear_done,
-             &target_tree_, &dim3_, &rank_map_);
+    sourcetree_t::delete_tree(clear_done, source_tree_, dim3_, rank_map_);
+    targettree_t::delete_tree(clear_done, target_tree_, dim3_, rank_map_);
     hpx_lco_wait(clear_done);
     hpx_lco_delete_sync(clear_done);
 
     // the unif counts
     delete [] unif_count_value_;
-
-    // then free the trees themselves
-    delete source_tree_;
-    delete target_tree_;
-
     delete [] rank_map_;
   }
 
@@ -237,8 +211,13 @@ class DualTree {
     assert(sdone != HPX_NULL);
 
     dualtree_t *thetree = this;
+    auto stree = source_tree_.here();
+    // TODO: I am not happy with this. We should not have to ask for the root
+    // from out here. But then what happens with apply? We do this simple thing
+    // for now, and when we pull this unrelated thing out, we can fix this.
+    sourcenode_t *narg = stree->root();
     hpx_call(HPX_HERE, source_apply_method_, HPX_NULL,
-             &thetree, &source_tree_->root_, &sdone);
+             &thetree, &narg, &sdone);
 
     hpx_lco_wait(sdone);
     hpx_lco_delete_sync(sdone);
@@ -248,8 +227,12 @@ class DualTree {
     assert(tdone != HPX_NULL);
 
     std::vector<sourcenode_t *> *consider = new std::vector<sourcenode_t *>{};
-    consider->push_back(source_tree_->root_);
-    targetnode_t *trgaddx = target_tree_->root_;
+    consider->push_back(narg);
+    auto ttree = target_tree_.here();
+    // TODO: I am not happy with this. We should not have to ask for the root
+    // from out here. But then what happens with apply? We do this simple thing
+    // for now, and when we pull this unrelated thing out, we can fix this.
+    targetnode_t *trgaddx = ttree_->root_;
     hpx_call(HPX_HERE, target_apply_method_, HPX_NULL,
              &thetree, &trgaddx, &consider, &same_sandt_, &tdone);
 
@@ -273,9 +256,13 @@ class DualTree {
   DAG *collect_DAG_nodes() {
     DAG *retval = new DAG{};
 
-    collect_DAG_nodes_from_S_node(source_tree_->root_, retval->source_leaves,
+    auto stree = source_tree_.here();
+    auto ttree = target_tree_.here();
+
+    // TODO: same complaint with root() here...
+    collect_DAG_nodes_from_S_node(stree_->root(), retval->source_leaves,
                                   retval->source_nodes);
-    collect_DAG_nodes_from_T_node(target_tree_->root_, retval->target_leaves,
+    collect_DAG_nodes_from_T_node(ttree_->root(), retval->target_leaves,
                                   retval->target_nodes);
 
     // TODO: Note that these are non-binding requests, but this is the most
@@ -299,11 +286,12 @@ class DualTree {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
 
+    // TODO: same complaint about root()...
     dualtree_t *argthis = this;
-    sourcenode_t *srcaddx = source_tree_->root_;
+    sourcenode_t *srcaddx = source_tree_.here()->root();
     hpx_call(HPX_HERE, create_S_expansions_from_DAG_, HPX_NULL,
              &done, &argthis, &srcaddx, &rwtree);
-    targetnode_t *trgaddx = target_tree_->root_;
+    targetnode_t *trgaddx = target_tree_.here()->root();
     hpx_call(HPX_HERE, create_T_expansions_from_DAG_, HPX_NULL,
              &done, &argthis, &trgaddx, &rwtree);
 
@@ -491,6 +479,8 @@ class DualTree {
     auto tree = global_tree.here();
     hpx_lco_delete_sync(tree->unif_count_);
 
+    global_tree.source_tree_.destroy();
+    global_tree.target_tree_.destroy();
     global_tree.destroy();
   }
 
@@ -1127,24 +1117,13 @@ class DualTree {
   /// get some parallelism here. Probably the easiest is to do this work
   /// as its own task.
   void prune_topnodes() {
-    // Go over uniform level and remove link to any no particle nodes
     int *s_counts = unif_count_src();
-    int *t_counts = unif_count_tar();
-    sourcenode_t *s_nodes = source_tree_->unif_grid_;
-    targetnode_t *t_nodes = target_tree_->unif_grid_;
-    for (int i = 0; i < dim3_; ++i) {
-      if (s_counts[i] == 0) {
-        s_nodes[i].parent->remove_child(&s_nodes[i]);
-      }
-      if (t_counts[i] == 0) {
-        t_nodes[i].parent->remove_child(&t_nodes[i]);
-      }
-    }
+    auto stree = source_tree_.here();
+    stree->pruneTopnodes(s_counts, dim3_, unif_level_);
 
-    // Now descend from above and remove any empty nodes, stopping at
-    // unif_level_ - 1
-    source_tree_->root_->remove_downward_links(unif_level_ - 1, 0);
-    target_tree_->root_->remove_downward_links(unif_level_ - 1, 0);
+    int *t_counts = unif_count_tar();
+    auto ttree = target_tree_.here();
+    ttree->pruneTopnodes(t_counts, dim3_, unif_level_);
   }
 
   /// The action responsible for dual tree partitioning
@@ -1166,6 +1145,9 @@ class DualTree {
 
     Array<source_t> sources{sources_gas};
     Array<target_t> targets{targets_gas};
+
+    auto stree = tree->source_tree_.here();
+    auto ttree = tree->target_tree_.here();
 
     {
       sourceref_t src_ref = sources.ref();
@@ -1194,13 +1176,11 @@ class DualTree {
                                                 tree->unif_level_);
 
       // Exchange points
-      auto stree = tree->source_tree_.here();
       stree->initPointExchange(tree->dim3_, tree->rank_map_,
                                tree->unif_count_src(), local_scount,
                                local_offset_s, tree->domain_,
                                tree->refinement_limit_, p_s);
 
-      auto ttree = tree->target_tree_.here();
       if (!tree->same_sandt_) {
         ttree->initPointExchange(tree->dim3_, tree->rank_map_,
                                  tree->unif_count_tar(), local_tcount,
@@ -1224,11 +1204,6 @@ class DualTree {
         }
       }
 
-      // These are still used below, so we need to work out how to remove
-      // those uses.
-      sourcenode_t *ns = tree->source_tree_->unif_grid_;
-      targetnode_t *nt = tree->target_tree_->unif_grid_;
-
       hpx_addr_t dual_tree_complete = hpx_lco_and_new(2 * tree->dim3_);
       assert(dual_tree_complete != HPX_NULL);
 
@@ -1237,13 +1212,13 @@ class DualTree {
           if (*(tree->unif_count_src(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
-            stree->sendNode(dual_tree_complete, i, tree->source_tree_);
+            stree->sendNode(dual_tree_complete, i, tree->source_tree_.data());
           }
 
           if (*(tree->unif_count_tar(i)) == 0) {
             hpx_lco_and_set(dual_tree_complete, HPX_NULL);
           } else {
-            ttree->sendNode(dual_tree_complete, i, tree->target_tree_);
+            ttree->sendNode(dual_tree_complete, i, tree->target_tree_.data());
           }
         } else {
           if (*(tree->unif_count_src(i)) == 0) {
@@ -1280,12 +1255,12 @@ class DualTree {
     }
 
     // Replace segment in the array
-    source_t *old_src_data = sources.replace(tree->source_tree_->sorted_);
+    source_t *old_src_data = sources.replace(stree->sorted());
     if (old_src_data != nullptr) {
       delete [] old_src_data;
     }
     if (!tree->same_sandt_) {
-      target_t *old_tar_data = targets.replace(tree->target_tree_->sorted_);
+      target_t *old_tar_data = targets.replace(ttree->sorted());
       if (old_tar_data != nullptr) {
         delete [] old_tar_data;
       }
@@ -1621,10 +1596,10 @@ class DualTree {
 
     // Detect if the edges have unknown target addresses and lookup the
     // correct address
+    auto ttree = local_tree->target_tree_.here();
     for (size_t i = 0; i < n_edges; ++i) {
       if (edges[i].target == HPX_NULL) {
-        edges[i].target = local_tree->target_tree_->lookup_lco_addx(
-                                edges[i].idx, edges[i].op);
+        edges[i].target = ttree->lookup_lco_addx(edges[i].idx, edges[i].op);
       }
     }
 
@@ -1937,9 +1912,7 @@ class DualTree {
   method_t method_;           /// method used during DAG discovery
 
   RankWise<sourcetree_t> source_tree_;
-  //sourcetree_t *source_tree_; /// The source tree
   RankWise<targettree_t> target_tree_;
-  //targettree_t *target_tree_; /// The target tree
 
   hpx_addr_t source_gas;      /// the source array meta data
   hpx_addr_t target_gas;      /// the target array meta data

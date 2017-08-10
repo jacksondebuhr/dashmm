@@ -84,6 +84,11 @@ class Tree {
 
   arrayref_t sorted() const {return sorted_;}
 
+  // TODO: I do not like this. See dualtree_t::create_DAG for the use case.
+  // also dualtree_t::collect_DAG_nodes.
+  // And dualtree_t::create_expansions_from_DAG
+  node_t root() {return root_;}
+
   /// Setup some basic information during initial tree construction
   ///
   /// This action is the target of a broadcast. The basic information about
@@ -98,51 +103,22 @@ class Tree {
     hpx_call(HPX_HERE, setup_basics_, sync, &thisarg, &unif_level);
   }
 
-  /// Destroy allocated data for this tree.
+  /// Delete the data stored in this tree
   ///
-  /// This will delete the local branches of the tree as well as destroying
-  /// any locks allocated for the uniform grid, and will free the remote
-  /// branches.
+  /// This is an asynchronous operation. It will return after the parecel is
+  /// sent. To track completion of the action, provided a non-HPX_NULL @p sync
+  /// argument to this method.
   ///
-  /// \param tree - the tree on which to act
-  /// \param ndim - the size of the uniform grid
-  /// \param rmap - the rank map of the nodes
-  static int delete_tree_handler(tree_t *tree, int ndim, int *rmap) {
-    // NOTE: The difference here is that there are two different allocation
-    // schemes for the nodes.
-
-    int rank = hpx_get_my_rank();
-    for (int i = 0; i < ndim; ++i) {
-      if (rmap[i] == rank) {
-        node_t *curr = &tree->unif_grid_[i];
-        curr->delete_lock();
-
-        for (int j = 0; j < 8; ++j) {
-          if (curr->child[j]) {
-            node_t::destroy_branch(curr->child[j]);
-          }
-        }
-
-        hpx_lco_delete_sync(curr->complete());
-      } else {
-        node_t *curr = &tree->unif_grid_[i];
-        curr->delete_lock();
-
-        for (int j = 0; j < 8; ++j) {
-          node_t *child = curr->child[j];
-          if (child) {
-            delete [] child;
-            break;
-          }
-        }
-      }
-    }
-
-    delete [] tree->root_;
-
-    hpx_lco_delete_sync(tree->unif_done_);
-
-    return HPX_SUCCESS;
+  /// \param sync - the synchronization LCO
+  /// \param global_tree - the global Tree
+  /// \param ndim - the number of uniform level nodes
+  /// \param rmap - the mapping from those nodes to owning rank
+  static void delete_tree(hpx_addr_t sync,
+                          RankWise<tree_t> global_tree,
+                          int ndim,
+                          int *rmap) {
+    hpx_addr_t targ = global_tree.data();
+    hpx_call(HPX_HERE, delete_tree_, sync, &targ, &ndim, &rmap);
   }
 
   /// Assign points to the uniform grid.
@@ -539,10 +515,31 @@ class Tree {
     hpx_lco_wait(unif_done_);
   }
 
+  /// Returns the uniform refinement level node's completion LCO
   hpx_addr_t unifNodeCompletion(int i) {
     return unif_grid_[i].complete();
   }
 
+  /// Prune unused topnodes from the tree
+  ///
+  /// Topnodes are those at the uniform refinement level or lower. This will
+  /// remove the links from the root to these nodes so that various traversals
+  /// will not visit nodes with no sources or targets, and will thus save
+  /// some overhead of HPX-5 actions that do nothing.
+  ///
+  /// \param counts - the counts per node of the unif level nodes
+  /// \param dim3 - the number of uniform level nodes
+  /// \param unif_level - the uniform level in the tree
+  void pruneTopnodes(const int *counts, int dim3, int unif_level) {
+    for (int i = 0; i < dim3; ++i) {
+      node_t *curr = &unif_grid_[i];
+      if (counts[i] == 0) {
+        curr->parent->remove_child(curr);
+      }
+    }
+
+    root_->removeDownwardLinks(unif_level - 1, 0);
+  }
 
 private:
   // TODO: Decide if this works. Also, is it too wide open for other Tree
@@ -864,6 +861,56 @@ private:
     curr->extract(branch, tree, n_nodes);
 
     hpx_lco_and_set_num(curr->complete(), 8, HPX_NULL);
+
+    return HPX_SUCCESS;
+  }
+
+  /// Destroy allocated data for this tree.
+  ///
+  /// This will delete the local branches of the tree as well as destroying
+  /// any locks allocated for the uniform grid, and will free the remote
+  /// branches.
+  ///
+  /// \param tree - the tree on which to act
+  /// \param ndim - the size of the uniform grid
+  /// \param rmap - the rank map of the nodes
+  static int delete_tree_handler(hpx_addr_t tree, int ndim, int *rmap) {
+    RankWise<tree_t> global_tree{tree};
+    auto local_tree = global_tree.here();
+
+    // NOTE: The difference here is that there are two different allocation
+    // schemes for the nodes.
+
+    int rank = hpx_get_my_rank();
+    for (int i = 0; i < ndim; ++i) {
+      if (rmap[i] == rank) {
+        node_t *curr = &local_tree->unif_grid_[i];
+        curr->delete_lock();
+
+        for (int j = 0; j < 8; ++j) {
+          if (curr->child[j]) {
+            node_t::destroy_branch(curr->child[j]);
+          }
+        }
+
+        hpx_lco_delete_sync(curr->complete());
+      } else {
+        node_t *curr = &local_tree->unif_grid_[i];
+        curr->delete_lock();
+
+        for (int j = 0; j < 8; ++j) {
+          node_t *child = curr->child[j];
+          if (child) {
+            delete [] child;
+            break;
+          }
+        }
+      }
+    }
+
+    delete [] local_tree->root_;
+
+    hpx_lco_delete_sync(local_tree->unif_done_);
 
     return HPX_SUCCESS;
   }
