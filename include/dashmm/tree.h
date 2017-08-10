@@ -87,6 +87,7 @@ class Tree {
   // TODO: I do not like this. See dualtree_t::create_DAG for the use case.
   // also dualtree_t::collect_DAG_nodes.
   // And dualtree_t::create_expansions_from_DAG
+  /// Return the root node of this Tree
   node_t *root() {return root_;}
 
   /// Setup some basic information during initial tree construction
@@ -129,6 +130,11 @@ class Tree {
   /// computing the distribution of the sources and targets during tree
   /// construction.
   ///
+  /// This spawns an asynchronous action. To detect the completion of that
+  /// action, provide a @p sync parameter that is not HPX_NULL. The provided
+  /// LCO will be set when the action is complete.
+  ///
+  /// \param sync - synchronization LCO to detect completion of action
   /// \param P - the records
   /// \param npts - the number of records
   /// \param geo - the overall domain geometry
@@ -150,6 +156,11 @@ class Tree {
   ///
   /// This will rearrange the particles into their bin order.
   ///
+  /// This spawns an asynchronous action. To detect the completion of that
+  /// action, provide a @p sync parameter that is not HPX_NULL. The provided
+  /// LCO will be set when the action is complete.
+  ///
+  /// \param sync - synchronization LCO to detect completion of action
   /// \param p_in - the input records; will be sorted
   /// \param npts - the number of records
   /// \param dim3 - the size of the uniform grid
@@ -266,7 +277,6 @@ class Tree {
   /// stored in the sorted array. Also, this allocates the segment of memory
   /// that will store the sorted data.
   ///
-  /// \param tree - the tree object
   /// \param dim3 - the number of uniform nodes
   /// \param rank_map - the node->rank map for the uniform nodes
   /// \param global_count - the global counts in each node of the uniform grid
@@ -276,7 +286,6 @@ class Tree {
   /// \param geo - the domain geometry for the tree
   /// \param threshold - the partitioning threshold for the tree
   /// \param temp - the local point data
-  /// \param n - the uniform grid nodes
   /// \param source_tree - the source tree
   void initPointExchangeSameSAndT(int dim3,
                                   int *rank_map,
@@ -425,6 +434,8 @@ class Tree {
   /// \parma z - the z component
   /// \param max - the max value of any component at the uniform refinement
   ///              level. This will be 2^unif_level
+  ///
+  /// \returns - the simple key
   static uint64_t simple_key(unsigned x, unsigned y, unsigned z, unsigned max) {
     return x + y * max + z * max * max;
   }
@@ -511,12 +522,12 @@ class Tree {
   /// Wait for the uniform level work to be finished
   ///
   /// This call will block the calling HPX-5 thread.
-  void waitForUnifDone() {
+  void waitForUnifDone() const {
     hpx_lco_wait(unif_done_);
   }
 
   /// Returns the uniform refinement level node's completion LCO
-  hpx_addr_t unifNodeCompletion(int i) {
+  hpx_addr_t unifNodeCompletion(int i) const {
     return unif_grid_[i].complete();
   }
 
@@ -542,7 +553,8 @@ class Tree {
   }
 
 private:
-  // NOTE: One of these is superfluous
+  // NOTE: One of these is superfluous; likely some metaprogramming magic could
+  //  remove the extraneous one.
   friend class Tree<Source, Target, Source>;
   friend class Tree<Source, Target, Target>;
 
@@ -557,6 +569,8 @@ private:
   ///
   /// \param tree - the address of the tree on which to act
   /// \param unif_level - the uniform partitioning level
+  ///
+  /// \returns - HPX_SUCCESS
   static int setup_basics_handler(tree_t *tree, int unif_level) {
     tree->unif_done_ = hpx_lco_and_new(1);
     assert(tree->unif_done_ != HPX_NULL);
@@ -628,9 +642,11 @@ private:
   /// \param count [out] - the number of points per uniform grid node
   ///
   /// \return HPX_SUCCESS
-  static int assign_points_to_unif_grid_handler(const record_t *P, int npts,
+  static int assign_points_to_unif_grid_handler(const record_t *P,
+                                                int npts,
                                                 const DomainGeometry *geo,
-                                                int unif_level, int *gid,
+                                                int unif_level,
+                                                int *gid,
                                                 int *count) {
     Point corner = geo->low();
     double scale = 1.0 / geo->size();
@@ -729,10 +745,15 @@ private:
   /// \param thresh - the partitioning threshold
   ///
   /// \returns - HPX_SUCCESS
-  static int merge_points_handler(record_t *temp, node_t *n, int n_arrived,
-                                  double px, double py, double pz, double size,
+  static int merge_points_handler(record_t *temp,
+                                  node_t *n,
+                                  int n_arrived,
+                                  double px,
+                                  double py,
+                                  double pz,
+                                  double size,
                                   int thresh) {
-    // Note: all the pointers are local to the calling rank.
+    // NOTE: all the pointers are local to the calling rank.
     n->lock();
     size_t first = n->first();
     record_t *p = n->parts.data();
@@ -872,6 +893,8 @@ private:
   /// \param tree - the tree on which to act
   /// \param ndim - the size of the uniform grid
   /// \param rmap - the rank map of the nodes
+  ///
+  /// \returns - HPX_SUCCESS
   static int delete_tree_handler(hpx_addr_t tree, int ndim, int *rmap) {
     RankWise<tree_t> global_tree{tree};
     auto local_tree = global_tree.here();

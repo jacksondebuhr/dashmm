@@ -90,7 +90,11 @@ class Node {
   /// \param parts - the particles inside the volume represented by this node
   /// \param parent - the parent of this node
   Node(Index index, arrayref_t parts, node_t *parent)
-      : idx{index}, parts{parts}, parent{parent}, dag{this, index}, first_{0} {
+      : idx{index},
+        parts{parts},
+        parent{parent},
+        dag{this, index},
+        first_{0} {
     for (int i = 0; i < 8; ++i) {
       child[i] = nullptr;
     }
@@ -183,8 +187,12 @@ class Node {
   /// \param pz - z position of low corner of domain
   /// \param size - size of domain
   /// \param same_sandt - nonzero if this is a case where S==T
-  void partition(hpx_addr_t sync, int threshold,
-                 double px, double py, double pz, double size,
+  void partition(hpx_addr_t sync,
+                 int threshold,
+                 double px,
+                 double py,
+                 double pz,
+                 double size,
                  int same_sandt) {
     node_t *thisarg = this;
     hpx_call(HPX_HERE, partition_node_, sync,
@@ -205,8 +213,13 @@ class Node {
   /// \param pz - z position of low corner of domain
   /// \param size - size of domain
   /// \param same_sandt - nonzero if this is a case where S==T
-  void partitionWhen(hpx_addr_t when, hpx_addr_t sync, int threshold,
-                     double px, double py, double pz, double size,
+  void partitionWhen(hpx_addr_t when,
+                     hpx_addr_t sync,
+                     int threshold,
+                     double px,
+                     double py,
+                     double pz,
+                     double size,
                      int same_sandt) {
     node_t *thisarg = this;
     hpx_call_when(when, HPX_HERE, partition_node_, sync,
@@ -219,8 +232,8 @@ class Node {
   ///
   /// \returns - the number of nodes in the branch below this node
   int n_descendants() const {
-    // NOTE: the implementation is not recursive because HPX-5 can work with
-    // small stack sizes.
+    // NOTE: the implementation is not recursive because HPX-5 has a
+    // small default stack size.
     std::vector<const node_t *> V{this};
     int count = 0;
     while (!V.empty()) {
@@ -357,7 +370,7 @@ class Node {
   /// completed for this node.
   ///
   /// NOTE: This should be a safe recursion because the depth of the top
-  /// part of the tree grows very slowly.
+  /// part of the tree grows slowly with the number of ranks.
   bool removeDownwardLinks(int limit, int level) {
     if (level < limit) {
       for (int i = 0; i < 8; ++i) {
@@ -397,6 +410,7 @@ class Node {
 
 
   // TODO: These should likely all be privatized.
+  //  This may have to wait on pulling stuff out of DualTree
   Index idx;                      /// index of the node
   arrayref_t parts;               /// segment for this node
   node_t *parent;                 /// parent node

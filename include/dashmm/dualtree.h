@@ -200,6 +200,7 @@ class DualTree {
   /// Return the rank owning the given unif grid node
   int rank_of_unif_grid(int idx) const {return rank_map_[idx];}
 
+  // TODO: Get this out of DualTree
   /// Create the DAG for this tree using the method specified for this object.
   ///
   /// This will allocate and collect the DAG nodes into the returned object.
@@ -243,6 +244,7 @@ class DualTree {
     return retval;
   }
 
+  // TODO: Get this out of DualTree
   /// Traverse the tree and collect the DAG nodes
   ///
   /// This will collect the nodes of the DAG into three groups: the source
@@ -275,6 +277,7 @@ class DualTree {
     return retval;
   }
 
+  // TODO: Get this out of DualTree
   /// Create the LCOs from the DAG
   ///
   /// This will traverse the source and target tree creating any needed
@@ -299,6 +302,7 @@ class DualTree {
     hpx_lco_delete_sync(done);
   }
 
+  // TODO: Get this out of DualTree
   /// Sets up termination detection for a DASHMM evaluation
   ///
   /// This is an asynchronous operation. The returned LCO becomes the
@@ -327,6 +331,7 @@ class DualTree {
     return retval;
   }
 
+  // TODO: Get this out of DualTree
   /// Initiate the DAG evaluation
   ///
   /// This starts the work of the evalution by starting the S->* work at the
@@ -377,6 +382,7 @@ class DualTree {
     }
   }
 
+  // TODO: Get this out of DualTree
   /// Destroys the LCOs associated with the DAG
   ///
   /// This is a synchronous operation. This destroys not only the expansion
@@ -488,6 +494,7 @@ class DualTree {
  private:
   friend class DualTreeRegistrar<Source, Target, Expansion, Method>;
 
+  // TODO: Get the out of DualTree
   /// Edge record for DAG instigation
   struct DAGInstigationRecord {
     Operation op;
@@ -504,6 +511,7 @@ class DualTree {
   /// \param sources_gas - the global address of the source data
   /// \param targets_gas - the global address of the target data
   /// \param domain_geometry - a reduction LCO to which the local domain is sent
+  /// \param same_sandt - is this an S==T DualTree
   ///
   /// \returns HPX_SUCCESS
   static int set_domain_geometry_handler(hpx_addr_t sources_gas,
@@ -565,7 +573,8 @@ class DualTree {
   /// \param lhs - the LCO data
   /// \param rhs - the set data
   /// \param UNUSED - the size of the set data
-  static void domain_geometry_op_handler(double *lhs, double *rhs,
+  static void domain_geometry_op_handler(double *lhs,
+                                         double *rhs,
                                          size_t UNUSED) {
     lhs[0] = fmin(lhs[0], rhs[0]);
     lhs[1] = fmax(lhs[1], rhs[1]);
@@ -617,13 +626,19 @@ class DualTree {
   /// \param same_sandt - is S == T for this tree
   /// \param source_gas - the source records
   /// \param target_gas - the target records
+  /// \param stree - the global address of the source tree
+  /// \param ttree - the global address of the target tree
   ///
   /// \returns - HPX_SUCCESS
-  static int init_partition_handler(hpx_addr_t rwdata, hpx_addr_t count,
-                                    int limit, hpx_addr_t domain_geometry,
-                                    int same_sandt, hpx_addr_t source_gas,
+  static int init_partition_handler(hpx_addr_t rwdata,
+                                    hpx_addr_t count,
+                                    int limit,
+                                    hpx_addr_t domain_geometry,
+                                    int same_sandt,
+                                    hpx_addr_t source_gas,
                                     hpx_addr_t target_gas,
-                                    hpx_addr_t stree, hpx_addr_t ttree) {
+                                    hpx_addr_t stree,
+                                    hpx_addr_t ttree) {
     RankWise<dualtree_t> global_tree{rwdata};
     auto tree = global_tree.here();
 
@@ -681,6 +696,8 @@ class DualTree {
   /// \param threshold - the partitioning threshold
   /// \param domain_geometry - an LCO into which the domain is reduced
   /// \param same_sandt - is S == T for this tree
+  /// \param sources - the source Array
+  /// \param targets - the target Array
   ///
   /// \returns - the Dual Tree
   static RankWise<dualtree_t> setup_basic_data(int threshold,
@@ -768,9 +785,13 @@ class DualTree {
   ///                         local offsets for the targets
   ///
   /// \returns - the local counts per uniform grid node
-  static int *sort_local_points(DualTree *tree, source_t *p_s,
-                                int n_sources, target_t *p_t, int n_targets,
-                                int **local_offset_s, int **local_offset_t) {
+  static int *sort_local_points(DualTree *tree,
+                                source_t *p_s,
+                                int n_sources,
+                                target_t *p_t,
+                                int n_targets,
+                                int **local_offset_s,
+                                int **local_offset_t) {
     int *local_count = new int[tree->dim3_ * 2]();
     int *local_scount = local_count;
     int *local_tcount = &local_count[tree->dim3_];
@@ -982,10 +1003,17 @@ class DualTree {
   /// \param smeta - the source meta data global address
   /// \param tmeta - the target meta data global address
   /// \param rwaddr - the global address of the dual tree
-  static int send_points_handler(int rank, int *count_s, int *count_t,
-                                 int *offset_s, int *offset_t,
-                                 source_t *sources, target_t *targets,
-                                 hpx_addr_t smeta, hpx_addr_t tmeta,
+  ///
+  /// \returns - HPX_SUCCESS
+  static int send_points_handler(int rank,
+                                 int *count_s,
+                                 int *count_t,
+                                 int *offset_s,
+                                 int *offset_t,
+                                 source_t *sources,
+                                 target_t *targets,
+                                 hpx_addr_t smeta,
+                                 hpx_addr_t tmeta,
                                  hpx_addr_t rwaddr) {
     RankWise<dualtree_t> global_tree{rwaddr};
     auto local_tree = global_tree.here();
@@ -1284,6 +1312,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Collect DAG nodes from source Tree Nodes
   ///
   /// \param root - tree node
@@ -1300,6 +1329,7 @@ class DualTree {
     root->dag.collect_DAG_nodes(sources, internals);
   }
 
+  // TODO: Get this out of DualTree
   /// Collect DAG nodes from target Tree Nodes
   ///
   /// \param root - tree node
@@ -1316,6 +1346,7 @@ class DualTree {
     root->dag.collect_DAG_nodes(targets, internals);
   }
 
+  /// TODO: Get this out of DualTree
   /// Action to create LCOs from the DAG
   ///
   /// This will walk through the source tree and create the Expansion LCOs
@@ -1382,6 +1413,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to create LCOs from the DAG
   ///
   /// This will walk through the target tree and create the Expansion LCOs
@@ -1456,6 +1488,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to start DAG evaluation work
   ///
   /// This is a recursove spawn through the source tree to begin the work of
@@ -1467,7 +1500,8 @@ class DualTree {
   /// \param last - the last DAGNode in consideration
   ///
   /// \returns - HPX_SUCCESS
-  static int instigate_dag_eval_handler(hpx_addr_t rwtree, DAGNode **first,
+  static int instigate_dag_eval_handler(hpx_addr_t rwtree,
+                                        DAGNode **first,
                                         DAGNode **last) {
     RankWise<dualtree_t> global_tree{rwtree};
     auto tree = global_tree.here();
@@ -1561,6 +1595,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action on remote side for DAG instigation
   ///
   /// Similar to the out edges for the Expansion LCOs, the edges out of the
@@ -1611,6 +1646,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Perform the actual work of DAG instigation
   ///
   /// \param n_src - the number of sources
@@ -1618,7 +1654,8 @@ class DualTree {
   /// \param domain - the domain geometry
   /// \param n_edges - the number of edges to process
   /// \param edge - the edge data
-  static void instigate_dag_eval_work(size_t n_src, Source *sources,
+  static void instigate_dag_eval_work(size_t n_src,
+                                      Source *sources,
                                       DomainGeometry &domain,
                                       size_t n_edges,
                                       DAGInstigationRecord *edge) {
@@ -1665,6 +1702,7 @@ class DualTree {
     }
   }
 
+  // TODO: Get this out of DualTree
   /// Action to apply Method::aggregate
   ///
   /// This is an action that is called dependent on the children of this
@@ -1693,6 +1731,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to apply Method::generate
   ///
   /// This is a recursive spawn through the source tree.
@@ -1702,7 +1741,8 @@ class DualTree {
   /// \param done - LCO to signal when application of the method is complete
   ///
   /// \returns - HPX_SUCCESS
-  static int source_apply_method_handler(dualtree_t *tree, sourcenode_t *node,
+  static int source_apply_method_handler(dualtree_t *tree,
+                                         sourcenode_t *node,
                                          hpx_addr_t done) {
     int n_children = node->n_children();
     if (n_children == 0) {
@@ -1741,6 +1781,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to apply Method::inherit and Method::process
   ///
   /// This is a parallel spawn through the tree to apply the method to the
@@ -1753,9 +1794,11 @@ class DualTree {
   /// \param done - LCO to signal with completion
   ///
   /// \returns - HPX_SUCCESS
-  static int target_apply_method_handler(dualtree_t *tree, targetnode_t *node,
+  static int target_apply_method_handler(dualtree_t *tree,
+                                         targetnode_t *node,
                                          std::vector<sourcenode_t *> *consider,
-                                         int same_sandt, hpx_addr_t done) {
+                                         int same_sandt,
+                                         hpx_addr_t done) {
     bool refine = false;
     if (node->idx.level() < tree->unif_level_) {
       refine = true;
@@ -1809,6 +1852,7 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to set up termination detection for the DAG evaluation
   ///
   /// \param done - LCO for termination detection
@@ -1870,13 +1914,16 @@ class DualTree {
     return HPX_SUCCESS;
   }
 
+  // TODO: Get this out of DualTree
   /// Action to destroy the DAG LCOs
   ///
   /// \param nodes - the DAG nodes
   /// \param n_nodes - the number of nodes
+  /// \param type - nonzero for TargetLCO, zero for ExpansionLCO
   ///
   /// \returns - HPX_SUCCESS
-  static int destroy_DAG_LCOs_handler(DAGNode **nodes, size_t n_nodes,
+  static int destroy_DAG_LCOs_handler(DAGNode **nodes,
+                                      size_t n_nodes,
                                       int type) {
     int myrank = hpx_get_my_rank();
     for (size_t i = 0; i < n_nodes; ++i) {

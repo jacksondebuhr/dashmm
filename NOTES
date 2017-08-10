@@ -1,11 +1,13 @@
 THIS BRANCH TODO
 
-TODO: check comments in node, tree and dualtree
+DONE: check comments in node, tree and dualtree
+DONE: Break the file into multiple parts, Node, Tree, DualTree
+
 TODO: Clean up dualtree.h
       remove whatever possible from that into the evaluator object.
-DONE: Break the file into multiple parts, Node, Tree, DualTree
+      ---> Would that remove the Expansion and Method template arguments?
+           That would be nice.
 TODO: In node, tree and dualtree privatize anything possible
-
 TODO: The same is true everywhere I guess.
 
 TODO: Update code comments
