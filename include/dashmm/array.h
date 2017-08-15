@@ -625,9 +625,11 @@ class Array {
     ArrayMetaData<T> *local{nullptr};
     assert(hpx_gas_try_pin(global, (void **)&local));
 
-    if (local->data != HPX_NULL) {
+    if (local->data != nullptr) {
       delete [] local->data;
     }
+
+    delete local->manager;
 
     hpx_gas_unpin(global);
 

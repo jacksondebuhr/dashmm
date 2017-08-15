@@ -1,5 +1,43 @@
 THIS BRANCH TODO
 
+DONE: check comments in node, tree and dualtree
+DONE: Break the file into multiple parts, Node, Tree, DualTree
+
+TODO: Clean up dualtree.h
+      remove whatever possible from that into the evaluator object.
+      ---> Would that remove the Expansion and Method template arguments?
+           That would be nice.
+TODO: In node, tree and dualtree privatize anything possible
+TODO: The same is true everywhere I guess.
+
+TODO: Update code comments
+TODO: clean up code where possible
+TODO: Documentation clean up throughout
+    - be sure to be clear about routines callable from HPX or not.
+    - actually build the documentation with DoxyGen to see if it is done
+TODO: Update the official documentation file that gets built into a pdf
+
+TODO: Should we explicitly enforce the singleton nature of Evaluator?
+        (This is not a bad idea, but it can wait, as long as the docs warn
+         users.)
+      AT THE VERY least, just decide if this should happen. If not, that's fine
+      and remove this from the list.
+
+TODO: should we put all the DAG stuff into a namespace DAG? So
+      dashmm::dag::Edge and so on. Extending this, should we do the same thing
+      for other subsystems?
+        This would be okay, but what would DAG turn into? dag::DAG? That's
+        pretty goofy...
+
+TODO: Should we use exceptions in the main interface to return errors? This is
+  probably cleaner. the catch is that I would need to work out what happens
+  when I emit an exception in an HPX action.
+
+TODO: Change distropolicy_t to work like the serializer does now.
+
+TODO: Make stuff sent to expansion_t const where possible.
+
+
 
 ==========================================
 Things that likely would not break the API
@@ -33,14 +71,15 @@ TODO: From tree.h line 2240
     // local segments unpinned. src_data and trg_data will unpin the segment
     // when the scope we introduce here is closed. Perhaps add unpin(), but
     // that detracts from the RAII nature of the current ArrayData object.
-TODO: Clean up tree.h -- remove whatever possible from that into the evaluator
-      object. Break the file into multiple parts, Node, Tree, DualTree
 
 
 Related to REU Work
 -----------------------
 TODO: Test Drake's other ideas and code for the distribution. Merge the best
       into dev-v2.
+      ---> probably make the unif node distribution all be classes that derive
+           from some abstract base. And then let the user supply an instance
+           that they want to use, and have some suitable default.
 TODO: Start to isolate backend inside DASHMM. Integrate BARIUM
 
 
@@ -48,10 +87,6 @@ Software Engineering/Good Practice Related
 ------------------------------------------
 TODO: Update INSTALL for the fact of cmake
 TODO: Work out the cpack stuff for the build system
-TODO: Update code comments
-TODO: clean up code where possible
-TODO: In tree, privatize anything possible
-TODO: The same is true everywhere I guess.
 TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
       to do about this.
           Basically, leave it better than you found it.
@@ -60,11 +95,7 @@ TODO: We are pretty inconsistent about the use of int vs size_t. Work out what
           integers for the accuracy.
 TODO: create standard regression and performance testing script to determine
       quality of a build.
-TODO: Documentation clean up throughout
-    - be sure to be clear about routines callable from HPX or not.
-    - actually build the documentation with DoxyGen to see if it is done
 TODO: Finish interface
-    - NOTE: this is not a vital thing to accomplish for 1.0.0
     - Make it so that an advanced user could call all the needed stuff directly
       from an HPX thread. <----- THIS ONE MAY BE MORE IMPORTANT THAN IT WAS
     - As a corollary to that, add assertions to routines that have
@@ -76,9 +107,6 @@ TODO: Another idea from Bo: Store the edges in one place and then just index
       into that. Cuts down on the representation by quite a bit.
 TODO: FORTRAN skeleten Expansion. Somehow link to a user's existing FORTRAN
       operations.
-TODO: Should we explicitly enforce the singleton nature of Evaluator?
-        (This is not a bad idea, but it can wait, as long as the docs warn
-         users.)
 
 ========================================
 Things that definitely would break the API
@@ -89,11 +117,6 @@ TODO: Make the way that Expansions manage their data not suck as much as it
       all of this, and it will be easy for a user to muck it up.
 TODO: ViewSet is not something I particularly like. See if there is a way to
   make this less awful. (This is basically the same as above)
-TODO: should we put all the DAG stuff into a namespace DAG? So
-      dashmm::dag::Edge and so on. Extending this, should we do the same thing
-      for other subsystems?
-        This would be okay, but what would DAG turn into? dag::DAG? That's
-        pretty goofy...
 TODO: Work out if there is a better way to apply the distribution. We shall
       need to have some way to parallelize it, or have some way to overlap that
       work with other work.
@@ -109,11 +132,6 @@ TODO: Perhaps we want to parameterize the nodes with some user data? So
   other constructions more easily. We basically would be able to hot swap
   implementations. Also, this might make it simpler to make a tree that can
   update adiabadically.
-TODO: Should we use exceptions in the main interface to return errors? This is
-  probably cleaner. the catch is that I would need to work out what happens
-  when I emit an exception in an HPX action.
-TODO: Change distropolicy_t to work like the serializer does now.
-TODO: Make stuff sent to expansion_t const where possible.
 
 
 

@@ -1,7 +1,0 @@
-The case_studies folder is intended for small applications that implement a
-certain part of the needed functionality of DASHMM. These will likely have code
-that migrates into the actual code base. Each should be self-contained, and
-should not link against code in other case studies. Copy and paste is
-recommended for using existing code. You can think of these as micro-apps, used
-by the DASHMM developers to explore the best methods to carry out the needed
-operations.
