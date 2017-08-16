@@ -24,7 +24,7 @@ Resources. To learn more about the DASHMM team, visit About DASHMM Team.
 *   January 24th, 2017 - 2017 Summer REU annouced.
 *   January 20th, 2017 - DASHMM 1.1.0 is released.
 *   November 2nd, 2016 - DASHMM 1.0.0 is released.
-*   September 30th, 2016 - First DASHMM Code paper published in Commun. Comput. Phys., 2016, 20, pp 1106-1126. [https://www.cambridge.org/core/journals/communications-in-computational-physics/article/dashmm-dynamic-adaptive-system-for-hierarchical-multipole-methods/FAC37B8C93D5D04FA257FDE3B48068E5](Code paper)
+*   September 30th, 2016 - First DASHMM [Code paper published in Commun. Comput. Phys., 2016, 20, pp 1106-1126.](https://www.cambridge.org/core/journals/communications-in-computational-physics/article/dashmm-dynamic-adaptive-system-for-hierarchical-multipole-methods/FAC37B8C93D5D04FA257FDE3B48068E5)
 *   April 25th, 2016 - DASHMM version 0.6 is released.
 *   January 29th, 2016 - DASHMM version 0.5 is released.
 *   REU program announced for Summer 2015
