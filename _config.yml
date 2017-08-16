@@ -1,2 +1,13 @@
 theme: jekyll-theme-minimal
 title: DASHMM
+navpages:
+    - title: DASHMM
+      url: /dashmm/
+    - title: Details
+      url: /dashmm/details.html
+    - title: Resources
+      url: /dashmm/resources.html
+    - title: Tutorial
+      url: /dashmm/tutorial.html
+    - title: DASHMM Team
+      url: /dashmm/team.html
