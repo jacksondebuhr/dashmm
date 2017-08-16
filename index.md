@@ -1,5 +1,6 @@
 ---
 layout: default
+title: DASHMM
 ---
 
 # DASHMM
@@ -21,7 +22,7 @@ Resources. To learn more about the DASHMM team, visit About DASHMM Team.
 *   August 16th, 2017 - DASHMM moves to a new home on github
 *   June 2nd, 2017 - DASHMM performance evaluation paper published in Proceedings of the 18th IEEE International Workshop on Parallel and Distributed Scientific and Engineering Computing (PDSEC2017)
 *   April 11th, 2017 - DASHMM 1.2.0 is released.
-*   January 24th, 2017 - 2017 Summer REU annouced.
+*   January 24th, 2017 - 2017 Summer REU announced.
 *   January 20th, 2017 - DASHMM 1.1.0 is released.
 *   November 2nd, 2016 - DASHMM 1.0.0 is released.
 *   September 30th, 2016 - First DASHMM [Code paper published in Commun. Comput. Phys., 2016, 20, pp 1106-1126.](https://www.cambridge.org/core/journals/communications-in-computational-physics/article/dashmm-dynamic-adaptive-system-for-hierarchical-multipole-methods/FAC37B8C93D5D04FA257FDE3B48068E5)
@@ -30,3 +31,7 @@ Resources. To learn more about the DASHMM team, visit About DASHMM Team.
 *   REU program announced for Summer 2015
 *   April 12th, 2015 - Presentation about DASHMM project at APS April Meeting 2015 in Baltimore, MD.
 *   October 1st, 2014 - The DASHMM project begins.
+
+## Acknowledgments
+
+DASHMM was initially funded by the NSF.
