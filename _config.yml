@@ -4,10 +4,10 @@ navpages:
     - title: DASHMM
       url:
     - title: Details
-      url: details.html
+      url: /details.html
     - title: Resources
-      url: resources.html
+      url: /resources.html
     - title: Tutorial
-      url: tutorial.html
+      url: /tutorial.html
     - title: DASHMM Team
-      url: team.html
+      url: /team.html

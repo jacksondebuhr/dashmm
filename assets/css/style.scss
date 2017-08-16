@@ -1,0 +1,21 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+#simplenav a {
+  background-color: #eee;
+  color: black;
+  display: block;
+  padding: 12px;
+  text-decoration: none;
+}
+
+#simplenav a:hover {
+  background-color: #ccc;
+}
+
+#simplenav a.active {
+  background-color: steelblue;
+  color: white;
+}
