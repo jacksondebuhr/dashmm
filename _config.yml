@@ -2,7 +2,7 @@ theme: jekyll-theme-minimal
 title: DASHMM
 navpages:
     - title: DASHMM
-      url:
+      url: /
     - title: Details
       url: /details.html
     - title: Resources
