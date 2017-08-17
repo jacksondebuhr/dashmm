@@ -11,11 +11,7 @@ and adaptive computational approach. DASHMM is designed to easily allow users
 to create tools usable in production-level end science that display 
 significantly improved strong scaling and efficiency for these applications.
 
-More details about the project can be found under Details. DASHMM can be 
-applied to a number of application domains. To start learning how to use 
-DASHMM, please visit User Guides and Tutorials. To download the latest version 
-of DASHMM, please visit Get DASHMM, or for prior versions please visit 
-Resources. To learn more about the DASHMM team, visit About DASHMM Team.
+More details about the project can be found under [Details]({{ site.url }}/details.html). To start learning how to use DASHMM, please visit the [DASHMM Tutorial]({{ site.url }}/tutorial.html). To download the latest version of DASHMM, please visit [Resources]({{ site.url }}/resources.html). To learn more about the DASHMM team, visit [DASHMM Team]({{ site.url }}/team.html).
 
 ## News
 
