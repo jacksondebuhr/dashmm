@@ -44,7 +44,7 @@ Next this will interpret the incoming arguments, and perform the evaluation test
 
 `dashmm::finalize()` shuts down the runtime and frees all resources used by DASHMM. There is no reason that this needs to be the last operation in a particular utility. Normal serial work can be performed after the call to `dashmm::finalize()`. However, it is an error to attempt use of any DASHMM routines after `dashmm::finalize()`.
 
-Note also that we are not checking all of the possible return codes from these library calls. Instead, we just `assert()` that everything comes out fine. This will be continued in the rest of the example code. For a list of the possible error codes that can be returned by the library calls, please see the DASHMM Basic User Guide in [Resources]({{ site.url}}/resources.html).
+Note also that we are not checking all of the possible return codes from these library calls. Instead, we just `assert()` that everything comes out fine. This will be continued in the rest of the example code. For a list of the possible error codes that can be returned by the library calls, please see the DASHMM Basic User Guide in [Resources]({{ site.baseurl}}/resources.html).
 
 ## The Four Main Types
 
@@ -335,4 +335,4 @@ Following the creation of the `test_handle` array, the evaluation is performed, 
 
 ## Next Steps
 
-Now you are familiar with a good portion of the elements of the basic interface to DASHMM. Specific details about the return codes from these functions can be found in the DASHMM User Guide, in [Resources]({{ site.url }}/resources.html).
+Now you are familiar with a good portion of the elements of the basic interface to DASHMM. Specific details about the return codes from these functions can be found in the DASHMM User Guide, in [Resources]({{ site.baseurl }}/resources.html).
