@@ -19,7 +19,7 @@ To make DASHMM available for your program, it is sufficient to `#include "dashmm
 
 We start with `main()`:
 
-```C++
+{% highlight c++ %}
 int main(int argc, char **argv) {
   auto err = dashmm::init(&argc, &argv);
   assert(err == dashmm::kSuccess);
@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-```
+{% endhighlight %}
 
 To use DASHMM in a program, one must initialize DASHMM using `dashmm::init()`. This call both initializes the HPX-5 runtime system as well as some internal bookkeeping data used by DASHMM. HPX-5 accepts some command-line arguments that control its behavior, and so we must provide those arguments to DASHMM. HPX-5 will remove the arguments from the command line used by HPX-5, so after the call to `dashmm::init()` the remaining command-line arguments will be ready to be interpreted by the application. For a list of the available HPX-5 related command line arguments, please visit the [HPX-5 website](https://hpx.crest.iu.edu/).
 
@@ -54,7 +54,7 @@ The four main types are the Source, Target, Expansion and Method types. There ar
 
 For the code in this tutorial, we will have the following Source and Target type:
 
-```C++
+{% highlight c++ %}
 struct SourceData {
   dashmm::Point position;
   double charge;
@@ -65,7 +65,7 @@ struct TargetData {
   std::complex<double> phi;
   int index;
 };
-```
+{% endhighlight %}
 
 In the previous, the `position`, `charge` and `phi` members are requirements of the expansions that we will be using. This tutorial does not do much other than compute the potential at the targets because of the sources, so these two types do not have too much beyond the required members. We have included an `index` because the sources and targets might be reordered during evaluation, and we will be interested in the original arrangement when we compare the accuracy of the method with the exact result obtained with direct summation.
 
@@ -75,7 +75,7 @@ This is a general feature of the Source and Target types. A user is free to add 
 
 After some pretty standard argument parsing, which will not be covered here, `main` calls out to `perform_evaluation_test` to perform most of the work of the demo. This routine starts as follows:
 
-```C++
+{% highlight c++ %}
 void perform_evaluation_test(InputArguments args) {
   srand(123456);
 
@@ -83,11 +83,11 @@ void perform_evaluation_test(InputArguments args) {
   dashmm::Array<TargetData> target_handle = prepare_targets(args);
 
   ...
-```
+{% endhighlight %}
 
 DASHMM provides a global address space from which it will read the data on which the evaluations takes place. The `Array<T>` class is a template class over a record type, `T`. This object is a handle to global memory that contains an array of records. These records are shared among the localities in the system, with each locality having some share of the total number of records.  These handles are returned by two utility functions, which are essentially identical. The first of these, `prepare_sources`, is given below.
 
-```C++
+{% highlight c++ %}
 dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
   SourceData *sources{nullptr};
   if (args.source_count) {
@@ -107,7 +107,7 @@ dashmm::Array<SourceData> prepare_sources(InputArguments &args) {
 
   return retval;
 }
-```
+{% endhighlight %}
 
 In `prepare_sources`, locally allocated `Source` records are filled with randomly generated particle data. The details of the distribution of the points and the associated charges can be controlled with some command line parameters to the demo program. For details on these, please see the `README` included with the demo, or provide `--help` as a command line argument to the demo program.
 
@@ -121,7 +121,7 @@ Once the data are specified, to perform a multipole method evaluation, one needs
 
 The next part of `perform_evaluation_test` covers the various pairs of expansion and method:
 
-```C++
+{% highlight c++ %}
   ...
 
   //Perform the evaluation
@@ -187,7 +187,7 @@ The next part of `perform_evaluation_test` covers the various pairs of expansion
   fprintf(stdout, "Evaluation took %lg [us]\n", elapsed(tf, t0));
 
   ...
-```
+{% endhighlight %}
 
 Each branch above is very similar: the `evaluate()` method is called on one of the `Evaluator` objects defined in this program (see Below).
 
@@ -205,7 +205,7 @@ The actions taken during a multipole method evaluation depend on up to four type
 
 To inform DASHMM of your intended sets of types, one must create an instance of an `Evaluator` parameterized with the needed types. This must occur before `dashmm::init`. In the demo, these evaluators are created as global objects.
 
-```C++
+{% highlight c++ %}
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::LaplaceCOM, dashmm::BH> laplace_bh{};
 dashmm::Evaluator<SourceData, TargetData,
@@ -222,7 +222,7 @@ dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Helmholtz, dashmm::Direct> helmholtz_direct{};
 dashmm::Evaluator<SourceData, TargetData,
                   dashmm::Helmholtz, dashmm::FMM97> helmholtz_fmm97{};
-```
+{% endhighlight %}
 
 The constructor for an `Evaluator` takes no arguments, but the object is a template over four parameters. It is an error to create more than one instance of an `Evaluator` with the same set of four types. There is no state associated with an Evaluator, so this is not a terrible restriction to impose.
 
@@ -232,7 +232,7 @@ The actual evaluation is done through the `evaluate` member of an `Evaluator` ob
 
 The final portions of `perform_evaluation_test` run a comparison case with a direct summation method to measure the accuracy of the approximate method.
 
-```C++
+{% highlight c++ %}
   ...
 
   if (args.verify) {
@@ -269,7 +269,7 @@ The final portions of `perform_evaluation_test` run a comparison case with a dir
     }
 
   ...
-```
+{% endhighlight %}
 
 If the user has selected to compare with the exact result computed via the Direct summation method, the first step is to select a small set of points from the targets. This attempts to compare to 400 points, or the full number of target points, whichever is smaller.
 
@@ -277,7 +277,7 @@ During the previous evaluation, the target particles will have been sorted and m
 
 After, the sub-sampled target locations are copied into a shorter array which is then copied into a new global `Array` using the now-familiar `allocate()` and `put()` methods:
 
-```C++
+{% highlight c++ %}
   ...
 
     // Create array for test targets
@@ -329,7 +329,7 @@ After, the sub-sampled target locations are copied into a shorter array which is
   err = target_handle.destroy();
   assert(err == dashmm::kSuccess);
 }
-```
+{% endhighlight %}
 
 Following the creation of the `test_handle` array, the evaluation is performed, either for the Laplace or Yukawa kernel for the original sources, and the sub-sampled targets. Once again, the results are `collect()`-ed. These are then fed into an error comparison routine `compare_results`, which will not be covered.
 
