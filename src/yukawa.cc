@@ -11,7 +11,13 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
+/// \file
+/// \brief Implementation of Yukawa kernel
+
+
 #include "builtins/yukawa.h"
+
 
 namespace dashmm {
 

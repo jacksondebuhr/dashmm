@@ -15,7 +15,9 @@
 /// \file src/special_function.cc
 /// \brief Implementation of special functions
 
+
 #include <algorithm>
+
 #include "builtins/special_function.h"
 
 

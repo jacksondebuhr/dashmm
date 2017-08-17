@@ -1,37 +1,16 @@
 THIS BRANCH TODO
 
-DONE: check comments in node, tree and dualtree
-DONE: Break the file into multiple parts, Node, Tree, DualTree
 
 TODO: Clean up dualtree.h
       remove whatever possible from that into the evaluator object.
       ---> Would that remove the Expansion and Method template arguments?
            That would be nice.
-TODO: In node, tree and dualtree privatize anything possible
-TODO: The same is true everywhere I guess.
 
-TODO: Update code comments
-TODO: clean up code where possible
+TODO: Also update naming scheme of non static class members (lots of these)
 TODO: Documentation clean up throughout
     - be sure to be clear about routines callable from HPX or not.
     - actually build the documentation with DoxyGen to see if it is done
 TODO: Update the official documentation file that gets built into a pdf
-
-TODO: Should we explicitly enforce the singleton nature of Evaluator?
-        (This is not a bad idea, but it can wait, as long as the docs warn
-         users.)
-      AT THE VERY least, just decide if this should happen. If not, that's fine
-      and remove this from the list.
-
-TODO: should we put all the DAG stuff into a namespace DAG? So
-      dashmm::dag::Edge and so on. Extending this, should we do the same thing
-      for other subsystems?
-        This would be okay, but what would DAG turn into? dag::DAG? That's
-        pretty goofy...
-
-TODO: Should we use exceptions in the main interface to return errors? This is
-  probably cleaner. the catch is that I would need to work out what happens
-  when I emit an exception in an HPX action.
 
 TODO: Change distropolicy_t to work like the serializer does now.
 

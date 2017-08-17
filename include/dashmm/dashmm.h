@@ -42,5 +42,8 @@
 #include "builtins/singlelocdistro.h"
 #include "builtins/randomdistro.h"
 
+// The built in serialization manager
+#include "builtins/trivialserializer.h"
+
 
 #endif // __DASHMM_USER_INTERFACE_H__

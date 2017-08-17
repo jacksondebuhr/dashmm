@@ -12,7 +12,7 @@
 // =============================================================================
 
 
-/// \file src/randomdistro.cc
+/// \file
 /// \brief Implementation of RandomDistro
 
 
@@ -25,6 +25,7 @@
 
 
 namespace dashmm {
+
 
 void RandomDistro::compute_distribution(DAG &dag) {
   // check that all sources and targets have locality set

@@ -11,6 +11,11 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
+/// \file
+/// \brief FMM97Distro implementation
+
+
 #include "builtins/fmm97distro.h"
 
 #include <algorithm>

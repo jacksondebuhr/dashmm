@@ -12,11 +12,11 @@
 // =============================================================================
 
 
-#include "dashmm/spmdutils.h"
-
-
 /// \file
 /// \brief Implementation of broadcast utility routine
+
+
+#include "dashmm/spmdutils.h"
 
 
 namespace dashmm {

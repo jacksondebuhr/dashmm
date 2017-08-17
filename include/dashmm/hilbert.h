@@ -18,8 +18,13 @@
 
 namespace dashmm {
 
-
+;
 /// Distribute the nodes according to a Hilbert space filling curve
+///
+/// \param num_ranks - the number of ranks over which to distribute
+/// \param global - the global counts of sources and targets per uniform node
+/// \param len - the number of uniform nodes
+/// \param lvl - the uniform refinement level
 int *distribute_points_hilbert(int num_ranks,
                                const int *global,
                                int len,

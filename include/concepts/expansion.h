@@ -124,14 +124,6 @@ class Expansion {
   /// it will be a smaller number if the object is created from a ViewSet.
   int view_count() const;
 
-  /// Fill in the data for a view object
-  ///
-  /// Given a ViewSet that contains the view indices, this will populate the
-  /// bytes and data members for the ViewSet. Note that this does not mean a
-  /// copy will be made of the data, but merely that the data pointers will be
-  /// valid.
-  void get_views(ViewSet &view) const;
-
   /// Get all the current views of the object
   ViewSet get_all_views() const;
 

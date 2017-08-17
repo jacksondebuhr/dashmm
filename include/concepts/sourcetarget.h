@@ -14,8 +14,8 @@
 
 /// Source concept in DASHMM
 ///
-/// To qualify as a Source for DASHMM, a type should be trivially copyable,
-/// and should provide one member accessible by name:
+/// To qualify as a Source for DASHMM, a type should provide one member 
+/// accessible by name:
 ///
 /// Point position;
 ///
@@ -31,19 +31,20 @@
 ///
 /// Failure to provide a type with the required members will result in
 /// compilation errors.
+///
+/// Additionally, there will be times that the Sources will be copied across
+/// the network, and so each type will need a Serializer associated with it.
+/// See include/dashmm/serializer.h for details.
 struct Source {
   Point position;
   double charge;
 };
 
 
-
-
 /// Target concept in DASHMM
 ///
-/// To work as a Target type in DASHMM, a type must be trivially copyable and
-/// must provide two (or more) members. The first is the location of the target
-/// given by:
+/// To work as a Target type in DASHMM, a type must provide two (or more) 
+/// members. The first is the location of the target given by:
 ///
 /// Point position
 ///
@@ -58,6 +59,10 @@ struct Source {
 /// and so a target must supply each member.
 ///
 /// Failure to provide the required members will result in compilation errors.
+///
+/// Additionally, there will be times that the Targets will be copied across
+/// the network, and so each type will need a Serializer associated with it.
+/// See include/dashmm/serializer.h for details.
 struct Target {
   Point position;
   std::complex<double> phi;   // for most, but not all cases

@@ -13,7 +13,7 @@
 
 
 /// \file src/bhdistro.cc
-/// \brief Implement BHDistro
+/// \brief Implementation of BHDistro
 
 
 #include "builtins/bhdistro.h"

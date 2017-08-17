@@ -11,6 +11,11 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
+/// \file
+/// \brief Implementation of Hilbert key and distrbution
+
+
 #include "dashmm/hilbert.h"
 
 #include <cassert>
