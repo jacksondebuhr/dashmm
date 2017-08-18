@@ -245,7 +245,7 @@ class Tree {
           // Copy local points before merging remote points
           curr->lock();
           auto sorted = curr->parts.data();
-          for (size_t j = 0; j < local_count[i]; ++j) {
+          for (int j = 0; j < local_count[i]; ++j) {
             sorted[j + curr->first()] = temp[local_offset[i] + j];
           }
 
@@ -701,14 +701,12 @@ private:
     }
 
     // Declare some loop variables
-    record_t source, save;
-    int source_sort, save_sort;
-    int isource, isave, idest;
+    record_t save;
 
     // O(N) in place rearrangement
     for (int i = 0; i < npts; ++i) {
       while (gid_of_points[i] != i) {
-        record_t save = p_in[gid_of_points[i]];
+        save = p_in[gid_of_points[i]];
         int idx = gid_of_points[gid_of_points[i]];
 
         p_in[gid_of_points[i]] = p_in[i];
@@ -795,7 +793,6 @@ private:
                                                int thresh) {
     target_node->lock();
     if (target_node->increment_first(n_arrived)) {
-      int ssat = 1;
       target_node->partitionWhen(source_node->complete(), HPX_NULL,
                                  thresh, px, py, pz, size, 1);
     }

@@ -540,9 +540,9 @@ class ExpansionLCO {
   /// \param out_edges - the out edge data
   /// \param first - the first edge to be processed
   /// \param last - the last edge to be proceed
-  static void spawn_out_edges_work(Header *head, 
+  static void spawn_out_edges_work(Header *head,
                                    OutEdgeRecord *out_edges,
-                                   int first, 
+                                   int first,
                                    int last) {
     for (int i = first; i <= last; ++i) {
       switch(out_edges[i].op) {
@@ -581,7 +581,7 @@ class ExpansionLCO {
   ///
   /// \param head - the incoming data
   /// \param target - global address of target LCO
-  static void m_to_m_out_edge(Header *head, 
+  static void m_to_m_out_edge(Header *head,
                               hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
     int from_child = head->index.which_child();
@@ -596,8 +596,8 @@ class ExpansionLCO {
   /// \param head - the incoming data
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
-  static void m_to_l_out_edge(Header *head, 
-                              hpx_addr_t target, 
+  static void m_to_l_out_edge(Header *head,
+                              hpx_addr_t target,
                               Index tidx) {
     EVENT_TRACE_DASHMM_MTOL_BEGIN();
     auto translated = head->data->M_to_L(head->index, tidx);
@@ -612,7 +612,7 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
   static void l_to_l_out_edge(Header *head,
-                              hpx_addr_t target, 
+                              hpx_addr_t target,
                               Index tidx) {
     EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
@@ -658,7 +658,7 @@ class ExpansionLCO {
 
   /// Serve an I->I edge
   ///
-  /// \param head - the incoming data\
+  /// \param head - the incoming data
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
   static void i_to_i_out_edge(Header *head, hpx_addr_t target, Index tidx) {

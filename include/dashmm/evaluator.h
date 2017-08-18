@@ -300,9 +300,9 @@ class Evaluator {
   ///            the runtime.
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
-                      int refinement_limit, 
+                      int refinement_limit,
                       const method_t *method,
-                      int n_digits, 
+                      int n_digits,
                       const std::vector<double> *kernelparams,
                       distropolicy_t distro = distropolicy_t{}) {
     DualTreeHandle tree = create_tree(sources, targets, refinement_limit);
@@ -487,7 +487,7 @@ class Evaluator {
     hpx_addr_t done = hpx_lco_and_new(n_workers);
     DAGNode **data = nodes.data();
 
-    for (int i = 0; i < remainder; ++i) {
+    for (size_t i = 0; i < remainder; ++i) {
       size_t start = i * (delta + 1);
       size_t end = start + delta + 1;
       DAGNode **first = &data[start];
