@@ -437,7 +437,7 @@ discovering the DAG each iteration, they can be created only once, and
 reused.
 
 \begin{lstlisting}
-DualTreeHandle create_tree(
+DualTreeHandle Evaluator::create_tree(
     const Array<Source> &sources,
     const Array<Target> &targets,
     int refinement_limit)
@@ -452,7 +452,7 @@ copied.
 This is a collective call and all ranks must participate.
 
 \begin{lstlisting}
-std::unique_ptr<DAG> create_DAG(
+std::unique_ptr<DAG> Evaluator::create_DAG(
     DualTreeHandle tree,
     int n_digits,
     const std::vector<double> *kernel_params,
@@ -469,7 +469,7 @@ create the DAG corresponding to the given method for the given Dual Tree.
 This is a collective call, and all ranks must participate.
 
 \begin{lstlisting}
-ReturnCode execute_DAG(DualTreeHandle tree, DAG *dag)
+ReturnCode Evaluator::execute_DAG(DualTreeHandle tree, DAG *dag)
 \end{lstlisting}
 
 \noindent Once the DAG has been constructed, this method will execute the work
@@ -483,7 +483,7 @@ again, it must be reset (see \texttt{reset\_DAG} below).
 This is a collective call, and all ranks must participate.
 
 \begin{lstlisting}
-ReturnCode reset_DAG(DAG *dag)
+ReturnCode Evaluator::reset_DAG(DAG *dag)
 \end{lstlisting}
 
 \noindent This will take a DAG that has been executed with the
@@ -498,7 +498,9 @@ This will return either \texttt{kSuccess} if there is no error, or
 This is a collective call, and all ranks must participate.
 
 \begin{lstlisting}
-ReturnCode destroy_DAG(DualTreeHandle tree, std::unique_ptr<DAG> dag)
+ReturnCode Evaluator::destroy_DAG(
+    DualTreeHandle tree, 
+    std::unique_ptr<DAG> dag)
 \end{lstlisting}
 
 \noindent This will destroy a DAG. This will return either \texttt{kSuccess}
@@ -508,7 +510,7 @@ if the destruction proceeds without error, or will return
 This is a collective call, and all ranks must participate.
 
 \begin{lstlisting}
-ReturnCode destroy_tree(DualTreeHandle tree)
+ReturnCode Evaluator::destroy_tree(DualTreeHandle tree)
 \end{lstlisting}
 
 \noindent This method destroys the Dual Tree specified by \texttt{tree}. This
@@ -543,7 +545,7 @@ The interface that all subclasses of \texttt{Serializer} must implement is
 given below.
 
 \begin{lstlisting}
-size_t size(void *object) const
+size_t Serializer::size(void *object) const
 \end{lstlisting}
 
 \noindent This method will return the serialized size in bytes of the given
@@ -553,7 +555,7 @@ used only for compatible objects. Typically, inside the implementation, the
 provided address will be typecast.
 
 \begin{lstlisting}
-void *serialize(void *object, void *buffer) const
+void *Serializer::serialize(void *object, void *buffer) const
 \end{lstlisting}
 
 \noindent This method will serialize the given object into the provided 
@@ -562,7 +564,7 @@ where \texttt{bytes} is the number of bytes of the serialized form of
 \texttt{object}.
 
 \begin{lstlisting}
-void *deserialize(void *buffer, void *object) const
+void *Serializer::deserialize(void *buffer, void *object) const
 \end{lstlisting}
 
 \noindent This method will deserialize an object from \texttt{buffer} into
@@ -584,7 +586,7 @@ At any point, an \texttt{Array}'s serialization manager can be changed with
 the following method of \texttt{Array}.
 
 \begin{lstlisting}
-ReturnCode set_manager(std::unique_ptr<Serializer> manager)
+ReturnCode Array<T>::set_manager(std::unique_ptr<Serializer> manager)
 \end{lstlisting} 
 
 \noindent This method will set the serialization manager for the array to the 
@@ -746,20 +748,20 @@ by their position in the DAG.
 The \texttt{DAG} object has the following members:
 
 \begin{lstlisting}
-std::vector<DAGNode *> source_leaves
+std::vector<DAGNode *> DAG::source_leaves
 \end{lstlisting}
 
 \noindent Nodes of the DAG that are associated with leaves of the source tree.
 These nodes will have no incoming edges.
 
 \begin{lstlisting}
-std::vector<DAGNode *> source_nodes
+std::vector<DAGNode *> DAG::source_nodes
 \end{lstlisting}
 
 \noindent All other DAG nodes that are associated with nodes of the source tree.
 
 \begin{lstlisting}
-std::vector<DAGNode *> target_leaves
+std::vector<DAGNode *> DAG::target_leaves
 \end{lstlisting}
 
 \noindent Nodes of the DAG that are associated with leaves of the target tree.
@@ -769,7 +771,7 @@ target tree after which more refinement for the method would only induce
 unnecessary overhead.
 
 \begin{lstlisting}
-std::vector<DAGNode *> target_nodes
+std::vector<DAGNode *> DAG::target_nodes
 \end{lstlisting}
 
 \noindent All other DAG nodes that are associated with node of the target tree.
