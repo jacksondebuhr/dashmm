@@ -15,7 +15,7 @@ More details about the project can be found under [Details]({{ site.baseurl }}/d
 
 ## News
 
-*   August 16th, 2017 - DASHMM moves to a new home on github
+*   August 16th, 2017 - DASHMM moves to a new home on GitHub
 *   June 2nd, 2017 - DASHMM performance evaluation paper published in Proceedings of the 18th IEEE International Workshop on Parallel and Distributed Scientific and Engineering Computing (PDSEC2017)
 *   April 11th, 2017 - DASHMM 1.2.0 is released.
 *   January 24th, 2017 - 2017 Summer REU announced.
