@@ -7,10 +7,6 @@ TODO: Clean up dualtree.h
            That would be nice.
 
 TODO: Also update naming scheme of non static class members (lots of these)
-TODO: Documentation clean up throughout
-    - be sure to be clear about routines callable from HPX or not.
-    - actually build the documentation with DoxyGen to see if it is done
-TODO: Update the official documentation file that gets built into a pdf
 
 TODO: Change distropolicy_t to work like the serializer does now.
 
