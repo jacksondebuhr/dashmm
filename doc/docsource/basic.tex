@@ -21,6 +21,7 @@ for basic use of the library. More details can be found in
 Chapter~\ref{ch:advanced}.
 
 \section{DASHMM concepts}
+
 This section covers both the conceptual framework of the multipole
 methods supported by DASHMM and the parallelization of those
 methods. More explanation of DASHMM's conceptual framework can be
@@ -40,8 +41,8 @@ select the method that most meets their needs.
 DASHMM includes a number of built-in expansion and method types, which are
 described in sections \ref{sec:bi-met} and \ref{sec:bi-exp}.
 
-
 \subsubsection{Source}
+
 The Source type gives the structure of the source point data. There
 are few requirements on the Source type. Typically the minimum
 requirements are the position and charge of the source. The \texttt{position}
@@ -58,10 +59,15 @@ struct SourceData {
 
 \noindent Beyond these required members, anything might be added to a Source
 type. This allows the user to associate application specific data to
-the sources in the evaluation. The only additional requirement is that
-the resulting type be trivially copyable.
+the sources in the evaluation.
+
+The Source records will be copied across the network, and so if the type is
+non-trivial, the user of DASHMM must provide a subclass of \texttt{Serializer}
+to handle the serialization and deserialization of Source objects. See
+section \ref{sec:serializer} for details.
 
 \subsubsection{Target}
+
 The Target type gives the structure of the target point data. There
 are similarly few requirements on the Target type. Each Target type
 will need a \texttt{position} of type \texttt{Point} and a member to store
@@ -81,8 +87,12 @@ struct TargetData {
 \noindent Beyond the required members, anything might be added to the Target
 type. A typical choice is an identifier of some kind because DASHMM
 evaluations will sort the input data to suit the parallel computation,
-and points can then be identified after the computation. Like with the
-Source type, the resulting Target type must be trivially copyable.
+and points can then be identified after the computation.
+
+The Target records will be copied across the network, and so if the type is
+non-trivial, the user of DASHMM must provide a subclass of \texttt{Serializer}
+to handle the serialization and deserialization of Target objects. See
+section \ref{sec:serializer} for details.
 
 \subsubsection{Expansion}
 
@@ -96,8 +106,8 @@ ways to expand a given kernel to be used in a multipole method
 computation. Each Expansion represents a way (or a closely related set
 of ways) that the potential is expanded into an approximation.
 
-The Expansion type is a template type over two parameters, the source
-and target types being employed. It is the Expansion type that places
+The Expansion type is a template type over two parameters, the Source
+and Target types being employed. It is the Expansion type that places
 restrictions on the Source and Target types; the Expansion requires
 certain data to compute from (taken from the Sources), and it will
 produce certain data (into the Targets). This allows the Expansion to
@@ -108,6 +118,7 @@ For details on creating user-defined Expansions, please see
 chapter~\ref{ch:advanced}.
 
 \subsubsection{Method}
+
 The final major abstraction in DASHMM is the Method. This type
 specifies how the Expansion is used on the provided Source data to
 compute the interaction at the locations specified in the Target
@@ -198,7 +209,7 @@ library calls for cases where each might be returned.
 
 \subsection{\texttt{dcomplex\_t}}
 Many kernels return potential values that are complex numbers. DASHMM provides
-\texttt{dcomplex\_t} an alias to \texttt{std::complex<double>}.
+\texttt{dcomplex\_t} as an alias to \texttt{std::complex<double>}.
 
 \subsection{\texttt{Point}}
 The \texttt{Point} class is used to represent locations in three dimensional
@@ -216,7 +227,7 @@ used to default construct a point.
 Point::Point(double *arr)
 \end{lstlisting}
 
-\noindent  Construct a point from a C-style array. It is  important that
+\noindent  Construct a point from a C-style array. It is important that
 \texttt{arr} should contain at least three members.
 
 \begin{lstlisting}
@@ -362,7 +373,8 @@ other ranks. This is a template over the type \texttt{T}. This is a
 collective operation. Each rank must provide the address of a type
 \texttt{T} object. For rank 0, this will provide  the address of the value
 to share; for all other ranks this provides the address into which the
-value broadcast from rank 0 will be stored.
+value broadcast from rank 0 will be stored. The type \texttt{T} must be
+trivially copyable.
 
 \section{Evaluation}
 
@@ -389,39 +401,38 @@ Specifying the full type of the evaluator will cause the template to expand
 out all of the needed actions to actually implement the evaluation using
 HPX-5, and will also register those actions with HPX-5.
 
-
 \begin{lstlisting}
 ReturnCode Evaluator::evaluate(
     const Array<Source> &sources,
     const Array<Target> &targets,
     int refinement_limit,
-    const Method<Source, Target, Expansion<Source, Target>> &method,
+    const Method<Source, Target, Expansion<Source, Target>> *method,
     int n_digits,
-    const std::vector<double> &kernelparams)
+    const std::vector<double> *kernelparams)
 \end{lstlisting}
 
 \noindent Perform a multipole method evaluation. The arguments to this method
 are as follows:
 
 \begin{itemize}
-\item \texttt{const Array<Source> \&sources}: the Array containing the source
-  data.
-\item \texttt{const Array<Target> \&targets}: the Array containing the target
-  data.
+\item \texttt{const Array<Source> \&sources}: the \texttt{Array} containing
+  the source data.
+\item \texttt{const Array<Target> \&targets}: the \texttt{Array} containing
+  the target data.
 \item \texttt{int refinement\_limit}: the refinement limit of the tree. The
   sources and  targets will be placed into a hierarchical partitioning of
   space. This partitioning will end when there are fewer sources or targets than
   the supplied refinement limit in the region under consideration.
-\item \texttt{const Method<Source, Target, Expansion<Source, Target>> \&method}:
-  the  method to use for the evaluation. A few methods require parameters at
-  construction, so this is passed in to provide those parameters to the
-  evaluation.
+\item \texttt{const Method<Source, Target, Expansion<Source, Target>> *method}:
+  an instance of the method to use for the evaluation. A few methods require
+  parameters at construction, so this is passed in to provide those parameters
+  to the evaluation.
 \item \texttt{int n\_digits}: the accuracy parameter for the \texttt{Expansion}
-  in use. This is  often the number of digits of accuracy required.
-\item \texttt{const std::vector<double> \&kernelparams}: the parameters for the
+  in use. This is often the number of digits of accuracy required.
+\item \texttt{const std::vector<double> *kernelparams}: the parameters for the
   kernel evaluation. These are those quantities that are constant for each use
-  of the particular expansion. See
-  the individual expansions for details about what needs to be provided.
+  of the particular expansion. See the individual expansions for details about
+  what needs to be provided.
 \end{itemize}
 
 Note that during evaluation, the records in the source and target arrays may be
@@ -439,11 +450,13 @@ The possible return values are \texttt{kSuccess} when there is no problem, and
 \texttt{kRuntimeError} when there is a problem with the execution.
 
 
-\section{DASHMM array}
+\section{DASHMM Array}
+
 DASHMM provides an array construct that represents a distributed collection of
 records. The \texttt{Array} object is a template
-type over the record. The only requirement on the record type is that it is
-trivially copyable. When an \texttt{Array} is created, as in
+type over the record. For basic use of \texttt{Array} the record type should
+be trivially copyable. For more advanced record types, see
+section~\ref{sec:serializer}. When an \texttt{Array} is created, as in
 
 \begin{lstlisting}[frame=]
 Array<T> source_data{};
@@ -531,6 +544,11 @@ memory, and will build the resulting array with the provided data.
 Providing an incorrect \texttt{record\_count} for this use case will cause
 undefined behavior.
 
+This will return \texttt{kDomainError} if the object already has an allocation,
+\texttt{kAllocationError} if memory is unable to be allocated,
+\texttt{kRuntimeError} if there is an error with the runtime system, or
+\texttt{kSuccess} if the method completes without a problem.
+
 \begin{lstlisting}
 ReturnCode Array<T>::destroy()
 \end{lstlisting}
@@ -589,7 +607,7 @@ range is inconsistent with the array object; or \texttt{kSuccess} otherwise.
 {\bf NOTE: Are we going to deprecate this?}
 
 \begin{lstlisting}
-std::unique_ptr<T[], void(*)(T *)> Array<T>::collect()
+std::unique_ptr<T[]> Array<T>::collect()
 \end{lstlisting}
 
 \noindent This method collects all of the records in the array and returns a
@@ -608,10 +626,10 @@ T *Array<T>::segment(size_t &count)
 \end{lstlisting}
 
 \noindent This method provides direct access to the local segment of an array.
-Because some DASHMM rountines will modify the segments of arrays, the length
+Because some DASHMM routines will modify the segments of arrays, the length
 of the returned array data cannot be known ahead of time. So, in addition to
 the segment's address, the number of records is returned via the \texttt{count}
-paramter. It is possible that this will return \texttt{nullptr}, but this will
+parameter. It is possible that this will return \texttt{nullptr}, but this will
 occur only when \texttt{count} is zero.
 
 This is a collective call. Each rank will receive the address and count of its
@@ -624,11 +642,11 @@ Note that calls to some other DASHMM routines will invalidate the address
 returned by this method.
 
 
-\section{Array map actions}
+\section{Array For Each Actions}
 
 To avoid the round trip from and to the global address space via
 \texttt{Array}'s \texttt{get()} and \texttt{put()} methods, one can make use
-of the \texttt{ArrayMapAction} type. This type specifies an action to be
+of the \texttt{ArrayForEachAction} type. This type specifies an action to be
 performed on the records of an array. Then, together with a method of the
 \texttt{Array} object, this allows for some computation to occur on the
 records of an array.
@@ -638,16 +656,17 @@ the array to which the action will be applied (hereafter \texttt{T}), and a
 type specifying an environment to provide to the action (hereafter \texttt{E}).
 
 The action is specified during construction of an object of type
-\texttt{ArrayMapAction}. This is provided as a function pointer, for a function
-with a particular signature. So that DASHMM can use the action on every
-locality, like the \texttt{Evaluator} object, any \texttt{ArrayMapAction}
-objects must be defined before \texttt{init()} is called.
+\texttt{ArrayForEachAction}. This is provided as a function pointer, for a
+function with a particular signature. So that DASHMM can use the action on
+every locality, like the \texttt{Evaluator} object, any
+\texttt{ArrayForEachAction} objects must be defined before \texttt{init()}
+is called.
 
 The function implementing the action must take three arguments, the first is
 a \texttt{T *} giving the data on which to act, the second is a
 \texttt{const size\_t} giving the number of records on which to act, and the
 third is \texttt{const E *}, where \texttt{E} is the environment type of the
-\texttt{ArrayMapAction}. For example:
+\texttt{ArrayForEachAction}. For example:
 
 \begin{lstlisting}[frame=]
 void update_position(T *data, const size_t count, const E *env) {
@@ -666,7 +685,7 @@ contiguous chunk of records. The action should only assume that
 \texttt{data[0]} through \texttt{data[count - 1]} are available for use.
 
 \begin{lstlisting}
-ArrayMapAction<T, E>::map_function_t
+ArrayForEachAction<T, E>::map_function_t
 \end{lstlisting}
 
 \noindent This class aliases the type of function that can implement the
@@ -677,30 +696,31 @@ void (*)(T *, const size_t, const E *)
 \end{lstlisting}
 
 \begin{lstlisting}
-ArrayMapAction<T, E>::ArrayMapAction(map_function_t f)
+ArrayForEachAction<T, E>::ArrayForEachAction(map_function_t f)
 \end{lstlisting}
 
 \noindent This constructs an array map action object. The provided function
 pointer
 will give the action that is performed on the array. To use an action,
-the associated \texttt{ArrayMapAction} must be defined before \texttt{init()} is
-called. This object will register the needed actions with the runtime system.
+the associated \texttt{ArrayForEachAction} must be defined before
+\texttt{init()} is called. This object will register the needed actions with
+the runtime system.
 
-For any given action \texttt{f} only a single \texttt{ArrayMapAction}
+For any given action \texttt{f} only a single \texttt{ArrayForEachAction}
 should be defined.
 
 \begin{lstlisting}
-ReturnCode Array<T>::map(ArrayMapAction<T, E> &act, const E *env)
+ReturnCode Array<T>::forEach(ArrayForEachAction<T, E> &act, const E *env)
 \end{lstlisting}
 
-\noindent Once an \texttt{ArrayMapAction} is defined, it can be used on a
-specific array
-by calling that array's \texttt{map()} method. This will cause the action
-represented by \texttt{act} to be applied on all entries of this array. The
-action ultimately works on segments of the array. The environment, \texttt{env}
-is provided unmodified to each segment.
+\noindent Once an \texttt{ArrayForEachAction} is defined, it can be used on a
+specific array by calling that array's \texttt{map()} method. This will cause
+the action represented by \texttt{act} to be applied on all entries of this
+array. The action ultimately works on segments of the array. The environment,
+\texttt{env} is provided unmodified to each segment.
 
-This is a collective call. It is an error to \texttt{map()} over an invalid array.
+This is a collective call. It is an error to call \texttt{forEach()} on an
+invalid array.
 
 
 \section{Built-in methods}
@@ -717,10 +737,9 @@ covered below, in order of increasing complexity.
 \subsection{\texttt{Direct}}
 
 The \texttt{Direct} method is primarily intended for use as a comparison for
-computing
-the exact result for a given set of sources. There is some parallelism
-implemented for this method, so the execution time is reduced somewhat.
-However, for realistic problem sizes, this method should be avoided.
+computing the exact result for a given set of sources. There is some
+parallelism implemented for this method, so the execution time is reduced
+somewhat. However, for realistic problem sizes, this method should be avoided.
 
 The only operation that is used by the \texttt{Direct} method is
 \texttt{StoT}, so any Expansion implementing that operator can be used with the
@@ -769,10 +788,10 @@ expansion must also implement fully the following operations: \texttt{StoM},
 
 \subsection{\texttt{FMM}}
 
-The \texttt{FMM} method implements the Fast Multipole Method in its original form.
-To create an \texttt{FMM} method, no arguments are needed as the decisions about
-which expansions to use in which situations are all made based on fixed
-geometric considerations.
+The \texttt{FMM} method implements the Fast Multipole Method in its original
+form. To create an \texttt{FMM} method, no arguments are needed as the
+decisions about which expansions to use in which situations are all made based
+on fixed geometric considerations.
 
 The following operations must have a full implementation in an expansion to be
 used with \texttt{FMM}: \texttt{StoT}, \texttt{StoM}, \texttt{StoL},
@@ -843,13 +862,33 @@ member of type \texttt{Point} with the name \texttt{position} must be provided;
 a member of type \texttt{dcomplex\_t} with the name \texttt{potential}
  must be provided.
 
+\subsection{\texttt{Helmholtz}}
+
+The \texttt{Helmholtz} expansion expands the Helmholtz potential in the
+low-frequency regime using spherical harmonics, spherical Bessel and Hankel
+functions. This potential is scaling variant, so a single kernel parameter
+must be provided to \texttt{evaluate()}. Calls to evaluate must also supply an
+accuracy parameter that gives the number of digits of accuracy required.
+
+Though this expansion is designed for use with the \texttt{FMM97} method.
+
+This expansion imposes the following restrictions on the source type: a
+member of type \texttt{Point} with the name \texttt{position} must be provided;
+a member of
+type \texttt{double} with the name \texttt{charge} must be provided.
+
+This expansion imposes the following restrictions on the target type: a
+member of type \texttt{Point} with the name \texttt{position} must be provided;
+a member of type \texttt{dcomplex\_t} with the name \texttt{potential}
+ must be provided.
+
 \subsection{\texttt{LaplaceCOM}}
 
 The \texttt{LaplaceCOM} expansion is a center of mass expansion of the Laplace
 potential. This form of the expansion extends to the quadrupole term, and
 because of the choice of center has an identically zero dipole term. This
-expansion can be used to compute the potential. See \texttt{LaplaceCOMAcc} for an
-equivalent expansion that computes the acceleration. This potential is
+expansion can be used to compute the potential. See \texttt{LaplaceCOMAcc} for
+an equivalent expansion that computes the acceleration. This potential is
 scale-invariant so no kernel parameters are needed in the call to
 \texttt{evaluate()}.
 Further, the number of terms in the expansion is fixed, so the accuracy
@@ -891,5 +930,4 @@ provided.
 
 This expansion imposes the following restrictions on the target type: a
 member of type \texttt{Point} with the name \texttt{position} must be provided;
-a member of type \texttt{double acceleration[3]} must
-be provided.
+a member \texttt{double acceleration[3]} must be provided.

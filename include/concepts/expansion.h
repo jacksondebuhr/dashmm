@@ -136,7 +136,7 @@ class Expansion {
   /// The number of terms in the expansion for the specified view.
   ///
   /// Do not confuse this with the size of the data in bytes for the given
-  /// view. That may be retried using get_views().
+  /// view. That may be retried using get_all_views().
   size_t view_size(int view) const;
 
   /// Get a term of the expansion.

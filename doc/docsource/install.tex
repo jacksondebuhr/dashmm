@@ -6,8 +6,8 @@ gives a brief sketch of the demo programs included with DASHMM.
 
 \section{Prerequisites}
 
-DASHMM v.\ 1.0.0 depends on one external library: HPX-5. The current
-version of DASHMM depends on version 4.0.0 of HPX-5 or later, which
+DASHMM v. \version depends on one external library: HPX-5. The current
+version of DASHMM depends on version 4.1.0 of HPX-5 or later, which
 may be found at \url{https://hpx.crest.iu.edu/}. Please see the
 official HPX-5 documentation for instructions on how to build, install
 and run HPX-5 on your system.
@@ -25,24 +25,28 @@ export PKG_CONFIG_PATH=/path/to/hpx/lib/pkgconfig:$PKG_CONFIG_PATH
 
 \section{Building DASHMM}
 
-The DASHMM library is straightforward to build. Once the previous
-prerequisite is met, one needs to perform the following steps:
+The DASHMM library is straightforward to build. DASHMM uses CMake for its
+build system, and so CMake of version at least 3.4 is required to build
+DASHMM. To build DASHMM, perform the following steps.
 
 \begin{enumerate}
 \item Unpack the source code into some convenient directory. For the
   sake of discussion, this guide assumes that the code has been
   unpacked in {\tt /path/to/dashmm/}.
-\item In {\tt /path/to/dashmm/} can be found {\tt Makefile}. There are
-  few (if any) changes that need to be made to this file for
-  successful compilation. The most likely change would be to modify
-  the compiler used. Any compiler supported by HPX-5 will be able to
-  compile DASHMM, provided it also support the C++11 standard. For
-  example, to change the compiler from the default ({\tt g++}) to the
-  Intel compiler, one needs to replace {\tt CXX=g++} with {\tt
-    CXX=icpc}.
-\item Run {\tt make} from {\tt /path/to/dashmm}. This should build the
-  library statically and it will be ready to link with your specific
-  application.
+\item Create some directory in which to build DASHMM. For the sake of argument,
+  assume that this is {\tt /path/to/dashmm/build/}.
+\item From that directory, run {\tt cmake .. -DCMAKE\_INSTALL\_PREFIX=/path/to/dashmm/install/}. It is \emph{not} recommended to use the default value for {\tt CMAKE\_INSTALL\_PREFIX}.  There are various additional options that
+  CMake will use during this process, see the CMake documentation for a
+  description of these. For instance, to change the compiler used,
+  specify {\tt -DCMAKE\_C\_COMPILER} and {\tt -DCMAKE\_CXX\_COMPILER} when running
+  {\tt cmake}.
+\item Run {\tt make} from {\tt /path/to/dashmm/build}.
+\item Run {\tt make install} from {\tt /path/to/dashmm/build/}. This will
+  install the library and the header files in the specified place.
+\item Further build targets are available, including
+  {\tt basic}, {\tt stepping} and {\tt user}, which build the various demo programs
+  included with DASHMM. These will not be installed by {\tt make install}, and
+  will instead be built in {\tt /path/to/dashmm/build/demo/}.
 \end{enumerate}
 
 Because DASHMM is heavily templated, a good deal of the code is
@@ -54,44 +58,44 @@ of DASHMM is worth the minor increase in compilation time.
 \section{Linking against DASHMM}
 
 To build a program using the DASHMM library, only a few things need to
-be done. DASHMM builds in place, so when compiling code that used the
-library, one must specify where to look for the header files, and
+be done. One must specify where to look for the header files, and
 where to look for the built library. Further, because DASHMM relies on
 HPX-5, one must also specify how to find HPX-5. For HPX-5 this is the
 easiest with the {\tt pkg-config} utility.
 
-Assuming that DASHMM was built in {\tt /path/to/dashmm}, to compile
-code (with, for example {\tt g++}) one must specify the following
+Assuming that DASHMM was installed in {\tt /path/to/dashmm/install/}, to
+compile code (with, for example {\tt g++}) one must specify the following
 arguments for compilation:
 
 \begin{lstlisting}[language=bash, frame=]
--I/path/to/dashmm/include $(shell pkg-config --cflags hpx)
+-I/path/to/dashmm/install/include $(shell pkg-config --cflags hpx)
 \end{lstlisting}
 
 \noindent Similarly, one must specify the following arguments for linking:
 
 \begin{lstlisting}[language=bash, frame=]
--L/path/to/dashmm/lib -ldashmm $(shell pkg-config --libs hpx)
+-L/path/to/dashmm/install/lib -ldashmm $(shell pkg-config --libs hpx)
 \end{lstlisting}
 
-\noindent Examples of this can be found in the demo programs included with
-DASHMM.
+For an example of automatically pulling and building DASHMM inside another
+project (with CMake), see the AFMPB project:
+\url{https://github.com/zhang416/afmpb}.
 
 \section{DASHMM demo programs}
 
 Included with DASHMM are several test codes that demonstrate the use
 of the library. These are found in the {\tt /path/to/dashmm/demo}
-subfolder. Each test can be built simply by running {\tt make} in the
-code's directory. Detailed information about each example can be found in
-the provided {\tt README} file.
+subfolder. Detailed information about each example can be found in
+the provided {\tt README} file. Each can be built by running
+{\tt make <target>}, where {\tt <target>} is the demo program name.
 
 \subsection{Basic demo}
 The {\tt basic} demo code creates a random distribution of source and
 target points and computes the potential at the targets due to the
 sources using any of the built-in kernels provided with DASHMM. A user
 can request a summary of the options to the test code by running the
-code with {\tt --help} as a command line argument, or by reading {\tt
-  /path/to/dashmm/demo/basic/README}.
+code with {\tt --help} as a command line argument, or by reading
+{\tt /path/to/dashmm/demo/basic/README}.
 
 \subsection{Time-stepping demo}
 The {\tt stepping} demo code creates a distribution of particles and
@@ -101,8 +105,8 @@ integrator, so many fine points of creating a good integrator are
 skipped. Instead, {\tt stepping} demonstrates those features of DASHMM
 that enable time-stepping codes as a use-case for DASHMM. A user can
 request a summary of the options to the code by running the code with
-{\tt --help} as a command line argument, or by reading {\tt
-  /path/to/dashmm/demo/stepping/README}.
+{\tt --help} as a command line argument, or by reading
+{\tt /path/to/dashmm/demo/stepping/README}.
 
 \subsection{User-defined expansion demo}
 
