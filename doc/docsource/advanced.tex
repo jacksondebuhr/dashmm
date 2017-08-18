@@ -556,18 +556,44 @@ provided address will be typecast.
 void *serialize(void *object, void *buffer) const
 \end{lstlisting}
 
-\noindent This method will serialize TODO
+\noindent This method will serialize the given object into the provided 
+\texttt{buffer}. This method then returns the address \texttt{buffer + bytes},
+where \texttt{bytes} is the number of bytes of the serialized form of 
+\texttt{object}.
 
 \begin{lstlisting}
 void *deserialize(void *buffer, void *object) const
 \end{lstlisting}
 
-\noindent TODO
+\noindent This method will deserialize an object from \texttt{buffer} into
+the provided \texttt{object}. This object already exists; this method fills
+in the correct values for the object, rather than creating a new object.
+The return value from this method is \texttt{buffer + bytes} where 
+\texttt{bytes} is the serialized size of the object.
 
 \section{Array}
 
-TODO: set_manager, get_manager
+When an \texttt{Array} contains records of a non-trivial type, the user of
+the array must provide an object that derives from \texttt{Serializer}, which
+has the task of serialization of those records. Without explicitly setting the
+serialization manager, an \texttt{Array} will initially have a
+\texttt{TrivialSerializer<T>} as its serialization manager, where \texttt{T} 
+is the record type of the array.
 
+At any point, an \texttt{Array}'s serialization manager can be changed with 
+the following method of \texttt{Array}.
+
+\begin{lstlisting}
+ReturnCode set_manager(std::unique_ptr<Serializer> manager)
+\end{lstlisting} 
+
+\noindent This method will set the serialization manager for the array to the 
+provided \texttt{Serializer} instance. This is a collective call, and all ranks
+must participate. Further, though it would be technically possible to do 
+otherwise, each rank should provide an object of the same subclass of 
+\texttt{Serializer}.
+
+\noindent
 
 \section{Array For Each Actions}
 
