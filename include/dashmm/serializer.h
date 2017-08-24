@@ -22,6 +22,20 @@
 namespace dashmm {
 
 
+/// Classes derived from Serializer are used to send data across the network
+///
+/// There are some times during a DASHMM evaluation that the Source or Target
+/// data is copied across the network (e.g. to serve S->T edges). To allow for
+/// non-trivial Source and Target record types, one can define a subclass of
+/// Serializer that will correctly serialize the record.
+///
+/// DASHMM comes with one built-in serialization object, TrivialSerializer.
+/// As the name suggests, the TrivialSerializer only works for objects that
+/// are trivially copyable. For more complicated records, a specific subclass
+/// should be created.
+///
+/// For more on how to set the Serializer for a given Array, see 
+/// include/dashmm/array.h
 class Serializer {
  public:
   virtual ~Serializer() { }

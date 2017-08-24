@@ -277,10 +277,6 @@ class ExpansionLCO {
   // Give the registrar access so that it might register our actions
   friend class ExpansionLCORegistrar<Source, Target, Expansion, Method>;
 
-  ///////////////////////////////////////////////////////////////////
-  // Types used internally
-  ///////////////////////////////////////////////////////////////////
-
   /// This stores the data needed to serve the out edge once the LCO is set
   struct OutEdgeRecord {
     Operation op;
@@ -306,10 +302,6 @@ class ExpansionLCO {
     ExpansionRole role;
     int yet_to_arrive;
   };
-
-  ///////////////////////////////////////////////////////////////////
-  // LCO Implementation
-  ///////////////////////////////////////////////////////////////////
 
   /// Initialization handler for Expansion LCOs
   ///
@@ -372,11 +364,6 @@ class ExpansionLCO {
   static bool predicate_handler(Header *i, size_t bytes) {
     return (i->yet_to_arrive == 0);
   }
-
-
-  ///////////////////////////////////////////////////////////////////
-  // Other related actions
-  ///////////////////////////////////////////////////////////////////
 
   /// Spawn the work at the out edges of this LCO
   ///
@@ -553,8 +540,10 @@ class ExpansionLCO {
   /// \param out_edges - the out edge data
   /// \param first - the first edge to be processed
   /// \param last - the last edge to be proceed
-  static void spawn_out_edges_work(Header *head, OutEdgeRecord *out_edges,
-                                   int first, int last) {
+  static void spawn_out_edges_work(Header *head,
+                                   OutEdgeRecord *out_edges,
+                                   int first,
+                                   int last) {
     for (int i = first; i <= last; ++i) {
       switch(out_edges[i].op) {
         case Operation::MtoM:
@@ -592,7 +581,8 @@ class ExpansionLCO {
   ///
   /// \param head - the incoming data
   /// \param target - global address of target LCO
-  static void m_to_m_out_edge(Header *head, hpx_addr_t target) {
+  static void m_to_m_out_edge(Header *head,
+                              hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOM_BEGIN();
     int from_child = head->index.which_child();
     auto translated = head->data->M_to_M(from_child);
@@ -606,7 +596,9 @@ class ExpansionLCO {
   /// \param head - the incoming data
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
-  static void m_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx) {
+  static void m_to_l_out_edge(Header *head,
+                              hpx_addr_t target,
+                              Index tidx) {
     EVENT_TRACE_DASHMM_MTOL_BEGIN();
     auto translated = head->data->M_to_L(head->index, tidx);
     expansionlco_t lco{target};
@@ -620,7 +612,8 @@ class ExpansionLCO {
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
   static void l_to_l_out_edge(Header *head,
-                              hpx_addr_t target, Index tidx) {
+                              hpx_addr_t target,
+                              Index tidx) {
     EVENT_TRACE_DASHMM_LTOL_BEGIN();
     int to_child = tidx.which_child();
     auto translated = head->data->L_to_L(to_child);
@@ -654,7 +647,6 @@ class ExpansionLCO {
   /// Serve an M->I edge
   ///
   /// \param head - the incoming data
-  /// \param views - ViewSet serving the expansion
   /// \param target - global address of target LCO
   static void m_to_i_out_edge(Header *head, hpx_addr_t target) {
     EVENT_TRACE_DASHMM_MTOI_BEGIN();
@@ -667,7 +659,6 @@ class ExpansionLCO {
   /// Serve an I->I edge
   ///
   /// \param head - the incoming data
-  /// \param views - ViewSet serving the expansion
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
   static void i_to_i_out_edge(Header *head, hpx_addr_t target, Index tidx) {
@@ -681,7 +672,6 @@ class ExpansionLCO {
   /// Serve an I->L edge
   ///
   /// \param head - the incoming data
-  /// \param views - ViewSet serving the expansion
   /// \param target - global address of target LCO
   /// \param tidx - index of target LCO
   static void i_to_l_out_edge(Header *head, hpx_addr_t target, Index tidx) {

@@ -12,11 +12,11 @@
 // =============================================================================
 
 
-#include "dashmm/viewset.h"
-
-
 /// \file
 /// \brief Implementation of ViewSet
+
+
+#include "dashmm/viewset.h"
 
 
 namespace dashmm {

@@ -47,9 +47,6 @@ namespace dashmm {
 /// two responsibilities: performing multipole method evaluations, and
 /// registration of actions with the runtime system.
 ///
-/// The interface for the object contains only one member, evaluate(), which
-/// performs a multipole method evaluation.
-///
 /// In addition, the object's constructor performs its second duty. DASHMM is
 /// a templated library. HPX-5 requires the address of functions that are to
 /// be called as actions. Thus, we must somehow manage to register the specific
@@ -303,8 +300,10 @@ class Evaluator {
   ///            the runtime.
   ReturnCode evaluate(const Array<source_t> &sources,
                       const Array<target_t> &targets,
-                      int refinement_limit, const method_t *method,
-                      int n_digits, const std::vector<double> *kernelparams,
+                      int refinement_limit,
+                      const method_t *method,
+                      int n_digits,
+                      const std::vector<double> *kernelparams,
                       distropolicy_t distro = distropolicy_t{}) {
     DualTreeHandle tree = create_tree(sources, targets, refinement_limit);
     auto dag = create_DAG(tree, n_digits, kernelparams,
@@ -488,7 +487,7 @@ class Evaluator {
     hpx_addr_t done = hpx_lco_and_new(n_workers);
     DAGNode **data = nodes.data();
 
-    for (int i = 0; i < remainder; ++i) {
+    for (size_t i = 0; i < remainder; ++i) {
       size_t start = i * (delta + 1);
       size_t end = start + delta + 1;
       DAGNode **first = &data[start];

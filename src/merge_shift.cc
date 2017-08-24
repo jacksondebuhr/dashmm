@@ -12,8 +12,9 @@
 // =============================================================================
 
 
-/// \file src/merge_shift.cc
+/// \file
 /// \brief Declare merge-and-shift table
+
 
 #include "builtins/merge_shift.h"
 

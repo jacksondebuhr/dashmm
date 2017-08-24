@@ -12,6 +12,10 @@
 // =============================================================================
 
 
+/// \file
+/// \brief SingleLocality distribution implementation
+
+
 #include "builtins/singlelocdistro.h"
 
 

@@ -124,14 +124,6 @@ class Expansion {
   /// it will be a smaller number if the object is created from a ViewSet.
   int view_count() const;
 
-  /// Fill in the data for a view object
-  ///
-  /// Given a ViewSet that contains the view indices, this will populate the
-  /// bytes and data members for the ViewSet. Note that this does not mean a
-  /// copy will be made of the data, but merely that the data pointers will be
-  /// valid.
-  void get_views(ViewSet &view) const;
-
   /// Get all the current views of the object
   ViewSet get_all_views() const;
 
@@ -144,7 +136,7 @@ class Expansion {
   /// The number of terms in the expansion for the specified view.
   ///
   /// Do not confuse this with the size of the data in bytes for the given
-  /// view. That may be retried using get_views().
+  /// view. That may be retried using get_all_views().
   size_t view_size(int view) const;
 
   /// Get a term of the expansion.
@@ -173,7 +165,8 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting multipole expansion
-  std::unique_ptr<expansion_t> S_to_M(source_t *first, source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_M(const source_t *first,
+                                      const source_t *last) const;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -186,7 +179,8 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(source_t *first, source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_L(const source_t *first,
+                                      const source_t *last) const;
 
   /// Change center of a multipole expansion
   ///
@@ -243,8 +237,10 @@ class Expansion {
   /// \param s_last - one past the last source point
   /// \param t_first - the first target point
   /// \param t_last - one past the last target point
-  void S_to_T(source_t *s_first, source_t *s_last,
-              target_t *t_first, target_t *t_last) const;
+  void S_to_T(const source_t *s_first,
+              const source_t *s_last,
+              target_t *t_first,
+              target_t *t_last) const;
 
   /// Compute an intermediate expansion from a multipole expansion.
   ///

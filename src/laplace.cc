@@ -11,6 +11,11 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
+/// \file
+/// Implementation of Laplace kernel
+
+
 #include "builtins/laplace.h"
 
 namespace dashmm {

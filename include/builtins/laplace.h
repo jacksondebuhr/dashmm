@@ -50,24 +50,24 @@ namespace dashmm {
 /// of the charge.
 ///
 
-void lap_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR); 
-void lap_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR); 
+void lap_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR);
+void lap_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR);
 
-void lap_s_to_m(Point dist, double q, double scale, dcomplex_t *M); 
+void lap_s_to_m(Point dist, double q, double scale, dcomplex_t *M);
 void lap_s_to_l(Point dist, double q, double scale, dcomplex_t *L);
-void lap_m_to_m(int from_child, const dcomplex_t *M, dcomplex_t *W); 
-void lap_l_to_l(int to_child, const dcomplex_t *L, dcomplex_t *W); 
-void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id); 
-void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int sid, int tid, ViewSet &t_views); 
-void lap_i_to_l(const ViewSet &views, int id, Index t_index, double scale, 
-                dcomplex_t *L); 
-void lap_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z); 
-void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L); 
+void lap_m_to_m(int from_child, const dcomplex_t *M, dcomplex_t *W);
+void lap_l_to_l(int to_child, const dcomplex_t *L, dcomplex_t *W);
+void lap_m_to_i(const dcomplex_t *M, ViewSet &views, int id);
+void lap_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
+                int sid, int tid, ViewSet &t_views);
+void lap_i_to_l(const ViewSet &views, int id, Index t_index, double scale,
+                dcomplex_t *L);
+void lap_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z);
+void lap_e_to_l(const dcomplex_t *E, char dir, bool sgn, dcomplex_t *L);
 
-std::vector<double> lap_m_to_t(Point dist, double scale, 
+std::vector<double> lap_m_to_t(Point dist, double scale,
                                const dcomplex_t *M, bool g = false);
-std::vector<double> lap_l_to_t(Point dist, double scale, 
+std::vector<double> lap_l_to_t(Point dist, double scale,
                                const dcomplex_t *L, bool g = false);
 
 
@@ -158,25 +158,27 @@ class Laplace {
     return data[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_M(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center);
-      lap_s_to_m(dist, i->charge, scale, M); 
+      lap_s_to_m(dist, i->charge, scale, M);
     }
    return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, center); 
+      Point dist = point_sub(i->position, center);
       lap_s_to_l(dist, i->charge, scale, L);
     }
     return std::unique_ptr<expansion_t>{retval};
@@ -186,7 +188,7 @@ class Laplace {
     expansion_t *retval{new expansion_t{kSourcePrimary}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    lap_m_to_m(from_child, M, W); 
+    lap_m_to_m(from_child, M, W);
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -251,7 +253,7 @@ class Laplace {
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    lap_l_to_l(to_child, L, W); 
+    lap_l_to_l(to_child, L, W);
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -260,8 +262,8 @@ class Laplace {
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center()); 
-      auto result = lap_m_to_t(dist, scale, M); 
+      Point dist = point_sub(i->position, views_.center());
+      auto result = lap_m_to_t(dist, scale, M);
       i->phi += result[0];
     }
   }
@@ -271,14 +273,16 @@ class Laplace {
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center()); 
-      auto result = lap_l_to_t(dist, scale, L); 
+      Point dist = point_sub(i->position, views_.center());
+      auto result = lap_l_to_t(dist, scale, L);
       i->phi += result[0];
     }
   }
 
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const {
+  void S_to_T(const Source *s_first,
+              const Source *s_last,
+              Target *t_first,
+              Target *t_last) const {
     for (auto i = t_first; i != t_last; ++i) {
       dcomplex_t potential{0.0, 0.0};
       for (auto j = s_first; j != s_last; ++j) {
@@ -295,13 +299,13 @@ class Laplace {
   std::unique_ptr<expansion_t> M_to_I() const {
     expansion_t *retval{new expansion_t{kSourceIntermediate}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    lap_m_to_i(M, retval->views_, 0); 
+    lap_m_to_i(M, retval->views_, 0);
     return std::unique_ptr<expansion_t>(retval);
   }
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
-    ViewSet views{kTargetIntermediate}; 
-    lap_i_to_i(s_index, t_index, views_, 0, 0, views); 
+    ViewSet views{kTargetIntermediate};
+    lap_i_to_i(s_index, t_index, views_, 0, 0, views);
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
   }
@@ -310,8 +314,8 @@ class Laplace {
     // t_index is the index of the child
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    double scale = views_.scale() * 2; 
-    lap_i_to_l(views_, 0, t_index, scale, L); 
+    double scale = views_.scale() * 2;
+    lap_i_to_l(views_, 0, t_index, scale, L);
     return std::unique_ptr<expansion_t>(retval);
   }
 

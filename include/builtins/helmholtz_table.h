@@ -153,6 +153,7 @@ private:
 extern std::unique_ptr<HelmholtzTable> builtin_helmholtz_table_;
 
 void update_helmholtz_table(int n_digits, double size, double omega);
+
 }; // namespace dashmm
 
 #endif

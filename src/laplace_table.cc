@@ -12,7 +12,7 @@
 // =============================================================================
 
 
-/// \file src/laplace_table.cc
+/// \file
 /// \brief Implementation of precomputed tables for Laplace
 
 

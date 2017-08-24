@@ -23,9 +23,8 @@ the previous.
 \label{sec:advconcepts}
 
 This sections covers the conceptual framework of DASHMM's implementation
-of general multipole methods.
-The following abstractions form the basis for the implementation of multipole
-methods in DASHMM.
+of general multipole methods. The following abstractions form the basis for the
+implementation of multipole methods in DASHMM.
 
 \subsection{The Dual Tree}
 
@@ -69,7 +68,7 @@ The explicit DAG is represented in DASHMM with objects that an advanced user of
 DASHMM might need to interact with. The implicit DAG comprises a number of
 HPX-5-aware objects that manage the parallel execution. The exact use and form
 of these objects is not necessary for even an advanced user; DASHMM insulates
-the user from specific details of HPX-5.
+the user from these details.
 
 \subsection{Expansion Roles}
 
@@ -124,6 +123,9 @@ The \texttt{StoT} operation computes the direct effect of a set of sources on
 a set of targets. If a method only schedules \texttt{StoT} operations, it will
 be the same as the direct summation method.
 
+The \texttt{StoL} operation computes the effect of a set of sources on a
+volume of the target tree.
+
 The \texttt{MtoI} operation transforms the summary information on the source
 tree into another form that certain advanced methods might find useful. The use
 of these intermediate expansions is what distinguishes FMM and FMM97. The
@@ -157,7 +159,7 @@ kernel. In the most direct sense, the kernel can be seen in the implemented
 \texttt{StoT} operation.
 
 Some kernels will have parameters that control the exact shape of the potential.
-In particular, the built-in Yukawa kernel is scaling variant, and so the
+For example, the built-in Yukawa kernel is scaling variant, and so the
 scale must be provided to DASHMM. These kernel parameters also impact the
 expansions that are employed in Expansion. Further, often there is some one-time
 precomputation that can occur that produces values that are used in the various
@@ -167,6 +169,29 @@ and is made available to all ranks. The table represents any values needed
 by the expansions and operations that does not change as the inputs to the
 operations change.
 
+\subsection{Methods and DAG creation}
+
+There are four main operations that a Method will employ during DAG discovery.
+
+The first is \emph{generate}. This operation is responsible for creating an
+approximation at the leaves of a source tree from the source records. This is
+often the generation of the multipole expansions from the source data.
+
+The second is \emph{aggregate}. In aggregate, the summary expansions computed
+at the child of a given node are combined into a summary that corresponds to
+all of the sources that are descendants of the given node.
+
+The third is \emph{inherit}. The inherit operation will take summary
+information for target nodes and will create summary information for the
+children of that node. Note that operations that end at a target leaf are not
+discovered in this operation.\footnote{This is an asymmetry that will be
+rectified in future versions of DASHMM.}
+
+The fourth is \emph{process}. It is in process that the bulk of the work of
+creating the DAG is done. This is responsible for forging any connection
+between the two trees. Notice that generate and aggregate only connect nodes
+on the source tree, and that inherit only connects nodes in the target tree.
+All other connections are made in process.
 
 
 \section{Basic types}
@@ -386,6 +411,8 @@ sizes. This, however, should not be set to take all of the system memory.
 
 \section{Evaluation}
 
+\subsection{Distribution Policy}
+
 The \texttt{Evaluator} object has one additional feature that was not
 covered in the previous chapter. In addition to the parameters outlined
 in Chapter~\ref{ch:basic}, one final optional parameter is available.
@@ -400,17 +427,185 @@ object of the type \texttt{Method<Source, Target, Expansion>::distropolicy\_t},
 where \texttt{Method, Source, Target} and \texttt{Expansion} are the template
 arguments supplied to the particular instance of \texttt{Evaluator}.
 
+\subsection{Expanded API}
+
+In addition to the one-size-fits-all approach implemented in the
+\texttt{evaluate()}, \texttt{Evaluator} objects expose sub-steps of the
+evaluation process. This is to enable uses in iterative methods, where the
+same DAG is used multiple times. Rather than creating the Dual Tree and
+discovering the DAG each iteration, they can be created only once, and
+reused.
+
+\begin{lstlisting}
+DualTreeHandle Evaluator::create_tree(
+    const Array<Source> &sources,
+    const Array<Target> &targets,
+    int refinement_limit)
+\end{lstlisting}
+
+\noindent Create a Dual Tree object in the global address space from the
+given \texttt{sources} and \texttt{targets}, and with the given
+\texttt{refinement\_limit}. The return value of this method is an opaque
+handle to the created Dual Tree. This value, being a handle, can be freely
+copied.
+
+This is a collective call and all ranks must participate.
+
+\begin{lstlisting}
+std::unique_ptr<DAG> Evaluator::create_DAG(
+    DualTreeHandle tree,
+    int n_digits,
+    const std::vector<double> *kernel_params,
+    const Method<Source, Target, Expansion<Source, Target>> *method,
+    distropolicy_t distro = distropolicy_t{})
+\end{lstlisting}
+
+\noindent Given a \texttt{tree}, an accuracy parameter \texttt{n\_digits},
+the kernel
+parameters, \texttt{kernel\_params} to use for this DAG, an instance of a
+Method object, and an optional distribution policy instance, this method will
+create the DAG corresponding to the given method for the given Dual Tree.
+
+This is a collective call, and all ranks must participate.
+
+\begin{lstlisting}
+ReturnCode Evaluator::execute_DAG(DualTreeHandle tree, DAG *dag)
+\end{lstlisting}
+
+\noindent Once the DAG has been constructed, this method will execute the work
+represented by the given DAG. This will return either \texttt{kSuccess} on
+successful execution, or \texttt{kRuntimeError} if there is a problem during
+the execution.
+
+After this call, the DAG is left in a used state. If the DAG is to be used
+again, it must be reset (see \texttt{reset\_DAG} below).
+
+This is a collective call, and all ranks must participate.
+
+\begin{lstlisting}
+ReturnCode Evaluator::reset_DAG(DAG *dag)
+\end{lstlisting}
+
+\noindent This will take a DAG that has been executed with the
+\texttt{execute\_DAG}
+method, and will reset the internal data structures so that it might be used
+again. Note that this does not actually perform the execution of that DAG,
+merely prepares it to be executed.
+
+This will return either \texttt{kSuccess} if there is no error, or
+\texttt{kRuntimeError} in the case of an error.
+
+This is a collective call, and all ranks must participate.
+
+\begin{lstlisting}
+ReturnCode Evaluator::destroy_DAG(
+    DualTreeHandle tree, 
+    std::unique_ptr<DAG> dag)
+\end{lstlisting}
+
+\noindent This will destroy a DAG. This will return either \texttt{kSuccess}
+if the destruction proceeds without error, or will return
+\texttt{kRuntimeError}.
+
+This is a collective call, and all ranks must participate.
+
+\begin{lstlisting}
+ReturnCode Evaluator::destroy_tree(DualTreeHandle tree)
+\end{lstlisting}
+
+\noindent This method destroys the Dual Tree specified by \texttt{tree}. This
+will return either \texttt{kSuccess} after successfully destroying the tree, or
+\texttt{kRuntimeError} if there is some error.
+
+This is a collective call, and all ranks must participate.
 
 
-\section{Array map actions}
+\section{Serializer}
+\label{sec:serializer}
 
-The \texttt{ArrayMapAction} utility class supports a third template parameter
-that controls the level of parallelism employed in the mapping of the work
-to the records in the array. This parameter is an integer that has the
+Source and Target data may at times need to be copied around the system, either
+locally or across the network. To allow for non-trivial Source and Target
+types, DASHMM allows the user to specify a serialization manager. This is
+a subclass of the \texttt{Serializer} abstract class, which has the job of
+correctly serializing and deserializing the data in a Source or Target
+record. Each \texttt{Array} has a serialization manager associated with it that
+takes responsibility for this serialization.
+
+\subsection{\texttt{TrivialSerializer}}
+
+DASHMM comes with one built in subclass of \texttt{Serializer}, called
+\texttt{TrivialSerializer}, which is actually a template over a single
+template parameter. It can work for any trivially-copyable type, and is the
+default serialization manager installed when a new \texttt{Array} is
+allocated.
+
+\subsection{\texttt{Serializer} Interface}
+
+The interface that all subclasses of \texttt{Serializer} must implement is
+given below.
+
+\begin{lstlisting}
+size_t Serializer::size(void *object) const
+\end{lstlisting}
+
+\noindent This method will return the serialized size in bytes of the given
+object. The interface does not contain any information about the type of the
+object, and so it is up to the user of DASHMM to assure that the subclass is
+used only for compatible objects. Typically, inside the implementation, the
+provided address will be typecast.
+
+\begin{lstlisting}
+void *Serializer::serialize(void *object, void *buffer) const
+\end{lstlisting}
+
+\noindent This method will serialize the given object into the provided 
+\texttt{buffer}. This method then returns the address \texttt{buffer + bytes},
+where \texttt{bytes} is the number of bytes of the serialized form of 
+\texttt{object}.
+
+\begin{lstlisting}
+void *Serializer::deserialize(void *buffer, void *object) const
+\end{lstlisting}
+
+\noindent This method will deserialize an object from \texttt{buffer} into
+the provided \texttt{object}. This object already exists; this method fills
+in the correct values for the object, rather than creating a new object.
+The return value from this method is \texttt{buffer + bytes} where 
+\texttt{bytes} is the serialized size of the object.
+
+\section{Array}
+
+When an \texttt{Array} contains records of a non-trivial type, the user of
+the array must provide an object that derives from \texttt{Serializer}, which
+has the task of serialization of those records. Without explicitly setting the
+serialization manager, an \texttt{Array} will initially have a
+\texttt{TrivialSerializer<T>} as its serialization manager, where \texttt{T} 
+is the record type of the array.
+
+At any point, an \texttt{Array}'s serialization manager can be changed with 
+the following method of \texttt{Array}.
+
+\begin{lstlisting}
+ReturnCode Array<T>::set_manager(std::unique_ptr<Serializer> manager)
+\end{lstlisting} 
+
+\noindent This method will set the serialization manager for the array to the 
+provided \texttt{Serializer} instance. This is a collective call, and all ranks
+must participate. Further, though it would be technically possible to do 
+otherwise, each rank should provide an object of the same subclass of 
+\texttt{Serializer}.
+
+\noindent
+
+\section{Array For Each Actions}
+
+The \texttt{ArrayForEachAction} utility class supports a third template
+parameter that controls the level of parallelism employed in the mapping of
+the work to the records in the array. This parameter is an integer that has the
 following meaning: if the argument is zero, the array will be handled in a
-single chunk; if the argument is positive, the array will be handled in a number
-of chunks equal to the number of HPX-5 scheduler threads times the provided
-argument.
+single chunk; if the argument is positive, the array will be handled in a
+number of chunks equal to the number of HPX-5 scheduler threads times the
+provided argument.
 
 The default value of this argument is 1, so the default operation of
 the map will be to split each rank's portion of the array into a number of
@@ -418,14 +613,14 @@ equally sized pieces equal to the number of scheduler threads. Unless there is
 the possibility for variation in the amount of computation that the mapped
 action performs per record, it is likely that the default value will be
 sufficient. If, however, the work for each record is variable, better
-performance may be achieved with smaller chunks, and thus larger third arguments
-to the template.
+performance may be achieved with smaller chunks, and thus larger third
+arguments to the template.
 
-The full declaration of \texttt{ArrayMapAction} is as follows:
+The full declaration of \texttt{ArrayForEachAction} is as follows:
 
 \begin{lstlisting}[frame=]
 template <typename T, typename E, int factor = 1>
-class ArrayMapAction;
+class ArrayForEachAction;
 \end{lstlisting}
 
 
@@ -506,10 +701,16 @@ give the locality a value of \texttt{-1}, and default construct the remaining
 members of the node.
 
 \begin{lstlisting}
-bool DAGNode::in_count() const
+size_t DAGNode::in_count() const
 \end{lstlisting}
 
 \noindent Returns the number of incoming edges to this node.
+
+\begin{lstlisting}
+size_t DAGNode::out_count() const
+\end{lstlisting}
+
+\noindent Returns the number of outgoing edges from this node.
 
 \begin{lstlisting}
 Index DAGNode::index()
@@ -534,7 +735,7 @@ bool DAGNode::is_normal() const
 bool DAGNode::is_interm() const
 \end{lstlisting}
 
-\noindent Inidicates if this node represents an intermediate expansion.
+\noindent Indicates if this node represents an intermediate expansion.
 
 
 \subsection{\texttt{DAG}}
@@ -547,20 +748,20 @@ by their position in the DAG.
 The \texttt{DAG} object has the following members:
 
 \begin{lstlisting}
-std::vector<DAGNode *> source_leaves
+std::vector<DAGNode *> DAG::source_leaves
 \end{lstlisting}
 
 \noindent Nodes of the DAG that are associated with leaves of the source tree.
 These nodes will have no incoming edges.
 
 \begin{lstlisting}
-std::vector<DAGNode *> source_nodes
+std::vector<DAGNode *> DAG::source_nodes
 \end{lstlisting}
 
 \noindent All other DAG nodes that are associated with nodes of the source tree.
 
 \begin{lstlisting}
-std::vector<DAGNode *> target_leaves
+std::vector<DAGNode *> DAG::target_leaves
 \end{lstlisting}
 
 \noindent Nodes of the DAG that are associated with leaves of the target tree.
@@ -570,7 +771,7 @@ target tree after which more refinement for the method would only induce
 unnecessary overhead.
 
 \begin{lstlisting}
-std::vector<DAGNode *> target_nodes
+std::vector<DAGNode *> DAG::target_nodes
 \end{lstlisting}
 
 \noindent All other DAG nodes that are associated with node of the target tree.
@@ -583,8 +784,8 @@ The \texttt{DAGInfo} object contains all the information related to the DAG
 for each node of the source and target trees. These objects will be the
 primary means by which a Method interacts with the DAG.
 
-Each \texttt{DAGInfo} object represents up to three DAG nodes: a particles
-node, the normal DAG node, and an intermediate DAG node. The particles node
+Each \texttt{DAGInfo} object represents up to three DAG nodes: a particle
+node, the normal DAG node, and an intermediate DAG node. The particle node
 represents the terminal nodes of the DAG: either the information about
 the sources, or the information about the targets. These DAG nodes do not
 represent expansions. The normal
@@ -797,7 +998,10 @@ ViewSet::ViewSet()
 \noindent Default construct the object.
 
 \begin{lstlisting}
-ViewSet::ViewSet(ExpansionRole role, const Point &center, double scale)
+ViewSet::ViewSet(
+    ExpansionRole role,
+    const Point &center = Point{},
+    double scale = 1.0)
 \end{lstlisting}
 
 \noindent Create an empty \texttt{ViewSet}, while setting a few vital features:
@@ -1060,11 +1264,13 @@ using expansion_t = Expansion<Source, Target>;
 \end{lstlisting}
 
 \noindent The latter introduces some brevity, while the former are mostly
-for completeness, though in some situations involving the \texttt{auto} keyword
-they allow for retrieving the Source and Target type.
+for completeness.
 
 \begin{lstlisting}
-Expansion::Expansion(Point center, double scale, ExpansionRole role)
+Expansion::Expansion(
+    ExpansionRole role,
+    double scale = 1.0,
+    Point center = Point{})
 \end{lstlisting}
 
 \noindent This constructor creates the expansion object with the given
@@ -1130,15 +1336,6 @@ smaller number for an expansion created by interpretation in the second
 constructor.
 
 \begin{lstlisting}
-void Expansion::get_views(ViewSet &views) const
-\end{lstlisting}
-
-\noindent Fill in data in the \texttt{views} object. Given a \texttt{ViewSet}
-that contains the view indices, this will populate the size and data members
-of \texttt{views}. Note that this does not perform a copy of the data in the
-views.
-
-\begin{lstlisting}
 ViewSet Expansion::get_all_views() const
 \end{lstlisting}
 
@@ -1163,7 +1360,7 @@ size_t Expansion::view_size(int view) const
 \noindent Return the view size for the specified \texttt{view}. This returns
 the number of terms in the expansion for the given view. Do not confuse this
 with the size in bytes of the data in a given view, which can be obtained with
-\texttt{get\_views()}.
+\texttt{get\_all\_views()}.
 
 \begin{lstlisting}
 dcomplex_t Expansion::view_term(int view, size_t i) const
@@ -1194,30 +1391,29 @@ The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t>
-Expansion::M_to_M(int from_child, double s_size) const
+Expansion::M_to_M(int from_child) const
 \end{lstlisting}
 
 \noindent Change the center of a multipole expansion. The shift in the center
 is specified through \texttt{from\_child}, which indicates the child from which
-the expansion is being converted. \texttt{s\_size} is the size of that child
-node.
+the expansion is being converted.
 This expansion will have a role of \texttt{kSourcePrimary}.
 The returned expansion will have a role of \texttt{kSourcePrimary}.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t>
-Expansion::M_to_L(Index s_index, double s_size, Index t_index) const
+Expansion::M_to_L(Index s_index, Index t_index) const
 \end{lstlisting}
 
 \noindent Convert a multipole expansion to a local expansion. To specify the
 change the source and target indices (\texttt{s\_index} and \texttt{t\_index}),
-as well as the size of the source (\texttt{s\_size}) are provided.
+are provided.
 This expansion will have a role of \texttt{kSourcePrimary}.
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t>
-Expansion::L_to_L(int to_child, double t_size) const
+Expansion::L_to_L(int to_child) const
 \end{lstlisting}
 
 \noindent Convert a local expansion to a local expansion for a child. The
@@ -1254,36 +1450,32 @@ The sources and targets are specified by pointers to the first and one past the
 last record.
 
 \begin{lstlisting}
-std::unique_ptr<expansion_t> Expansion::M_to_I(Index s_index) const
+std::unique_ptr<expansion_t> Expansion::M_to_I() const
 \end{lstlisting}
 
 \noindent Create an intermediate expansion from a multipole expansion.
-\texttt{s\_index} is the index of the tree node being represented by both the
-multipole and intermediate expansions.
 This expansion will have a role of \texttt{kSourcePrimary}.
 The returned expansion will have a role of \texttt{kSourceIntermediate}.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t>
-Expansion::I_to_I(Index s_index, double s_size, Index t_index) const
+Expansion::I_to_I(Index s_index, Index t_index) const
 \end{lstlisting}
 
 \noindent Translate a source-side intermediate expansion into a target-side
 intermediate expansion. The \texttt{s\_index} and \texttt{t\_index} are the
 index of the tree nodes that are represented by this object, and the
-resulting expansion, respectively. Additionally, the \texttt{s\_size} gives
-the size of the source tree node.
+resulting expansion, respectively.
 This expansion will have a role of \texttt{kSourceIntermediate}.
 The returned expansion will have a role of \texttt{kTargetIntermediate}.
 
 \begin{lstlisting}
 std::unique_ptr<expansion_t>
-Expansion::I_to_L(Index t_index, double t_size) const
+Expansion::I_to_L(Index t_index) const
 \end{lstlisting}
 
 \noindent Translate a target-side intermediate expansion into a local
-expansion. The target tree node's index, \texttt{t\_index}, and size,
-\texttt{t\_size}, are provided.
+expansion. The target tree node's index, \texttt{t\_index}, is provided.
 This expansion will have a role of \texttt{kTargetIntermediate}.
 The returned expansion will have a role of \texttt{kTargetPrimary}.
 
@@ -1295,8 +1487,10 @@ void Expansion::add_expansion(const expansion_t *temp)
 summing the coefficients, but can be more involved in some cases.
 
 \begin{lstlisting}
-static void Expansion::update_table(int n_digits, double domain_size,
-                                   const std::vector<double> &kernel_params)
+static void Expansion::update_table(
+    int n_digits,
+    double domain_size,
+    const std::vector<double> &kernel_params)
 \end{lstlisting}
 
 \noindent Update a kernel table. This should generate or update a kernel table
@@ -1332,8 +1526,10 @@ table. In particular, kernel parameters needed by this routine should be
 stored in the table.
 
 \begin{lstlisting}
-static int Expansion::weight_estimate(Operation op, Index s = Index{},
-                                      Index t = Index{})
+static int Expansion::weight_estimate(
+    Operation op,
+    Index s = Index{},
+    Index t = Index{})
 \end{lstlisting}
 
 \noindent Compute an estimate of the cost to send the result of the given
@@ -1345,7 +1541,7 @@ the cost. In others, the source and target indices, \texttt{s} and \texttt{t}.
 
 \section{User-defined Methods}
 
-To create a user-defined Method, one must create a class with that conforms
+To create a user-defined Method, one must create a class that conforms
 to the following interface. For a description of the four primary routines
 of a Method, please see~\ref{sec:advconcepts}. To implement a user-defined
 Method, one must be familiar with the following DASHMM constructs: the
@@ -1433,8 +1629,10 @@ requires. Further, operations between nodes should be scheduled. The typical
 operation for \texttt{aggregate} is \texttt{MtoM}.
 
 \begin{lstlisting}
-void Method::inherit(targetnode_t *curr, DomainGeometry *domain,
-                     bool curr_is_leaf) const
+void Method::inherit(
+    targetnode_t *curr,
+    DomainGeometry *domain,
+    bool curr_is_leaf) const
 \end{lstlisting}
 
 \noindent
@@ -1450,8 +1648,11 @@ operation for \texttt{inherit} is \texttt{LtoL}.
 
 
 \begin{lstlisting}
-void Method::process(targetnode_t *curr, std::vector<sourcenode_t *> &consider,
-                     bool curr_is_leaf, DomainGeometry *domain) const
+void Method::process(
+    targetnode_t *curr,
+    std::vector<sourcenode_t *> &consider,
+    bool curr_is_leaf,
+    DomainGeometry *domain) const
 \end{lstlisting}
 
 \noindent
@@ -1475,9 +1676,10 @@ was true. In that case, it should be that \texttt{consider} will have been
 completely used by the call to \texttt{process}.
 
 \begin{lstlisting}
-void Method::refine_test(bool same_sources_and_targets,
-                         const targetnode_t *curr,
-                         const std::vector<sourcenode_t *> &consider) const
+void Method::refine_test(
+    bool same_sources_and_targets,
+    const targetnode_t *curr,
+    const std::vector<sourcenode_t *> &consider) const
 \end{lstlisting}
 
 \noindent

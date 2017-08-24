@@ -19,6 +19,7 @@
 /// \file
 /// \brief Definitions needed to interact with DASHMM array objects.
 
+
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -112,7 +113,7 @@ class Array {
   ///
   /// This is called from the SPMD user-application. This cannot be used
   /// inside an HPX-5 thread. Each rank of the user application will provide
-  /// its own @p record count. The resulting array will be created with the
+  /// its own @p record_count. The resulting array will be created with the
   /// provided distribution of records. One or more of these counts can be
   /// zero provided there is at least one non-zero count from some rank.
   ///
@@ -121,7 +122,7 @@ class Array {
   /// local segment of the array for the calling rank. DASHMM will assume
   /// ownership of a segment provided in this fashion.  Each rank can provide
   /// a segment and the resulting Array will be formed of the provided
-  /// segments. If this options is omitted or is nullptr, DASHMM will allocate
+  /// segments. If this option is omitted or is nullptr, DASHMM will allocate
   /// memory, which must be accessed via other methods.
   ///
   /// \param record_count - the number of records that will be in the array
@@ -295,7 +296,7 @@ class Array {
   /// records, that will have to be fixed with a call to resum().
   ///
   /// NOTE: This can only be called from inside an HPX-5 thread, and as such,
-  /// It is suggested that the casual user not use this routine.
+  /// It is suggested that the casual user not call this routine.
   ///
   /// \param ref - an ArrayRef giving the new segment to install for this rank
   ///
@@ -535,9 +536,11 @@ class Array {
   ///                   total array length
   /// \param record_size - the size of each record
   /// \param record_count - the number of records for this rank
+  /// \param segment - a segment to assume ownership of, can be nullptr
   ///
   /// \returns - HPX_SUCCESS
-  static int allocate_local_work_handler(hpx_addr_t data, hpx_addr_t reducer,
+  static int allocate_local_work_handler(hpx_addr_t data, 
+                                         hpx_addr_t reducer,
                                          hpx_addr_t retcode,
                                          size_t record_count,
                                          T *segment) {
@@ -588,6 +591,7 @@ class Array {
   /// Action to deallocate the reduction LCO used during Array allocation
   ///
   /// \param reducer - the global address of the reduction LCO
+  /// \param retcide - the return value reduction LCO
   ///
   /// \returns - HPX_SUCCESS
   static int allocate_array_destroy_reducer_handler(hpx_addr_t reducer,
@@ -642,7 +646,7 @@ class Array {
   /// take the maximum value.
   ///
   /// \returns - HPX_SUCCESS
-  static int get_or_put_retcode_reducer_handler(void) {
+  static int get_or_put_retcode_reducer_handler() {
     hpx_addr_t retval = hpx_lco_reduce_new(hpx_get_num_ranks(),
         sizeof(int), int_max_ident_op, int_max_op);
     hpx_exit(sizeof(retval), &retval);
@@ -671,8 +675,11 @@ class Array {
   /// \param reducer - the LCO that will reduce the error codes from each rank
   ///
   /// \returns - HPX_SUCCESS
-  static int array_get_handler(hpx_addr_t obj, size_t first, size_t last,
-                               T *out_data, hpx_addr_t reducer) {
+  static int array_get_handler(hpx_addr_t obj, 
+                               size_t first, 
+                               size_t last,
+                               T *out_data, 
+                               hpx_addr_t reducer) {
     int retval = kSuccess;
 
     hpx_addr_t global = hpx_addr_add(obj,
@@ -712,8 +719,11 @@ class Array {
   /// \param reducer - the LCO that will combine error codes from each rank
   ///
   /// \returns - HPX_SUCCESS
-  static int array_put_handler(hpx_addr_t obj, size_t first, size_t last,
-                               T *in_data, hpx_addr_t reducer) {
+  static int array_put_handler(hpx_addr_t obj, 
+                               size_t first, 
+                               size_t last,
+                               T *in_data, 
+                               hpx_addr_t reducer) {
     int retval = kSuccess;
 
     hpx_addr_t global = hpx_addr_add(obj,
@@ -739,6 +749,13 @@ class Array {
     hpx_exit(sizeof(retval), &retval);
   }
 
+  /// Action to serve segment requests
+  ///
+  /// The returned segment is provided through hpx_exit().
+  ///
+  /// \param data - the array meta data
+  ///
+  /// \return - HPX_SUCCESS
   static int array_segment_request_handler(hpx_addr_t data) {
     hpx_addr_t global = hpx_addr_add(data,
           sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
@@ -756,6 +773,13 @@ class Array {
     hpx_exit(sizeof(retval), &retval);
   }
 
+  /// Action implementing collect()
+  ///
+  /// Returned values are provided through hpx_exit().
+  ///
+  /// \param data - the Array meta data
+  ///
+  /// \return - HPX_SUCCESS
   static int array_collect_handler(hpx_addr_t data) {
     // collect counts from GAS
     int my_rank = hpx_get_my_rank();
@@ -801,7 +825,15 @@ class Array {
     hpx_exit(sizeof(retval), &retval);
   }
 
-  static int array_collect_request_handler(hpx_addr_t data, hpx_addr_t done,
+  /// Action to handle collect requests
+  ///
+  /// \param data - the Array meta data
+  /// \param done - LCO address to signal completion
+  /// \param location - address to which the results will be copied
+  ///
+  /// \return - HPX_SUCCESS
+  static int array_collect_request_handler(hpx_addr_t data, 
+                                           hpx_addr_t done,
                                            T *location) {
     hpx_addr_t global = hpx_addr_add(data,
               sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),
@@ -843,6 +875,12 @@ class Array {
     return HPX_SUCCESS;
   }
 
+  /// Return action from collect() requests
+  ///
+  /// \param data - the data returned
+  /// \param size - the size of the parcel data
+  ///
+  /// \return - HPX_SUCCESS
   static int array_collect_receive_handler(char *data, size_t size) {
     hpx_addr_t *meta = reinterpret_cast<hpx_addr_t *>(data);
     hpx_addr_t global = hpx_addr_add(*meta,
@@ -864,6 +902,10 @@ class Array {
     return HPX_SUCCESS;
   }
 
+  /// Action to set the Array's serialization manager
+  ///
+  /// \param manger - address of instance of manager; Array assumes ownership
+  /// \param data - the array meta data
   static int array_set_manager_handler(Serializer *manager, hpx_addr_t data) {
     hpx_addr_t global = hpx_addr_add(data,
               sizeof(ArrayMetaData<T>) * hpx_get_my_rank(),

@@ -11,8 +11,10 @@
 //  Extreme Scale Technologies (CREST).
 // =============================================================================
 
+
 /// \file src/helmholtz_table.cc
 /// \brief Implementation of precomputed tables for Helmholtz
+
 
 #include "builtins/helmholtz_table.h"
 

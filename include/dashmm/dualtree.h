@@ -254,7 +254,7 @@ class DualTree {
   ///
   /// This is a synchronous operation.
   ///
-  /// \param dag - a DAG object to be populated
+  /// \returns - the resulting DAG
   DAG *collect_DAG_nodes() {
     DAG *retval = new DAG{};
 
@@ -285,6 +285,8 @@ class DualTree {
   /// tree.
   ///
   /// This is a synchronous operation.
+  ///
+  /// \param rwtree - the global tree address
   void create_expansions_from_DAG(hpx_addr_t rwtree) {
     hpx_addr_t done = hpx_lco_and_new(2);
     assert(done != HPX_NULL);
@@ -308,8 +310,7 @@ class DualTree {
   /// This is an asynchronous operation. The returned LCO becomes the
   /// responsibility of the caller.
   ///
-  /// \param targets - vector of target nodes in the DAG
-  /// \param internals - vector of internal nodes in the DAG
+  /// \param dag - the DAG
   ///
   /// \returns - LCO that will signal that all targets have completed their
   ///            computation.
@@ -342,6 +343,7 @@ class DualTree {
   /// of the full evaluation implicitly waits on this operation.
   ///
   /// \param global_tree - the Dual Tree
+  /// \param dag - the DAG
   void start_DAG_evaluation(RankWise<dualtree_t> &global_tree, DAG *dag) {
     hpx_addr_t rwaddr = global_tree.data();
 
@@ -428,7 +430,8 @@ class DualTree {
   /// \param targets - the target data
   ///
   /// \returns - the RankWise object containing the dual tree
-  static RankWise<dualtree_t> create(int threshold, Array<Source> sources,
+  static RankWise<dualtree_t> create(int threshold, 
+                                     Array<Source> sources,
                                      Array<Target> targets) {
     bool same_sandt{false};
     if (sources.data() == targets.data()) {
@@ -457,8 +460,6 @@ class DualTree {
   /// system.
   ///
   /// \param global_tree - an object previously initialized with create()
-  /// \param sources - the source data
-  /// \param targets - the target data
   ///
   /// \returns - an LCO indication completion of the partitioning.
   static hpx_addr_t partition(RankWise<dualtree_t> global_tree) {

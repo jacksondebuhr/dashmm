@@ -157,7 +157,8 @@ class LaplaceCOMAcc {
     }
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_M(const Source *first,
+                                      const Source *last) const {
     expansion_t *temp{new expansion_t{kSourcePrimary}};
     temp->calc_mtot(first, last);
     temp->calc_xcom(first, last);
@@ -165,7 +166,8 @@ class LaplaceCOMAcc {
     return std::unique_ptr<expansion_t>{temp};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(const Source *first,
+                                      const Source *last) const {
     return std::unique_ptr<expansion_t>{nullptr};
   }
 
@@ -236,8 +238,10 @@ class LaplaceCOMAcc {
 
   void L_to_T(Target *first, Target *last) const { }
 
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const {
+  void S_to_T(const Source *s_first,
+              const Source *s_last,
+              Target *t_first,
+              Target *t_last) const {
     for (auto targ = t_first; targ != t_last; ++targ) {
       Point pos = targ->position;
       double sum[3] = {0.0, 0.0, 0.0};
@@ -371,7 +375,7 @@ class LaplaceCOMAcc {
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_mtot(Source *first, Source *last) const {
+  void calc_mtot(const Source *first, const Source *last) const {
     assert(valid(ViewSet{}));
     data_->mtot = 0.0;
     for (auto i = first; i != last; ++i) {
@@ -383,7 +387,7 @@ class LaplaceCOMAcc {
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_xcom(Source *first, Source *last) const {
+  void calc_xcom(const Source *first, const Source *last) const {
     assert(valid(ViewSet{}));
     data_->xcom[0] = 0.0;
     data_->xcom[1] = 0.0;
@@ -405,7 +409,7 @@ class LaplaceCOMAcc {
   ///
   /// \param first - the first source
   /// \param last - (one past the) last source
-  void calc_Q(Source *first, Source *last) const {
+  void calc_Q(const Source *first, const Source *last) const {
     assert(valid(ViewSet{}));
     for (int i = 0; i < 6; ++i) {
       data_->Q[i] = 0;
