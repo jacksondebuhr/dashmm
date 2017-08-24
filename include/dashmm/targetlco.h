@@ -113,7 +113,7 @@ class TargetLCO {
   ///
   /// \param n - the number of sources
   /// \param sources - the sources themselves
-  void contribute_S_to_T(size_t n, source_t *sources) const {
+  void contribute_S_to_T(size_t n, const source_t *sources) const {
     StoT input{kStoT, n, sources};
     hpx_lco_set_rsync(lco_, sizeof(StoT), &input);
   }
@@ -148,7 +148,7 @@ class TargetLCO {
   struct StoT {
     int code;
     size_t count;
-    source_t *sources;
+    const source_t *sources;
   };
 
   /// M->T parameters type

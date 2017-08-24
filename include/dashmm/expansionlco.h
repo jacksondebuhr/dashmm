@@ -197,7 +197,7 @@ class ExpansionLCO {
   ///
   /// \param sources - the source data
   /// \param n_src - the number of sources
-  void S_to_M(Point center, Source *sources, size_t n_src, Index idx) {
+  void S_to_M(Point center, const Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOM_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, center, scale};
@@ -222,7 +222,7 @@ class ExpansionLCO {
   /// \param sources - the source data
   /// \param n_src - the number of sources
   /// \param idx - the index of the node for which this is an expansion
-  void S_to_L(Point center, Source *sources, size_t n_src, Index idx) {
+  void S_to_L(Point center, const Source *sources, size_t n_src, Index idx) {
     EVENT_TRACE_DASHMM_STOL_BEGIN();
     double scale = expansion_t::compute_scale(idx);
     ViewSet views{kNoRoleNeeded, center, scale};
@@ -241,7 +241,9 @@ class ExpansionLCO {
   /// \param sources - the source data
   /// \param n_sources - the number of sources
   /// \param targets - a reference to the target points
-  void S_to_T(Source *sources, size_t n_sources, targetlco_t targets) const {
+  void S_to_T(const Source *sources,
+              size_t n_sources,
+              targetlco_t targets) const {
     targets.contribute_S_to_T(n_sources, sources);
   }
 
