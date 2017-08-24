@@ -43,7 +43,7 @@ namespace {
   };
 
   // Compute the Hilbert key for a given set of indicies
-  int hilbert_key(unsigned x, unsigned y, unsigned z, unsigned slen) {
+  int hilbert_key(int x, int y, int z, int slen) {
     std::array<int, 8> offsets{0, 1, 2, 3, 4, 5, 6, 7};
     std::array<int, 8> offsets_next{};
     int key = 0;

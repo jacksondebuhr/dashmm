@@ -151,7 +151,8 @@ public:
     return data[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_M(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
@@ -205,7 +206,8 @@ public:
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kTargetPrimary}};
@@ -475,8 +477,10 @@ public:
   }
 
 
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const {
+  void S_to_T(const Source *s_first,
+              const Source *s_last,
+              Target *t_first,
+              Target *t_last) const {
     double omega = builtin_helmholtz_table_->omega();
     for (auto i = t_first; i != t_last; ++i) {
       dcomplex_t potential{0.0, 0.0};
@@ -1115,7 +1119,7 @@ private:
       }
     }
 
-    delete [] powers_ealpha; 
+    delete [] powers_ealpha;
   }
 
   void rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR,

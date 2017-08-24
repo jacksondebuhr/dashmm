@@ -50,28 +50,28 @@ namespace dashmm {
 /// of the charge.
 ///
 
-void yuk_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR); 
-void yuk_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR); 
+void yuk_rotate_sph_z(const dcomplex_t *M, double alpha, dcomplex_t *MR);
+void yuk_rotate_sph_y(const dcomplex_t *M, const double *d, dcomplex_t *MR);
 
 void yuk_s_to_m(Point dist, double q, double scale, dcomplex_t *M);
-void yuk_s_to_l(Point dist, double q, double scale, dcomplex_t *L); 
-void yuk_m_to_m(int from_child, const dcomplex_t *M, double scale, 
-                dcomplex_t *W); 
-void yuk_l_to_l(int to_child, const dcomplex_t *L, double scale, 
-                dcomplex_t *W); 
-void yuk_m_to_i(const dcomplex_t *M, ViewSet &views, double scale, int id); 
-void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views, 
-                int sid, int tid, double scale, ViewSet &t_views); 
-void yuk_i_to_l(const ViewSet &views, int id, Index t_index, double scale, 
-                dcomplex_t *L); 
-void yuk_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z, 
-                double scale); 
-void yuk_e_to_l(const dcomplex_t *E, char dir, bool sgn, double scale, 
-                dcomplex_t *L); 
+void yuk_s_to_l(Point dist, double q, double scale, dcomplex_t *L);
+void yuk_m_to_m(int from_child, const dcomplex_t *M, double scale,
+                dcomplex_t *W);
+void yuk_l_to_l(int to_child, const dcomplex_t *L, double scale,
+                dcomplex_t *W);
+void yuk_m_to_i(const dcomplex_t *M, ViewSet &views, double scale, int id);
+void yuk_i_to_i(Index s_index, Index t_index, const ViewSet &s_views,
+                int sid, int tid, double scale, ViewSet &t_views);
+void yuk_i_to_l(const ViewSet &views, int id, Index t_index, double scale,
+                dcomplex_t *L);
+void yuk_e_to_e(dcomplex_t *M, const dcomplex_t *W, int x, int y, int z,
+                double scale);
+void yuk_e_to_l(const dcomplex_t *E, char dir, bool sgn, double scale,
+                dcomplex_t *L);
 
-std::vector<double> yuk_m_to_t(Point dist, double scale, 
+std::vector<double> yuk_m_to_t(Point dist, double scale,
                                const dcomplex_t *M, bool g = false);
-std::vector<double> yuk_l_to_t(Point dist, double scale, 
+std::vector<double> yuk_l_to_t(Point dist, double scale,
                                const dcomplex_t *L, bool g = false);
 
 /// This class is a template with parameters for the source and target
@@ -163,26 +163,28 @@ public:
     return data[i];
   }
 
-  std::unique_ptr<expansion_t> S_to_M(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_M(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kSourcePrimary, scale, center}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, center); 
-      yuk_s_to_m(dist, i->charge, scale, M); 
+      Point dist = point_sub(i->position, center);
+      yuk_s_to_m(dist, i->charge, scale, M);
     }
     return std::unique_ptr<expansion_t>{retval};
   }
 
-  std::unique_ptr<expansion_t> S_to_L(Source *first, Source *last) const {
+  std::unique_ptr<expansion_t> S_to_L(const Source *first,
+                                      const Source *last) const {
     double scale = views_.scale();
     Point center = views_.center();
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, center); 
-      lap_s_to_l(dist, i->charge, scale, L); 
+      Point dist = point_sub(i->position, center);
+      lap_s_to_l(dist, i->charge, scale, L);
     }
     return std::unique_ptr<expansion_t>{retval};
   }
@@ -192,7 +194,7 @@ public:
     double scale = views_.scale();
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    yuk_m_to_m(from_child, M, scale, W); 
+    yuk_m_to_m(from_child, M, scale, W);
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -205,7 +207,7 @@ public:
     double scale = views_.scale();
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
     dcomplex_t *W = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    yuk_l_to_l(to_child, L, scale, W); 
+    yuk_l_to_l(to_child, L, scale, W);
     return std::unique_ptr<expansion_t>{retval};
   }
 
@@ -214,9 +216,9 @@ public:
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center()); 
-      auto result = yuk_m_to_t(dist, scale, M); 
-      i->phi += result[0]; 
+      Point dist = point_sub(i->position, views_.center());
+      auto result = yuk_m_to_t(dist, scale, M);
+      i->phi += result[0];
     }
   }
 
@@ -225,14 +227,16 @@ public:
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
 
     for (auto i = first; i != last; ++i) {
-      Point dist = point_sub(i->position, views_.center()); 
-      auto result = yuk_l_to_t(dist, scale, L); 
+      Point dist = point_sub(i->position, views_.center());
+      auto result = yuk_l_to_t(dist, scale, L);
       i->phi += result[0];
     }
   }
 
-  void S_to_T(Source *s_first, Source *s_last,
-              Target *t_first, Target *t_last) const {
+  void S_to_T(const Source *s_first,
+              const Source *s_last,
+              Target *t_first,
+              Target *t_last) const {
     double lambda = builtin_yukawa_table_->lambda();
     for (auto i = t_first; i != t_last; ++i) {
       dcomplex_t potential{0.0, 0.0};
@@ -251,14 +255,14 @@ public:
     double scale = views_.scale();
     expansion_t *retval{new expansion_t{kSourceIntermediate, scale}};
     dcomplex_t *M = reinterpret_cast<dcomplex_t *>(views_.view_data(0));
-    yuk_m_to_i(M, retval->views_, scale, 0); 
+    yuk_m_to_i(M, retval->views_, scale, 0);
     return std::unique_ptr<expansion_t>(retval);
   }
 
   std::unique_ptr<expansion_t> I_to_I(Index s_index, Index t_index) const {
     ViewSet views{kTargetIntermediate};
-    double scale = views_.scale(); 
-    yuk_i_to_i(s_index, t_index, views_, 0, 0, scale, views); 
+    double scale = views_.scale();
+    yuk_i_to_i(s_index, t_index, views_, 0, 0, scale, views);
     expansion_t *retval = new expansion_t{views};
     return std::unique_ptr<expansion_t>{retval};
   }
@@ -267,8 +271,8 @@ public:
     // t_index is the index of the child
     expansion_t *retval{new expansion_t{kTargetPrimary}};
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
-    double scale = views_.scale() / 2.0; 
-    yuk_i_to_l(views_, 0, t_index, scale, L); 
+    double scale = views_.scale() / 2.0;
+    yuk_i_to_l(views_, 0, t_index, scale, L);
     return std::unique_ptr<expansion_t>(retval);
   }
 

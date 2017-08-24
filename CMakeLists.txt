@@ -3,8 +3,8 @@ cmake_minimum_required (VERSION 3.4)
 project (dashmm)
 
 set (CMAKE_CXX_STANDARD 11)
-set (CMAKE_CXX_FLAGS_DEBUG "-Wall -pedantic -O0 -g")
-set (CMAKE_CXX_FLAGS_RELEASE "-Wall -pedantic -O3")
+set (CMAKE_CXX_FLAGS_DEBUG "-Wall -O0 -g")
+set (CMAKE_CXX_FLAGS_RELEASE "-Wall -O3")
 
 find_package (PkgConfig)
 pkg_search_module (HPX REQUIRED hpx)

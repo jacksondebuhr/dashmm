@@ -165,7 +165,8 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting multipole expansion
-  std::unique_ptr<expansion_t> S_to_M(source_t *first, source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_M(const source_t *first,
+                                      const source_t *last) const;
 
   /// Create a local expansion for a given set of source points
   ///
@@ -178,7 +179,8 @@ class Expansion {
   /// \param last - address of one past the last source
   ///
   /// \returns - The resulting local expansion
-  std::unique_ptr<expansion_t> S_to_L(source_t *first, source_t *last) const;
+  std::unique_ptr<expansion_t> S_to_L(const source_t *first,
+                                      const source_t *last) const;
 
   /// Change center of a multipole expansion
   ///
@@ -235,8 +237,10 @@ class Expansion {
   /// \param s_last - one past the last source point
   /// \param t_first - the first target point
   /// \param t_last - one past the last target point
-  void S_to_T(source_t *s_first, source_t *s_last,
-              target_t *t_first, target_t *t_last) const;
+  void S_to_T(const source_t *s_first,
+              const source_t *s_last,
+              target_t *t_first,
+              target_t *t_last) const;
 
   /// Compute an intermediate expansion from a multipole expansion.
   ///
