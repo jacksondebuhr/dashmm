@@ -95,8 +95,8 @@ void lap_s_to_m(Point dist, double q, double scale, dcomplex_t *M) {
   
   // Compute multipole expansion M_n^m
   legendre_Plm(p, ctheta, legendre.data());
-  for (int m = 0; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
+  for (int n = 0; n <= p; ++n) {
+    for (int m = 0; m <= n; ++m) {
       M[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
         legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
     }
@@ -134,8 +134,8 @@ void lap_s_to_l(Point dist, double q, double scale, dcomplex_t *L) {
   
   // compute local expansion L_n^m
   legendre_Plm(p, ctheta, legendre.data());
-  for (int m = 0; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
+  for (int n = 0; n <= p; ++n) {
+    for (int m = 0; m <= n; ++m) {
       L[midx(n, m)] += q * powers_r[n] * powers_ephi[m] *
         legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
     }
@@ -799,7 +799,7 @@ std::vector<double> lap_m_to_t(Point dist, double scale,
     powers_r[j] = powers_r[j - 1] / r;
   
   // Compute powers of exp(i * phi)
-  for (int j = 1; j <= p; ++j) 
+  for (int j = 1; j <= p + 1; ++j) 
     powers_ephi[j] = powers_ephi[j - 1] * ephi;
 
   // Evaluate the multipole expansion M_n^0
@@ -809,8 +809,8 @@ std::vector<double> lap_m_to_t(Point dist, double scale,
 
 
   // Evaluate the multipole expansions M_n^m, where m = 1, ..., p
-  for (int m = 1; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
+  for (int n = 1; n <= p; ++n) {
+    for (int m = 1; m <= n; ++m) {
       potential += 2.0 * real(M[midx(n, m)] * powers_ephi[m]) *
         powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
     }
@@ -905,8 +905,8 @@ std::vector<double> lap_l_to_t(Point dist, double scale,
     potential += L[midx(n, 0)] * powers_r[n] * legendre[midx(n, 0)];
   
   // Evaluate the local expansions L_n^m, where m = 1, ..., p
-  for (int m = 1; m <= p; ++m) {
-    for (int n = m; n <= p; ++n) {
+  for (int n = 1; n <= p; ++n) {
+    for (int m = 1; m <= n; ++m) {
       potential += 2.0 * real(L[midx(n, m)] * powers_ephi[m]) *
         powers_r[n] * legendre[midx(n, m)] * sqf[n - m] / sqf[n + m];
     }
