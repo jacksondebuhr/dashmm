@@ -363,7 +363,7 @@ class Evaluator {
     hpx_lco_delete_sync(partitiondone);
     hpx_time_t creation_end = hpx_time_now();
     double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    fprintf(stdout, "Evaluation: tree creation %lg [us]\n", creation_deltat);
+    fprintf(stdout, "Evaluate: tree creation %lg [us]\n", creation_deltat);
 
     hpx_addr_t rwaddr = global_tree.data();
     hpx_exit(sizeof(hpx_addr_t), &rwaddr);
