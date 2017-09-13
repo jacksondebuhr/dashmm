@@ -858,9 +858,9 @@ std::vector<double> lap_m_to_t(Point dist, double scale,
     fy = -imag(zs2 + zs1); 
     fz += 2.0 * real(zs3); 
 
-    retval.push_back(fx / scale); 
-    retval.push_back(fy / scale);
-    retval.push_back(fz / scale); 
+    retval.push_back(fx * scale); 
+    retval.push_back(fy * scale);
+    retval.push_back(fz * scale); 
   }
 
   return retval; 
