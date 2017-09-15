@@ -29,6 +29,27 @@ namespace dashmm {
 
 namespace {
 
+#ifdef USEMORTONKEYS
+  /// Split the bits of an integer to be used in a Morton Key
+  static uint64_t split(unsigned k) {
+    uint64_t split = k & 0x1fffff;
+    split = (split | split << 32) & 0x1f00000000ffff;
+    split = (split | split << 16) & 0x1f0000ff0000ff;
+    split = (split | split << 8)  & 0x100f00f00f00f00f;
+    split = (split | split << 4)  & 0x10c30c30c30c30c3;
+    split = (split | split << 2)  & 0x1249249249249249;
+    return split;
+  }
+
+  /// Compute the Morton key for a gives set of indices
+  static uint64_t morton_key(unsigned x, unsigned y, unsigned z) {
+    uint64_t key = 0;
+    key |= split(x) | split(y) << 1 | split(z) << 2;
+    return key;
+  }
+
+#else // Not using Morton keys
+
   // Group transformations for hilbert subcubes
   constexpr int h_indicies[8] {0, 1, 3, 2, 7, 6, 4, 5};
   constexpr int h_transforms[8][8] {
@@ -62,7 +83,8 @@ namespace {
 
     return key;
   }
-
+  
+#endif
 
   std::vector<int> partition(const std::vector<int> &counts,
                              int np,
@@ -132,7 +154,11 @@ int *distribute_points_hilbert(int num_ranks,
       int ypart = zpart + yidx * klen;
       for (int xidx = 0; xidx < klen; ++xidx) {
         int i = xidx + ypart;
+#ifndef USEMORTONKEYS
         int hidx = hilbert_key(xidx, yidx, zidx, klen);
+#else
+        int hidx = morton_key(xidx, yidx, zidx);
+#endif
         counts[hidx] = s[i] + t[i];
         origin[hidx] = i;
       }
