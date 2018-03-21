@@ -104,10 +104,17 @@ public:
   }
   double size(double scale) const {return size_ * scale / scale_;}
 
+  bool update(int n_digits, double size, double omega) const {
+    if (n_digits_ != n_digits || size_ != size || omega_ != omega) 
+      return true;
+    return false;
+  }
+    
 private:
   int p_;
   int s_e_;
   int s_p_;
+  int n_digits_; 
   double omega_;
   double size_;
   double scale_;
