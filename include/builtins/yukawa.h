@@ -184,7 +184,7 @@ public:
     dcomplex_t *L = reinterpret_cast<dcomplex_t *>(retval->views_.view_data(0));
     for (auto i = first; i != last; ++i) {
       Point dist = point_sub(i->position, center);
-      lap_s_to_l(dist, i->charge, scale, L);
+      yuk_s_to_l(dist, i->charge, scale, L);
     }
     return std::unique_ptr<expansion_t>{retval};
   }
