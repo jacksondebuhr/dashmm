@@ -713,7 +713,7 @@ public:
         e2e_p(T[j], Prop_z, dx, dy, 0, scale, true);
         e2e_e(T[j + 1], Evan_mz, dx, dy, 0, scale);
       } else if (tag <= 5) {
-        e2e_p(T[j], Prop_y, dx, dy, 0, scale, true);
+        e2e_p(T[j], Prop_y, dz, dx, 0, scale, true);
         e2e_e(T[j + 1], Evan_my, dz, dx, 0, scale);
       } else if (tag <= 13) {
         e2e_p(T[j], Prop_x, -dz, dy, 0, scale, true);
