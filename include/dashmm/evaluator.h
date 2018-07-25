@@ -353,7 +353,7 @@ class Evaluator {
     Array<source_t> sources{sources_addr};
     Array<target_t> targets{targets_addr};
 
-    hpx_time_t creation_begin = hpx_time_now();
+    //hpx_time_t creation_begin = hpx_time_now();
     RankWise<dualtree_t> global_tree = dualtree_t::create(refinement_limit,
                                                           sources,
                                                           targets);
@@ -361,9 +361,9 @@ class Evaluator {
     hpx_addr_t partitiondone = dualtree_t::partition(global_tree);
     hpx_lco_wait(partitiondone);
     hpx_lco_delete_sync(partitiondone);
-    hpx_time_t creation_end = hpx_time_now();
-    double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
-    fprintf(stdout, "Evaluate: tree creation %7.6e [us]\n", creation_deltat);
+    //hpx_time_t creation_end = hpx_time_now();
+    //double creation_deltat = hpx_time_diff_us(creation_begin, creation_end);
+    //fprintf(stdout, "Evaluate: tree creation %7.6e [us]\n", creation_deltat);
 
     hpx_addr_t rwaddr = global_tree.data();
     hpx_exit(sizeof(hpx_addr_t), &rwaddr);
@@ -382,27 +382,27 @@ class Evaluator {
     expansion_t::update_table(n_digits, domain_size, *kernel_params);
 
     // This creates and distributes the explicit DAG
-    hpx_time_t distribute_begin = hpx_time_now();
+    //hpx_time_t distribute_begin = hpx_time_now();
     DAG *dag = tree->create_DAG();
     distropolicy_t distro{*distro_ptr};
     distro.compute_distribution(*dag);
-    hpx_time_t distribute_end = hpx_time_now();
-    double distribute_deltat = hpx_time_diff_us(distribute_begin,
-                                                distribute_end);
-    fprintf(stdout, "Evaluate: DAG creation and distribution: %7.6e [us]\n",
-            distribute_deltat);
+    //hpx_time_t distribute_end = hpx_time_now();
+    //double distribute_deltat = hpx_time_diff_us(distribute_begin,
+    //                                                distribute_end);
+    //fprintf(stdout, "Evaluate: DAG creation and distribution: %7.6e [us]\n",
+    //        distribute_deltat);
 
     // Here we sort the DAG edges by here / remote
     dag->partitionLocal(hpx_get_my_rank());
 
     // This allocates the implicit DAG
-    hpx_time_t allocate_begin = hpx_time_now();
+    //hpx_time_t allocate_begin = hpx_time_now();
     // TODO: change this so that tree does not manage this work; indeed,
     // it might be helpful to have done that sort
     tree->create_expansions_from_DAG(rwaddr);
-    hpx_time_t allocate_end = hpx_time_now();
-    double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
-    fprintf(stdout, "Evaluate: LCO allocation: %7.6e [us]\n", allocate_deltat);
+    //hpx_time_t allocate_end = hpx_time_now();
+    //double allocate_deltat = hpx_time_diff_us(allocate_begin, allocate_end);
+    //fprintf(stdout, "Evaluate: LCO allocation: %7.6e [us]\n", allocate_deltat);
 
     //return a pointer to the DAG at this rank
     hpx_exit(sizeof(DAG *), &dag);
@@ -423,13 +423,13 @@ class Evaluator {
     EVENT_TRACE_DASHMM_ZEROREF();
 #endif
 
-    hpx_time_t evaluate_begin = hpx_time_now();
+    //hpx_time_t evaluate_begin = hpx_time_now();
     tree->start_DAG_evaluation(global_tree, dag);
     hpx_addr_t heredone = tree->setup_termination_detection(dag);
     hpx_lco_wait(heredone);
-    hpx_time_t evaluate_end = hpx_time_now();
-    double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
-    fprintf(stdout, "Evaluate: DAG evaluation: %7.6e [us]\n", evaluate_deltat);
+    //hpx_time_t evaluate_end = hpx_time_now();
+    //double evaluate_deltat = hpx_time_diff_us(evaluate_begin, evaluate_end);
+    //fprintf(stdout, "Evaluate: DAG evaluation: %7.6e [us]\n", evaluate_deltat);
 
 #ifdef DASHMM_INSTRUMENTATION
     libhpx_inst_phase_end();
