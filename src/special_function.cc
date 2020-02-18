@@ -1401,6 +1401,8 @@ void bessel_hn_scaled(int nb, double x, double scale, dcomplex_t *B) {
       factor = factor * scale;
     }
   }
+  delete[] Jn;
+  delete[] Yn;
 }
 
 } // namespace dashmm
